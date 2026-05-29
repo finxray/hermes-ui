@@ -754,6 +754,12 @@ textarea:disabled {
   outline: 0;
 }
 
+.memory-card-button.is-active {
+  border-color: rgba(142, 230, 198, 0.48);
+  background: rgba(142, 230, 198, 0.07);
+  box-shadow: inset 2px 0 0 rgba(142, 230, 198, 0.55);
+}
+
 .card-title {
   display: flex;
   justify-content: space-between;
@@ -791,6 +797,10 @@ textarea:disabled {
 .memory-readonly-section {
   padding-top: 10px;
   border-top: 1px solid var(--border-soft);
+}
+
+.memory-readonly-section .pill {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .memory-metadata {

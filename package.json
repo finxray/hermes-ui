@@ -13,6 +13,7 @@
     "studio:env": "node scripts/studio-env.mjs",
     "studio:open": "node scripts/open-studio-browser.mjs",
     "build": "npm run build -w @hermes-ui/web",
+    "check:brain-memory-client": "node scripts/check-brain-memory-client-shapes.mjs",
     "typecheck": "npm run typecheck -w @hermes-ui/web"
   },
   "overrides": {

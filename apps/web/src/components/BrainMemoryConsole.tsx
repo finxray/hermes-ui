@@ -36,6 +36,7 @@ export function BrainMemoryConsole({
 }: BrainMemoryConsoleProps) {
   const [query, setQuery] = useState("gateway");
   const [mockDetail, setMockDetail] = useState<MemoryEvidence | null>(null);
+  const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
   const { isSearching, lastResponse, search } = useBrainMemorySearch();
   const {
     clearInspection,
@@ -58,6 +59,7 @@ export function BrainMemoryConsole({
   useEffect(() => {
     setQuery(activeSession?.memoryEvidence[0]?.title ?? activeProject.name);
     setMockDetail(null);
+    setSelectedMemoryId(null);
     clearInspection();
   }, [
     activeProject.id,
@@ -73,6 +75,9 @@ export function BrainMemoryConsole({
     if (!cleanQuery) {
       return;
     }
+    setMockDetail(null);
+    setSelectedMemoryId(null);
+    clearInspection();
     await search({
       context,
       limit: 8,
@@ -151,6 +156,10 @@ export function BrainMemoryConsole({
           Browser calls the local BFF only; the BFF calls Gateway read-only endpoints when enabled.
           Tenant search may require BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY.
         </div>
+        <div className="card-meta">
+          Project/session scope is enforced by Brain Memory Gateway. Legacy unscoped memories are
+          excluded by default.
+        </div>
         {scope ? <ScopeSummary scope={scope} /> : null}
         {lastResponse?.error ? <div className="status-error">{lastResponse.error.message}</div> : null}
       </section>
@@ -163,16 +172,20 @@ export function BrainMemoryConsole({
         {shouldUseMock ? (
           <MockMemoryResults
             results={mockResults}
+            selectedMemoryId={selectedMemoryId}
             onSelect={(memory) => {
               clearInspection();
+              setSelectedMemoryId(memory.id);
               setMockDetail(memory);
             }}
           />
         ) : (
           <GatewayMemoryResults
             results={gatewayResults}
+            selectedMemoryId={selectedMemoryId}
             onSelect={(memory) => {
               setMockDetail(null);
+              setSelectedMemoryId(memory.id);
               void inspect({
                 context,
                 memoryId: memory.id
@@ -189,6 +202,7 @@ export function BrainMemoryConsole({
           mockDetail={mockDetail}
           onClose={() => {
             setMockDetail(null);
+            setSelectedMemoryId(null);
             clearInspection();
           }}
         />
@@ -242,10 +256,12 @@ function filterMockEvidence(memoryEvidence: MemoryEvidence[], query: string) {
 
 function MockMemoryResults({
   onSelect,
-  results
+  results,
+  selectedMemoryId
 }: {
   onSelect: (memory: MemoryEvidence) => void;
   results: MemoryEvidence[];
+  selectedMemoryId: string | null;
 }) {
   if (results.length === 0) {
     return (
@@ -261,7 +277,8 @@ function MockMemoryResults({
       {results.map((memory) => (
         <li key={memory.id}>
           <button
-            className="memory-card memory-card-button"
+            aria-current={selectedMemoryId === memory.id ? "true" : undefined}
+            className={`memory-card memory-card-button${selectedMemoryId === memory.id ? " is-active" : ""}`}
             type="button"
             onClick={() => onSelect(memory)}
           >
@@ -282,10 +299,12 @@ function MockMemoryResults({
 
 function GatewayMemoryResults({
   onSelect,
-  results
+  results,
+  selectedMemoryId
 }: {
   onSelect: (memory: NormalizedMemoryResult) => void;
   results: NormalizedMemoryResult[];
+  selectedMemoryId: string | null;
 }) {
   if (results.length === 0) {
     return (
@@ -301,7 +320,8 @@ function GatewayMemoryResults({
       {results.map((memory) => (
         <li key={memory.id}>
           <button
-            className="memory-card memory-card-button"
+            aria-current={selectedMemoryId === memory.id ? "true" : undefined}
+            className={`memory-card memory-card-button${selectedMemoryId === memory.id ? " is-active" : ""}`}
             type="button"
             onClick={() => onSelect(memory)}
           >

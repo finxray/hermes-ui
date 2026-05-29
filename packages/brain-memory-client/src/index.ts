@@ -306,7 +306,7 @@ export async function inspectBrainMemory(
       supersession: null,
       error: {
         kind: "unconfigured",
-        message: "Set BRAIN_MEMORY_GATEWAY_URL and enable real Gateway reads."
+        message: "Brain Memory Gateway is not configured. Showing local/mock memory only."
       },
       checkedAt
     };
@@ -505,24 +505,21 @@ function normalizeHttpError(path: string, status: number): BrainMemoryError {
   if (status === 401) {
     return {
       kind: "unauthorized",
-      message:
-        "Brain Memory UI API bearer is missing/invalid, or Gateway memory auth is required for this endpoint."
+      message: "Brain Memory UI API bearer is required or invalid."
     };
   }
 
   if (status === 403) {
     return {
       kind: "forbidden",
-      message:
-        "Tenant-bound Gateway memory key is missing, lacks read access, or is not authorized for this tenant."
+      message: "Tenant key is not authorized for this memory scope."
     };
   }
 
   if (status === 404) {
     return {
       kind: "http_error",
-      message:
-        "Memory is not available in the current project/session scope, or the endpoint was not found (HTTP 404)."
+      message: "Memory is not available in the current project/session scope (HTTP 404)."
     };
   }
 

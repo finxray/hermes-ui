@@ -4,10 +4,8 @@ import {
   Brain,
   Edit3,
   FileText,
-  FolderGit2,
   FolderPlus,
   MessageSquarePlus,
-  MessagesSquare,
   RotateCcw,
   Trash2
 } from "lucide-react";
@@ -120,9 +118,6 @@ export function Sidebar({
               <div className="row-with-actions">
                 {editing?.kind === "project" && editing.id === project.id ? (
                   <div className="project-button is-active">
-                    <span className="project-glyph" aria-hidden="true">
-                      <FolderGit2 size={15} />
-                    </span>
                     <span>
                       <input
                         autoFocus
@@ -159,12 +154,8 @@ export function Sidebar({
                     aria-current={project.id === activeProject.id ? "page" : undefined}
                     onClick={() => actions.switchProject(project.id)}
                   >
-                    <span className="project-glyph" aria-hidden="true">
-                      <FolderGit2 size={15} />
-                    </span>
                     <span>
                       <span className="project-name">{project.name}</span>
-                      <span className="project-description">{project.description}</span>
                     </span>
                     <span className="project-count">
                       {allSessions.filter(
@@ -206,7 +197,6 @@ export function Sidebar({
                 <div className="row-with-actions">
                   {editing?.kind === "session" && editing.id === session.id ? (
                     <div className="session-button is-active">
-                      <MessagesSquare size={15} aria-hidden="true" />
                       <span>
                         <input
                           autoFocus
@@ -226,10 +216,6 @@ export function Sidebar({
                             }
                           }}
                         />
-                        <span className="session-meta">
-                          {formatRelativeDate(session.updatedAt)} - {session.messages.length}{" "}
-                          messages
-                        </span>
                       </span>
                     </div>
                   ) : (
@@ -241,13 +227,8 @@ export function Sidebar({
                       aria-current={session.id === activeSession?.id ? "page" : undefined}
                       onClick={() => actions.switchSession(session.id)}
                     >
-                      <MessagesSquare size={15} aria-hidden="true" />
                       <span>
                         <span className="session-title">{session.title}</span>
-                        <span className="session-meta">
-                          {formatRelativeDate(session.updatedAt)} - {session.messages.length}{" "}
-                          messages
-                        </span>
                       </span>
                     </button>
                   )}

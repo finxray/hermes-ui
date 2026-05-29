@@ -8,15 +8,10 @@ import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import {
-  Brain,
-  CircleHelp,
-  FolderKanban,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
-  PanelRightOpen,
-  Search,
-  TerminalSquare
+  PanelRightOpen
 } from "lucide-react";
 import { useState } from "react";
 
@@ -45,30 +40,20 @@ export function AppShell() {
           >
             {isLeftPanelOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
           </button>
-          <div className="app-menu-brand">
-            <span className="app-menu-mark" aria-hidden="true">
-              <Brain size={15} />
-            </span>
-            <span>Brain Memory Studio</span>
-          </div>
           <nav className="app-menu" aria-label="Workspace sections">
             <button className="app-menu-item is-active" type="button">
               Workspace
             </button>
             <button className="app-menu-item" type="button">
-              <Search size={13} aria-hidden="true" />
               Memory
             </button>
             <button className="app-menu-item" type="button">
-              <FolderKanban size={13} aria-hidden="true" />
               Projects
             </button>
             <button className="app-menu-item" type="button">
-              <TerminalSquare size={13} aria-hidden="true" />
               Tools
             </button>
             <button className="app-menu-item" type="button">
-              <CircleHelp size={13} aria-hidden="true" />
               Help
             </button>
           </nav>
@@ -96,21 +81,19 @@ export function AppShell() {
           </button>
         </div>
       </header>
-      {isLeftPanelOpen ? (
-        <Sidebar
-          actions={actions}
-          activeProject={activeProject}
-          activeSession={activeSession}
-          allSessions={state.sessions}
-          connectionStatus={state.connectionStatus}
-          hermesStatus={hermesStatus.status}
-          isHermesStatusLoading={hermesStatus.isLoading}
-          isHydrated={isHydrated}
-          projects={state.projects}
-          refreshHermesStatus={hermesStatus.refresh}
-          sessions={activeProjectSessions}
-        />
-      ) : null}
+      <Sidebar
+        actions={actions}
+        activeProject={activeProject}
+        activeSession={activeSession}
+        allSessions={state.sessions}
+        connectionStatus={state.connectionStatus}
+        hermesStatus={hermesStatus.status}
+        isHermesStatusLoading={hermesStatus.isLoading}
+        isHydrated={isHydrated}
+        projects={state.projects}
+        refreshHermesStatus={hermesStatus.refresh}
+        sessions={activeProjectSessions}
+      />
       <ChatView
         activeProject={activeProject}
         activeSession={activeSession}
@@ -120,18 +103,16 @@ export function AppShell() {
         modelChoices={state.modelChoices}
         workspaceActions={actions}
       />
-      {isRightPanelOpen ? (
-        <ContextPanel
-          activeProject={activeProject}
-          activeSession={activeSession}
-          brainMemoryStatus={brainMemoryStatus.status}
-          hermesStatus={hermesStatus.status}
-          isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
-          isHermesStatusLoading={hermesStatus.isLoading}
-          refreshBrainMemoryStatus={brainMemoryStatus.refresh}
-          refreshHermesStatus={hermesStatus.refresh}
-        />
-      ) : null}
+      <ContextPanel
+        activeProject={activeProject}
+        activeSession={activeSession}
+        brainMemoryStatus={brainMemoryStatus.status}
+        hermesStatus={hermesStatus.status}
+        isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
+        isHermesStatusLoading={hermesStatus.isLoading}
+        refreshBrainMemoryStatus={brainMemoryStatus.refresh}
+        refreshHermesStatus={hermesStatus.refresh}
+      />
     </main>
   );
 }

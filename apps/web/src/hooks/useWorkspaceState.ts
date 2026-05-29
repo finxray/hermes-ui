@@ -9,6 +9,7 @@ import {
   workspaceReducer,
   type WorkspaceAction
 } from "@/lib/workspaceStore";
+import type { ChatMessage, ToolEvent } from "@/data/types";
 
 export function useWorkspaceState() {
   const [state, dispatch] = useReducer(workspaceReducer, undefined, createMockWorkspaceState);
@@ -38,6 +39,10 @@ export function useWorkspaceState() {
 
   const actions = useMemo(
     () => ({
+      appendMessage: (sessionId: string, message: ChatMessage) =>
+        dispatch({ type: "appendMessage", sessionId, message }),
+      appendToolEvent: (sessionId: string, event: ToolEvent) =>
+        dispatch({ type: "appendToolEvent", sessionId, event }),
       archiveSession: (sessionId: string) => dispatch({ type: "archiveSession", sessionId }),
       createProject: () => dispatch({ type: "createProject" }),
       createSession: () => dispatch({ type: "createSession" }),
@@ -48,7 +53,22 @@ export function useWorkspaceState() {
         dispatch({ type: "renameSession", sessionId, title }),
       reset: () => dispatch({ type: "reset" }),
       switchProject: (projectId: string) => dispatch({ type: "switchProject", projectId }),
-      switchSession: (sessionId: string) => dispatch({ type: "switchSession", sessionId })
+      switchSession: (sessionId: string) => dispatch({ type: "switchSession", sessionId }),
+      updateMessage: (
+        sessionId: string,
+        messageId: string,
+        content: string,
+        status?: Extract<WorkspaceAction, { type: "updateMessage" }>["status"],
+        references?: string[]
+      ) =>
+        dispatch({
+          type: "updateMessage",
+          sessionId,
+          messageId,
+          content,
+          references,
+          status
+        })
     }),
     []
   );

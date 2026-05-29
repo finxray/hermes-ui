@@ -1,22 +1,60 @@
 import { SendHorizontal } from "lucide-react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 
-export function Composer() {
+type ComposerProps = {
+  disabled?: boolean;
+  isGenerating?: boolean;
+  onSend: (message: string) => void;
+};
+
+export function Composer({ disabled = false, isGenerating = false, onSend }: ComposerProps) {
+  const [draft, setDraft] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const message = draft.trim();
+    if (!message || disabled || isGenerating) {
+      return;
+    }
+    setDraft("");
+    onSend(message);
+  }
+
   return (
     <div className="composer-wrap">
-      <form className="composer" aria-label="Mock message composer">
+      <form className="composer" aria-label="Message composer" onSubmit={submit}>
         <div className="composer-box">
           <textarea
             aria-label="Message"
-            disabled
-            placeholder="Mock composer. Real sending arrives in a later Hermes integration slice."
+            disabled={disabled || isGenerating}
+            placeholder={
+              disabled
+                ? "Create or select a chat to send a message."
+                : "Message Hermes through the local BFF..."
+            }
+            value={draft}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
           />
-          <button className="send-button" type="button" disabled aria-label="Send message">
+          <button
+            className="send-button"
+            type="submit"
+            disabled={disabled || isGenerating || draft.trim().length === 0}
+            aria-label="Send message"
+          >
             <SendHorizontal size={17} />
           </button>
         </div>
         <div className="composer-note">
-          Future streaming should batch deltas with an external buffer or animation-frame flush,
-          not update React state once per token.
+          {isGenerating
+            ? "Hermes is responding. Deltas are buffered and flushed on animation frames."
+            : "Streaming batches deltas with an animation-frame flush, not one React update per token."}
         </div>
       </form>
     </div>

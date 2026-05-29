@@ -33,6 +33,7 @@ export function AppShell() {
         hermesStatus={hermesStatus.status}
         isHermesStatusLoading={hermesStatus.isLoading}
         modelChoices={state.modelChoices}
+        workspaceActions={actions}
       />
       <ContextPanel
         activeProject={activeProject}

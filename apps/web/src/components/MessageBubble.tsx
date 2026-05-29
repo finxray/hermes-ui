@@ -17,11 +17,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <div className="message-head">
           <span className="message-author">{message.author}</span>
           <span className="message-meta">{message.createdAt}</span>
+          {message.status && message.status !== "complete" ? (
+            <span className="pill">{message.status}</span>
+          ) : null}
         </div>
         <div className="message-content">
-          {message.content.split("\n").map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
-          ))}
+          {message.content
+            ? message.content.split("\n").map((paragraph, index) => (
+                <p key={`${message.id}-${index}`}>{paragraph}</p>
+              ))
+            : <p className="stream-placeholder">Waiting for Hermes...</p>}
         </div>
         {message.references ? (
           <div className="reference-row" aria-label="Mock retrieval references">

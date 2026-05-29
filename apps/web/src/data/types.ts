@@ -15,6 +15,7 @@ export type ChatMessage = {
   createdAt: string;
   content: string;
   references?: string[];
+  status?: "complete" | "streaming" | "error" | "mock";
 };
 
 export type MemoryEvidence = {
@@ -30,7 +31,7 @@ export type MemoryEvidence = {
 export type ToolEvent = {
   id: string;
   name: string;
-  status: "completed" | "mocked" | "pending";
+  status: "started" | "completed" | "failed" | "mocked" | "pending";
   detail: string;
   time: string;
 };

@@ -497,6 +497,10 @@ textarea:disabled {
   background: transparent;
 }
 
+.message:has(.pill) .message-card {
+  border-color: var(--border-soft);
+}
+
 .message-head {
   display: flex;
   flex-wrap: wrap;
@@ -523,6 +527,11 @@ textarea:disabled {
 
 .message-content p:last-child {
   margin-bottom: 0;
+}
+
+.stream-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .reference-row {

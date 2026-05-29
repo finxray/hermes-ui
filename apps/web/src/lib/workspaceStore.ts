@@ -1,5 +1,12 @@
 import { workspaceMock } from "@/data/mockWorkspace";
-import type { PersistedWorkspaceState, Project, Session, WorkspaceState } from "@/data/types";
+import type {
+  ChatMessage,
+  PersistedWorkspaceState,
+  Project,
+  Session,
+  ToolEvent,
+  WorkspaceState
+} from "@/data/types";
 
 export const WORKSPACE_STORAGE_KEY = "hermes-ui.workspace.v1";
 export const WORKSPACE_STORAGE_VERSION = 1;
@@ -13,6 +20,16 @@ type WorkspaceAction =
   | { type: "renameProject"; projectId: string; name: string }
   | { type: "renameSession"; sessionId: string; title: string }
   | { type: "archiveSession"; sessionId: string }
+  | { type: "appendMessage"; sessionId: string; message: ChatMessage }
+  | {
+      type: "updateMessage";
+      sessionId: string;
+      messageId: string;
+      content: string;
+      status?: ChatMessage["status"];
+      references?: string[];
+    }
+  | { type: "appendToolEvent"; sessionId: string; event: ToolEvent }
   | { type: "reset" };
 
 export type { WorkspaceAction };
@@ -42,6 +59,12 @@ export function workspaceReducer(
       return renameSession(state, action.sessionId, action.title);
     case "archiveSession":
       return archiveSession(state, action.sessionId);
+    case "appendMessage":
+      return appendMessage(state, action.sessionId, action.message);
+    case "updateMessage":
+      return updateMessage(state, action);
+    case "appendToolEvent":
+      return appendToolEvent(state, action.sessionId, action.event);
     case "reset":
       return createMockWorkspaceState();
     default:
@@ -245,6 +268,100 @@ function archiveSession(state: WorkspaceState, sessionId: string): WorkspaceStat
   };
 }
 
+function appendMessage(
+  state: WorkspaceState,
+  sessionId: string,
+  message: ChatMessage
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session) {
+    return state;
+  }
+
+  const now = new Date().toISOString();
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            messages: [...item.messages, message],
+            summary:
+              item.messages.length === 0 && message.role === "user"
+                ? summarizeMessage(message.content)
+                : item.summary,
+            title:
+              item.title === "New chat" && message.role === "user"
+                ? summarizeTitle(message.content)
+                : item.title,
+            updatedAt: now
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
+function updateMessage(
+  state: WorkspaceState,
+  action: Extract<WorkspaceAction, { type: "updateMessage" }>
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === action.sessionId);
+  if (!session) {
+    return state;
+  }
+
+  const now = new Date().toISOString();
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === action.sessionId
+        ? {
+            ...item,
+            messages: item.messages.map((message) =>
+              message.id === action.messageId
+                ? {
+                    ...message,
+                    content: action.content,
+                    references: action.references ?? message.references,
+                    status: action.status ?? message.status
+                  }
+                : message
+            ),
+            updatedAt: now
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
+function appendToolEvent(
+  state: WorkspaceState,
+  sessionId: string,
+  event: ToolEvent
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session) {
+    return state;
+  }
+
+  const now = new Date().toISOString();
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            toolEvents: [event, ...item.toolEvents].slice(0, 24),
+            updatedAt: now
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
 function touchProject(state: WorkspaceState, projectId: string, updatedAt: string): WorkspaceState {
   return {
     ...state,
@@ -281,4 +398,13 @@ function makeProjectIcon(name: string): string {
     .join("")
     .padEnd(2, "P")
     .slice(0, 2);
+}
+
+function summarizeTitle(content: string): string {
+  return summarizeMessage(content).slice(0, 44);
+}
+
+function summarizeMessage(content: string): string {
+  const clean = content.replace(/\s+/g, " ").trim();
+  return clean.length > 80 ? `${clean.slice(0, 77)}...` : clean || "New chat";
 }

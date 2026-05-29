@@ -26,7 +26,7 @@ export function ContextPanel({
     <aside className="context-panel" aria-label="Context, memory, tools, and files">
       <header className="panel-head">
         <h2>Context console</h2>
-        <p>Read-only mock view. Gateway-backed memory inspection arrives later.</p>
+        <p>Hermes status and tool stream events are real when connected; memory remains mocked.</p>
         <div className="panel-tabs" aria-label="Panel sections">
           <button className="tab-button is-active" type="button">
             Context
@@ -113,7 +113,7 @@ export function ContextPanel({
           {toolEvents.length === 0 ? (
             <div className="empty-state compact">
               <div className="empty-state-title">No tool activity</div>
-              <p>Tool events remain mocked until Hermes streaming is added.</p>
+              <p>Hermes stream tool events will appear here when a connected agent emits them.</p>
             </div>
           ) : (
             <ul className="tool-list">

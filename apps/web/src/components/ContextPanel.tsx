@@ -1,4 +1,4 @@
-import { Activity, Database, FileText, FolderGit2, ShieldCheck } from "lucide-react";
+import { Activity, Database, FileText, FolderGit2, KeyRound, ShieldCheck } from "lucide-react";
 import { HermesStatusPanel } from "@/components/HermesStatusPanel";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session } from "@/data/types";
@@ -74,6 +74,60 @@ export function ContextPanel({
               </div>
             </div>
             <div className="card-meta">{activeProject.memoryScopeKey}</div>
+          </div>
+        </section>
+
+        <section className="panel-section" aria-labelledby="context-contract-heading">
+          <div className="section-label" id="context-contract-heading">
+            <span>Active context contract</span>
+            <KeyRound size={13} aria-hidden="true" />
+          </div>
+          <div className="summary-card">
+            <div className="card-title">
+              <span>Prepared scope</span>
+              <span className="pill">Brain Memory later</span>
+            </div>
+            <div className="context-contract-grid">
+              <ContextField label="Tenant" value={activeProject.memoryScope.tenantId} />
+              <ContextField label="Project" value={activeProject.memoryScope.projectId} />
+              <ContextField label="Project key" value={activeProject.memoryScope.stableProjectKey} />
+              <ContextField
+                label="Retrieval"
+                value={activeProject.memoryScope.retrievalProfile}
+              />
+              <ContextField label="Policy" value={activeProject.memoryScope.contextPolicy} />
+              <ContextField
+                label="Pinned"
+                value={
+                  activeProject.memoryScope.pinnedMemoryIds.length > 0
+                    ? activeProject.memoryScope.pinnedMemoryIds.join(", ")
+                    : "None"
+                }
+              />
+              <ContextField label="Session" value={activeSession?.memoryScope.sessionId ?? "None"} />
+              <ContextField
+                label="Session key"
+                value={activeSession?.memoryScope.stableSessionKey ?? "No active session"}
+              />
+              <ContextField
+                label="Hermes session"
+                value={activeSession?.hermesSessionId ?? "No active session"}
+              />
+              <ContextField
+                label="Project context"
+                value={activeSession?.memoryScope.includeProjectContext ? "Included" : "Off"}
+              />
+              <ContextField
+                label="Session context"
+                value={activeSession?.memoryScope.includeSessionContext ? "Included" : "Off"}
+              />
+              <ContextField label="Status" value="Prepared, not connected to Brain Memory" />
+            </div>
+            <div className="card-body">
+              {activeSession?.memoryScope.userVisibleSummary ??
+                activeProject.memoryScope.userVisibleSummary ??
+                "This scope is ready to travel with Hermes requests."}
+            </div>
           </div>
         </section>
 
@@ -165,5 +219,14 @@ export function ContextPanel({
         </section>
       </div>
     </aside>
+  );
+}
+
+function ContextField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="context-field">
+      <span className="context-field-label">{label}</span>
+      <span className="context-field-value">{value}</span>
+    </div>
   );
 }

@@ -1,15 +1,18 @@
 import { workspaceMock } from "@/data/mockWorkspace";
 import type {
   ChatMessage,
+  ProjectMemoryScope,
   PersistedWorkspaceState,
   Project,
   Session,
+  SessionMemoryScope,
   ToolEvent,
   WorkspaceState
 } from "@/data/types";
 
 export const WORKSPACE_STORAGE_KEY = "hermes-ui.workspace.v1";
 export const WORKSPACE_STORAGE_VERSION = 1;
+export const DEFAULT_TENANT_ID = "tenant-local";
 
 type WorkspaceAction =
   | { type: "hydrate"; state: WorkspaceState }
@@ -98,14 +101,10 @@ export function saveWorkspaceState(storage: Storage, state: WorkspaceState) {
 }
 
 function normalizeWorkspace(state: WorkspaceState): WorkspaceState {
-  const projects = state.projects.length > 0 ? state.projects : createMockWorkspaceState().projects;
-  const sessions = state.sessions.map((session) => ({
-    ...session,
-    messages: session.messages ?? [],
-    memoryEvidence: session.memoryEvidence ?? [],
-    toolEvents: session.toolEvents ?? [],
-    artifacts: session.artifacts ?? []
-  }));
+  const rawProjects =
+    state.projects.length > 0 ? state.projects : createMockWorkspaceState().projects;
+  const projects = rawProjects.map((project) => normalizeProject(project));
+  const sessions = state.sessions.map((session) => normalizeSession(session, projects));
 
   const activeProjectId = projects.some((project) => project.id === state.activeProjectId)
     ? state.activeProjectId
@@ -152,12 +151,18 @@ function createProject(state: WorkspaceState): WorkspaceState {
   ).length;
   const suffix = nextNumber === 0 ? "" : ` ${nextNumber + 1}`;
   const id = `project-${crypto.randomUUID()}`;
+  const memoryScopeKey = makeProjectStableKey(DEFAULT_TENANT_ID, id);
   const project: Project = {
     id,
     name: `Untitled project${suffix}`,
     description: "Local mock project. Rename and add chats when ready.",
     icon: makeProjectIcon(`Untitled project${suffix}`),
-    memoryScopeKey: `studio:tenant-local:${id}`,
+    memoryScopeKey,
+    memoryScope: makeProjectMemoryScope({
+      id,
+      name: `Untitled project${suffix}`,
+      memoryScopeKey
+    }),
     createdAt: now,
     updatedAt: now
   };
@@ -177,11 +182,19 @@ function createSession(state: WorkspaceState): WorkspaceState {
   }
 
   const now = new Date().toISOString();
+  const id = `session-${crypto.randomUUID()}`;
+  const hermesSessionId = `hermes-${id}`;
   const session: Session = {
-    id: `session-${crypto.randomUUID()}`,
+    id,
     projectId: project.id,
+    hermesSessionId,
     title: "New chat",
     summary: "Empty local mock session",
+    memoryScope: makeSessionMemoryScope({
+      project,
+      sessionId: id,
+      title: "New chat"
+    }),
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -371,6 +384,56 @@ function touchProject(state: WorkspaceState, projectId: string, updatedAt: strin
   };
 }
 
+function normalizeProject(project: Project): Project {
+  const memoryScope = project.memoryScope ?? makeProjectMemoryScope(project);
+  const memoryScopeKey = project.memoryScopeKey || memoryScope.stableProjectKey;
+
+  return {
+    ...project,
+    memoryScopeKey,
+    memoryScope: {
+      ...memoryScope,
+      tenantId: memoryScope.tenantId || DEFAULT_TENANT_ID,
+      projectId: memoryScope.projectId || project.id,
+      stableProjectKey: memoryScope.stableProjectKey || memoryScopeKey,
+      retrievalProfile: memoryScope.retrievalProfile || "balanced",
+      pinnedMemoryIds: memoryScope.pinnedMemoryIds ?? [],
+      contextPolicy: memoryScope.contextPolicy || "balanced"
+    }
+  };
+}
+
+function normalizeSession(session: Session, projects: Project[]): Session {
+  const project = projects.find((item) => item.id === session.projectId);
+  const memoryScope =
+    session.memoryScope ??
+    makeSessionMemoryScope({
+      project,
+      sessionId: session.id,
+      title: session.title
+    });
+
+  return {
+    ...session,
+    hermesSessionId: session.hermesSessionId || `hermes-${session.id}`,
+    memoryScope: {
+      ...memoryScope,
+      tenantId: memoryScope.tenantId || project?.memoryScope.tenantId || DEFAULT_TENANT_ID,
+      projectId: memoryScope.projectId || session.projectId,
+      sessionId: memoryScope.sessionId || session.id,
+      stableSessionKey:
+        memoryScope.stableSessionKey ||
+        makeSessionStableKey(project?.memoryScope.tenantId ?? DEFAULT_TENANT_ID, session.projectId, session.id),
+      includeProjectContext: memoryScope.includeProjectContext !== false,
+      includeSessionContext: memoryScope.includeSessionContext !== false
+    },
+    messages: session.messages ?? [],
+    memoryEvidence: session.memoryEvidence ?? [],
+    toolEvents: session.toolEvents ?? [],
+    artifacts: session.artifacts ?? []
+  };
+}
+
 export function getVisibleSessions(state: WorkspaceState, projectId: string): Session[] {
   return state.sessions
     .filter((session) => session.projectId === projectId && !session.archivedAt)
@@ -398,6 +461,48 @@ function makeProjectIcon(name: string): string {
     .join("")
     .padEnd(2, "P")
     .slice(0, 2);
+}
+
+function makeProjectMemoryScope(project: Pick<Project, "id" | "name"> & Partial<Project>): ProjectMemoryScope {
+  const stableProjectKey =
+    project.memoryScopeKey || makeProjectStableKey(DEFAULT_TENANT_ID, project.id);
+
+  return {
+    tenantId: DEFAULT_TENANT_ID,
+    projectId: project.id,
+    stableProjectKey,
+    retrievalProfile: "balanced",
+    pinnedMemoryIds: [],
+    contextPolicy: "balanced",
+    userVisibleSummary: `${project.name} project context is prepared for future Brain Memory retrieval.`
+  };
+}
+
+function makeSessionMemoryScope(args: {
+  project?: Project;
+  sessionId: string;
+  title: string;
+}): SessionMemoryScope {
+  const tenantId = args.project?.memoryScope.tenantId ?? DEFAULT_TENANT_ID;
+  const projectId = args.project?.id ?? "project-unknown";
+
+  return {
+    tenantId,
+    projectId,
+    sessionId: args.sessionId,
+    stableSessionKey: makeSessionStableKey(tenantId, projectId, args.sessionId),
+    includeProjectContext: true,
+    includeSessionContext: true,
+    userVisibleSummary: `${args.title} session context is prepared for future Brain Memory continuity.`
+  };
+}
+
+function makeProjectStableKey(tenantId: string, projectId: string): string {
+  return `studio:${tenantId}:project:${projectId}`;
+}
+
+function makeSessionStableKey(tenantId: string, projectId: string, sessionId: string): string {
+  return `studio:${tenantId}:project:${projectId}:session:${sessionId}`;
 }
 
 function summarizeTitle(content: string): string {

@@ -1,9 +1,39 @@
+export type ContextPolicy =
+  | "balanced"
+  | "project-first"
+  | "session-first"
+  | "minimal";
+
+export type RetrievalProfile = "balanced" | "precise" | "broad" | "minimal";
+
+export type ProjectMemoryScope = {
+  tenantId: string;
+  projectId: string;
+  stableProjectKey: string;
+  retrievalProfile: RetrievalProfile;
+  pinnedMemoryIds: string[];
+  contextPolicy: ContextPolicy;
+  userVisibleSummary?: string;
+};
+
+export type SessionMemoryScope = {
+  tenantId: string;
+  projectId: string;
+  sessionId: string;
+  stableSessionKey: string;
+  includeProjectContext: boolean;
+  includeSessionContext: boolean;
+  lastContextRefreshAt?: string;
+  userVisibleSummary?: string;
+};
+
 export type Project = {
   id: string;
   name: string;
   description: string;
   icon: string;
   memoryScopeKey: string;
+  memoryScope: ProjectMemoryScope;
   createdAt: string;
   updatedAt: string;
 };
@@ -46,8 +76,10 @@ export type Artifact = {
 export type Session = {
   id: string;
   projectId: string;
+  hermesSessionId: string;
   title: string;
   summary: string;
+  memoryScope: SessionMemoryScope;
   createdAt: string;
   updatedAt: string;
   archivedAt?: string;

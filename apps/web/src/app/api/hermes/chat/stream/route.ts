@@ -1,5 +1,6 @@
 import {
   streamHermesSessionChat,
+  type HermesChatContext,
   type HermesChatError,
   type HermesChatHistoryMessage,
   type HermesChatRequest
@@ -66,30 +67,23 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
 
   const input = body as Record<string, unknown>;
   const message = cleanText(input.message, MAX_MESSAGE_CHARS);
-  const projectId = cleanString(input.projectId, 256);
-  const projectTitle = cleanString(input.projectTitle, 256);
-  const sessionId = cleanString(input.sessionId, 256);
-  const sessionTitle = cleanString(input.sessionTitle, 256);
+  const context = readContext(input.context);
 
   if (!message) {
     return badRequest("bad_response", "Message is required.");
   }
-  if (!projectId || !projectTitle || !sessionId || !sessionTitle) {
-    return badRequest("bad_response", "Project and session metadata is required.");
+  if (!context) {
+    return badRequest("bad_response", "Structured project and session context is required.");
   }
 
   return {
     ok: true,
     request: {
+      context,
       message,
-      projectId,
-      projectTitle,
       provider: cleanOptionalString(input.provider, 128),
-      memoryScopeKey: cleanOptionalString(input.memoryScopeKey, 256),
       model: cleanOptionalString(input.model, 128),
-      recentMessages: readRecentMessages(input.recentMessages),
-      sessionId,
-      sessionTitle
+      recentMessages: readRecentMessages(input.recentMessages)
     }
   };
 }
@@ -118,6 +112,87 @@ function cleanOptionalString(value: unknown, maxLength: number): string | null {
   return typeof value === "string"
     ? value.replace(/[\r\n\x00]/g, " ").trim().slice(0, maxLength) || null
     : null;
+}
+
+function readContext(value: unknown): HermesChatContext | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const context = value as Record<string, unknown>;
+  const project = readObject(context.project);
+  const session = readObject(context.session);
+  const ui = readObject(context.ui);
+  if (!project || !session || !ui) {
+    return null;
+  }
+
+  const projectId = cleanString(project.id, 256);
+  const projectTitle = cleanString(project.title, 256);
+  const projectStableKey = cleanString(project.stableKey, 256);
+  const tenantId = cleanString(project.tenantId, 256);
+  const sessionId = cleanString(session.id, 256);
+  const sessionTitle = cleanString(session.title, 256);
+  const sessionStableKey = cleanString(session.stableKey, 256);
+  const hermesSessionId = cleanString(session.hermesSessionId, 256);
+  const workspaceVersion = Number(ui.workspaceVersion);
+
+  if (
+    !projectId ||
+    !projectTitle ||
+    !projectStableKey ||
+    !tenantId ||
+    !sessionId ||
+    !sessionTitle ||
+    !sessionStableKey ||
+    !hermesSessionId ||
+    !Number.isInteger(workspaceVersion)
+  ) {
+    return null;
+  }
+
+  return {
+    project: {
+      id: projectId,
+      title: projectTitle,
+      stableKey: projectStableKey,
+      tenantId,
+      retrievalProfile: cleanString(project.retrievalProfile, 64) || "balanced",
+      contextPolicy: cleanString(project.contextPolicy, 64) || "balanced",
+      pinnedMemoryIds: readStringArray(project.pinnedMemoryIds, 24, 256),
+      userVisibleSummary: cleanOptionalString(project.userVisibleSummary, 512) ?? undefined
+    },
+    session: {
+      id: sessionId,
+      title: sessionTitle,
+      stableKey: sessionStableKey,
+      hermesSessionId,
+      includeProjectContext: session.includeProjectContext !== false,
+      includeSessionContext: session.includeSessionContext !== false,
+      lastContextRefreshAt: cleanOptionalString(session.lastContextRefreshAt, 64) ?? undefined,
+      userVisibleSummary: cleanOptionalString(session.userVisibleSummary, 512) ?? undefined
+    },
+    ui: {
+      source: "hermes-ui",
+      workspaceVersion
+    }
+  };
+}
+
+function readObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readStringArray(value: unknown, maxItems: number, maxLength: number): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => cleanString(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
 }
 
 function readRecentMessages(value: unknown): HermesChatRequest["recentMessages"] {

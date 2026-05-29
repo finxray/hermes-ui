@@ -11,6 +11,44 @@ import type {
 
 const createdAt = "2026-05-29T09:00:00.000Z";
 const updatedAt = "2026-05-29T09:18:00.000Z";
+const tenantId = "tenant-local";
+
+function projectScope(
+  projectId: string,
+  summary: string,
+  retrievalProfile: Project["memoryScope"]["retrievalProfile"] = "balanced",
+  contextPolicy: Project["memoryScope"]["contextPolicy"] = "balanced",
+  pinnedMemoryIds: string[] = []
+): Project["memoryScope"] {
+  return {
+    tenantId,
+    projectId,
+    stableProjectKey: `studio:${tenantId}:project:${projectId}`,
+    retrievalProfile,
+    pinnedMemoryIds,
+    contextPolicy,
+    userVisibleSummary: summary
+  };
+}
+
+function sessionScope(
+  projectId: string,
+  sessionId: string,
+  summary: string,
+  includeProjectContext = true,
+  includeSessionContext = true
+): Session["memoryScope"] {
+  return {
+    tenantId,
+    projectId,
+    sessionId,
+    stableSessionKey: `studio:${tenantId}:project:${projectId}:session:${sessionId}`,
+    includeProjectContext,
+    includeSessionContext,
+    lastContextRefreshAt: "2026-05-29T09:15:00.000Z",
+    userVisibleSummary: summary
+  };
+}
 
 export const projects: Project[] = [
   {
@@ -18,7 +56,14 @@ export const projects: Project[] = [
     name: "Brain Memory",
     description: "Gateway-scoped persistent memory and UI console",
     icon: "BM",
-    memoryScopeKey: "studio:tenant-local:project-brain-memory",
+    memoryScopeKey: "studio:tenant-local:project:project-brain-memory",
+    memoryScope: projectScope(
+      "project-brain-memory",
+      "Use canonical architecture and Gateway contract notes before session-local chat history.",
+      "balanced",
+      "project-first",
+      ["memory-adr", "memory-scope"]
+    ),
     createdAt,
     updatedAt
   },
@@ -27,7 +72,14 @@ export const projects: Project[] = [
     name: "Hermes Agent",
     description: "API server, runs, approvals, and tool events",
     icon: "HA",
-    memoryScopeKey: "studio:tenant-local:project-hermes-agent",
+    memoryScopeKey: "studio:tenant-local:project:project-hermes-agent",
+    memoryScope: projectScope(
+      "project-hermes-agent",
+      "Prefer Hermes API discovery, run events, and session continuity facts.",
+      "precise",
+      "session-first",
+      ["memory-adr"]
+    ),
     createdAt,
     updatedAt: "2026-05-28T12:00:00.000Z"
   },
@@ -36,7 +88,13 @@ export const projects: Project[] = [
     name: "Packaging",
     description: "Local desktop, Docker, and release workflow",
     icon: "PK",
-    memoryScopeKey: "studio:tenant-local:project-packaging",
+    memoryScopeKey: "studio:tenant-local:project:project-packaging",
+    memoryScope: projectScope(
+      "project-packaging",
+      "Keep setup, environment, and release packaging context scoped away from agent-runtime design.",
+      "broad",
+      "balanced"
+    ),
     createdAt,
     updatedAt: "2026-05-25T12:00:00.000Z"
   }
@@ -228,8 +286,14 @@ export const sessions: Session[] = [
   {
     id: "session-roadmap",
     projectId: "project-brain-memory",
+    hermesSessionId: "hermes-session-roadmap",
     title: "Hermes UI roadmap",
     summary: "Slice planning for the Studio shell and future integration path",
+    memoryScope: sessionScope(
+      "project-brain-memory",
+      "session-roadmap",
+      "Roadmap discussion should include Brain Memory project policy plus this session's slice history."
+    ),
     createdAt,
     updatedAt,
     messages: roadmapMessages,
@@ -240,8 +304,14 @@ export const sessions: Session[] = [
   {
     id: "session-memory-contract",
     projectId: "project-brain-memory",
+    hermesSessionId: "hermes-session-memory-contract",
     title: "Gateway memory contract",
     summary: "Read-only search, evidence, supersession, and audit endpoints",
+    memoryScope: sessionScope(
+      "project-brain-memory",
+      "session-memory-contract",
+      "Gateway contract work should prioritize read-only memory visibility and audited future mutations."
+    ),
     createdAt,
     updatedAt: "2026-05-28T10:00:00.000Z",
     messages: gatewayMessages,
@@ -252,8 +322,14 @@ export const sessions: Session[] = [
   {
     id: "session-evidence-ui",
     projectId: "project-brain-memory",
+    hermesSessionId: "hermes-session-evidence-ui",
     title: "Evidence cards and audit trail",
     summary: "Memory console display rules and trust markers",
+    memoryScope: sessionScope(
+      "project-brain-memory",
+      "session-evidence-ui",
+      "Evidence UI work should focus on traceability, source layers, and user trust markers."
+    ),
     createdAt,
     updatedAt: "2026-05-27T11:00:00.000Z",
     messages: evidenceMessages,
@@ -264,8 +340,14 @@ export const sessions: Session[] = [
   {
     id: "session-runs-api",
     projectId: "project-hermes-agent",
+    hermesSessionId: "hermes-session-runs-api",
     title: "Runs API event model",
     summary: "Mapping run lifecycle events into a future tool panel",
+    memoryScope: sessionScope(
+      "project-hermes-agent",
+      "session-runs-api",
+      "Runs API context should emphasize lifecycle events, reconnect, stop, and approvals."
+    ),
     createdAt,
     updatedAt: "2026-05-28T12:00:00.000Z",
     messages: runsMessages,
@@ -276,8 +358,16 @@ export const sessions: Session[] = [
   {
     id: "session-approval-flow",
     projectId: "project-hermes-agent",
+    hermesSessionId: "hermes-session-approval-flow",
     title: "Approval and stop UX",
     summary: "Mocking approval controls without wiring real Hermes calls",
+    memoryScope: sessionScope(
+      "project-hermes-agent",
+      "session-approval-flow",
+      "Approval UX should remain capability-gated until Hermes event payloads are verified.",
+      true,
+      true
+    ),
     createdAt,
     updatedAt: "2026-05-26T12:00:00.000Z",
     messages: approvalMessages,
@@ -288,8 +378,16 @@ export const sessions: Session[] = [
   {
     id: "session-desktop-package",
     projectId: "project-packaging",
+    hermesSessionId: "hermes-session-desktop-package",
     title: "Downloadable local package",
     summary: "Install, run, and health-check expectations",
+    memoryScope: sessionScope(
+      "project-packaging",
+      "session-desktop-package",
+      "Packaging session context should stay focused on setup scripts, env docs, and health checks.",
+      true,
+      false
+    ),
     createdAt,
     updatedAt: "2026-05-25T12:00:00.000Z",
     messages: packageMessages,

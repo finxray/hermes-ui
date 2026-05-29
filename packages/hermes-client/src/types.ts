@@ -60,12 +60,35 @@ export type HermesChatHistoryMessage = {
   content: string;
 };
 
+export type HermesChatContext = {
+  project: {
+    id: string;
+    title: string;
+    stableKey: string;
+    tenantId: string;
+    retrievalProfile: string;
+    contextPolicy: string;
+    pinnedMemoryIds?: string[];
+    userVisibleSummary?: string;
+  };
+  session: {
+    id: string;
+    title: string;
+    stableKey: string;
+    hermesSessionId: string;
+    includeProjectContext: boolean;
+    includeSessionContext: boolean;
+    lastContextRefreshAt?: string;
+    userVisibleSummary?: string;
+  };
+  ui: {
+    source: "hermes-ui";
+    workspaceVersion: number;
+  };
+};
+
 export type HermesChatRequest = {
-  projectId: string;
-  projectTitle: string;
-  sessionId: string;
-  sessionTitle: string;
-  memoryScopeKey?: string | null;
+  context: HermesChatContext;
   message: string;
   recentMessages?: HermesChatHistoryMessage[];
   model?: string | null;

@@ -6,6 +6,7 @@ import { MessageBubble } from "@/components/MessageBubble";
 import { ModelSelector } from "@/components/ModelSelector";
 import { StatusBadge } from "@/components/StatusBadge";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
+import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesChatStreamEvent, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { ChatMessage, ModelChoice, Project, Session, ToolEvent } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
@@ -82,18 +83,39 @@ export function ChatView({
 
     await streamHermesChatFromBff(
       {
-        memoryScopeKey: activeProject.memoryScopeKey,
+        context: {
+          project: {
+            id: activeProject.id,
+            title: activeProject.name,
+            stableKey: activeProject.memoryScope.stableProjectKey,
+            tenantId: activeProject.memoryScope.tenantId,
+            retrievalProfile: activeProject.memoryScope.retrievalProfile,
+            contextPolicy: activeProject.memoryScope.contextPolicy,
+            pinnedMemoryIds: activeProject.memoryScope.pinnedMemoryIds,
+            userVisibleSummary: activeProject.memoryScope.userVisibleSummary
+          },
+          session: {
+            id: session.id,
+            title: session.title,
+            stableKey: session.memoryScope.stableSessionKey,
+            hermesSessionId: session.hermesSessionId,
+            includeProjectContext: session.memoryScope.includeProjectContext,
+            includeSessionContext: session.memoryScope.includeSessionContext,
+            lastContextRefreshAt: session.memoryScope.lastContextRefreshAt,
+            userVisibleSummary: session.memoryScope.userVisibleSummary
+          },
+          ui: {
+            source: "hermes-ui",
+            workspaceVersion: WORKSPACE_STORAGE_VERSION
+          }
+        },
         message: content,
         model: selectedModel?.id ?? null,
-        projectId: activeProject.id,
-        projectTitle: activeProject.name,
         provider: selectedModel?.provider ?? null,
         recentMessages: session.messages.slice(-12).map((message) => ({
           role: message.role,
           content: message.content
-        })),
-        sessionId: session.id,
-        sessionTitle: session.title
+        }))
       },
       {
         onEvent: (event) => {
@@ -105,7 +127,7 @@ export function ChatView({
             accumulated = event.message.content || accumulated;
             workspaceActions.updateMessage(session.id, assistantId, accumulated, "complete", [
               "Hermes session stream",
-              activeProject.memoryScopeKey
+              activeProject.memoryScope.stableProjectKey
             ]);
           } else if (event.type === "tool_event" || event.type === "run_event") {
             workspaceActions.appendToolEvent(session.id, toToolEvent(event));
@@ -195,7 +217,7 @@ export function ChatView({
           <div className="reference-row" aria-label="Active scope references">
             <span className="reference-chip">
               <BookOpenText size={14} aria-hidden="true" />
-              Scope: {activeProject.memoryScopeKey}
+              Scope: {activeProject.memoryScope.stableProjectKey}
             </span>
             <span className="reference-chip">
               <SendHorizontal size={14} aria-hidden="true" />

@@ -755,6 +755,36 @@ textarea:disabled {
   gap: 6px;
 }
 
+.context-contract-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.context-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+}
+
+.context-field-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.context-field-value {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

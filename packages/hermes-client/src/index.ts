@@ -1,5 +1,6 @@
 import type {
   HermesChatError,
+  HermesChatContext,
   HermesChatRequest,
   HermesChatStreamEvent,
   HermesChatStreamResult,
@@ -25,6 +26,7 @@ const ENDPOINTS: Array<{
 
 export type {
   HermesChatError,
+  HermesChatContext,
   HermesChatHistoryMessage,
   HermesChatRequest,
   HermesChatStreamEvent,
@@ -168,8 +170,8 @@ export async function streamHermesSessionChat(
   }
 
   const fetchImpl = config.fetchImpl ?? fetch;
-  const hermesSessionId = sanitizeHermesId(request.sessionId);
-  const memoryScopeKey = sanitizeHeaderValue(request.memoryScopeKey ?? null);
+  const hermesSessionId = sanitizeHermesId(request.context.session.hermesSessionId);
+  const memoryScopeKey = sanitizeHeaderValue(request.context.project.stableKey);
   const supportsSessionStream = await checkSessionStreamingCapability({
     apiKey: config.apiKey,
     base,
@@ -191,7 +193,7 @@ export async function streamHermesSessionChat(
     fetchImpl,
     model: request.model,
     sessionId: hermesSessionId,
-    sessionTitle: request.sessionTitle,
+    sessionTitle: request.context.session.title,
     timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
   });
 
@@ -217,10 +219,11 @@ export async function streamHermesSessionChat(
         conversation_history: request.recentMessages ?? [],
         input: request.message,
         metadata: {
-          project_id: request.projectId,
-          project_title: request.projectTitle,
+          context: request.context,
+          project_id: request.context.project.id,
+          project_title: request.context.project.title,
           provider: request.provider ?? null,
-          studio_session_id: request.sessionId
+          studio_session_id: request.context.session.id
         }
       }),
       cache: "no-store",

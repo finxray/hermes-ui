@@ -252,7 +252,8 @@ textarea:disabled {
 
 .brand {
   padding: 12px 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-bottom: 0;
+  background: transparent;
 }
 
 .brand-mark {
@@ -268,11 +269,9 @@ textarea:disabled {
   height: 32px;
   flex: 0 0 32px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 0;
   border-radius: var(--radius-sm);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
-    var(--bg-elevated);
+  background: transparent;
   color: var(--accent);
 }
 
@@ -294,6 +293,7 @@ textarea:disabled {
 .sidebar-actions,
 .sidebar-section {
   padding: 12px 4px;
+  background: transparent;
 }
 
 .sidebar-actions {
@@ -388,6 +388,7 @@ textarea:disabled {
   gap: 3px;
   margin: 0;
   padding: 0;
+  background: transparent;
   list-style: none;
 }
 
@@ -396,6 +397,7 @@ textarea:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 2px;
   align-items: center;
+  background: transparent;
 }
 
 .project-button {
@@ -533,7 +535,8 @@ textarea:disabled {
 .sidebar-foot {
   margin-top: auto;
   padding: 12px 4px 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.045);
+  border-top: 0;
+  background: transparent;
 }
 
 .sidebar-foot .status-badge {
@@ -545,6 +548,7 @@ textarea:disabled {
 .status-stack {
   display: grid;
   gap: 4px;
+  background: transparent;
 }
 
 .full-width {

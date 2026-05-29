@@ -88,9 +88,6 @@ export default function CodexShellPrototypePage() {
             Help
           </button>
         </nav>
-        <button className={styles.iconButton} type="button" aria-label="Collapse right rail">
-          <PanelRightClose size={19} />
-        </button>
       </header>
 
       <aside className={styles.leftRail} aria-label="Prototype project navigation">
@@ -233,7 +230,12 @@ export default function CodexShellPrototypePage() {
 
       <aside className={styles.rightRail} aria-label="Prototype context console">
         <header className={styles.panelHeader}>
-          <h2>Context console</h2>
+          <div className={styles.panelTitleRow}>
+            <h2>Context console</h2>
+            <button className={styles.iconButton} type="button" aria-label="Collapse right rail">
+              <PanelRightClose size={19} />
+            </button>
+          </div>
           <p>Hermes can stream live; Brain Memory inspection is read-only and Gateway-mediated.</p>
           <div className={styles.tabs} aria-label="Context console tabs">
             <button className={styles.tabActive} type="button">

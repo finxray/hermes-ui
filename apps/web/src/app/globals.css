@@ -110,8 +110,8 @@ textarea:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  min-height: 40px;
-  padding: 0 10px 8px;
+  min-height: 48px;
+  padding: 0 10px 10px;
   color: var(--text-secondary);
 }
 
@@ -389,8 +389,8 @@ textarea:disabled {
   grid-template-columns: minmax(0, 1fr) 24px;
   align-items: center;
   width: 100%;
-  padding: 0 15px;
-  border-radius: var(--radius-md);
+  padding: 0 12px;
+  border-radius: 14px;
   background: transparent;
 }
 
@@ -578,7 +578,7 @@ textarea:disabled {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.052);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -672,7 +672,7 @@ textarea:disabled {
   padding: 0 34px 0 10px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.044);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .transcript {
@@ -683,7 +683,7 @@ textarea:disabled {
 
 .transcript-inner {
   display: grid;
-  max-width: 860px;
+  max-width: 989px;
   margin: 0 auto;
   gap: 20px;
 }
@@ -739,28 +739,17 @@ textarea:disabled {
 
 .message {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-items: start;
 }
 
 .message-avatar {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
+  display: none;
 }
 
 .message[data-role="assistant"] .message-avatar {
-  border-color: rgba(142, 230, 198, 0.22);
-  background: var(--accent-dim);
-  color: var(--accent);
+  display: none;
 }
 
 .message-card {
@@ -771,15 +760,15 @@ textarea:disabled {
 }
 
 .message[data-role="user"] .message-card {
-  border-color: rgba(145, 184, 255, 0.16);
-  background:
-    linear-gradient(180deg, rgba(145, 184, 255, 0.055), transparent),
-    rgba(24, 27, 32, 0.9);
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.085);
 }
 
 .message[data-role="assistant"] .message-card {
-  border-color: rgba(255, 255, 255, 0.055);
-  background: rgba(255, 255, 255, 0.018);
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .message:has(.pill) .message-card {
@@ -820,13 +809,13 @@ textarea:disabled {
 
 .message-author {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
 }
 
 .message-content {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.62;
 }
 
@@ -877,7 +866,7 @@ textarea:disabled {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.052);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 16px;
 }
 
 .composer-wrap {
@@ -894,7 +883,7 @@ textarea:disabled {
 
 .composer {
   display: grid;
-  max-width: 860px;
+  max-width: 989px;
   margin: 0 auto;
   gap: 8px;
 }
@@ -971,6 +960,7 @@ textarea:disabled {
   border-radius: 999px;
   background: transparent;
   color: var(--text-secondary);
+  font-size: 16px;
 }
 
 .composer-tool-button {
@@ -981,7 +971,7 @@ textarea:disabled {
   max-width: min(42vw, 260px);
   padding: 0 10px;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1044,7 +1034,7 @@ textarea:disabled {
 .panel-head p {
   margin: 4px 0 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.45;
 }
 
@@ -1060,7 +1050,7 @@ textarea:disabled {
   padding: 0 8px;
   border-color: transparent;
   overflow: hidden;
-  font-size: 11px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1321,7 +1311,7 @@ textarea:disabled {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.045);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -1371,14 +1361,14 @@ textarea:disabled {
   border: 0;
 }
 
-/* Slice correction: scale UI copy closer to the Codex reference. */
+/* Slice correction: normalize UI copy after the shell debug pass. */
 .brand-title,
 .topbar h1,
 .panel-head h2,
 .card-title,
 .message-author,
 .empty-state-title {
-  font-size: 120%;
+  font-size: 15px;
 }
 
 .app-menu-item,
@@ -1395,8 +1385,10 @@ textarea:disabled {
 .status-badge,
 .tab-button,
 .mini-action,
-.model-select {
-  font-size: 120%;
+.model-select,
+.pill,
+.reference-chip {
+  font-size: 15px;
 }
 
 .project-description,
@@ -1408,67 +1400,16 @@ textarea:disabled {
 .metric-label,
 .composer-note,
 .context-field-label,
-.pill,
 .section-label {
-  font-size: 120%;
+  font-size: 14px;
 }
 
 .project-count,
 .metric-value {
-  font-size: 120%;
+  font-size: 15px;
 }
 
-.sidebar .text-button,
-.project-button,
-.session-button,
-.app-menu-item,
-.tab-button,
 .mini-action,
-.composer-tool-button,
-.composer-model-button {
-  border-color: transparent;
-  background-color: transparent;
-}
-
-.row-with-actions:hover,
-.row-with-actions:focus-within {
-  background: var(--bg-control-hover);
-}
-
-.row-with-actions:has(.session-button.is-active) {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.sidebar .text-button:hover,
-.app-menu-item:hover,
-.tab-button:hover,
-.mini-action:hover,
-.composer-tool-button:hover,
-.composer-model-button:hover,
-.sidebar .text-button:focus-visible,
-.app-menu-item:focus-visible,
-.tab-button:focus-visible,
-.mini-action:focus-visible,
-.composer-tool-button:focus-visible,
-.composer-model-button:focus-visible {
-  background: var(--bg-control-hover);
-}
-
-.tab-button.is-active {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.project-button:hover,
-.project-button:focus-visible,
-.session-button:hover,
-.session-button:focus-visible,
-.session-button.is-active {
-  background: transparent;
-}
-
-.tab-button,
-.mini-action,
-.pill,
 .context-field-label,
 .metric-label {
   font-size: 13.2px;

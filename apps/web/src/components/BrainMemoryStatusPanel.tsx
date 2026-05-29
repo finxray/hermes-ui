@@ -51,8 +51,8 @@ export function BrainMemoryStatusPanel({
         {status?.error ? <div className="status-error">{status.error.message}</div> : null}
         {status?.mode === "mock" || status?.mode === "unconfigured" ? (
           <div className="card-meta">
-            Connect later: install or start Brain Memory Gateway, then set
-            BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true in apps/web/.env.local.
+            Connect later with npm run studio:env -- --mode attach-brain-memory-later,
+            then set BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true when Gateway is reachable.
           </div>
         ) : null}
         <div className="card-meta">Last checked: {checkedAt}</div>

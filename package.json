@@ -10,6 +10,7 @@
     "dev": "npm run dev -w @hermes-ui/web",
     "studio:dev": "npm run dev",
     "studio:doctor": "node scripts/studio-doctor.mjs",
+    "studio:env": "node scripts/studio-env.mjs",
     "studio:open": "node scripts/open-studio-browser.mjs",
     "build": "npm run build -w @hermes-ui/web",
     "typecheck": "npm run typecheck -w @hermes-ui/web"

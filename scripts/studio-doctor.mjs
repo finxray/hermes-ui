@@ -60,7 +60,7 @@ addCheck(
   "web-env-local",
   existsSync(join(root, "apps", "web", ".env.local")),
   "apps/web/.env.local exists.",
-  "apps/web/.env.local is missing. Copy .env.example into apps/web/.env.local for local development.",
+  "apps/web/.env.local is missing. Run npm run studio:env -- --mode web-ui-with-hermes or choose another mode.",
   "warn"
 );
 
@@ -283,7 +283,7 @@ function inferBrainMemoryUiState(brainMemoryEnv, bffStatus) {
 function makeSuggestions(currentReport) {
   const suggestions = [];
   if (!existsSync(join(root, "apps", "web", ".env.local"))) {
-    suggestions.push("Create apps/web/.env.local from .env.example.");
+    suggestions.push("Create apps/web/.env.local with npm run studio:env -- --mode web-ui-with-hermes.");
   }
   if (currentReport.services.hermesDirect.status !== "connected") {
     suggestions.push("Start Hermes API server and verify HERMES_API_BASE_URL/health.");

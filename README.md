@@ -33,23 +33,20 @@ See `docs/packaging/PACKAGING_MODES.md`.
 npm install
 ```
 
-2. Enable or verify Hermes API server, then check:
+2. Choose an env template:
+
+```powershell
+npm run studio:env -- --list
+npm run studio:env -- --mode web-ui-with-hermes
+```
+
+Use `web-ui-only` if Hermes is not running yet. Existing `apps/web/.env.local`
+is preserved unless `--force` is passed.
+
+3. Enable or verify Hermes API server, then check:
 
 ```powershell
 curl http://127.0.0.1:8642/health
-```
-
-3. Create `apps/web/.env.local` from `.env.example`.
-
-Recommended Web UI standalone defaults:
-
-```text
-HERMES_API_BASE_URL=http://127.0.0.1:8642
-HERMES_API_KEY=
-HERMES_UI_ENABLE_REAL_HERMES=true
-BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8765
-BRAIN_MEMORY_API_KEY=
-BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=false
 ```
 
 4. Run the local doctor:
@@ -71,6 +68,8 @@ npm run studio:open
 ```
 
 The app opens at `http://127.0.0.1:3000`.
+
+For mode-specific setup paths, see `docs/packaging/LOCAL_STARTUP_GUIDE.md`.
 
 ## Boundary
 

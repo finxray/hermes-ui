@@ -96,15 +96,7 @@ textarea:disabled {
 }
 
 .app-shell::before {
-  position: absolute;
-  inset: -12% -12% -12% 420px;
-  z-index: 0;
-  pointer-events: none;
-  content: "";
-  background:
-    radial-gradient(circle at 38% 3%, rgba(127, 91, 210, 0.12), transparent 32rem),
-    radial-gradient(circle at 72% 10%, rgba(88, 126, 148, 0.08), transparent 30rem);
-  animation: ambient-drift 22s ease-in-out infinite alternate;
+  content: none;
 }
 
 .app-shell > * {

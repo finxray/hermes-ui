@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Brain,
   ChevronDown,
+  Circle,
   Database,
   FileText,
   Folder,
@@ -150,6 +151,10 @@ export default function CodexShellPrototypePage() {
             </button>
             <button className={styles.mockAction} type="button">
               Refresh Hermes
+            </button>
+            <button className={`${styles.mockAction} ${styles.settingsAction}`} type="button">
+              <Circle size={15} aria-hidden="true" />
+              Settings
             </button>
           </div>
         </section>

@@ -768,6 +768,34 @@ textarea:disabled {
   gap: 6px;
 }
 
+.memory-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.memory-search-input {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  outline: 0;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.memory-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.memory-search-input:focus {
+  border-color: rgba(142, 230, 198, 0.38);
+  box-shadow: 0 0 0 2px rgba(142, 230, 198, 0.1);
+}
+
 .context-contract-grid {
   display: grid;
   gap: 8px;

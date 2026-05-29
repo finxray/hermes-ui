@@ -1,5 +1,12 @@
 # @hermes-ui/brain-memory-client
 
-Placeholder package for the future typed Brain Memory Gateway UI client.
+Typed server-side client for Brain Memory Gateway UI/read-only endpoints.
 
-Slice 01 intentionally does not implement this client. The UI must only use Gateway-approved endpoints and must never access Postgres, Redis, Qdrant, RAGLight, or storage internals directly.
+Current supported calls:
+
+- `GET /health`
+- `POST /ui/memory/search`
+
+This package is for Gateway-mediated observability only. It must not import or
+call Postgres, Redis, Qdrant, RAGLight, filesystem memory internals, or any
+storage adapter directly.

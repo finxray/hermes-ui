@@ -3,6 +3,7 @@
 import { ChatView } from "@/components/ChatView";
 import { ContextPanel } from "@/components/ContextPanel";
 import { Sidebar } from "@/components/Sidebar";
+import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 
@@ -10,6 +11,7 @@ export function AppShell() {
   const { actions, activeProject, activeProjectSessions, activeSession, isHydrated, state } =
     useWorkspaceState();
   const hermesStatus = useHermesStatus();
+  const brainMemoryStatus = useBrainMemoryStatus();
 
   return (
     <main className="app-shell">
@@ -38,8 +40,11 @@ export function AppShell() {
       <ContextPanel
         activeProject={activeProject}
         activeSession={activeSession}
+        brainMemoryStatus={brainMemoryStatus.status}
         hermesStatus={hermesStatus.status}
+        isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
         isHermesStatusLoading={hermesStatus.isLoading}
+        refreshBrainMemoryStatus={brainMemoryStatus.refresh}
         refreshHermesStatus={hermesStatus.refresh}
       />
     </main>

@@ -1,0 +1,17 @@
+{
+  "name": "hermes-ui",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @hermes-ui/web",
+    "build": "npm run build -w @hermes-ui/web",
+    "typecheck": "npm run typecheck -w @hermes-ui/web"
+  },
+  "overrides": {
+    "postcss": "8.5.15"
+  }
+}

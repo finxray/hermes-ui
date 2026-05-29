@@ -6,6 +6,7 @@ import {
   type HermesChatRequest
 } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { buildMemoryScopeBridgeInstruction } from "@/lib/memoryScopeBridge";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -80,12 +81,19 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
     ok: true,
     request: {
       context,
+      instructions: isMemoryScopeBridgeEnabled()
+        ? buildMemoryScopeBridgeInstruction(context)
+        : null,
       message,
       provider: cleanOptionalString(input.provider, 128),
       model: cleanOptionalString(input.model, 128),
       recentMessages: readRecentMessages(input.recentMessages)
     }
   };
+}
+
+function isMemoryScopeBridgeEnabled(): boolean {
+  return process.env.HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE !== "false";
 }
 
 function badRequest(kind: "bad_response", message: string): ParseResult {

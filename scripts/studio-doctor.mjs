@@ -99,6 +99,7 @@ function readHermesEnv(values) {
   return {
     baseUrl: values.HERMES_API_BASE_URL || "",
     apiKeySet: Boolean(values.HERMES_API_KEY),
+    enableMemoryScopeBridge: values.HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE || "",
     enableRealHermes: values.HERMES_UI_ENABLE_REAL_HERMES || ""
   };
 }
@@ -351,6 +352,9 @@ function printReport(currentReport) {
   console.log(`Hermes URL: ${currentReport.env.hermes.baseUrl || "(not set)"}`);
   console.log(`Hermes API key: ${currentReport.env.hermes.apiKeySet ? "set" : "not set"}`);
   console.log(`Hermes real mode: ${currentReport.env.hermes.enableRealHermes || "(not set)"}`);
+  console.log(
+    `Hermes memory scope bridge: ${currentReport.env.hermes.enableMemoryScopeBridge || "(default true)"}`
+  );
   console.log(`Brain Memory URL: ${currentReport.env.brainMemory.baseUrl || "(not set)"}`);
   console.log(`Brain Memory UI API key: ${currentReport.env.brainMemory.uiApiKeySet ? "set" : "not set"}`);
   console.log(

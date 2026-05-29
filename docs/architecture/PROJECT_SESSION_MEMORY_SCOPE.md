@@ -118,12 +118,18 @@ Implemented now:
   `studio:tenant-local:project:project-brain-memory`.
 - The request body includes a `metadata.context` object with the structured
   project/session/UI metadata.
+- Slice 08D adds a temporary BFF memory-scope bridge. When
+  `HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE` is not `false`, the BFF also sends a
+  compact `instructions` block containing `tenantId`, `projectKey`,
+  `sessionKey`, `source`, and a safe context subset. This is a compatibility
+  bridge for current Hermes session-chat behavior and should be retired once
+  Hermes natively propagates `metadata.context` into MCP tool calls.
 
 Important limitation: current Hermes session-chat source ignores unknown
 `metadata` fields for agent behavior. The metadata body field is therefore a
-preserved contract and observability hook, not a confirmed Brain Memory input.
-The documented and meaningful memory-scope mechanism today is
-`X-Hermes-Session-Key`.
+preserved contract and observability hook. Until Hermes supports it natively,
+the bridge instruction is the path that makes session scope visible to Brain
+Memory MCP tool calls.
 
 ## How Brain Memory Will Use This Later
 
@@ -144,6 +150,7 @@ metadata to:
 - Structured browser-to-BFF context in chat requests.
 - BFF validation for structured context.
 - Hermes client forwarding of `X-Hermes-Session-Key`.
+- Hermes UI BFF memory-scope bridge through `instructions`.
 - Right-panel Active Context Contract preview.
 
 ## Not Implemented Yet

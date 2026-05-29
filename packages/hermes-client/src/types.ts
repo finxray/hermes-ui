@@ -89,6 +89,7 @@ export type HermesChatContext = {
 
 export type HermesChatRequest = {
   context: HermesChatContext;
+  instructions?: string | null;
   message: string;
   recentMessages?: HermesChatHistoryMessage[];
   model?: string | null;

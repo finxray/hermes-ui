@@ -218,8 +218,10 @@ export async function streamHermesSessionChat(
       body: JSON.stringify({
         conversation_history: request.recentMessages ?? [],
         input: request.message,
+        instructions: request.instructions || undefined,
         metadata: {
           context: request.context,
+          memory_scope_bridge_enabled: Boolean(request.instructions),
           project_id: request.context.project.id,
           project_title: request.context.project.title,
           provider: request.provider ?? null,

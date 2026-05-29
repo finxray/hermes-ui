@@ -114,6 +114,17 @@ docs/design/slice-10c-control-language-refinement.png
 The screenshot shows Brain Memory Studio / Hermes UI, not Codex UI or an
 unrelated app page.
 
+Follow-up correction after visual review:
+
+```text
+docs/design/slice-10c-corrected-codex-shell.png
+```
+
+The corrected screenshot shows the shell background continuing behind the right
+rail instead of using a visibly separate right-side background. It also shows
+flatter top menu controls and left sidebar action rows with less extra button
+background.
+
 ## Checks Run
 
 - `npm run check:workspace-state`: passed

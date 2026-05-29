@@ -56,7 +56,7 @@ textarea:disabled {
   display: grid;
   grid-template-rows: 44px minmax(0, 1fr);
   grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(300px, 360px);
-  column-gap: 14px;
+  column-gap: 0;
   height: 100dvh;
   min-height: 0;
   padding: 10px 14px 14px;
@@ -64,9 +64,8 @@ textarea:disabled {
   background:
     radial-gradient(circle at 44% 0, rgba(158, 110, 255, 0.12), transparent 34rem),
     radial-gradient(circle at 66% 4%, rgba(145, 184, 255, 0.08), transparent 28rem),
-    linear-gradient(90deg, transparent 0, transparent 24%, rgba(17, 18, 22, 0.5) 36%, rgba(17, 18, 22, 0.46) 100%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01) 28%, transparent),
-    var(--bg-shell-glass);
+    #111214;
 }
 
 .app-shell.is-left-collapsed {
@@ -104,7 +103,7 @@ textarea:disabled {
 .app-topbar-left,
 .app-topbar-right {
   min-width: 0;
-  gap: 10px;
+  gap: 8px;
 }
 
 .app-topbar-right {
@@ -112,7 +111,7 @@ textarea:disabled {
 }
 
 .app-menu-brand {
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
   color: var(--text-primary);
   font-size: 13px;
@@ -127,24 +126,24 @@ textarea:disabled {
   place-items: center;
   border: 0;
   border-radius: 9px;
-  background: var(--bg-control-active);
+  background: rgba(255, 255, 255, 0.055);
   color: var(--accent);
 }
 
 .app-menu {
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
-  padding: 2px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.028);
-  backdrop-filter: blur(18px);
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .app-menu-item {
   gap: 6px;
   min-height: 28px;
-  padding: 0 10px;
+  padding: 0 8px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -156,8 +155,12 @@ textarea:disabled {
 .app-menu-item:focus-visible,
 .app-menu-item.is-active {
   outline: 0;
-  background: var(--bg-control-active);
+  background: var(--bg-control-hover);
   color: var(--text-primary);
+}
+
+.app-menu-item.is-active {
+  background: transparent;
 }
 
 .sidebar,
@@ -177,7 +180,7 @@ textarea:disabled {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 8px;
 }
 
 .brand {
@@ -228,8 +231,8 @@ textarea:disabled {
 
 .sidebar-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 2px;
 }
 
 .icon-button,
@@ -254,10 +257,10 @@ textarea:disabled {
 .text-button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 9px;
   font-size: 12px;
   font-weight: 560;
 }
@@ -303,7 +306,7 @@ textarea:disabled {
 .artifact-list,
 .memory-list {
   display: grid;
-  gap: 8px;
+  gap: 3px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -312,7 +315,7 @@ textarea:disabled {
 .row-with-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
+  gap: 2px;
   align-items: center;
 }
 
@@ -322,7 +325,7 @@ textarea:disabled {
   width: 100%;
   align-items: center;
   gap: 10px;
-  padding: 9px;
+  padding: 8px 9px;
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -421,7 +424,7 @@ textarea:disabled {
   width: 100%;
   align-items: center;
   gap: 8px;
-  padding: 9px 10px;
+  padding: 8px 9px;
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -441,7 +444,7 @@ textarea:disabled {
 
 .status-stack {
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .full-width {
@@ -495,14 +498,15 @@ textarea:disabled {
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.085);
-  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-right-color: rgba(255, 255, 255, 0.035);
+  border-radius: 22px 0 0 22px;
   background:
     radial-gradient(circle at 48% -4%, rgba(154, 111, 255, 0.105), transparent 24rem),
     radial-gradient(circle at 88% 0, rgba(142, 230, 198, 0.06), transparent 21rem),
     linear-gradient(180deg, rgba(255, 255, 255, 0.048), transparent 20rem),
     var(--bg-workspace);
-  box-shadow: var(--shadow-workspace);
+  box-shadow: 0 24px 84px rgba(0, 0, 0, 0.38);
 }
 
 .topbar {
@@ -859,12 +863,9 @@ textarea:disabled {
 .context-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  padding-left: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.045);
-  background:
-    radial-gradient(circle at 0 0, rgba(154, 111, 255, 0.055), transparent 18rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 18rem),
-    transparent;
+  padding-left: 18px;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
 }
 
 .panel-head {
@@ -926,11 +927,11 @@ textarea:disabled {
 .memory-card,
 .tool-card,
 .artifact-card {
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.045);
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent),
-    rgba(21, 23, 26, 0.72);
+    rgba(255, 255, 255, 0.035);
 }
 
 .summary-card {

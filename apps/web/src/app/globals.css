@@ -372,6 +372,11 @@ textarea:disabled {
   list-style: none;
 }
 
+.project-list > li,
+.session-list > li {
+  width: 100%;
+}
+
 .status-list,
 .tool-list,
 .artifact-list,
@@ -384,6 +389,7 @@ textarea:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 24px;
   align-items: center;
+  width: 100%;
   padding: 0 15px;
   border-radius: var(--radius-md);
   background: transparent;

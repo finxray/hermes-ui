@@ -1,15 +1,20 @@
 "use client";
 
-import { Database, Search } from "lucide-react";
+import { Database, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { BrainMemoryStatusPanel } from "@/components/BrainMemoryStatusPanel";
+import { useMemoryInspection } from "@/hooks/useMemoryInspection";
 import { useBrainMemorySearch } from "@/hooks/useBrainMemorySearch";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type {
   NormalizedBrainMemorySearchScope,
   BrainMemorySearchContext,
+  NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemoryStatus,
-  NormalizedMemoryResult
+  NormalizedMemoryDetail,
+  NormalizedMemoryEvidence,
+  NormalizedMemoryResult,
+  NormalizedMemorySupersessionChain
 } from "@hermes-ui/brain-memory-client";
 import type { MemoryEvidence, Project, Session } from "@/data/types";
 import type { FormEvent } from "react";
@@ -30,7 +35,14 @@ export function BrainMemoryConsole({
   onRefreshStatus
 }: BrainMemoryConsoleProps) {
   const [query, setQuery] = useState("gateway");
+  const [mockDetail, setMockDetail] = useState<MemoryEvidence | null>(null);
   const { isSearching, lastResponse, search } = useBrainMemorySearch();
+  const {
+    clearInspection,
+    inspect,
+    isInspecting,
+    response: inspectionResponse
+  } = useMemoryInspection();
   const context = useMemo(
     () => makeSearchContext(activeProject, activeSession),
     [activeProject, activeSession]
@@ -45,7 +57,15 @@ export function BrainMemoryConsole({
 
   useEffect(() => {
     setQuery(activeSession?.memoryEvidence[0]?.title ?? activeProject.name);
-  }, [activeProject.id, activeProject.name, activeSession?.id, activeSession?.memoryEvidence]);
+    setMockDetail(null);
+    clearInspection();
+  }, [
+    activeProject.id,
+    activeProject.name,
+    activeSession?.id,
+    activeSession?.memoryEvidence,
+    clearInspection
+  ]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -141,11 +161,38 @@ export function BrainMemoryConsole({
           <span>{shouldUseMock ? mockResults.length : gatewayResults.length}</span>
         </div>
         {shouldUseMock ? (
-          <MockMemoryResults results={mockResults} />
+          <MockMemoryResults
+            results={mockResults}
+            onSelect={(memory) => {
+              clearInspection();
+              setMockDetail(memory);
+            }}
+          />
         ) : (
-          <GatewayMemoryResults results={gatewayResults} />
+          <GatewayMemoryResults
+            results={gatewayResults}
+            onSelect={(memory) => {
+              setMockDetail(null);
+              void inspect({
+                context,
+                memoryId: memory.id
+              });
+            }}
+          />
         )}
       </section>
+
+      {(mockDetail || inspectionResponse || isInspecting) ? (
+        <MemoryDetailPanel
+          inspection={inspectionResponse}
+          isInspecting={isInspecting}
+          mockDetail={mockDetail}
+          onClose={() => {
+            setMockDetail(null);
+            clearInspection();
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -193,7 +240,13 @@ function filterMockEvidence(memoryEvidence: MemoryEvidence[], query: string) {
   );
 }
 
-function MockMemoryResults({ results }: { results: MemoryEvidence[] }) {
+function MockMemoryResults({
+  onSelect,
+  results
+}: {
+  onSelect: (memory: MemoryEvidence) => void;
+  results: MemoryEvidence[];
+}) {
   if (results.length === 0) {
     return (
       <div className="empty-state compact">
@@ -206,22 +259,34 @@ function MockMemoryResults({ results }: { results: MemoryEvidence[] }) {
   return (
     <ul className="memory-list">
       {results.map((memory) => (
-        <li className="memory-card" key={memory.id}>
-          <div className="card-title">
-            <span>{memory.title}</span>
-            <span className="pill">{memory.layer}</span>
-          </div>
-          <div className="card-body">{memory.excerpt}</div>
-          <div className="card-meta">
-            {memory.source} - mock score {memory.score} - {memory.timestamp}
-          </div>
+        <li key={memory.id}>
+          <button
+            className="memory-card memory-card-button"
+            type="button"
+            onClick={() => onSelect(memory)}
+          >
+            <div className="card-title">
+              <span>{memory.title}</span>
+              <span className="pill">{memory.layer}</span>
+            </div>
+            <div className="card-body">{memory.excerpt}</div>
+            <div className="card-meta">
+              {memory.source} - mock score {memory.score} - {memory.timestamp}
+            </div>
+          </button>
         </li>
       ))}
     </ul>
   );
 }
 
-function GatewayMemoryResults({ results }: { results: NormalizedMemoryResult[] }) {
+function GatewayMemoryResults({
+  onSelect,
+  results
+}: {
+  onSelect: (memory: NormalizedMemoryResult) => void;
+  results: NormalizedMemoryResult[];
+}) {
   if (results.length === 0) {
     return (
       <div className="empty-state compact">
@@ -234,23 +299,181 @@ function GatewayMemoryResults({ results }: { results: NormalizedMemoryResult[] }
   return (
     <ul className="memory-list">
       {results.map((memory) => (
-        <li className="memory-card" key={memory.id}>
-          <div className="card-title">
-            <span>{memory.title ?? memory.id}</span>
-            <span className="pill">{memory.scopeStatus ?? memory.layer ?? "unknown"}</span>
-          </div>
-          <div className="card-body">{memory.snippet ?? memory.content}</div>
-          <div className="card-meta">
-            {memory.source ?? "Gateway"} - score {formatScore(memory.score)} - evidence{" "}
-            {memory.evidenceCount ?? 0}
-          </div>
-          <div className="card-meta">
-            {memory.projectKey ?? "project scope unknown"} -{" "}
-            {memory.supersessionStatus ?? "unknown"}
-          </div>
+        <li key={memory.id}>
+          <button
+            className="memory-card memory-card-button"
+            type="button"
+            onClick={() => onSelect(memory)}
+          >
+            <div className="card-title">
+              <span>{memory.title ?? memory.id}</span>
+              <span className="pill">{memory.scopeStatus ?? memory.layer ?? "unknown"}</span>
+            </div>
+            <div className="card-body">{memory.snippet ?? memory.content}</div>
+            <div className="card-meta">
+              {memory.source ?? "Gateway"} - score {formatScore(memory.score)} - evidence{" "}
+              {memory.evidenceCount ?? 0}
+            </div>
+            <div className="card-meta">
+              {memory.projectKey ?? "project scope unknown"} -{" "}
+              {memory.sessionKey ?? "project memory"} - {memory.supersessionStatus ?? "unknown"}
+            </div>
+          </button>
         </li>
       ))}
     </ul>
+  );
+}
+
+function MemoryDetailPanel({
+  inspection,
+  isInspecting,
+  mockDetail,
+  onClose
+}: {
+  inspection: NormalizedBrainMemoryInspectResponse | null;
+  isInspecting: boolean;
+  mockDetail: MemoryEvidence | null;
+  onClose: () => void;
+}) {
+  const detail = inspection?.detail ?? null;
+
+  return (
+    <section className="panel-section" aria-labelledby="memory-detail-heading">
+      <div className="section-label" id="memory-detail-heading">
+        <span>Memory detail</span>
+        <button
+          aria-label="Close memory detail"
+          className="icon-button subtle"
+          type="button"
+          onClick={onClose}
+        >
+          <X size={14} aria-hidden="true" />
+        </button>
+      </div>
+
+      {isInspecting ? (
+        <div className="summary-card memory-detail-panel">
+          <div className="card-title">
+            <span>Loading memory</span>
+            <span className="pill">read-only</span>
+          </div>
+          <div className="card-body">Fetching scoped detail through the local BFF.</div>
+        </div>
+      ) : null}
+
+      {!isInspecting && inspection?.error ? (
+        <div className="status-error">{inspection.error.message}</div>
+      ) : null}
+
+      {!isInspecting && mockDetail ? <MockMemoryDetail memory={mockDetail} /> : null}
+
+      {!isInspecting && detail ? (
+        <GatewayMemoryDetail
+          detail={detail}
+          evidence={inspection?.evidence ?? null}
+          supersession={inspection?.supersession ?? null}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function MockMemoryDetail({ memory }: { memory: MemoryEvidence }) {
+  return (
+    <div className="summary-card memory-detail-panel">
+      <div className="card-title">
+        <span>{memory.title}</span>
+        <span className="pill">mock/local</span>
+      </div>
+      <div className="memory-detail-content">{memory.excerpt}</div>
+      <div className="context-contract-grid">
+        <ContextField label="Memory id" value={memory.id} />
+        <ContextField label="Layer" value={memory.layer} />
+        <ContextField label="Source" value={memory.source} />
+        <ContextField label="Timestamp" value={memory.timestamp} />
+      </div>
+      <div className="card-meta">
+        Gateway detail is unavailable in mock mode; this is local demo evidence only.
+      </div>
+    </div>
+  );
+}
+
+function GatewayMemoryDetail({
+  detail,
+  evidence,
+  supersession
+}: {
+  detail: NormalizedMemoryDetail;
+  evidence: NormalizedMemoryEvidence | null;
+  supersession: NormalizedMemorySupersessionChain | null;
+}) {
+  return (
+    <div className="summary-card memory-detail-panel">
+      <div className="card-title">
+        <span>{detail.id}</span>
+        <span className="pill">{detail.scopeStatus ?? "scoped"}</span>
+      </div>
+      <div className="memory-detail-content">{detail.content}</div>
+      {detail.snippet ? <div className="card-body">Snippet: {detail.snippet}</div> : null}
+      <div className="context-contract-grid">
+        <ContextField label="Memory id" value={detail.id} />
+        <ContextField label="Layer" value={detail.layer ?? "unknown"} />
+        <ContextField label="Source" value={detail.source ?? "Gateway"} />
+        <ContextField label="Project key" value={detail.projectKey ?? "unknown"} />
+        <ContextField label="Session key" value={detail.sessionKey ?? "project-level"} />
+        <ContextField label="Supersession" value={detail.supersessionStatus ?? "unknown"} />
+        <ContextField label="Evidence count" value={String(detail.evidenceCount ?? 0)} />
+        <ContextField label="Created" value={detail.createdAt ?? "unknown"} />
+        <ContextField label="Updated" value={detail.updatedAt ?? "unknown"} />
+      </div>
+      {detail.scope ? <ScopeSummary scope={detail.scope} /> : null}
+      <ReadOnlyStatusSection
+        label="Evidence"
+        status={evidence?.status}
+        emptyText="Evidence storage is not implemented yet."
+        count={evidence?.evidence.length ?? 0}
+      />
+      <ReadOnlyStatusSection
+        label="Supersession chain"
+        status={supersession?.status}
+        emptyText="Supersession chain storage is not implemented yet."
+        count={supersession?.chain.length ?? 0}
+      />
+      {detail.metadata ? (
+        <details className="memory-metadata">
+          <summary>Metadata</summary>
+          <pre>{JSON.stringify(detail.metadata, null, 2)}</pre>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function ReadOnlyStatusSection({
+  count,
+  emptyText,
+  label,
+  status
+}: {
+  count: number;
+  emptyText: string;
+  label: string;
+  status?: string;
+}) {
+  return (
+    <div className="memory-readonly-section">
+      <div className="card-title">
+        <span>{label}</span>
+        <span className="pill">{status ?? "unknown"}</span>
+      </div>
+      <div className="card-body">
+        {status === "not_implemented" || count === 0
+          ? emptyText
+          : `${count} read-only item${count === 1 ? "" : "s"} available.`}
+      </div>
+    </div>
   );
 }
 

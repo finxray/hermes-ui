@@ -736,6 +736,24 @@ textarea:disabled {
   padding: 12px;
 }
 
+.memory-card-button {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.memory-card-button:hover,
+.memory-card-button:focus-visible {
+  border-color: rgba(142, 230, 198, 0.34);
+  background: var(--bg-surface-2);
+  outline: 0;
+}
+
 .card-title {
   display: flex;
   justify-content: space-between;
@@ -750,6 +768,58 @@ textarea:disabled {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.memory-detail-panel {
+  gap: 12px;
+}
+
+.memory-detail-content {
+  max-height: 240px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.memory-readonly-section {
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.memory-metadata {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.memory-metadata summary {
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.memory-metadata pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .status-error {

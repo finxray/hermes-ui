@@ -1,5 +1,7 @@
 import type {
+  BrainMemoryInspectRequest,
   BrainMemorySearchContext,
+  NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus
 } from "@hermes-ui/brain-memory-client";
@@ -52,6 +54,35 @@ export async function searchBrainMemoryViaBff(args: {
   }
 }
 
+export async function inspectBrainMemoryViaBff(
+  args: BrainMemoryInspectRequest
+): Promise<NormalizedBrainMemoryInspectResponse> {
+  try {
+    const response = await fetch("/api/brain-memory/memory/inspect", {
+      body: JSON.stringify(args),
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      method: "POST"
+    });
+
+    if (!response.ok) {
+      return brainMemoryInspectError(
+        args.memoryId,
+        `Brain Memory inspect route returned HTTP ${response.status}.`
+      );
+    }
+
+    return (await response.json()) as NormalizedBrainMemoryInspectResponse;
+  } catch {
+    return brainMemoryInspectError(
+      args.memoryId,
+      "Could not reach the local Brain Memory inspect route."
+    );
+  }
+}
+
 function brainMemoryStatusError(message: string): NormalizedBrainMemoryStatus {
   return {
     mode: "error",
@@ -81,5 +112,23 @@ function brainMemorySearchError(
       message
     },
     searchedAt: new Date().toISOString()
+  };
+}
+
+function brainMemoryInspectError(
+  memoryId: string,
+  message: string
+): NormalizedBrainMemoryInspectResponse {
+  return {
+    mode: "error",
+    memoryId,
+    detail: null,
+    evidence: null,
+    supersession: null,
+    error: {
+      kind: "network",
+      message
+    },
+    checkedAt: new Date().toISOString()
   };
 }

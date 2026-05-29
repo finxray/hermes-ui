@@ -1,33 +1,44 @@
 import type {
   BrainMemoryClientConfig,
   BrainMemoryError,
+  BrainMemoryInspectRequest,
   BrainMemorySearchRequest,
+  NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
+  NormalizedMemoryDetail,
+  NormalizedMemoryEvidence,
   NormalizedMemoryLayer,
   NormalizedMemoryResult,
   NormalizedMemoryScopeStatus,
+  NormalizedMemorySupersessionChain,
   NormalizedSupersessionStatus
 } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 3500;
 const SEARCH_PATH = "/ui/memory/search";
+const MEMORY_PATH = "/ui/memory";
 const HEALTH_PATH = "/health";
 const CAPABILITIES_PATH = "/ui/capabilities";
 
 export type {
   BrainMemoryClientConfig,
   BrainMemoryError,
+  BrainMemoryInspectRequest,
   BrainMemoryMode,
   BrainMemorySearchContext,
   BrainMemorySearchRequest,
+  NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
+  NormalizedMemoryDetail,
+  NormalizedMemoryEvidence,
   NormalizedMemoryLayer,
   NormalizedMemoryResult,
   NormalizedMemoryScopeStatus,
+  NormalizedMemorySupersessionChain,
   NormalizedSupersessionStatus
 } from "./types";
 
@@ -249,6 +260,137 @@ export async function searchBrainMemory(
   };
 }
 
+export async function inspectBrainMemory(
+  config: BrainMemoryClientConfig,
+  request: BrainMemoryInspectRequest
+): Promise<NormalizedBrainMemoryInspectResponse> {
+  const checkedAt = new Date().toISOString();
+  const memoryId = request.memoryId.trim().slice(0, 256);
+
+  if (!memoryId) {
+    return {
+      mode: "error",
+      memoryId,
+      detail: null,
+      evidence: null,
+      supersession: null,
+      error: {
+        kind: "bad_response",
+        message: "Memory id is required."
+      },
+      checkedAt
+    };
+  }
+
+  if (config.enabled === false) {
+    return {
+      mode: "mock",
+      memoryId,
+      detail: null,
+      evidence: null,
+      supersession: null,
+      error: {
+        kind: "disabled",
+        message: "Real Brain Memory Gateway inspection is disabled."
+      },
+      checkedAt
+    };
+  }
+
+  if (!config.baseUrl?.trim()) {
+    return {
+      mode: "unconfigured",
+      memoryId,
+      detail: null,
+      evidence: null,
+      supersession: null,
+      error: {
+        kind: "unconfigured",
+        message: "Set BRAIN_MEMORY_GATEWAY_URL and enable real Gateway reads."
+      },
+      checkedAt
+    };
+  }
+
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return {
+      mode: "error",
+      memoryId,
+      detail: null,
+      evidence: null,
+      supersession: null,
+      error: {
+        kind: "invalid_config",
+        message: "BRAIN_MEMORY_GATEWAY_URL must be a valid http:// or https:// URL."
+      },
+      checkedAt
+    };
+  }
+
+  const detailResult = await fetchGatewayJson({
+    base,
+    fetchImpl: config.fetchImpl ?? fetch,
+    gatewayMemoryApiKey: config.gatewayMemoryApiKey,
+    method: "GET",
+    path: buildMemoryReadPath(request, memoryId),
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    uiApiKey: resolveUiApiKey(config)
+  });
+
+  if (!detailResult.ok) {
+    return {
+      mode: "error",
+      memoryId,
+      detail: null,
+      evidence: null,
+      supersession: null,
+      error: detailResult.error,
+      checkedAt
+    };
+  }
+
+  const [evidenceResult, supersessionResult] = await Promise.all([
+    fetchGatewayJson({
+      base,
+      fetchImpl: config.fetchImpl ?? fetch,
+      gatewayMemoryApiKey: config.gatewayMemoryApiKey,
+      method: "GET",
+      path: buildMemoryReadPath(request, `${memoryId}/evidence`),
+      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      uiApiKey: resolveUiApiKey(config)
+    }),
+    fetchGatewayJson({
+      base,
+      fetchImpl: config.fetchImpl ?? fetch,
+      gatewayMemoryApiKey: config.gatewayMemoryApiKey,
+      method: "GET",
+      path: buildMemoryReadPath(request, `${memoryId}/supersession-chain`),
+      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      uiApiKey: resolveUiApiKey(config)
+    })
+  ]);
+
+  let partialError: BrainMemoryError | null = null;
+  if (!evidenceResult.ok) {
+    partialError = evidenceResult.error;
+  } else if (!supersessionResult.ok) {
+    partialError = supersessionResult.error;
+  }
+
+  return {
+    mode: "real",
+    memoryId,
+    detail: normalizeMemoryDetail(detailResult.data, memoryId),
+    evidence: evidenceResult.ok ? normalizeMemoryEvidence(evidenceResult.data, memoryId) : null,
+    supersession: supersessionResult.ok
+      ? normalizeMemorySupersessionChain(supersessionResult.data, memoryId)
+      : null,
+    error: partialError,
+    checkedAt
+  };
+}
+
 function parseBaseUrl(value: string): URL | null {
   try {
     const url = new URL(value);
@@ -352,6 +494,14 @@ async function fetchGatewayJson(args: {
 }
 
 function normalizeHttpError(path: string, status: number): BrainMemoryError {
+  if (status === 400) {
+    return {
+      kind: "bad_response",
+      message:
+        "Brain Memory rejected the request context or memory id for this read (HTTP 400)."
+    };
+  }
+
   if (status === 401) {
     return {
       kind: "unauthorized",
@@ -365,6 +515,14 @@ function normalizeHttpError(path: string, status: number): BrainMemoryError {
       kind: "forbidden",
       message:
         "Tenant-bound Gateway memory key is missing, lacks read access, or is not authorized for this tenant."
+    };
+  }
+
+  if (status === 404) {
+    return {
+      kind: "http_error",
+      message:
+        "Memory is not available in the current project/session scope, or the endpoint was not found (HTTP 404)."
     };
   }
 
@@ -418,6 +576,27 @@ function buildSearchFallbackPath(
     params.set("session_id", request.context.session.id);
   }
   return `${SEARCH_PATH}?${params.toString()}`;
+}
+
+function buildMemoryReadPath(request: BrainMemoryInspectRequest, memoryPath: string): string {
+  const params = new URLSearchParams({
+    includeSessionContext: String(request.context.session?.includeSessionContext ?? true),
+    projectId: request.context.project.id,
+    projectKey: request.context.project.stableKey,
+    projectTitle: request.context.project.title,
+    tenantId: request.context.project.tenantId
+  });
+  if (request.context.session?.id) {
+    params.set("sessionId", request.context.session.id);
+  }
+  if (request.context.session?.stableKey) {
+    params.set("sessionKey", request.context.session.stableKey);
+  }
+  if (request.context.session?.title) {
+    params.set("sessionTitle", request.context.session.title);
+  }
+
+  return `${MEMORY_PATH}/${memoryPath.split("/").map(encodeURIComponent).join("/")}?${params.toString()}`;
 }
 
 function extractCapabilities(data: Record<string, unknown> | null): Record<string, unknown> | null {
@@ -495,10 +674,92 @@ function normalizeSearchResult(value: unknown, index: number): NormalizedMemoryR
     sessionKey: asOptionalString(item.session_key) ?? asOptionalString(item.sessionKey),
     evidenceCount: asInteger(item.evidence_count) ?? asInteger(item.evidenceCount),
     scopeStatus: normalizeScopeStatus(item.scope_status ?? item.scopeStatus ?? metadataField(item.metadata, "scopeStatus")),
-    supersessionStatus: normalizeSupersessionStatus(item.supersession_status),
+    supersessionStatus: normalizeSupersessionStatus(
+      item.supersession_status ?? item.supersessionStatus
+    ),
     createdAt: asOptionalString(item.created_at) ?? asOptionalString(item.createdAt),
     updatedAt: asOptionalString(item.updated_at) ?? asOptionalString(item.updatedAt),
     metadata: normalizeMetadata(item.metadata)
+  };
+}
+
+function normalizeMemoryDetail(
+  data: Record<string, unknown> | null,
+  fallbackId: string
+): NormalizedMemoryDetail | null {
+  const item = unwrapMemoryDetail(data);
+  if (!item) {
+    return null;
+  }
+
+  const id = asString(item.id) || asString(item.memory_id) || fallbackId;
+  const content =
+    asString(item.content) ||
+    asString(item.full_content) ||
+    asString(item.content_text) ||
+    asString(item.snippet);
+
+  if (!id || !content) {
+    return null;
+  }
+
+  return {
+    id,
+    content,
+    snippet: asOptionalString(item.snippet) ?? asOptionalString(item.content_preview),
+    layer: normalizeLayer(item.layer),
+    source: asOptionalString(item.source) ?? asOptionalString(item.source_label),
+    projectKey: asOptionalString(item.project_key) ?? asOptionalString(item.projectKey),
+    sessionKey: asOptionalString(item.session_key) ?? asOptionalString(item.sessionKey),
+    scopeStatus: normalizeScopeStatus(
+      item.scope_status ?? item.scopeStatus ?? metadataField(item.metadata, "scopeStatus")
+    ),
+    supersessionStatus: normalizeSupersessionStatus(
+      item.supersession_status ?? item.supersessionStatus
+    ),
+    evidenceCount: asInteger(item.evidence_count) ?? asInteger(item.evidenceCount),
+    createdAt: asOptionalString(item.created_at) ?? asOptionalString(item.createdAt),
+    updatedAt: asOptionalString(item.updated_at) ?? asOptionalString(item.updatedAt),
+    metadata: normalizeMetadata(item.metadata),
+    scope: normalizeSearchScope(data)
+  };
+}
+
+function unwrapMemoryDetail(data: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!data) {
+    return null;
+  }
+
+  const candidates = [data.memory, data.detail, data.data, data];
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      return candidate as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+function normalizeMemoryEvidence(
+  data: Record<string, unknown> | null,
+  fallbackId: string
+): NormalizedMemoryEvidence {
+  const evidence = Array.isArray(data?.evidence) ? data.evidence : [];
+  return {
+    memoryId: asString(data?.memoryId) || asString(data?.memory_id) || fallbackId,
+    evidence,
+    status: asOptionalString(data?.status)
+  };
+}
+
+function normalizeMemorySupersessionChain(
+  data: Record<string, unknown> | null,
+  fallbackId: string
+): NormalizedMemorySupersessionChain {
+  const chain = Array.isArray(data?.chain) ? data.chain : [];
+  return {
+    memoryId: asString(data?.memoryId) || asString(data?.memory_id) || fallbackId,
+    chain,
+    status: asOptionalString(data?.status)
   };
 }
 

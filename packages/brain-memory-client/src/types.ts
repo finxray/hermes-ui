@@ -75,6 +75,11 @@ export type BrainMemorySearchRequest = {
   context: BrainMemorySearchContext;
 };
 
+export type BrainMemoryInspectRequest = {
+  memoryId: string;
+  context: BrainMemorySearchContext;
+};
+
 export type NormalizedMemoryLayer =
   | "hot"
   | "canonical"
@@ -123,6 +128,35 @@ export type NormalizedMemoryResult = {
   metadata?: Record<string, unknown>;
 };
 
+export type NormalizedMemoryDetail = {
+  id: string;
+  content: string;
+  snippet?: string;
+  layer?: NormalizedMemoryLayer;
+  source?: string;
+  projectKey?: string;
+  sessionKey?: string;
+  scopeStatus?: NormalizedMemoryScopeStatus;
+  supersessionStatus?: NormalizedSupersessionStatus;
+  evidenceCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  metadata?: Record<string, unknown>;
+  scope?: NormalizedBrainMemorySearchScope | null;
+};
+
+export type NormalizedMemoryEvidence = {
+  memoryId: string;
+  evidence: unknown[];
+  status?: string;
+};
+
+export type NormalizedMemorySupersessionChain = {
+  memoryId: string;
+  chain: unknown[];
+  status?: string;
+};
+
 export type NormalizedBrainMemorySearchResponse = {
   mode: BrainMemoryMode;
   query: string;
@@ -130,4 +164,14 @@ export type NormalizedBrainMemorySearchResponse = {
   scope?: NormalizedBrainMemorySearchScope | null;
   error: BrainMemoryError | null;
   searchedAt: string;
+};
+
+export type NormalizedBrainMemoryInspectResponse = {
+  mode: BrainMemoryMode;
+  memoryId: string;
+  detail: NormalizedMemoryDetail | null;
+  evidence: NormalizedMemoryEvidence | null;
+  supersession: NormalizedMemorySupersessionChain | null;
+  error: BrainMemoryError | null;
+  checkedAt: string;
 };

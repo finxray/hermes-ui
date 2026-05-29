@@ -97,7 +97,7 @@ textarea:disabled {
 
 .app-shell::before {
   position: absolute;
-  inset: -12% -12% -12% max(320px, 24vw);
+  inset: -12% -12% -12% 420px;
   z-index: 0;
   pointer-events: none;
   content: "";

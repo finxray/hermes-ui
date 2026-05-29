@@ -175,6 +175,9 @@ Additional live Windows Chrome verification:
 - a real UI send requested `POST /api/hermes/chat/stream` and received HTTP 200;
 - a direct BFF streaming probe produced live `message_delta`, `message_done`,
   `run.completed`, and `done` events from Hermes;
+- adapter hardening now sends Hermes a collision-resistant session title such
+  as `New chat [<session-id-suffix>]` while preserving the Studio title in UI
+  metadata, because live Hermes rejects duplicate session titles;
 - no `HERMES_API_KEY` value appeared in the visible page;
 - localStorage persisted the live smoke message after reload;
 - no horizontal overflow was detected.

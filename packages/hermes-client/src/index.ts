@@ -412,7 +412,7 @@ async function ensureHermesSession(args: {
       body: JSON.stringify({
         id: args.sessionId,
         model: args.model || undefined,
-        title: args.sessionTitle
+        title: makeHermesSessionTitle(args.sessionTitle, args.sessionId)
       }),
       cache: "no-store",
       headers,
@@ -439,6 +439,13 @@ async function ensureHermesSession(args: {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function makeHermesSessionTitle(title: string, sessionId: string): string {
+  const cleanTitle = title.replace(/[\r\n\x00]/g, " ").trim() || "Studio chat";
+  const suffix = sessionId.slice(-8) || "session";
+  const base = cleanTitle.length > 80 ? cleanTitle.slice(0, 80).trim() : cleanTitle;
+  return `${base} [${suffix}]`;
 }
 
 function sanitizeHermesId(value: string): string {

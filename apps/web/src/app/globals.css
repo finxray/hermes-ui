@@ -5,6 +5,8 @@
 }
 
 html {
+  height: 100%;
+  overflow: hidden;
   background: var(--bg-canvas);
   color: var(--text-primary);
   font-family:
@@ -15,7 +17,9 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
+  height: 100%;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 34rem),
     var(--bg-canvas);
@@ -49,19 +53,23 @@ textarea:disabled {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(300px, 360px);
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: rgba(8, 9, 10, 0.82);
 }
 
 .sidebar,
 .context-panel {
-  min-height: 100vh;
+  min-height: 0;
+  height: 100%;
   background: color-mix(in srgb, var(--bg-app) 92%, black);
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   border-right: 1px solid var(--border-soft);
 }
 
@@ -356,7 +364,9 @@ textarea:disabled {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg-canvas);
 }
 
@@ -556,6 +566,9 @@ textarea:disabled {
 }
 
 .composer-wrap {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   padding: 14px clamp(16px, 4vw, 52px) 22px;
   border-top: 1px solid var(--border-soft);
   background: rgba(8, 9, 10, 0.9);
@@ -836,12 +849,27 @@ textarea:disabled {
 }
 
 @media (max-width: 1180px) {
+  html,
+  body {
+    overflow: auto;
+  }
+
   .app-shell {
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    min-height: 100dvh;
+    height: auto;
+    overflow: visible;
+  }
+
+  .sidebar,
+  .chat-view {
+    min-height: 0;
+    height: 100dvh;
   }
 
   .context-panel {
     grid-column: 1 / -1;
+    height: auto;
     min-height: auto;
     max-height: none;
     border-top: 1px solid var(--border-soft);
@@ -865,9 +893,15 @@ textarea:disabled {
   }
 
   .sidebar,
-  .chat-view,
   .context-panel {
+    height: auto;
     min-height: auto;
+    overflow: visible;
+  }
+
+  .chat-view {
+    min-height: 100dvh;
+    height: 100dvh;
   }
 
   .sidebar {

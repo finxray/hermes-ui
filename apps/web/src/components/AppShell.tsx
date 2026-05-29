@@ -3,7 +3,6 @@
 import { ChatView } from "@/components/ChatView";
 import { ContextPanel } from "@/components/ContextPanel";
 import { Sidebar } from "@/components/Sidebar";
-import { StatusBadge } from "@/components/StatusBadge";
 import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
@@ -59,17 +58,6 @@ export function AppShell() {
           </nav>
         </div>
         <div className="app-topbar-right">
-          <StatusBadge
-            label={`Hermes ${formatHermesStatus(hermesStatus.status, hermesStatus.isLoading)}`}
-            tone={hermesStatusTone(hermesStatus.status, hermesStatus.isLoading)}
-          />
-          <StatusBadge
-            label={`Memory ${formatBrainMemoryStatus(
-              brainMemoryStatus.status,
-              brainMemoryStatus.isLoading
-            )}`}
-            tone={brainMemoryStatusTone(brainMemoryStatus.status, brainMemoryStatus.isLoading)}
-          />
           <button
             className="icon-button shell-toggle"
             type="button"
@@ -115,71 +103,4 @@ export function AppShell() {
       />
     </main>
   );
-}
-
-function formatHermesStatus(status: ReturnType<typeof useHermesStatus>["status"], isLoading: boolean) {
-  if (isLoading && !status) {
-    return "checking";
-  }
-  if (!status || status.mode === "unconfigured") {
-    return "unconfigured";
-  }
-  if (status.mode === "real" && status.reachable) {
-    return "connected";
-  }
-  if (status.mode === "mock") {
-    return "mock";
-  }
-  return "unreachable";
-}
-
-function hermesStatusTone(
-  status: ReturnType<typeof useHermesStatus>["status"],
-  isLoading: boolean
-): "error" | "mock" | "quiet" | "success" {
-  if (isLoading && !status) {
-    return "quiet";
-  }
-  if (status?.mode === "real" && status.reachable) {
-    return "success";
-  }
-  if (status?.mode === "error") {
-    return "error";
-  }
-  return "mock";
-}
-
-function formatBrainMemoryStatus(
-  status: ReturnType<typeof useBrainMemoryStatus>["status"],
-  isLoading: boolean
-) {
-  if (isLoading && !status) {
-    return "checking";
-  }
-  if (!status || status.mode === "unconfigured") {
-    return "unconfigured";
-  }
-  if (status.mode === "real" && status.reachable) {
-    return "connected";
-  }
-  if (status.mode === "mock") {
-    return "mock";
-  }
-  return "unreachable";
-}
-
-function brainMemoryStatusTone(
-  status: ReturnType<typeof useBrainMemoryStatus>["status"],
-  isLoading: boolean
-): "error" | "mock" | "quiet" | "success" {
-  if (isLoading && !status) {
-    return "quiet";
-  }
-  if (status?.mode === "real" && status.reachable) {
-    return "success";
-  }
-  if (status?.mode === "error") {
-    return "error";
-  }
-  return "mock";
 }

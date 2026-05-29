@@ -7,8 +7,6 @@ import { useRef, useState } from "react";
 import { Composer } from "@/components/Composer";
 import { EmptyState } from "@/components/EmptyState";
 import { MessageBubble } from "@/components/MessageBubble";
-import { ModelSelector } from "@/components/ModelSelector";
-import { StatusBadge } from "@/components/StatusBadge";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesChatStreamEvent, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
@@ -183,13 +181,6 @@ export function ChatView({
             </p>
           </div>
         </div>
-        <div className="topbar-actions">
-          <ModelSelector choices={modelChoices} selectedId="hermes-default" />
-          <StatusBadge
-            label={`Hermes ${formatHermesStatus(hermesStatus, isHermesStatusLoading)}`}
-            tone={hermesStatusTone(hermesStatus, isHermesStatusLoading)}
-          />
-        </div>
       </header>
 
       <div className="transcript" aria-label="Chat transcript">
@@ -328,36 +319,4 @@ function describePayload(payload: Record<string, unknown>) {
     return message;
   }
   return "Normalized Hermes stream event";
-}
-
-function formatHermesStatus(status: NormalizedHermesStatus | null, isLoading: boolean) {
-  if (isLoading && !status) {
-    return "checking";
-  }
-  if (!status || status.mode === "unconfigured") {
-    return "unconfigured";
-  }
-  if (status.mode === "real" && status.reachable) {
-    return "connected";
-  }
-  if (status.mode === "mock") {
-    return "mock";
-  }
-  return "unreachable";
-}
-
-function hermesStatusTone(
-  status: NormalizedHermesStatus | null,
-  isLoading: boolean
-): "error" | "mock" | "quiet" | "success" {
-  if (isLoading && !status) {
-    return "quiet";
-  }
-  if (status?.mode === "real" && status.reachable) {
-    return "success";
-  }
-  if (status?.mode === "error") {
-    return "error";
-  }
-  return "mock";
 }

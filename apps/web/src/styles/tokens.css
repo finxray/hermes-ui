@@ -8,7 +8,9 @@
   --bg-surface: #15171a;
   --bg-surface-2: #1b1e22;
   --bg-elevated: #23272d;
-  --bg-workspace: #101113;
+  --bg-workspace: #111216;
+  --bg-control-hover: rgba(255, 255, 255, 0.055);
+  --bg-control-active: rgba(255, 255, 255, 0.082);
 
   --border-soft: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);

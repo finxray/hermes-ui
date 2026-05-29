@@ -1,4 +1,12 @@
-import { AlertTriangle, BookOpenText, PanelRight, SendHorizontal } from "lucide-react";
+import {
+  AlertTriangle,
+  BookOpenText,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  SendHorizontal
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { Composer } from "@/components/Composer";
 import { EmptyState } from "@/components/EmptyState";
@@ -18,8 +26,12 @@ type ChatViewProps = {
   activeSession: Session | null;
   createSession: () => void;
   hermesStatus: NormalizedHermesStatus | null;
+  isLeftPanelOpen: boolean;
   isHermesStatusLoading: boolean;
+  isRightPanelOpen: boolean;
   modelChoices: ModelChoice[];
+  toggleLeftPanel: () => void;
+  toggleRightPanel: () => void;
   workspaceActions: WorkspaceActions;
 };
 
@@ -28,8 +40,12 @@ export function ChatView({
   activeSession,
   createSession,
   hermesStatus,
+  isLeftPanelOpen,
   isHermesStatusLoading,
+  isRightPanelOpen,
   modelChoices,
+  toggleLeftPanel,
+  toggleRightPanel,
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -167,12 +183,23 @@ export function ChatView({
   return (
     <section className="chat-view" aria-label="Chat workspace">
       <header className="topbar">
-        <div>
-          <h1>{activeSession?.title ?? "No chat selected"}</h1>
-          <p>
-            {activeProject.name} ·{" "}
-            {activeSession?.summary ?? "Create a new local mock chat to start this project."}
-          </p>
+        <div className="topbar-left">
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={isLeftPanelOpen ? "Collapse left sidebar" : "Open left sidebar"}
+            aria-pressed={isLeftPanelOpen}
+            onClick={toggleLeftPanel}
+          >
+            {isLeftPanelOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+          <div className="topbar-title">
+            <h1>{activeSession?.title ?? "No chat selected"}</h1>
+            <p>
+              {activeProject.name} /{" "}
+              {activeSession?.summary ?? "Create a new local mock chat to start this project."}
+            </p>
+          </div>
         </div>
         <div className="topbar-actions">
           <ModelSelector choices={modelChoices} selectedId="hermes-default" />
@@ -180,8 +207,14 @@ export function ChatView({
             label={`Hermes ${formatHermesStatus(hermesStatus, isHermesStatusLoading)}`}
             tone={hermesStatusTone(hermesStatus, isHermesStatusLoading)}
           />
-          <button className="icon-button" type="button" aria-label="Open right panel">
-            <PanelRight size={16} />
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={isRightPanelOpen ? "Collapse right context panel" : "Open right context panel"}
+            aria-pressed={isRightPanelOpen}
+            onClick={toggleRightPanel}
+          >
+            {isRightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
           </button>
         </div>
       </header>

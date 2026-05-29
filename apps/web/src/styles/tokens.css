@@ -3,9 +3,11 @@
 
   --bg-canvas: #08090a;
   --bg-app: #0d0f11;
+  --bg-rail: #0f1012;
   --bg-surface: #15171a;
   --bg-surface-2: #1b1e22;
   --bg-elevated: #23272d;
+  --bg-workspace: #101113;
 
   --border-soft: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
@@ -26,4 +28,5 @@
   --radius-xl: 24px;
 
   --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.35);
+  --shadow-workspace: 0 24px 90px rgba(0, 0, 0, 0.46);
 }

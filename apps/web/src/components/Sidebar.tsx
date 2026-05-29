@@ -92,7 +92,7 @@ export function Sidebar({
           </div>
           <div>
             <p className="brand-title">Brain Memory Studio</p>
-            <p className="brand-subtitle">Hermes UI static shell</p>
+            <p className="brand-subtitle">Hermes UI local workspace</p>
           </div>
         </div>
       </div>

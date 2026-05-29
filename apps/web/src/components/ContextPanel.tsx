@@ -252,7 +252,7 @@ function ToolActivitySection({ toolEvents }: { toolEvents: Session["toolEvents"]
       ) : (
         <ul className="tool-list">
           {toolEvents.map((event) => (
-            <li className="tool-card" key={event.id}>
+            <li className="tool-card" data-status={event.status} key={event.id}>
               <span className="tool-icon" aria-hidden="true">
                 <Activity size={14} />
               </span>

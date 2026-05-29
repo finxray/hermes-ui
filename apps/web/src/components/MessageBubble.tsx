@@ -9,7 +9,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const initials = message.role === "assistant" ? "H" : "A";
 
   return (
-    <article className="message" data-role={message.role}>
+    <article className="message" data-role={message.role} data-status={message.status ?? "complete"}>
       <div className="message-avatar" aria-hidden="true">
         {initials}
       </div>

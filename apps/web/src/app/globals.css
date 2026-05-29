@@ -381,17 +381,30 @@ textarea:disabled {
 
 .row-with-actions {
   position: relative;
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  padding: 0 15px;
+  border-radius: var(--radius-md);
   background: transparent;
+}
+
+.row-with-actions:hover,
+.row-with-actions:focus-within {
+  background: var(--bg-control-hover);
+}
+
+.row-with-actions:has(.session-button.is-active) {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .project-button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr) 34px;
   width: 100%;
   align-items: center;
   gap: 8px;
-  padding: 8px 34px 8px 0;
+  padding: 8px 0;
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -466,10 +479,8 @@ textarea:disabled {
   gap: 2px;
   opacity: 0;
   pointer-events: none;
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
+  position: static;
+  transform: none;
   transition: opacity 100ms ease;
 }
 
@@ -483,8 +494,8 @@ textarea:disabled {
 
 .mini-action {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   place-items: center;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -493,10 +504,8 @@ textarea:disabled {
 }
 
 .row-with-actions > .mini-action {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
+  position: static;
+  transform: none;
 }
 
 .sidebar .mini-action {
@@ -517,7 +526,7 @@ textarea:disabled {
   width: 100%;
   align-items: center;
   gap: 8px;
-  padding: 8px 34px 8px 0;
+  padding: 8px 0;
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -525,7 +534,7 @@ textarea:disabled {
 
 .session-button.is-active {
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -1416,17 +1425,22 @@ textarea:disabled {
   background-color: transparent;
 }
 
+.row-with-actions:hover,
+.row-with-actions:focus-within {
+  background: var(--bg-control-hover);
+}
+
+.row-with-actions:has(.session-button.is-active) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .sidebar .text-button:hover,
-.project-button:hover,
-.session-button:hover,
 .app-menu-item:hover,
 .tab-button:hover,
 .mini-action:hover,
 .composer-tool-button:hover,
 .composer-model-button:hover,
 .sidebar .text-button:focus-visible,
-.project-button:focus-visible,
-.session-button:focus-visible,
 .app-menu-item:focus-visible,
 .tab-button:focus-visible,
 .mini-action:focus-visible,
@@ -1435,9 +1449,16 @@ textarea:disabled {
   background: var(--bg-control-hover);
 }
 
-.session-button.is-active,
 .tab-button.is-active {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.project-button:hover,
+.project-button:focus-visible,
+.session-button:hover,
+.session-button:focus-visible,
+.session-button.is-active {
+  background: transparent;
 }
 
 .tab-button,

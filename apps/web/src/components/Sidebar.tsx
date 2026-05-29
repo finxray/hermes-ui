@@ -91,7 +91,6 @@ export function Sidebar({
           </div>
           <div>
             <p className="brand-title">Brain Memory Studio</p>
-            <p className="brand-subtitle">Hermes UI local workspace</p>
           </div>
         </div>
       </div>
@@ -181,7 +180,6 @@ export function Sidebar({
       <section className="sidebar-section" aria-labelledby="sessions-heading">
         <div className="section-label" id="sessions-heading">
           <span>Sessions</span>
-          <span>{activeProject.name}</span>
         </div>
         {sessions.length === 0 ? (
           <EmptyState

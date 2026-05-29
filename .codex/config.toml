@@ -1,0 +1,11 @@
+# Project-scoped Codex defaults.
+# Codex will load this only if the project is trusted.
+# Override per run when using Slice 0 or other complex architecture work.
+
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+model_verbosity = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "cached"
+personality = "pragmatic"

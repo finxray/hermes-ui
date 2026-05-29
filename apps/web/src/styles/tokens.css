@@ -4,6 +4,7 @@
   --bg-canvas: #08090a;
   --bg-app: #0d0f11;
   --bg-rail: #0f1012;
+  --bg-shell-glass: rgba(16, 15, 19, 0.76);
   --bg-surface: #15171a;
   --bg-surface-2: #1b1e22;
   --bg-elevated: #23272d;
@@ -28,5 +29,5 @@
   --radius-xl: 24px;
 
   --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.35);
-  --shadow-workspace: 0 24px 90px rgba(0, 0, 0, 0.46);
+  --shadow-workspace: 0 30px 110px rgba(0, 0, 0, 0.56);
 }

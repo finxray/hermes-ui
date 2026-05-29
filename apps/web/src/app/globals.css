@@ -20,24 +20,11 @@ body {
   min-height: 100dvh;
   height: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 46% -18%, rgba(149, 105, 255, 0.15), transparent 34rem),
-    radial-gradient(circle at 76% -10%, rgba(142, 230, 198, 0.08), transparent 28rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 30rem),
-    var(--bg-canvas);
+  background: #003f22;
 }
 
 body::before {
-  position: fixed;
-  inset: -18%;
-  z-index: -1;
-  pointer-events: none;
-  content: "";
-  background:
-    radial-gradient(circle at 30% 0%, rgba(111, 83, 194, 0.12), transparent 32rem),
-    radial-gradient(circle at 72% 8%, rgba(76, 127, 140, 0.08), transparent 30rem),
-    radial-gradient(circle at 58% 100%, rgba(120, 64, 94, 0.07), transparent 34rem);
-  animation: ambient-drift 18s ease-in-out infinite alternate;
+  content: none;
 }
 
 @keyframes ambient-drift {
@@ -92,7 +79,7 @@ textarea:disabled {
   padding: 8px 0 0;
   overflow: hidden;
   transition: grid-template-columns 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  background: var(--bg-workspace);
+  background: #003f22;
 }
 
 .app-shell::before {
@@ -617,7 +604,7 @@ textarea:disabled {
   border-right-color: rgba(255, 255, 255, 0.035);
   border-radius: 18px 0 0 0;
   background: var(--bg-workspace);
-  box-shadow: 0 24px 84px rgba(0, 0, 0, 0.38);
+  box-shadow: none;
 }
 
 .topbar {

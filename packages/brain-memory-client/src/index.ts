@@ -12,6 +12,7 @@ import type {
 const DEFAULT_TIMEOUT_MS = 3500;
 const SEARCH_PATH = "/ui/memory/search";
 const HEALTH_PATH = "/health";
+const CAPABILITIES_PATH = "/ui/capabilities";
 
 export type {
   BrainMemoryClientConfig,
@@ -81,12 +82,12 @@ export async function getBrainMemoryStatus(
   }
 
   const result = await fetchGatewayJson({
-    apiKey: config.apiKey,
     base,
     fetchImpl: config.fetchImpl ?? fetch,
     method: "GET",
     path: HEALTH_PATH,
-    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    uiApiKey: resolveUiApiKey(config)
   });
 
   if (!result.ok) {
@@ -102,13 +103,22 @@ export async function getBrainMemoryStatus(
     };
   }
 
+  const capabilitiesResult = await fetchGatewayJson({
+    base,
+    fetchImpl: config.fetchImpl ?? fetch,
+    method: "GET",
+    path: CAPABILITIES_PATH,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    uiApiKey: resolveUiApiKey(config)
+  });
+
   return {
     mode: "real",
     configured: true,
     reachable: true,
     baseUrl: safeDisplayUrl(base),
     health: result.data,
-    capabilities: extractCapabilities(result.data),
+    capabilities: capabilitiesResult.ok ? extractCapabilities(capabilitiesResult.data) : null,
     error: null,
     checkedAt
   };
@@ -176,34 +186,37 @@ export async function searchBrainMemory(
   }
 
   const body = {
+    context: request.context,
+    context_policy: request.context.project.contextPolicy,
     include_evidence_summary: true,
     limit,
     project_id: request.context.project.id,
     query,
     retrieval_profile: request.context.project.retrievalProfile,
     session_id: request.context.session?.id,
-    tenant_id: request.context.project.tenantId,
-    context: request.context
+    tenant_id: request.context.project.tenantId
   };
 
   let result = await fetchGatewayJson({
-    apiKey: config.apiKey,
     base,
     body,
     fetchImpl: config.fetchImpl ?? fetch,
+    gatewayMemoryApiKey: config.gatewayMemoryApiKey,
     method: "POST",
     path: SEARCH_PATH,
-    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    uiApiKey: resolveUiApiKey(config)
   });
 
   if (!result.ok && shouldTryGetSearchFallback(result.error)) {
     result = await fetchGatewayJson({
-      apiKey: config.apiKey,
       base,
       fetchImpl: config.fetchImpl ?? fetch,
+      gatewayMemoryApiKey: config.gatewayMemoryApiKey,
       method: "GET",
       path: buildSearchFallbackPath(request, query, limit),
-      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      uiApiKey: resolveUiApiKey(config)
     });
   }
 
@@ -252,20 +265,38 @@ function buildEndpointUrl(base: URL, path: string): string {
   return new URL(path.replace(/^\//, ""), root).toString();
 }
 
-function applyGatewayAuth(headers: Headers, apiKey?: string | null) {
-  if (apiKey) {
-    headers.set("Authorization", `Bearer ${apiKey}`);
+function resolveUiApiKey(config: BrainMemoryClientConfig): string | null {
+  return cleanOptionalSecret(config.uiApiKey) ?? cleanOptionalSecret(config.legacyApiKey) ?? null;
+}
+
+function cleanOptionalSecret(value?: string | null): string | null {
+  const cleanValue = value?.trim();
+  return cleanValue ? cleanValue : null;
+}
+
+function applyGatewayAuth(
+  headers: Headers,
+  auth: { gatewayMemoryApiKey?: string | null; uiApiKey?: string | null }
+) {
+  const uiApiKey = cleanOptionalSecret(auth.uiApiKey);
+  const gatewayMemoryApiKey = cleanOptionalSecret(auth.gatewayMemoryApiKey);
+  if (uiApiKey) {
+    headers.set("Authorization", `Bearer ${uiApiKey}`);
+  }
+  if (gatewayMemoryApiKey) {
+    headers.set("X-Gateway-Memory-Api-Key", gatewayMemoryApiKey);
   }
 }
 
 async function fetchGatewayJson(args: {
-  apiKey?: string | null;
   base: URL;
   body?: Record<string, unknown>;
   fetchImpl: typeof fetch;
+  gatewayMemoryApiKey?: string | null;
   method: "GET" | "POST";
   path: string;
   timeoutMs: number;
+  uiApiKey?: string | null;
 }): Promise<
   | { ok: true; data: Record<string, unknown> | null }
   | { ok: false; error: BrainMemoryError }
@@ -273,7 +304,10 @@ async function fetchGatewayJson(args: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), args.timeoutMs);
   const headers = new Headers({ Accept: "application/json" });
-  applyGatewayAuth(headers, args.apiKey);
+  applyGatewayAuth(headers, {
+    gatewayMemoryApiKey: args.gatewayMemoryApiKey,
+    uiApiKey: args.uiApiKey
+  });
 
   if (args.method === "POST") {
     headers.set("Content-Type", "application/json");
@@ -292,10 +326,7 @@ async function fetchGatewayJson(args: {
     if (!response.ok) {
       return {
         ok: false,
-        error: {
-          kind: "http_error",
-          message: `${args.path} returned HTTP ${response.status}.`
-        }
+        error: normalizeHttpError(args.path, response.status)
       };
     }
 
@@ -308,6 +339,29 @@ async function fetchGatewayJson(args: {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function normalizeHttpError(path: string, status: number): BrainMemoryError {
+  if (status === 401) {
+    return {
+      kind: "unauthorized",
+      message:
+        "Brain Memory UI API bearer is missing/invalid, or Gateway memory auth is required for this endpoint."
+    };
+  }
+
+  if (status === 403) {
+    return {
+      kind: "forbidden",
+      message:
+        "Tenant-bound Gateway memory key is missing, lacks read access, or is not authorized for this tenant."
+    };
+  }
+
+  return {
+    kind: "http_error",
+    message: `${path} returned HTTP ${status}.`
+  };
 }
 
 async function readJsonObject(response: Response): Promise<Record<string, unknown> | null> {
@@ -357,6 +411,10 @@ function buildSearchFallbackPath(
 }
 
 function extractCapabilities(data: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (data?.features && typeof data.features === "object" && !Array.isArray(data.features)) {
+    return data as Record<string, unknown>;
+  }
+
   const capabilities = data?.capabilities;
   return capabilities && typeof capabilities === "object" && !Array.isArray(capabilities)
     ? (capabilities as Record<string, unknown>)

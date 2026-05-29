@@ -7,6 +7,8 @@ export type BrainMemoryError = {
     | "invalid_config"
     | "network"
     | "timeout"
+    | "unauthorized"
+    | "forbidden"
     | "http_error"
     | "bad_response"
     | "unknown";
@@ -15,7 +17,20 @@ export type BrainMemoryError = {
 
 export type BrainMemoryClientConfig = {
   baseUrl?: string | null;
-  apiKey?: string | null;
+  /**
+   * Optional UI/BFF bearer gate for Brain Memory /ui/** endpoints.
+   * This does not authorize tenant memory access by itself.
+   */
+  uiApiKey?: string | null;
+  /**
+   * Tenant-bound Gateway memory key sent only where Gateway memory auth is required.
+   */
+  gatewayMemoryApiKey?: string | null;
+  /**
+   * Backward-compatible alias for the old BRAIN_MEMORY_API_KEY env var.
+   * Prefer uiApiKey and gatewayMemoryApiKey for new integrations.
+   */
+  legacyApiKey?: string | null;
   enabled?: boolean;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;

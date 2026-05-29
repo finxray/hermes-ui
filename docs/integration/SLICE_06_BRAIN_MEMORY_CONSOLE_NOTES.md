@@ -55,9 +55,16 @@ Added to `.env.example`:
 
 ```text
 BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8765
+BRAIN_MEMORY_UI_API_KEY=
+BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY=
 BRAIN_MEMORY_API_KEY=
 BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=false
 ```
+
+Slice 07A refines the auth model: `BRAIN_MEMORY_UI_API_KEY` is the optional
+UI/BFF bearer gate, while `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` is the
+tenant-bound key for read-only `/ui/memory/search`. `BRAIN_MEMORY_API_KEY`
+remains only a legacy alias for older local configs.
 
 The default flag is `false`, so the UI stays in mock mode until a real Gateway HTTP UI endpoint is intentionally enabled.
 

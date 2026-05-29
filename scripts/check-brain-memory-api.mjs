@@ -9,7 +9,8 @@ for (const arg of process.argv.slice(2)) {
 }
 
 const baseUrl = args.get("url") || process.env.BRAIN_MEMORY_GATEWAY_URL;
-const apiKey = process.env.BRAIN_MEMORY_API_KEY;
+const uiApiKey = process.env.BRAIN_MEMORY_UI_API_KEY || process.env.BRAIN_MEMORY_API_KEY;
+const gatewayMemoryApiKey = process.env.BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY;
 const query = args.get("query");
 
 if (!baseUrl) {
@@ -37,16 +38,33 @@ try {
   );
 
   if (query) {
+    const tenantId = args.get("tenant") || "local-dev";
     const search = await gatewayFetch(base, "/ui/memory/search", {
       body: JSON.stringify({
+        context: {
+          project: {
+            contextPolicy: "project-and-session",
+            id: "doctor-project",
+            retrievalProfile: "balanced",
+            stableKey: "doctor",
+            tenantId,
+            title: "Doctor"
+          },
+          session: null,
+          ui: {
+            source: "hermes-ui",
+            workspaceVersion: 1
+          }
+        },
         include_evidence_summary: true,
         limit: 5,
         query,
-        tenant_id: args.get("tenant") || "tenant-local"
+        tenant_id: tenantId
       }),
       headers: {
         "Content-Type": "application/json"
       },
+      includeGatewayMemoryKey: true,
       method: "POST"
     });
     console.log(JSON.stringify({ search }, null, 2));
@@ -61,19 +79,26 @@ async function gatewayFetch(base, path, init) {
     Accept: "application/json",
     ...(init.headers ?? {})
   });
-  if (apiKey) {
+  if (uiApiKey) {
     headers.set("Authorization", "Bearer [redacted]");
+  }
+  if (init.includeGatewayMemoryKey && gatewayMemoryApiKey) {
+    headers.set("X-Gateway-Memory-Api-Key", "[redacted]");
   }
 
   const networkHeaders = new Headers(headers);
-  if (apiKey) {
-    networkHeaders.set("Authorization", `Bearer ${apiKey}`);
+  if (uiApiKey) {
+    networkHeaders.set("Authorization", `Bearer ${uiApiKey}`);
+  }
+  if (init.includeGatewayMemoryKey && gatewayMemoryApiKey) {
+    networkHeaders.set("X-Gateway-Memory-Api-Key", gatewayMemoryApiKey);
   }
 
-  const response = await fetch(new URL(path.replace(/^\//, ""), `${base.href}/`), {
-    ...init,
+  const response = await fetch(buildEndpointUrl(base, path), {
+    body: init.body,
     cache: "no-store",
-    headers: networkHeaders
+    headers: networkHeaders,
+    method: init.method
   });
   const text = await response.text();
   let body = null;
@@ -91,6 +116,11 @@ async function gatewayFetch(base, path, init) {
     body,
     status: response.status
   };
+}
+
+function buildEndpointUrl(base, path) {
+  const root = base.href.endsWith("/") ? base.href : `${base.href}/`;
+  return new URL(path.replace(/^\//, ""), root);
 }
 
 function parseBaseUrl(value) {

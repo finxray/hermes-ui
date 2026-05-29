@@ -81,7 +81,13 @@ Recommended env:
 ```text
 HERMES_UI_ENABLE_REAL_HERMES=true
 BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true
+BRAIN_MEMORY_UI_API_KEY=
+BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY=<tenant-bound read key>
 ```
+
+`BRAIN_MEMORY_UI_API_KEY` is an optional UI/BFF bearer gate. Tenant memory
+search authorization comes from `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`, which
+the BFF sends as `X-Gateway-Memory-Api-Key` for `/ui/memory/search`.
 
 ## Attach Brain Memory Later
 
@@ -93,8 +99,12 @@ Current path:
 1. Keep the Web UI running in standalone mode.
 2. Install/start Brain Memory using its own project instructions.
 3. Configure `apps/web/.env.local` with `BRAIN_MEMORY_GATEWAY_URL`.
-4. Set `BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true`.
-5. Run `npm run studio:doctor`.
+4. Set `BRAIN_MEMORY_UI_API_KEY` if the Gateway has the optional `/ui/**`
+   bearer gate enabled.
+5. Set `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` for tenant-authorized read-only
+   memory search unless explicit local-dev bypass is enabled.
+6. Set `BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true`.
+7. Run `npm run studio:doctor`.
 
 Future path:
 

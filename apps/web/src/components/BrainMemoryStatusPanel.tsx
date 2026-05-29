@@ -13,6 +13,7 @@ export function BrainMemoryStatusPanel({
   onRefresh
 }: BrainMemoryStatusPanelProps) {
   const checkedAt = status?.checkedAt ? new Date(status.checkedAt).toLocaleTimeString() : "Never";
+  const capabilities = formatCapabilities(status?.capabilities ?? null);
 
   return (
     <section className="panel-section" aria-labelledby="brain-memory-status-heading">
@@ -55,6 +56,17 @@ export function BrainMemoryStatusPanel({
             then set BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true when Gateway is reachable.
           </div>
         ) : null}
+        {status?.mode === "real" ? (
+          <div className="card-meta">
+            {capabilities.length > 0
+              ? `Capabilities: ${capabilities.join(", ")}`
+              : "Capabilities endpoint unavailable or protected; status is still read from /health."}
+          </div>
+        ) : null}
+        <div className="card-meta">
+          Real memory search may require both an optional UI API bearer and a tenant-bound Gateway
+          memory key.
+        </div>
         <div className="card-meta">Last checked: {checkedAt}</div>
       </div>
     </section>
@@ -78,4 +90,20 @@ function statusLabel(status: NormalizedBrainMemoryStatus | null, isLoading: bool
     return "Gateway mock mode";
   }
   return "Gateway unreachable";
+}
+
+function formatCapabilities(capabilities: Record<string, unknown> | null): string[] {
+  const features =
+    capabilities?.features && typeof capabilities.features === "object" && !Array.isArray(capabilities.features)
+      ? (capabilities.features as Record<string, unknown>)
+      : capabilities;
+
+  if (!features) {
+    return [];
+  }
+
+  return Object.entries(features)
+    .filter(([, value]) => value === true)
+    .map(([key]) => key)
+    .slice(0, 5);
 }

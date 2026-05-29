@@ -24,6 +24,7 @@ const report = {
   services: {
     hermesDirect: null,
     hermesBff: null,
+    brainMemoryCapabilitiesDirect: null,
     brainMemoryDirect: null,
     brainMemoryBff: null
   },
@@ -79,6 +80,9 @@ report.services.hermesDirect = await checkHermesDirect(report.env.hermes);
 report.services.hermesBff = await fetchJson(`${webUiUrl}/api/hermes/status`);
 report.services.brainMemoryBff = await fetchJson(`${webUiUrl}/api/brain-memory/status`);
 report.services.brainMemoryDirect = await checkBrainMemoryDirect(report.env.brainMemory);
+report.services.brainMemoryCapabilitiesDirect = await checkBrainMemoryCapabilitiesDirect(
+  report.env.brainMemory
+);
 report.brainMemoryUi = inferBrainMemoryUiState(report.env.brainMemory, report.services.brainMemoryBff);
 report.suggestions = makeSuggestions(report);
 
@@ -102,8 +106,10 @@ function readHermesEnv(values) {
 function readBrainMemoryEnv(values) {
   return {
     baseUrl: values.BRAIN_MEMORY_GATEWAY_URL || "",
-    apiKeySet: Boolean(values.BRAIN_MEMORY_API_KEY),
-    enableRealGateway: values.BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY || ""
+    enableRealGateway: values.BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY || "",
+    gatewayMemoryApiKeySet: Boolean(values.BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY),
+    legacyApiKeySet: Boolean(values.BRAIN_MEMORY_API_KEY),
+    uiApiKeySet: Boolean(values.BRAIN_MEMORY_UI_API_KEY)
   };
 }
 
@@ -200,15 +206,30 @@ async function checkBrainMemoryDirect(brainMemoryEnv) {
       detail: "Brain Memory Gateway direct health skipped because real Gateway mode is disabled."
     };
   }
-  return fetchJson(`${trimSlash(brainMemoryEnv.baseUrl)}/health`);
+  return fetchJson(`${trimSlash(brainMemoryEnv.baseUrl)}/health`, {
+    headers: makeBrainMemoryUiAuthHeader()
+  });
 }
 
-async function fetchJson(url) {
+async function checkBrainMemoryCapabilitiesDirect(brainMemoryEnv) {
+  if (brainMemoryEnv.enableRealGateway !== "true" || !brainMemoryEnv.baseUrl) {
+    return {
+      status: "disabled",
+      detail: "Brain Memory Gateway capabilities skipped because real Gateway mode is disabled."
+    };
+  }
+  return fetchJson(`${trimSlash(brainMemoryEnv.baseUrl)}/ui/capabilities`, {
+    headers: makeBrainMemoryUiAuthHeader()
+  });
+}
+
+async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       cache: "no-store",
+      headers: options.headers,
       signal: controller.signal
     });
     const text = await response.text();
@@ -249,6 +270,8 @@ function sanitizeBody(body) {
   delete copy.apiKey;
   delete copy.HERMES_API_KEY;
   delete copy.BRAIN_MEMORY_API_KEY;
+  delete copy.BRAIN_MEMORY_UI_API_KEY;
+  delete copy.BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY;
   return copy;
 }
 
@@ -275,6 +298,9 @@ function inferBrainMemoryUiState(brainMemoryEnv, bffStatus) {
     return "disabled";
   }
   if (bffStatus?.status === "connected" && bffStatus.body?.mode === "real") {
+    if (!bffStatus.body.capabilities) {
+      return "health-only";
+    }
     return "enabled";
   }
   return "configured-unreachable";
@@ -290,6 +316,14 @@ function makeSuggestions(currentReport) {
   }
   if (currentReport.installMode === "web-ui-only") {
     suggestions.push("Brain Memory is optional. Keep BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=false until you install/connect it.");
+  }
+  if (
+    currentReport.env.brainMemory.enableRealGateway === "true" &&
+    !currentReport.env.brainMemory.gatewayMemoryApiKeySet
+  ) {
+    suggestions.push(
+      "For real memory search, set BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY unless Gateway loopback dev bypass is explicitly enabled."
+    );
   }
   if (currentReport.installMode === "bundle-ready") {
     suggestions.push("Run npm run dev, then npm run studio:open to use the bundle-ready local setup.");
@@ -318,7 +352,15 @@ function printReport(currentReport) {
   console.log(`Hermes API key: ${currentReport.env.hermes.apiKeySet ? "set" : "not set"}`);
   console.log(`Hermes real mode: ${currentReport.env.hermes.enableRealHermes || "(not set)"}`);
   console.log(`Brain Memory URL: ${currentReport.env.brainMemory.baseUrl || "(not set)"}`);
-  console.log(`Brain Memory API key: ${currentReport.env.brainMemory.apiKeySet ? "set" : "not set"}`);
+  console.log(`Brain Memory UI API key: ${currentReport.env.brainMemory.uiApiKeySet ? "set" : "not set"}`);
+  console.log(
+    `Brain Memory tenant memory key: ${
+      currentReport.env.brainMemory.gatewayMemoryApiKeySet ? "set" : "not set"
+    }`
+  );
+  console.log(
+    `Brain Memory legacy API key: ${currentReport.env.brainMemory.legacyApiKeySet ? "set" : "not set"}`
+  );
   console.log(`Brain Memory real mode: ${currentReport.env.brainMemory.enableRealGateway || "(not set)"}`);
   console.log(`Brain Memory UI state: ${currentReport.brainMemoryUi}`);
   console.log("");
@@ -328,6 +370,10 @@ function printReport(currentReport) {
   printService("Web UI BFF Hermes status", currentReport.services.hermesBff);
   printService("Web UI BFF Brain Memory status", currentReport.services.brainMemoryBff);
   printService("Brain Memory Gateway direct /health", currentReport.services.brainMemoryDirect);
+  printService(
+    "Brain Memory Gateway direct /ui/capabilities",
+    currentReport.services.brainMemoryCapabilitiesDirect
+  );
   console.log("");
 
   console.log("Suggested next commands");
@@ -338,6 +384,11 @@ function printReport(currentReport) {
     console.log("- npm run dev");
     console.log("- npm run studio:open");
   }
+}
+
+function makeBrainMemoryUiAuthHeader() {
+  const cleanValue = (env.BRAIN_MEMORY_UI_API_KEY || env.BRAIN_MEMORY_API_KEY || "").trim();
+  return cleanValue ? { Authorization: `Bearer ${cleanValue}` } : undefined;
 }
 
 function printService(label, service) {

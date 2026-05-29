@@ -74,6 +74,9 @@ Before using this mode, make sure:
 
 - Hermes API server is reachable;
 - Brain Memory Gateway HTTP UI/read-only endpoint is reachable;
+- if the Gateway protects `/ui/**`, `BRAIN_MEMORY_UI_API_KEY` is set;
+- for real memory search, `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` matches a
+  tenant-bound read key in Brain Memory `GATEWAY_MEMORY_API_KEYS`;
 - `BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true` is intentional.
 
 ## D. Attach Brain Memory Later
@@ -91,6 +94,8 @@ npm run studio:env -- --mode attach-brain-memory-later
 
 ```text
 BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8765
+BRAIN_MEMORY_UI_API_KEY=
+BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY=<tenant-bound read key>
 BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true
 ```
 
@@ -102,6 +107,11 @@ npm run studio:doctor
 
 When Gateway is reachable, the Brain Memory console should switch from
 attach-later/mock to real status/search.
+
+`BRAIN_MEMORY_UI_API_KEY` is only an optional UI/BFF bearer gate. It does not
+authorize tenant memory reads by itself. `/ui/memory/search` uses
+`X-Gateway-Memory-Api-Key`, sourced from `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`,
+and the active project tenant comes from the UI context contract.
 
 ## E. Brain Memory Standalone
 

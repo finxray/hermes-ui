@@ -127,6 +127,7 @@ export function BrainMemoryConsole({
         </form>
         <div className="card-meta">
           Browser calls the local BFF only; the BFF calls Gateway read-only endpoints when enabled.
+          Tenant search may require BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY.
         </div>
         {lastResponse?.error ? <div className="status-error">{lastResponse.error.message}</div> : null}
       </section>

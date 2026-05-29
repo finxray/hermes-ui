@@ -25,6 +25,11 @@ Brain Memory inspection.
 
 See `docs/packaging/PACKAGING_MODES.md`.
 
+Brain Memory `/ui/**` may use two auth layers: an optional
+`BRAIN_MEMORY_UI_API_KEY` bearer gate, and a tenant-bound
+`BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` for read-only memory search. The UI sends
+both only from the server-side BFF.
+
 ## Local Development
 
 1. Install dependencies:

@@ -29,10 +29,12 @@ export async function POST(request: Request) {
 
   const response = await searchBrainMemory(
     {
-      apiKey: process.env.BRAIN_MEMORY_API_KEY,
       baseUrl: process.env.BRAIN_MEMORY_GATEWAY_URL,
       enabled: process.env.BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY === "true",
-      timeoutMs: 7_500
+      gatewayMemoryApiKey: process.env.BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY,
+      legacyApiKey: process.env.BRAIN_MEMORY_API_KEY,
+      timeoutMs: 7_500,
+      uiApiKey: process.env.BRAIN_MEMORY_UI_API_KEY
     },
     parsed.request
   );

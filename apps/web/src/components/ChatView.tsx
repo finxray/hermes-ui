@@ -4,12 +4,15 @@ import { EmptyState } from "@/components/EmptyState";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ModelSelector } from "@/components/ModelSelector";
 import { StatusBadge } from "@/components/StatusBadge";
+import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { ModelChoice, Project, Session } from "@/data/types";
 
 type ChatViewProps = {
   activeProject: Project;
   activeSession: Session | null;
   createSession: () => void;
+  hermesStatus: NormalizedHermesStatus | null;
+  isHermesStatusLoading: boolean;
   modelChoices: ModelChoice[];
 };
 
@@ -17,6 +20,8 @@ export function ChatView({
   activeProject,
   activeSession,
   createSession,
+  hermesStatus,
+  isHermesStatusLoading,
   modelChoices
 }: ChatViewProps) {
   return (
@@ -31,7 +36,10 @@ export function ChatView({
         </div>
         <div className="topbar-actions">
           <ModelSelector choices={modelChoices} selectedId="hermes-default" />
-          <StatusBadge label="Hermes disconnected / mock" tone="mock" />
+          <StatusBadge
+            label={`Hermes ${formatHermesStatus(hermesStatus, isHermesStatusLoading)}`}
+            tone={hermesStatusTone(hermesStatus, isHermesStatusLoading)}
+          />
           <button className="icon-button" type="button" aria-label="Open right panel">
             <PanelRight size={16} />
           </button>
@@ -43,8 +51,8 @@ export function ChatView({
           <div className="mock-banner" role="status">
             <AlertTriangle size={15} aria-hidden="true" />
             <span>
-              Mock data only. No Hermes, Brain Memory Gateway, provider, or storage calls are
-              active in this slice.
+              Chat remains mocked. This slice only checks Hermes health/capabilities through the
+              server-side BFF.
             </span>
           </div>
           {activeSession ? (
@@ -82,4 +90,36 @@ export function ChatView({
       <Composer />
     </section>
   );
+}
+
+function formatHermesStatus(status: NormalizedHermesStatus | null, isLoading: boolean) {
+  if (isLoading && !status) {
+    return "checking";
+  }
+  if (!status || status.mode === "unconfigured") {
+    return "unconfigured";
+  }
+  if (status.mode === "real" && status.reachable) {
+    return "connected";
+  }
+  if (status.mode === "mock") {
+    return "mock";
+  }
+  return "unreachable";
+}
+
+function hermesStatusTone(
+  status: NormalizedHermesStatus | null,
+  isLoading: boolean
+): "error" | "mock" | "quiet" | "success" {
+  if (isLoading && !status) {
+    return "quiet";
+  }
+  if (status?.mode === "real" && status.reachable) {
+    return "success";
+  }
+  if (status?.mode === "error") {
+    return "error";
+  }
+  return "mock";
 }

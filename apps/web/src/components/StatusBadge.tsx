@@ -1,6 +1,6 @@
 type StatusBadgeProps = {
   label: string;
-  tone?: "mock" | "quiet";
+  tone?: "error" | "mock" | "quiet" | "success";
 };
 
 export function StatusBadge({ label, tone = "quiet" }: StatusBadgeProps) {

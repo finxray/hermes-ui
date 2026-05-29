@@ -344,6 +344,14 @@ textarea:disabled {
   background: var(--accent);
 }
 
+.status-badge[data-tone="success"] .status-dot {
+  background: #42d392;
+}
+
+.status-badge[data-tone="error"] .status-dot {
+  background: var(--danger);
+}
+
 .chat-view {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -720,6 +728,22 @@ textarea:disabled {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.status-error {
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 107, 107, 0.24);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffb4b4;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.capability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .pill {

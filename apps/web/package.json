@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hermes-ui/hermes-client": "file:../../packages/hermes-client",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",

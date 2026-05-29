@@ -1,5 +1,6 @@
 # @hermes-ui/hermes-client
 
-Placeholder package for the future typed Hermes API client.
+Typed server-side Hermes API client foundation.
 
-Slice 01 intentionally does not implement this client. Real Hermes health, capabilities, sessions, responses, runs, approvals, and streaming support begins in later integration slices through the Web UI BFF.
+Slice 03 implements health, models, and capabilities only. Chat, sessions, responses,
+runs, approvals, and streaming remain future work through the Web UI BFF.

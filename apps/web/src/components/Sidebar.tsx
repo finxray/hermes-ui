@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusBadge } from "@/components/StatusBadge";
+import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session, WorkspaceState } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
 
@@ -26,7 +27,10 @@ type SidebarProps = {
   activeSession: Session | null;
   actions: WorkspaceActions;
   connectionStatus: WorkspaceState["connectionStatus"];
+  hermesStatus: NormalizedHermesStatus | null;
+  isHermesStatusLoading: boolean;
   isHydrated: boolean;
+  refreshHermesStatus: () => void;
 };
 
 export function Sidebar({
@@ -37,7 +41,10 @@ export function Sidebar({
   activeProject,
   activeSession,
   connectionStatus,
-  isHydrated
+  hermesStatus,
+  isHermesStatusLoading,
+  isHydrated,
+  refreshHermesStatus
 }: SidebarProps) {
   const [editing, setEditing] = useState<
     | { kind: "project"; id: string; value: string }
@@ -274,7 +281,10 @@ export function Sidebar({
           <FileText size={13} aria-hidden="true" />
         </div>
         <div className="status-stack">
-          <StatusBadge label={`Hermes: ${connectionStatus.hermes}`} tone="mock" />
+          <StatusBadge
+            label={`Hermes: ${formatHermesStatus(hermesStatus, isHermesStatusLoading)}`}
+            tone={hermesStatusTone(hermesStatus, isHermesStatusLoading)}
+          />
           <StatusBadge label={`Brain Memory: ${connectionStatus.brainMemory}`} tone="mock" />
           <StatusBadge
             label={isHydrated ? "LocalStorage: active" : "LocalStorage: loading"}
@@ -284,10 +294,48 @@ export function Sidebar({
             <RotateCcw size={14} aria-hidden="true" />
             Reset mock data
           </button>
+          <button className="text-button full-width" type="button" onClick={refreshHermesStatus}>
+            Refresh Hermes
+          </button>
         </div>
       </div>
     </aside>
   );
+}
+
+function formatHermesStatus(status: NormalizedHermesStatus | null, isLoading: boolean) {
+  if (isLoading && !status) {
+    return "checking";
+  }
+  if (!status) {
+    return "unknown";
+  }
+  if (status.mode === "real" && status.reachable) {
+    return "connected";
+  }
+  if (status.mode === "unconfigured") {
+    return "unconfigured";
+  }
+  if (status.mode === "mock") {
+    return "mock";
+  }
+  return "unreachable";
+}
+
+function hermesStatusTone(
+  status: NormalizedHermesStatus | null,
+  isLoading: boolean
+): "error" | "mock" | "quiet" | "success" {
+  if (isLoading && !status) {
+    return "quiet";
+  }
+  if (status?.mode === "real" && status.reachable) {
+    return "success";
+  }
+  if (status?.mode === "error") {
+    return "error";
+  }
+  return "mock";
 }
 
 function formatRelativeDate(value: string): string {

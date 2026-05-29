@@ -1,12 +1,23 @@
 import { Activity, Database, FileText, FolderGit2, ShieldCheck } from "lucide-react";
+import { HermesStatusPanel } from "@/components/HermesStatusPanel";
+import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session } from "@/data/types";
 
 type ContextPanelProps = {
   activeProject: Project;
   activeSession: Session | null;
+  hermesStatus: NormalizedHermesStatus | null;
+  isHermesStatusLoading: boolean;
+  refreshHermesStatus: () => void;
 };
 
-export function ContextPanel({ activeProject, activeSession }: ContextPanelProps) {
+export function ContextPanel({
+  activeProject,
+  activeSession,
+  hermesStatus,
+  isHermesStatusLoading,
+  refreshHermesStatus
+}: ContextPanelProps) {
   const memoryEvidence = activeSession?.memoryEvidence ?? [];
   const toolEvents = activeSession?.toolEvents ?? [];
   const artifacts = activeSession?.artifacts ?? [];
@@ -33,6 +44,12 @@ export function ContextPanel({ activeProject, activeSession }: ContextPanelProps
       </header>
 
       <div className="panel-scroll">
+        <HermesStatusPanel
+          isLoading={isHermesStatusLoading}
+          onRefresh={refreshHermesStatus}
+          status={hermesStatus}
+        />
+
         <section className="panel-section" aria-labelledby="active-context-heading">
           <div className="section-label" id="active-context-heading">
             <span>Active context</span>

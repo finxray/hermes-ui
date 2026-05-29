@@ -1,28 +1,81 @@
+"use client";
+
 import {
   Brain,
+  Edit3,
   FileText,
   FolderPlus,
   MessageSquarePlus,
-  MessagesSquare
+  MessagesSquare,
+  RotateCcw,
+  Trash2
 } from "lucide-react";
+import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { Project, Session, WorkspaceMock } from "@/data/types";
+import type { Project, Session, WorkspaceState } from "@/data/types";
+import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
+
+type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 
 type SidebarProps = {
   projects: Project[];
+  allSessions: Session[];
   sessions: Session[];
   activeProject: Project;
-  activeSession: Session;
-  connectionStatus: WorkspaceMock["connectionStatus"];
+  activeSession: Session | null;
+  actions: WorkspaceActions;
+  connectionStatus: WorkspaceState["connectionStatus"];
+  isHydrated: boolean;
 };
 
 export function Sidebar({
+  actions,
+  allSessions,
   projects,
   sessions,
   activeProject,
   activeSession,
-  connectionStatus
+  connectionStatus,
+  isHydrated
 }: SidebarProps) {
+  const [editing, setEditing] = useState<
+    | { kind: "project"; id: string; value: string }
+    | { kind: "session"; id: string; value: string }
+    | null
+  >(null);
+
+  function startRenameProject(project: Project) {
+    setEditing({ kind: "project", id: project.id, value: project.name });
+  }
+
+  function startRenameSession(session: Session) {
+    setEditing({ kind: "session", id: session.id, value: session.title });
+  }
+
+  function commitRename() {
+    if (!editing) {
+      return;
+    }
+    const value = editing.value.trim();
+    if (!value) {
+      return;
+    }
+    if (editing.kind === "project") {
+      actions.renameProject(editing.id, value);
+    } else {
+      actions.renameSession(editing.id, value);
+    }
+    setEditing(null);
+  }
+
+  function archiveSession(session: Session) {
+    const confirmed = window.confirm(`Archive "${session.title}"?`);
+    if (confirmed) {
+      actions.archiveSession(session.id);
+    }
+  }
+
   return (
     <aside className="sidebar" aria-label="Projects and sessions">
       <div className="brand">
@@ -38,11 +91,11 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-actions">
-        <button className="text-button" type="button" disabled title="Mocked in Slice 01">
+        <button className="text-button" type="button" onClick={actions.createProject}>
           <FolderPlus size={15} aria-hidden="true" />
           Project
         </button>
-        <button className="text-button" type="button" disabled title="Mocked in Slice 01">
+        <button className="text-button" type="button" onClick={actions.createSession}>
           <MessageSquarePlus size={15} aria-hidden="true" />
           Chat
         </button>
@@ -56,20 +109,71 @@ export function Sidebar({
         <ul className="project-list">
           {projects.map((project) => (
             <li key={project.id}>
-              <button
-                className={`project-button ${project.id === activeProject.id ? "is-active" : ""}`}
-                type="button"
-                aria-current={project.id === activeProject.id ? "page" : undefined}
-              >
-                <span className="project-glyph" aria-hidden="true">
-                  {project.icon}
-                </span>
-                <span>
-                  <span className="project-name">{project.name}</span>
-                  <span className="project-description">{project.description}</span>
-                </span>
-                <span className="project-count">{project.sessionCount}</span>
-              </button>
+              <div className="row-with-actions">
+                {editing?.kind === "project" && editing.id === project.id ? (
+                  <div className="project-button is-active">
+                    <span className="project-glyph" aria-hidden="true">
+                      {project.icon}
+                    </span>
+                    <span>
+                      <input
+                        autoFocus
+                        className="rename-input"
+                        aria-label={`Rename project ${project.name}`}
+                        value={editing.value}
+                        onChange={(event) =>
+                          setEditing({ ...editing, value: event.currentTarget.value })
+                        }
+                        onBlur={commitRename}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            commitRename();
+                          }
+                          if (event.key === "Escape") {
+                            setEditing(null);
+                          }
+                        }}
+                      />
+                      <span className="project-description">{project.description}</span>
+                    </span>
+                    <span className="project-count">
+                      {allSessions.filter(
+                        (session) => session.projectId === project.id && !session.archivedAt
+                      ).length}
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    className={`project-button ${
+                      project.id === activeProject.id ? "is-active" : ""
+                    }`}
+                    type="button"
+                    aria-current={project.id === activeProject.id ? "page" : undefined}
+                    onClick={() => actions.switchProject(project.id)}
+                  >
+                    <span className="project-glyph" aria-hidden="true">
+                      {project.icon}
+                    </span>
+                    <span>
+                      <span className="project-name">{project.name}</span>
+                      <span className="project-description">{project.description}</span>
+                    </span>
+                    <span className="project-count">
+                      {allSessions.filter(
+                        (session) => session.projectId === project.id && !session.archivedAt
+                      ).length}
+                    </span>
+                  </button>
+                )}
+                <button
+                  className="mini-action"
+                  type="button"
+                  aria-label={`Rename project ${project.name}`}
+                  onClick={() => startRenameProject(project)}
+                >
+                  <Edit3 size={13} aria-hidden="true" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -80,25 +184,88 @@ export function Sidebar({
           <span>Sessions</span>
           <span>{activeProject.name}</span>
         </div>
-        <ul className="session-list">
-          {sessions.map((session) => (
-            <li key={session.id}>
-              <button
-                className={`session-button ${session.id === activeSession.id ? "is-active" : ""}`}
-                type="button"
-                aria-current={session.id === activeSession.id ? "page" : undefined}
-              >
-                <MessagesSquare size={15} aria-hidden="true" />
-                <span>
-                  <span className="session-title">{session.title}</span>
-                  <span className="session-meta">
-                    {session.updatedAt} · {session.messageCount} messages
+        {sessions.length === 0 ? (
+          <EmptyState
+            title="No chats yet"
+            body="Create a local mock chat for this project. It will stay in browser localStorage."
+            actionLabel="New chat"
+            onAction={actions.createSession}
+          />
+        ) : (
+          <ul className="session-list">
+            {sessions.map((session) => (
+              <li key={session.id}>
+                <div className="row-with-actions">
+                  {editing?.kind === "session" && editing.id === session.id ? (
+                    <div className="session-button is-active">
+                      <MessagesSquare size={15} aria-hidden="true" />
+                      <span>
+                        <input
+                          autoFocus
+                          className="rename-input"
+                          aria-label={`Rename session ${session.title}`}
+                          value={editing.value}
+                          onChange={(event) =>
+                            setEditing({ ...editing, value: event.currentTarget.value })
+                          }
+                          onBlur={commitRename}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              commitRename();
+                            }
+                            if (event.key === "Escape") {
+                              setEditing(null);
+                            }
+                          }}
+                        />
+                        <span className="session-meta">
+                          {formatRelativeDate(session.updatedAt)} - {session.messages.length}{" "}
+                          messages
+                        </span>
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      className={`session-button ${
+                        session.id === activeSession?.id ? "is-active" : ""
+                      }`}
+                      type="button"
+                      aria-current={session.id === activeSession?.id ? "page" : undefined}
+                      onClick={() => actions.switchSession(session.id)}
+                    >
+                      <MessagesSquare size={15} aria-hidden="true" />
+                      <span>
+                        <span className="session-title">{session.title}</span>
+                        <span className="session-meta">
+                          {formatRelativeDate(session.updatedAt)} - {session.messages.length}{" "}
+                          messages
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                  <span className="inline-actions">
+                    <button
+                      className="mini-action"
+                      type="button"
+                      aria-label={`Rename session ${session.title}`}
+                      onClick={() => startRenameSession(session)}
+                    >
+                      <Edit3 size={13} aria-hidden="true" />
+                    </button>
+                    <button
+                      className="mini-action"
+                      type="button"
+                      aria-label={`Archive session ${session.title}`}
+                      onClick={() => archiveSession(session)}
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
                   </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <div className="sidebar-foot">
@@ -109,8 +276,27 @@ export function Sidebar({
         <div className="status-stack">
           <StatusBadge label={`Hermes: ${connectionStatus.hermes}`} tone="mock" />
           <StatusBadge label={`Brain Memory: ${connectionStatus.brainMemory}`} tone="mock" />
+          <StatusBadge
+            label={isHydrated ? "LocalStorage: active" : "LocalStorage: loading"}
+            tone="quiet"
+          />
+          <button className="text-button full-width" type="button" onClick={actions.reset}>
+            <RotateCcw size={14} aria-hidden="true" />
+            Reset mock data
+          </button>
         </div>
       </div>
     </aside>
   );
+}
+
+function formatRelativeDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
 }

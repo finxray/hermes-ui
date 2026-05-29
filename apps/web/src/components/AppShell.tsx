@@ -1,44 +1,35 @@
+"use client";
+
 import { ChatView } from "@/components/ChatView";
 import { ContextPanel } from "@/components/ContextPanel";
 import { Sidebar } from "@/components/Sidebar";
-import type { WorkspaceMock } from "@/data/types";
+import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 
-type AppShellProps = {
-  workspace: WorkspaceMock;
-};
-
-export function AppShell({ workspace }: AppShellProps) {
-  const activeProject =
-    workspace.projects.find((project) => project.id === workspace.activeProjectId) ??
-    workspace.projects[0];
-  const activeSession =
-    workspace.sessions.find((session) => session.id === workspace.activeSessionId) ??
-    workspace.sessions[0];
-  const activeProjectSessions = workspace.sessions.filter(
-    (session) => session.projectId === activeProject.id
-  );
+export function AppShell() {
+  const { actions, activeProject, activeProjectSessions, activeSession, isHydrated, state } =
+    useWorkspaceState();
 
   return (
     <main className="app-shell">
       <Sidebar
+        actions={actions}
         activeProject={activeProject}
         activeSession={activeSession}
-        connectionStatus={workspace.connectionStatus}
-        projects={workspace.projects}
+        allSessions={state.sessions}
+        connectionStatus={state.connectionStatus}
+        isHydrated={isHydrated}
+        projects={state.projects}
         sessions={activeProjectSessions}
       />
       <ChatView
         activeProject={activeProject}
         activeSession={activeSession}
-        messages={workspace.messages}
-        modelChoices={workspace.modelChoices}
+        createSession={actions.createSession}
+        modelChoices={state.modelChoices}
       />
       <ContextPanel
         activeProject={activeProject}
         activeSession={activeSession}
-        artifacts={workspace.artifacts}
-        memoryEvidence={workspace.memoryEvidence}
-        toolEvents={workspace.toolEvents}
       />
     </main>
   );

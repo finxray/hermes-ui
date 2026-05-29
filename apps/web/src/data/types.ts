@@ -3,17 +3,9 @@ export type Project = {
   name: string;
   description: string;
   icon: string;
-  sessionCount: number;
   memoryScopeKey: string;
-};
-
-export type Session = {
-  id: string;
-  projectId: string;
-  title: string;
-  summary: string;
+  createdAt: string;
   updatedAt: string;
-  messageCount: number;
 };
 
 export type ChatMessage = {
@@ -50,24 +42,38 @@ export type Artifact = {
   status: string;
 };
 
+export type Session = {
+  id: string;
+  projectId: string;
+  title: string;
+  summary: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+  messages: ChatMessage[];
+  memoryEvidence: MemoryEvidence[];
+  toolEvents: ToolEvent[];
+  artifacts: Artifact[];
+};
+
 export type ModelChoice = {
   id: string;
   label: string;
   provider: string;
 };
 
-export type WorkspaceMock = {
+export type WorkspaceState = {
   activeProjectId: string;
-  activeSessionId: string;
+  activeSessionId: string | null;
   projects: Project[];
   sessions: Session[];
-  messages: ChatMessage[];
-  memoryEvidence: MemoryEvidence[];
-  toolEvents: ToolEvent[];
-  artifacts: Artifact[];
   modelChoices: ModelChoice[];
   connectionStatus: {
     hermes: string;
     brainMemory: string;
   };
+};
+
+export type PersistedWorkspaceState = WorkspaceState & {
+  version: number;
 };

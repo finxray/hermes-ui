@@ -1,30 +1,32 @@
 import { AlertTriangle, BookOpenText, PanelRight, SendHorizontal } from "lucide-react";
 import { Composer } from "@/components/Composer";
+import { EmptyState } from "@/components/EmptyState";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ModelSelector } from "@/components/ModelSelector";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { ChatMessage, ModelChoice, Project, Session } from "@/data/types";
+import type { ModelChoice, Project, Session } from "@/data/types";
 
 type ChatViewProps = {
   activeProject: Project;
-  activeSession: Session;
-  messages: ChatMessage[];
+  activeSession: Session | null;
+  createSession: () => void;
   modelChoices: ModelChoice[];
 };
 
 export function ChatView({
   activeProject,
   activeSession,
-  messages,
+  createSession,
   modelChoices
 }: ChatViewProps) {
   return (
     <section className="chat-view" aria-label="Chat workspace">
       <header className="topbar">
         <div>
-          <h1>{activeSession.title}</h1>
+          <h1>{activeSession?.title ?? "No chat selected"}</h1>
           <p>
-            {activeProject.name} · {activeSession.summary}
+            {activeProject.name} ·{" "}
+            {activeSession?.summary ?? "Create a new local mock chat to start this project."}
           </p>
         </div>
         <div className="topbar-actions">
@@ -45,9 +47,25 @@ export function ChatView({
               active in this slice.
             </span>
           </div>
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
+          {activeSession ? (
+            activeSession.messages.length > 0 ? (
+              activeSession.messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))
+            ) : (
+              <EmptyState
+                title="New chat is empty"
+                body="This local mock session is ready for Slice 03+ integration. Sending remains disabled until Hermes is wired through the BFF."
+              />
+            )
+          ) : (
+            <EmptyState
+              title="No chats in this project"
+              body="Projects can exist without sessions. Create a new local mock chat when you want a transcript under this project."
+              actionLabel="New chat"
+              onAction={createSession}
+            />
+          )}
           <div className="reference-row" aria-label="Active scope references">
             <span className="reference-chip">
               <BookOpenText size={14} aria-hidden="true" />

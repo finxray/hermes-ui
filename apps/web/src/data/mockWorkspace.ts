@@ -6,8 +6,11 @@ import type {
   Project,
   Session,
   ToolEvent,
-  WorkspaceMock
+  WorkspaceState
 } from "./types";
+
+const createdAt = "2026-05-29T09:00:00.000Z";
+const updatedAt = "2026-05-29T09:18:00.000Z";
 
 export const projects: Project[] = [
   {
@@ -15,79 +18,31 @@ export const projects: Project[] = [
     name: "Brain Memory",
     description: "Gateway-scoped persistent memory and UI console",
     icon: "BM",
-    sessionCount: 3,
-    memoryScopeKey: "studio:tenant-local:project-brain-memory"
+    memoryScopeKey: "studio:tenant-local:project-brain-memory",
+    createdAt,
+    updatedAt
   },
   {
     id: "project-hermes-agent",
     name: "Hermes Agent",
     description: "API server, runs, approvals, and tool events",
     icon: "HA",
-    sessionCount: 2,
-    memoryScopeKey: "studio:tenant-local:project-hermes-agent"
+    memoryScopeKey: "studio:tenant-local:project-hermes-agent",
+    createdAt,
+    updatedAt: "2026-05-28T12:00:00.000Z"
   },
   {
     id: "project-packaging",
     name: "Packaging",
     description: "Local desktop, Docker, and release workflow",
     icon: "PK",
-    sessionCount: 1,
-    memoryScopeKey: "studio:tenant-local:project-packaging"
+    memoryScopeKey: "studio:tenant-local:project-packaging",
+    createdAt,
+    updatedAt: "2026-05-25T12:00:00.000Z"
   }
 ];
 
-export const sessions: Session[] = [
-  {
-    id: "session-roadmap",
-    projectId: "project-brain-memory",
-    title: "Hermes UI roadmap",
-    summary: "Slice planning for the Studio shell and future integration path",
-    updatedAt: "Today 13:18",
-    messageCount: 12
-  },
-  {
-    id: "session-memory-contract",
-    projectId: "project-brain-memory",
-    title: "Gateway memory contract",
-    summary: "Read-only search, evidence, supersession, and audit endpoints",
-    updatedAt: "Yesterday",
-    messageCount: 9
-  },
-  {
-    id: "session-evidence-ui",
-    projectId: "project-brain-memory",
-    title: "Evidence cards and audit trail",
-    summary: "Memory console display rules and trust markers",
-    updatedAt: "May 27",
-    messageCount: 7
-  },
-  {
-    id: "session-runs-api",
-    projectId: "project-hermes-agent",
-    title: "Runs API event model",
-    summary: "Mapping run lifecycle events into a future tool panel",
-    updatedAt: "May 28",
-    messageCount: 8
-  },
-  {
-    id: "session-approval-flow",
-    projectId: "project-hermes-agent",
-    title: "Approval and stop UX",
-    summary: "Mocking approval controls without wiring real Hermes calls",
-    updatedAt: "May 26",
-    messageCount: 5
-  },
-  {
-    id: "session-desktop-package",
-    projectId: "project-packaging",
-    title: "Downloadable local package",
-    summary: "Install, run, and health-check expectations",
-    updatedAt: "May 25",
-    messageCount: 6
-  }
-];
-
-export const messages: ChatMessage[] = [
+const roadmapMessages: ChatMessage[] = [
   {
     id: "msg-1",
     role: "user",
@@ -121,6 +76,73 @@ export const messages: ChatMessage[] = [
     content:
       "Done in the static model: Brain Memory is selected, Hermes UI roadmap is active, and both Hermes plus Brain Memory Gateway are labeled as disconnected mock connections. Future slices can replace these labels with BFF-backed health checks without changing the shell layout.",
     references: ["Mock status", "Slice 03 health plan"]
+  }
+];
+
+const gatewayMessages: ChatMessage[] = [
+  {
+    id: "msg-contract-1",
+    role: "user",
+    author: "Alexey",
+    createdAt: "12:41",
+    content: "What should the Brain Memory Gateway expose to the UI first?"
+  },
+  {
+    id: "msg-contract-2",
+    role: "assistant",
+    author: "Hermes UI mock",
+    createdAt: "12:42",
+    content:
+      "Start read-only: project/session lists, memory search, memory detail, evidence, supersession chain, and audit. Admin actions should stay behind explicit Gateway policy in a later slice.",
+    references: ["Gateway endpoint proposal", "Read-only console"]
+  }
+];
+
+const evidenceMessages: ChatMessage[] = [
+  {
+    id: "msg-evidence-1",
+    role: "assistant",
+    author: "Hermes UI mock",
+    createdAt: "11:18",
+    content:
+      "Evidence cards should show source, layer, score, timestamp, and a short excerpt. The user needs to see why memory was retrieved without seeing raw storage internals.",
+    references: ["Memory evidence", "Audit visibility"]
+  }
+];
+
+const runsMessages: ChatMessage[] = [
+  {
+    id: "msg-runs-1",
+    role: "assistant",
+    author: "Hermes UI mock",
+    createdAt: "10:04",
+    content:
+      "The Runs API is the best future fit for long-lived work because it can expose pollable status, structured events, approvals, and stop support.",
+    references: ["/v1/runs", "run events", "stop"]
+  }
+];
+
+const approvalMessages: ChatMessage[] = [
+  {
+    id: "msg-approval-1",
+    role: "assistant",
+    author: "Hermes UI mock",
+    createdAt: "09:31",
+    content:
+      "Approval UI should stay capability-gated until Hermes is connected. The shell can reserve panel space, but it must not pretend approvals are live.",
+    references: ["approval.request", "approval.responded"]
+  }
+];
+
+const packageMessages: ChatMessage[] = [
+  {
+    id: "msg-package-1",
+    role: "assistant",
+    author: "Hermes UI mock",
+    createdAt: "08:45",
+    content:
+      "Packaging can come later with Docker Compose, env examples, health checks, and local setup docs. Slice 02 should stay browser-local.",
+    references: ["Slice 09", "local package"]
   }
 ];
 
@@ -202,6 +224,81 @@ export const artifacts: Artifact[] = [
   }
 ];
 
+export const sessions: Session[] = [
+  {
+    id: "session-roadmap",
+    projectId: "project-brain-memory",
+    title: "Hermes UI roadmap",
+    summary: "Slice planning for the Studio shell and future integration path",
+    createdAt,
+    updatedAt,
+    messages: roadmapMessages,
+    memoryEvidence,
+    toolEvents,
+    artifacts
+  },
+  {
+    id: "session-memory-contract",
+    projectId: "project-brain-memory",
+    title: "Gateway memory contract",
+    summary: "Read-only search, evidence, supersession, and audit endpoints",
+    createdAt,
+    updatedAt: "2026-05-28T10:00:00.000Z",
+    messages: gatewayMessages,
+    memoryEvidence: memoryEvidence.slice(0, 2),
+    toolEvents: toolEvents.slice(1),
+    artifacts: artifacts.slice(0, 2)
+  },
+  {
+    id: "session-evidence-ui",
+    projectId: "project-brain-memory",
+    title: "Evidence cards and audit trail",
+    summary: "Memory console display rules and trust markers",
+    createdAt,
+    updatedAt: "2026-05-27T11:00:00.000Z",
+    messages: evidenceMessages,
+    memoryEvidence: memoryEvidence.slice(1),
+    toolEvents: toolEvents.slice(2),
+    artifacts: artifacts.slice(1)
+  },
+  {
+    id: "session-runs-api",
+    projectId: "project-hermes-agent",
+    title: "Runs API event model",
+    summary: "Mapping run lifecycle events into a future tool panel",
+    createdAt,
+    updatedAt: "2026-05-28T12:00:00.000Z",
+    messages: runsMessages,
+    memoryEvidence: memoryEvidence.slice(0, 1),
+    toolEvents,
+    artifacts
+  },
+  {
+    id: "session-approval-flow",
+    projectId: "project-hermes-agent",
+    title: "Approval and stop UX",
+    summary: "Mocking approval controls without wiring real Hermes calls",
+    createdAt,
+    updatedAt: "2026-05-26T12:00:00.000Z",
+    messages: approvalMessages,
+    memoryEvidence: memoryEvidence.slice(0, 1),
+    toolEvents: toolEvents.slice(1),
+    artifacts: artifacts.slice(0, 1)
+  },
+  {
+    id: "session-desktop-package",
+    projectId: "project-packaging",
+    title: "Downloadable local package",
+    summary: "Install, run, and health-check expectations",
+    createdAt,
+    updatedAt: "2026-05-25T12:00:00.000Z",
+    messages: packageMessages,
+    memoryEvidence: memoryEvidence.slice(2),
+    toolEvents: toolEvents.slice(1),
+    artifacts: artifacts.slice(2)
+  }
+];
+
 export const modelChoices: ModelChoice[] = [
   {
     id: "hermes-default",
@@ -220,15 +317,11 @@ export const modelChoices: ModelChoice[] = [
   }
 ];
 
-export const workspaceMock: WorkspaceMock = {
+export const workspaceMock: WorkspaceState = {
   activeProjectId: "project-brain-memory",
   activeSessionId: "session-roadmap",
   projects,
   sessions,
-  messages,
-  memoryEvidence,
-  toolEvents,
-  artifacts,
   modelChoices,
   connectionStatus: {
     hermes: "Disconnected / mock",

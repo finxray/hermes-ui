@@ -85,6 +85,26 @@ export type NormalizedMemoryLayer =
 
 export type NormalizedSupersessionStatus = "active" | "superseded" | "unknown";
 
+export type NormalizedMemoryScopeStatus =
+  | "matching-project"
+  | "matching-session"
+  | "legacy-unscoped"
+  | "mismatched-project"
+  | "mismatched-session"
+  | "unknown";
+
+export type NormalizedBrainMemorySearchScope = {
+  tenantId?: string;
+  projectKey?: string;
+  sessionKey?: string;
+  mode?: string;
+  includeLegacyUnscoped?: boolean;
+  status?: string;
+  legacyUnscopedExcluded?: number;
+  mismatchedProjectExcluded?: number;
+  mismatchedSessionExcluded?: number;
+};
+
 export type NormalizedMemoryResult = {
   id: string;
   title?: string;
@@ -96,6 +116,7 @@ export type NormalizedMemoryResult = {
   projectKey?: string;
   sessionKey?: string;
   evidenceCount?: number;
+  scopeStatus?: NormalizedMemoryScopeStatus;
   supersessionStatus?: NormalizedSupersessionStatus;
   createdAt?: string;
   updatedAt?: string;
@@ -106,6 +127,7 @@ export type NormalizedBrainMemorySearchResponse = {
   mode: BrainMemoryMode;
   query: string;
   results: NormalizedMemoryResult[];
+  scope?: NormalizedBrainMemorySearchScope | null;
   error: BrainMemoryError | null;
   searchedAt: string;
 };

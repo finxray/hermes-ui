@@ -6,6 +6,7 @@ import { BrainMemoryStatusPanel } from "@/components/BrainMemoryStatusPanel";
 import { useBrainMemorySearch } from "@/hooks/useBrainMemorySearch";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type {
+  NormalizedBrainMemorySearchScope,
   BrainMemorySearchContext,
   NormalizedBrainMemoryStatus,
   NormalizedMemoryResult
@@ -40,6 +41,7 @@ export function BrainMemoryConsole({
   );
   const gatewayResults = lastResponse?.mode === "real" ? lastResponse.results : [];
   const shouldUseMock = !lastResponse || lastResponse.mode !== "real";
+  const scope = lastResponse?.mode === "real" ? lastResponse.scope : null;
 
   useEffect(() => {
     setQuery(activeSession?.memoryEvidence[0]?.title ?? activeProject.name);
@@ -129,6 +131,7 @@ export function BrainMemoryConsole({
           Browser calls the local BFF only; the BFF calls Gateway read-only endpoints when enabled.
           Tenant search may require BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY.
         </div>
+        {scope ? <ScopeSummary scope={scope} /> : null}
         {lastResponse?.error ? <div className="status-error">{lastResponse.error.message}</div> : null}
       </section>
 
@@ -234,7 +237,7 @@ function GatewayMemoryResults({ results }: { results: NormalizedMemoryResult[] }
         <li className="memory-card" key={memory.id}>
           <div className="card-title">
             <span>{memory.title ?? memory.id}</span>
-            <span className="pill">{memory.layer ?? "unknown"}</span>
+            <span className="pill">{memory.scopeStatus ?? memory.layer ?? "unknown"}</span>
           </div>
           <div className="card-body">{memory.snippet ?? memory.content}</div>
           <div className="card-meta">
@@ -248,6 +251,22 @@ function GatewayMemoryResults({ results }: { results: NormalizedMemoryResult[] }
         </li>
       ))}
     </ul>
+  );
+}
+
+function ScopeSummary({ scope }: { scope: NormalizedBrainMemorySearchScope }) {
+  const excluded = scope.legacyUnscopedExcluded ?? 0;
+  const mismatchedProject = scope.mismatchedProjectExcluded ?? 0;
+  const mismatchedSession = scope.mismatchedSessionExcluded ?? 0;
+
+  return (
+    <div className="card-meta">
+      Scope: {scope.status ?? "unknown"} / {scope.mode ?? "project"} for{" "}
+      {scope.projectKey ?? "project"}.
+      {excluded > 0 ? ` Legacy/unscoped excluded: ${excluded}.` : ""}
+      {mismatchedProject > 0 ? ` Project mismatches excluded: ${mismatchedProject}.` : ""}
+      {mismatchedSession > 0 ? ` Session mismatches excluded: ${mismatchedSession}.` : ""}
+    </div>
   );
 }
 

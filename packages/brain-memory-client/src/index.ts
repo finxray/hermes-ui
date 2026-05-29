@@ -2,10 +2,12 @@ import type {
   BrainMemoryClientConfig,
   BrainMemoryError,
   BrainMemorySearchRequest,
+  NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
   NormalizedMemoryLayer,
   NormalizedMemoryResult,
+  NormalizedMemoryScopeStatus,
   NormalizedSupersessionStatus
 } from "./types";
 
@@ -20,10 +22,12 @@ export type {
   BrainMemoryMode,
   BrainMemorySearchContext,
   BrainMemorySearchRequest,
+  NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
   NormalizedMemoryLayer,
   NormalizedMemoryResult,
+  NormalizedMemoryScopeStatus,
   NormalizedSupersessionStatus
 } from "./types";
 
@@ -137,6 +141,7 @@ export async function searchBrainMemory(
       mode: "error",
       query,
       results: [],
+      scope: null,
       error: {
         kind: "bad_response",
         message: "Memory search query is required."
@@ -150,6 +155,7 @@ export async function searchBrainMemory(
       mode: "mock",
       query,
       results: [],
+      scope: null,
       error: {
         kind: "disabled",
         message: "Real Brain Memory Gateway search is disabled; using local mock evidence."
@@ -163,6 +169,7 @@ export async function searchBrainMemory(
       mode: "unconfigured",
       query,
       results: [],
+      scope: null,
       error: {
         kind: "unconfigured",
         message: "Set BRAIN_MEMORY_GATEWAY_URL and enable real Gateway search."
@@ -177,6 +184,7 @@ export async function searchBrainMemory(
       mode: "error",
       query,
       results: [],
+      scope: null,
       error: {
         kind: "invalid_config",
         message: "BRAIN_MEMORY_GATEWAY_URL must be a valid http:// or https:// URL."
@@ -225,6 +233,7 @@ export async function searchBrainMemory(
       mode: "error",
       query,
       results: [],
+      scope: null,
       error: result.error,
       searchedAt
     };
@@ -234,6 +243,7 @@ export async function searchBrainMemory(
     mode: "real",
     query,
     results: normalizeSearchResults(result.data).slice(0, limit),
+    scope: normalizeSearchScope(result.data),
     error: null,
     searchedAt
   };
@@ -433,6 +443,29 @@ function normalizeSearchResults(data: Record<string, unknown> | null): Normalize
     .filter((item): item is NormalizedMemoryResult => Boolean(item));
 }
 
+function normalizeSearchScope(data: Record<string, unknown> | null): NormalizedBrainMemorySearchScope | null {
+  const scope = data?.scope;
+  if (!scope || typeof scope !== "object" || Array.isArray(scope)) {
+    return null;
+  }
+
+  const item = scope as Record<string, unknown>;
+  return {
+    tenantId: asOptionalString(item.tenantId) ?? asOptionalString(item.tenant_id),
+    projectKey: asOptionalString(item.projectKey) ?? asOptionalString(item.project_key),
+    sessionKey: asOptionalString(item.sessionKey) ?? asOptionalString(item.session_key),
+    mode: asOptionalString(item.mode),
+    includeLegacyUnscoped: asBoolean(item.includeLegacyUnscoped ?? item.include_legacy_unscoped),
+    status: asOptionalString(item.status),
+    legacyUnscopedExcluded:
+      asInteger(item.legacyUnscopedExcluded) ?? asInteger(item.legacy_unscoped_excluded),
+    mismatchedProjectExcluded:
+      asInteger(item.mismatchedProjectExcluded) ?? asInteger(item.mismatched_project_excluded),
+    mismatchedSessionExcluded:
+      asInteger(item.mismatchedSessionExcluded) ?? asInteger(item.mismatched_session_excluded)
+  };
+}
+
 function normalizeSearchResult(value: unknown, index: number): NormalizedMemoryResult | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -461,11 +494,18 @@ function normalizeSearchResult(value: unknown, index: number): NormalizedMemoryR
     projectKey: asOptionalString(item.project_key) ?? asOptionalString(item.projectKey),
     sessionKey: asOptionalString(item.session_key) ?? asOptionalString(item.sessionKey),
     evidenceCount: asInteger(item.evidence_count) ?? asInteger(item.evidenceCount),
+    scopeStatus: normalizeScopeStatus(item.scope_status ?? item.scopeStatus ?? metadataField(item.metadata, "scopeStatus")),
     supersessionStatus: normalizeSupersessionStatus(item.supersession_status),
     createdAt: asOptionalString(item.created_at) ?? asOptionalString(item.createdAt),
     updatedAt: asOptionalString(item.updated_at) ?? asOptionalString(item.updatedAt),
     metadata: normalizeMetadata(item.metadata)
   };
+}
+
+function metadataField(metadata: unknown, key: string): unknown {
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? (metadata as Record<string, unknown>)[key]
+    : undefined;
 }
 
 function normalizeLayer(value: unknown): NormalizedMemoryLayer {
@@ -483,6 +523,19 @@ function normalizeLayer(value: unknown): NormalizedMemoryLayer {
 
 function normalizeSupersessionStatus(value: unknown): NormalizedSupersessionStatus {
   if (value === "active" || value === "superseded") {
+    return value;
+  }
+  return "unknown";
+}
+
+function normalizeScopeStatus(value: unknown): NormalizedMemoryScopeStatus {
+  if (
+    value === "matching-project" ||
+    value === "matching-session" ||
+    value === "legacy-unscoped" ||
+    value === "mismatched-project" ||
+    value === "mismatched-session"
+  ) {
     return value;
   }
   return "unknown";
@@ -513,4 +566,8 @@ function asNumber(value: unknown): number | undefined {
 
 function asInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
+}
+
+function asBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
 }

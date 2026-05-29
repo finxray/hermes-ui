@@ -46,9 +46,15 @@ export function BrainMemoryStatusPanel({
         <div className="card-body">
           {status?.baseUrl
             ? `Gateway URL: ${status.baseUrl}`
-            : "Set BRAIN_MEMORY_GATEWAY_URL and enable the Gateway flag for real read-only checks."}
+            : "Brain Memory is optional. The Web UI can run standalone; set BRAIN_MEMORY_GATEWAY_URL and enable the Gateway flag when you connect Brain Memory later."}
         </div>
         {status?.error ? <div className="status-error">{status.error.message}</div> : null}
+        {status?.mode === "mock" || status?.mode === "unconfigured" ? (
+          <div className="card-meta">
+            Connect later: install or start Brain Memory Gateway, then set
+            BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true in apps/web/.env.local.
+          </div>
+        ) : null}
         <div className="card-meta">Last checked: {checkedAt}</div>
       </div>
     </section>

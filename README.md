@@ -1,53 +1,85 @@
 # Hermes UI + Brain Memory Studio
 
-Local ChatGPT-like workspace for Hermes Agent with first-class Brain Memory integration.
+Local ChatGPT-like workspace for Hermes Agent with optional, Gateway-mediated
+Brain Memory inspection.
 
-This repository is intended to become a downloadable package that contains:
+## Current Shape
 
-- a beautiful OpenAI-inspired dark Web UI,
-- project-based chat sessions,
-- Hermes Agent integration,
-- Brain Memory integration through Gateway-approved endpoints,
-- optional high-throughput model mode for providers such as Cerebras/Kimi K2.6,
-- packaging scripts for local development and later Docker Compose.
+- Next.js/React Web UI in `apps/web`.
+- Server-side BFF routes for Hermes and Brain Memory status/search.
+- Hermes chat streaming through the BFF.
+- Brain Memory console foundation, read-only and optional.
+- No direct browser-to-Hermes or browser-to-Brain-Memory calls.
+- No direct Postgres, Redis, Qdrant, RAGLight, or storage access.
 
-## Current state
+## Packaging Modes
 
-This folder currently contains the roadmap, architecture rules, Codex prompts, and design/performance guidance. It intentionally does **not** contain application code yet. Codex should start with Slice 0 discovery before scaffolding the app.
+- **Web UI standalone:** run the Web UI with Hermes. Brain Memory is optional
+  and can stay disabled.
+- **Brain Memory standalone:** Brain Memory remains usable as its own
+  backend/MCP/Gateway project without this Web UI.
+- **Recommended bundle mode:** future Web UI + Brain Memory setup for users who
+  want persistent project/session memory.
+- **Attach Brain Memory later:** start with Web UI standalone, then configure a
+  Brain Memory Gateway URL when ready.
 
-## Recommended first local commands
+See `docs/packaging/PACKAGING_MODES.md`.
 
-Run these from:
+## Local Development
+
+1. Install dependencies:
 
 ```powershell
-cd C:\Users\Alexey\.cursor\projects\hermes-ui
+npm install
 ```
 
-Then initialize the repository:
+2. Enable or verify Hermes API server, then check:
 
 ```powershell
-git init
-git add .
-git commit -m "chore: add initial Hermes UI roadmap"
+curl http://127.0.0.1:8642/health
 ```
 
-After that, start Codex with the prompt in:
+3. Create `apps/web/.env.local` from `.env.example`.
+
+Recommended Web UI standalone defaults:
 
 ```text
-docs/codex/PROMPT_SLICE_00_DISCOVERY.md
+HERMES_API_BASE_URL=http://127.0.0.1:8642
+HERMES_API_KEY=
+HERMES_UI_ENABLE_REAL_HERMES=true
+BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8765
+BRAIN_MEMORY_API_KEY=
+BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=false
 ```
 
-## Product thesis
+4. Run the local doctor:
 
-A local ChatGPT-like workspace with transparent, inspectable, project-aware long-term memory.
+```powershell
+npm run studio:doctor
+```
 
-The Web UI should feel familiar to ChatGPT users: titled sessions, project navigation, contextual continuity, streaming responses, model selection, and polished dark-mode ergonomics. The key differentiator is that Brain Memory makes context persistent, inspectable, and user-controllable.
+5. Start the Web UI:
 
-## Non-negotiable boundary
+```powershell
+npm run dev
+```
 
-The UI must not become the memory system or the agent runtime.
+6. Open the app:
 
-- Hermes remains the agent runtime.
-- Brain Memory Gateway remains the memory authority.
-- The UI may call Hermes and Brain Memory Gateway endpoints.
-- The UI must not directly write to Postgres, Redis, Qdrant, RAGLight, or any storage layer.
+```powershell
+npm run studio:open
+```
+
+The app opens at `http://127.0.0.1:3000`.
+
+## Boundary
+
+The UI is not the agent runtime and not the memory authority.
+
+```text
+Browser UI -> Next.js BFF -> Hermes API server
+Browser UI -> Next.js BFF -> Brain Memory Gateway UI/read-only endpoints
+```
+
+Hermes remains the agent runtime. Brain Memory Gateway remains the memory
+authority.

@@ -1,4 +1,4 @@
-import { workspaceMock } from "@/data/mockWorkspace";
+import { workspaceMock } from "../data/mockWorkspace";
 import type {
   ChatMessage,
   ProjectMemoryScope,
@@ -108,12 +108,17 @@ function normalizeWorkspace(state: WorkspaceState): WorkspaceState {
 
   const activeProjectId = projects.some((project) => project.id === state.activeProjectId)
     ? state.activeProjectId
-    : projects[0]?.id;
-  const activeSession = selectSessionForProject(sessions, activeProjectId, state.activeSessionId);
+    : selectMostRecentProject(projects)?.id;
+  const repairedProjectId = activeProjectId ?? "";
+  const activeSession = selectSessionForProject(
+    sessions,
+    repairedProjectId,
+    state.activeSessionId
+  );
 
   return {
     ...state,
-    activeProjectId,
+    activeProjectId: repairedProjectId,
     activeSessionId: activeSession?.id ?? null,
     projects,
     sessions
@@ -146,21 +151,21 @@ function switchSession(state: WorkspaceState, sessionId: string): WorkspaceState
 
 function createProject(state: WorkspaceState): WorkspaceState {
   const now = new Date().toISOString();
-  const nextNumber = state.projects.filter((project) =>
-    project.name.startsWith("Untitled project")
-  ).length;
-  const suffix = nextNumber === 0 ? "" : ` ${nextNumber + 1}`;
+  const name = makeUniqueTitle(
+    "Untitled project",
+    state.projects.map((project) => project.name)
+  );
   const id = `project-${crypto.randomUUID()}`;
   const memoryScopeKey = makeProjectStableKey(DEFAULT_TENANT_ID, id);
   const project: Project = {
     id,
-    name: `Untitled project${suffix}`,
+    name,
     description: "Local mock project. Rename and add chats when ready.",
-    icon: makeProjectIcon(`Untitled project${suffix}`),
+    icon: makeProjectIcon(name),
     memoryScopeKey,
     memoryScope: makeProjectMemoryScope({
       id,
-      name: `Untitled project${suffix}`,
+      name,
       memoryScopeKey
     }),
     createdAt: now,
@@ -184,16 +189,22 @@ function createSession(state: WorkspaceState): WorkspaceState {
   const now = new Date().toISOString();
   const id = `session-${crypto.randomUUID()}`;
   const hermesSessionId = `hermes-${id}`;
+  const title = makeUniqueTitle(
+    "New chat",
+    state.sessions
+      .filter((session) => session.projectId === project.id)
+      .map((session) => session.title)
+  );
   const session: Session = {
     id,
     projectId: project.id,
     hermesSessionId,
-    title: "New chat",
+    title,
     summary: "Empty local mock session",
     memoryScope: makeSessionMemoryScope({
       project,
       sessionId: id,
-      title: "New chat"
+      title
     }),
     createdAt: now,
     updatedAt: now,
@@ -304,7 +315,7 @@ function appendMessage(
                 ? summarizeMessage(message.content)
                 : item.summary,
             title:
-              item.title === "New chat" && message.role === "user"
+              isDefaultSessionTitle(item.title) && message.role === "user"
                 ? summarizeTitle(message.content)
                 : item.title,
             updatedAt: now
@@ -452,6 +463,10 @@ function selectSessionForProject(
   return visible.find((session) => session.id === preferredSessionId) ?? visible[0] ?? null;
 }
 
+function selectMostRecentProject(projects: Project[]): Project | null {
+  return [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+}
+
 function makeProjectIcon(name: string): string {
   return name
     .split(/\s+/)
@@ -505,8 +520,33 @@ function makeSessionStableKey(tenantId: string, projectId: string, sessionId: st
   return `studio:${tenantId}:project:${projectId}:session:${sessionId}`;
 }
 
+function makeUniqueTitle(baseTitle: string, existingTitles: string[]): string {
+  const used = new Set(existingTitles.map((title) => title.trim().toLowerCase()));
+  if (!used.has(baseTitle.toLowerCase())) {
+    return baseTitle;
+  }
+
+  let next = 2;
+  while (used.has(`${baseTitle} ${next}`.toLowerCase())) {
+    next += 1;
+  }
+  return `${baseTitle} ${next}`;
+}
+
+function isDefaultSessionTitle(title: string): boolean {
+  return /^New chat(?: \d+)?$/i.test(title.trim());
+}
+
 function summarizeTitle(content: string): string {
-  return summarizeMessage(content).slice(0, 44);
+  const clean = summarizeMessage(content)
+    .replace(/^(please\s+)?(can|could|would)\s+you\s+/i, "")
+    .replace(/^(please\s+)/i, "")
+    .replace(/[?!.,:;]+$/g, "")
+    .trim();
+  if (!clean) {
+    return "New chat";
+  }
+  return `${clean[0].toUpperCase()}${clean.slice(1)}`.slice(0, 44);
 }
 
 function summarizeMessage(content: string): string {

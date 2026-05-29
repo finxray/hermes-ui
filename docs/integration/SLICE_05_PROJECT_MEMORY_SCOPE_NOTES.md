@@ -168,6 +168,17 @@ Browser smoke verified:
 - unconfigured mock send still works and persists after reload;
 - no horizontal overflow.
 
+Additional live Windows Chrome verification:
+
+- opened `http://127.0.0.1:3000` in visible Windows Chrome;
+- Hermes status showed configured and connected;
+- a real UI send requested `POST /api/hermes/chat/stream` and received HTTP 200;
+- a direct BFF streaming probe produced live `message_delta`, `message_done`,
+  `run.completed`, and `done` events from Hermes;
+- no `HERMES_API_KEY` value appeared in the visible page;
+- localStorage persisted the live smoke message after reload;
+- no horizontal overflow was detected.
+
 ## Known Limitations
 
 - No live Hermes instance was available for validating memory scoping end to

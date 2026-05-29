@@ -461,6 +461,7 @@ function normalizeHermesSseStream(upstream: ReadableStream<Uint8Array>) {
     async start(controller) {
       const reader = upstream.getReader();
       let buffer = "";
+      let doneSent = false;
 
       try {
         while (true) {
@@ -473,14 +474,16 @@ function normalizeHermesSseStream(upstream: ReadableStream<Uint8Array>) {
           const frames = buffer.split(/\r?\n\r?\n/);
           buffer = frames.pop() ?? "";
           for (const frame of frames) {
-            writeNormalizedFrame(controller, encoder, frame);
+            doneSent = writeNormalizedFrame(controller, encoder, frame) || doneSent;
           }
         }
 
         if (buffer.trim()) {
-          writeNormalizedFrame(controller, encoder, buffer);
+          doneSent = writeNormalizedFrame(controller, encoder, buffer) || doneSent;
         }
-        writeUiSse(controller, encoder, { type: "done" });
+        if (!doneSent) {
+          writeUiSse(controller, encoder, { type: "done" });
+        }
       } catch {
         writeUiSse(controller, encoder, {
           type: "error",
@@ -489,6 +492,9 @@ function normalizeHermesSseStream(upstream: ReadableStream<Uint8Array>) {
             message: "Hermes stream ended unexpectedly."
           }
         });
+        if (!doneSent) {
+          writeUiSse(controller, encoder, { type: "done" });
+        }
       } finally {
         controller.close();
         reader.releaseLock();
@@ -501,15 +507,17 @@ function writeNormalizedFrame(
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
   frame: string
-) {
+): boolean {
   const parsed = parseSseFrame(frame);
   if (!parsed) {
-    return;
+    return false;
   }
   const normalized = normalizeHermesSseEvent(parsed.eventName, parsed.payload);
   if (normalized) {
     writeUiSse(controller, encoder, normalized);
+    return normalized.type === "done";
   }
+  return false;
 }
 
 function parseSseFrame(frame: string): { eventName: string; payload: Record<string, unknown> | null } | null {

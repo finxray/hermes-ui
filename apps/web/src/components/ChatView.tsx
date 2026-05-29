@@ -38,6 +38,10 @@ export function ChatView({
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const flushFrameRef = useRef<number | null>(null);
+  const selectedModel = modelChoices.find((choice) => choice.id === "hermes-default");
+  const modelLabel = selectedModel
+    ? `${selectedModel.label} · ${selectedModel.provider}`
+    : "Hermes default";
 
   async function handleSend(content: string) {
     if (!activeSession || isGenerating) {
@@ -45,7 +49,6 @@ export function ChatView({
     }
 
     const session = activeSession;
-    const selectedModel = modelChoices.find((choice) => choice.id === "hermes-default");
     const userMessage = createMessage("user", "Alexey", content, "complete");
     const assistantId = `msg-${crypto.randomUUID()}`;
     const assistantMessage: ChatMessage = {
@@ -230,7 +233,12 @@ export function ChatView({
         </div>
       </div>
 
-      <Composer disabled={!activeSession} isGenerating={isGenerating} onSend={handleSend} />
+      <Composer
+        disabled={!activeSession}
+        isGenerating={isGenerating}
+        modelLabel={modelLabel}
+        onSend={handleSend}
+      />
     </section>
   );
 }

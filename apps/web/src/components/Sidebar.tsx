@@ -4,6 +4,7 @@ import {
   Brain,
   Edit3,
   FileText,
+  FolderGit2,
   FolderPlus,
   MessageSquarePlus,
   MessagesSquare,
@@ -120,7 +121,7 @@ export function Sidebar({
                 {editing?.kind === "project" && editing.id === project.id ? (
                   <div className="project-button is-active">
                     <span className="project-glyph" aria-hidden="true">
-                      {project.icon}
+                      <FolderGit2 size={15} />
                     </span>
                     <span>
                       <input
@@ -159,7 +160,7 @@ export function Sidebar({
                     onClick={() => actions.switchProject(project.id)}
                   >
                     <span className="project-glyph" aria-hidden="true">
-                      {project.icon}
+                      <FolderGit2 size={15} />
                     </span>
                     <span>
                       <span className="project-name">{project.name}</span>

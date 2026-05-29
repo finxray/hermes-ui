@@ -1,14 +1,20 @@
-import { SendHorizontal } from "lucide-react";
+import { Mic, Plus, SendHorizontal, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 type ComposerProps = {
   disabled?: boolean;
   isGenerating?: boolean;
+  modelLabel?: string;
   onSend: (message: string) => void;
 };
 
-export function Composer({ disabled = false, isGenerating = false, onSend }: ComposerProps) {
+export function Composer({
+  disabled = false,
+  isGenerating = false,
+  modelLabel = "Hermes default",
+  onSend
+}: ComposerProps) {
   const [draft, setDraft] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -42,14 +48,32 @@ export function Composer({ disabled = false, isGenerating = false, onSend }: Com
               }
             }}
           />
-          <button
-            className="send-button"
-            type="submit"
-            disabled={disabled || isGenerating || draft.trim().length === 0}
-            aria-label="Send message"
-          >
-            <SendHorizontal size={17} />
-          </button>
+          <div className="composer-controls" aria-label="Composer controls">
+            <div className="composer-controls-left">
+              <button className="composer-tool-button" type="button" aria-label="Attach context">
+                <Plus size={17} />
+              </button>
+              <button className="composer-model-button" type="button" aria-label="Selected model">
+                {modelLabel}
+              </button>
+              <button className="composer-tool-button" type="button" aria-label="Composer options">
+                <SlidersHorizontal size={16} />
+              </button>
+            </div>
+            <div className="composer-controls-right">
+              <button className="composer-tool-button" type="button" aria-label="Voice input">
+                <Mic size={16} />
+              </button>
+              <button
+                className="send-button"
+                type="submit"
+                disabled={disabled || isGenerating || draft.trim().length === 0}
+                aria-label="Send message"
+              >
+                <SendHorizontal size={17} />
+              </button>
+            </div>
+          </div>
         </div>
         <div className="composer-note">
           {isGenerating

@@ -398,6 +398,24 @@ textarea:disabled {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.row-with-actions:has(.session-button.is-active)::after {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--text-secondary);
+  border-radius: 999px;
+  content: "";
+  opacity: 0.9;
+  transform: translateY(-50%);
+}
+
+.row-with-actions:has(.session-button.is-active):hover::after,
+.row-with-actions:has(.session-button.is-active):focus-within::after {
+  opacity: 0;
+}
+
 .project-button {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
@@ -526,7 +544,7 @@ textarea:disabled {
   width: 100%;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 10px 0;
   border-color: transparent;
   background: transparent;
   text-align: left;

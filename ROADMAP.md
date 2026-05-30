@@ -102,6 +102,35 @@ one unique message through the UI/BFF path, waits for a non-empty assistant
 response, and keeps the default browser smoke non-mutating. Details are
 documented in `docs/checkpoints/LIVE_SEND_SMOKE_12G.md`.
 
+## Checkpoint: Slice 13A Hermes-native agent orchestration contract
+
+Slice 13A re-verified current upstream Hermes API docs/source on 2026-05-30 at
+HEAD `5921d667855880b0aa2083a50f001748aed52f3e` and captured the next product
+contract. Hermes UI should evolve from an MVP chat shell into a
+Hermes-native agent orchestration studio: ChatGPT-like sessions, Codex-like
+activity, transparent Brain Memory, and capability-driven Hermes controls.
+
+Concise roadmap:
+
+- Hermes-native agent orchestration: use `/v1/capabilities` first, keep the
+  BFF boundary, move commercial-grade activity toward `/v1/runs` and run
+  events, then add real stop/cancel and approvals.
+- ChatGPT-like sessions: make session storage, auto-title, history, rename,
+  archive/delete, search, summaries, and project context restoration reliable.
+- Codex-like activity: normalize Hermes events into stable activity blocks for
+  tools, commands, reasoning, approvals, errors, elapsed time, and artifacts.
+- Brain Memory transparency: keep Gateway-mediated read-only inspection, show
+  scoped retrieval/store events, evidence, supersession, and audit trails before
+  any future admin action.
+
+Contract docs:
+
+- `docs/architecture/HERMES_API_UX_CONTRACT.md`
+- `docs/product/AGENT_ORCHESTRATION_UX_CONTRACT.md`
+- `docs/product/AGENT_ACTIVITY_EVENT_MODEL.md`
+- `docs/architecture/HERMES_EVENT_NORMALIZATION_PLAN.md`
+- `docs/product/AGENT_ORCHESTRATION_SLICE_PLAN.md`
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

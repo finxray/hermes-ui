@@ -119,7 +119,7 @@ async function main() {
   checkRequiredServices();
 
   if (args.devCommand) {
-    addCommand("dev-command", "pass", "npm run dev", "Run this in a separate terminal to start the Web UI dev server.");
+    addCommand("dev-command", "pass", "npm run studio:web", "Run this in a separate terminal to start only the Web UI dev server.");
   }
 
   if (args.smoke) {
@@ -512,7 +512,7 @@ function addPortDiagnosticsCheck(ports) {
       false,
       "",
       noHealthy
-        ? `No healthy Studio server found. Selected base URL ${webUiUrl} is stale/broken and static chunks failed; inspect listener ownership, stop the stale server manually, start a fresh server, then re-check with --base-url. See ${recoveryRunbookPath}.`
+        ? `No healthy Studio server found. Selected base URL ${webUiUrl} is stale/broken and static chunks failed; inspect listener ownership, stop the stale server manually if needed, start only the Web UI with studio:web, then re-check with --base-url. See ${recoveryRunbookPath}.`
         : `You are testing against stale server ${webUiUrl}. Static chunks failed for the selected base URL; pass --base-url for a healthy Studio server before running browser smokes.`,
       "required"
     );
@@ -919,12 +919,12 @@ function buildRecommendedActions() {
     actions.push({
       command: makePowerShellPortCommand(broken.map((item) => item.port)),
       kind: "identify-stale-process",
-      message: "Suggested recovery sequence: identify listener ownership, stop the stale server manually, start a fresh server, then re-check the selected base URL."
+      message: "Suggested recovery sequence: identify listener ownership, stop the stale server manually if needed, start only the Web UI with studio:web, then re-check the selected base URL."
     });
     actions.push({
-      command: `npm run dev -- --port ${new URL(exampleFreshBaseUrl).port}`,
+      command: `npm run studio:web -- --port ${new URL(exampleFreshBaseUrl).port} --open --ui-smoke`,
       kind: "fresh-server",
-      message: `If port 3000 remains stale, start a fresh dev server on an unused port such as ${exampleFreshBaseUrl} in a separate terminal.`
+      message: `If port 3000 remains stale, explicitly start only the Web UI on an unused port such as ${exampleFreshBaseUrl}.`
     });
     actions.push({
       command: `npm run studio:launch -- --check --base-url ${exampleFreshBaseUrl}`,
@@ -981,9 +981,9 @@ function buildRecommendedActions() {
 
   if (!args.noPortScan && healthy.length === 0 && broken.length === 0) {
     actions.push({
-      command: "npm run dev",
+      command: "npm run studio:web",
       kind: "no-studio-server",
-      message: "No Studio server was found on ports 3000-3007. Start the Web UI, then re-run the launcher."
+      message: "No Studio server was found on ports 3000-3007. Start only the Web UI, then re-run the launcher."
     });
     actions.push({
       command: "npm run studio:launch -- --check",
@@ -1033,9 +1033,9 @@ function buildRecoveryCommands() {
       platform: "all"
     });
     commands.push({
-      command: `npm run dev -- --port ${new URL(exampleFreshBaseUrl).port}`,
+      command: `npm run studio:web -- --port ${new URL(exampleFreshBaseUrl).port} --open --ui-smoke`,
       destructive: false,
-      label: "Start a fresh Web UI dev server on an unused port after manually stopping stale servers if needed",
+      label: "Start only the Web UI dev server on an unused port after manually stopping stale servers if needed",
       platform: "all"
     });
     commands.push({
@@ -1066,7 +1066,7 @@ function buildRecoveryCommands() {
 
   if (report.diagnostics.brokenStudioPorts.length > 0) {
     commands.push({
-      command: "npm run dev",
+      command: "npm run studio:web",
       destructive: false,
       label: "Restart the Web UI after manually stopping the stale terminal",
       platform: "all"
@@ -1093,7 +1093,7 @@ function buildRecoveryCommands() {
 
   if (!args.noPortScan && report.diagnostics.healthyStudioPorts.length === 0 && report.diagnostics.brokenStudioPorts.length === 0) {
     commands.push({
-      command: "npm run dev",
+      command: "npm run studio:web",
       destructive: false,
       label: "Start Web UI dev server",
       platform: "all"
@@ -1324,7 +1324,7 @@ function makeSuggestions() {
     suggestions.push("Create env with npm run studio:env -- --mode web-ui-with-hermes or web-ui-only.");
   }
   if (!report.services.webUi?.ok) {
-    suggestions.push("Start the Web UI in a separate terminal: npm run dev, then run npm run studio:launch -- --check.");
+    suggestions.push("Start the Web UI explicitly with npm run studio:web, then run npm run studio:launch -- --check.");
   }
   if (likelyStudio.length > 1) {
     suggestions.push(`Multiple likely Studio servers are running: ${likelyStudio.map((item) => item.baseUrl).join(", ")}. Prefer ${canonical || "port 3000 when healthy"} or choose one explicitly with --base-url.`);
@@ -1336,12 +1336,12 @@ function makeSuggestions() {
       : `Stale/broken non-selected Studio server detected: ${brokenStudio.map((item) => item.baseUrl).join(", ")}. This may confuse browser tabs; run npm run studio:launch -- --check --recovery for copyable recovery commands.`);
   }
   if (noHealthyWithBroken) {
-    suggestions.push(`No healthy Studio server was found. Identify and stop stale servers manually, then start a fresh server with npm run dev -- --port ${new URL(exampleFreshBaseUrl).port}.`);
+    suggestions.push(`No healthy Studio server was found. Identify and stop stale servers manually if needed, then start only the Web UI with npm run studio:web -- --port ${new URL(exampleFreshBaseUrl).port} --open --ui-smoke.`);
     suggestions.push(`Verify the fresh server before smokes: npm run studio:launch -- --check --base-url ${exampleFreshBaseUrl}.`);
     suggestions.push(`After that passes, run browser smokes with --base-url ${exampleFreshBaseUrl}; do not smoke the stale ${webUiUrl} target.`);
   }
   if (report.services.staticAssets?.status === "warn") {
-    suggestions.push("Static chunk issues usually mean a stale Next server. Restart npm run dev or next start; only then consider removing apps/web/.next.");
+    suggestions.push("Static chunk issues usually mean a stale Next server. Restart with npm run studio:web; only then consider removing apps/web/.next.");
   }
   if (canonical && canonical !== webUiUrl) {
     suggestions.push(`Use the recommended healthy Studio URL explicitly: npm run studio:launch -- --check --base-url ${canonical}.`);
@@ -1365,7 +1365,7 @@ function makeSuggestions() {
     suggestions.push("Open the app with npm run studio:launch -- --open.");
   }
   if (args.devCommand) {
-    suggestions.push("The launcher does not start long-running services by default; run npm run dev yourself.");
+    suggestions.push("The launcher does not start long-running services by default; run npm run studio:web yourself when you explicitly want only the Web UI.");
   }
   suggestions.push("If the UI looks wrong, confirm the route is /, not /design/codex-shell, and reset Chrome/Edge zoom to 100% with Ctrl+0.");
   return suggestions;
@@ -1521,7 +1521,7 @@ Flags:
   --no-port-scan                 Skip nearby localhost Studio port diagnostics.
   --json                         Print the structured launcher report as JSON.
   --verbose                      Include extra failure detail in text output.
-  --dev-command                  Print npm run dev as a next command only.
+  --dev-command                  Print npm run studio:web as a next command only.
   --recovery                     Emphasize print-only recovery commands.
   --print-recovery-plan          Alias for --recovery; prints guidance only.
 
@@ -1675,9 +1675,9 @@ function printRecoveryGuidance() {
   if (noHealthyWithBroken) {
     console.log("- No healthy Studio server found.");
     console.log(`- Stale/broken ports found: ${report.diagnostics.brokenStudioPorts.map((item) => item.baseUrl).join(", ")}.`);
-    console.log("- Suggested recovery sequence: identify stale process, stop stale server manually, start a fresh server, re-check selected base URL.");
+    console.log("- Suggested recovery sequence: identify stale process, stop stale server manually if needed, start only the Web UI with studio:web, re-check selected base URL.");
     console.log(`- Manual runbook: ${recoveryRunbookPath}.`);
-    console.log(`- Fresh-port example: npm run dev -- --port ${new URL(exampleFreshBaseUrl).port}`);
+    console.log(`- Fresh-port example: npm run studio:web -- --port ${new URL(exampleFreshBaseUrl).port} --open --ui-smoke`);
     console.log(`- Verify before browser smokes: npm run studio:launch -- --check --base-url ${exampleFreshBaseUrl}`);
     console.log(`- Base-url-safe smoke example: npm run smoke:ui -- --base-url ${exampleFreshBaseUrl}`);
   }

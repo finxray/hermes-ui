@@ -14,6 +14,8 @@
     "studio:launch": "node scripts/studio-launch.mjs",
     "studio:launch:smoke": "node scripts/studio-launch.mjs --check --smoke --ui-smoke",
     "studio:open": "node scripts/open-studio-browser.mjs",
+    "studio:web": "node scripts/studio-web-dev.mjs",
+    "studio:web:3002": "node scripts/studio-web-dev.mjs --port 3002",
     "build": "npm run build -w @hermes-ui/web",
     "check:agent-activity": "node scripts/check-agent-activity-events.mjs",
     "check:agent-activity-rendering": "node scripts/check-agent-activity-rendering.mjs",

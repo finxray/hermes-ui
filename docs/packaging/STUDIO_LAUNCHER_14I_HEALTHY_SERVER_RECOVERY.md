@@ -32,7 +32,7 @@ launcher now prints:
 - `No healthy Studio server found`;
 - stale/broken port list;
 - a manual recovery sequence;
-- fresh-port example using `npm run dev -- --port 3002`;
+- fresh-port example using `npm run studio:web -- --port 3002 --open --ui-smoke`;
 - selected-base-url verification command;
 - base-url-safe smoke example;
 - `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`.
@@ -69,8 +69,8 @@ The manual workflow is documented in
 1. Diagnose with `npm run studio:launch -- --check --verbose`.
 2. Identify listeners with `ss` or `Get-NetTCPConnection`.
 3. Stop stale servers manually after verifying ownership.
-4. Start a fresh dev server with `npm run dev` or
-   `npm run dev -- --port 3002`.
+4. Start only the Web UI dev server with `npm run studio:web` or
+   `npm run studio:web -- --port 3002 --open --ui-smoke`.
 5. Verify with
    `npm run studio:launch -- --check --base-url http://127.0.0.1:<port>`.
 6. Run smokes only with the same healthy `--base-url`.
@@ -79,6 +79,10 @@ The manual workflow is documented in
 
 The repo currently has no committed root or web `start` script, so no
 `npm run start` recovery command is documented.
+
+Slice 14J later added `studio:web` as the explicit optional Web UI-only start
+wrapper. It refuses stale/broken selected ports and still does not manage
+Hermes, Brain Memory, Docker, systemd, env files, or cache cleanup.
 
 ## Base-Url Smoke Guidance
 

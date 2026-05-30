@@ -28,6 +28,8 @@ the deferred production one-command CLI.
 | `npm run studio:launch -- --check --print-recovery-plan` | Prints the healthy-server recovery plan without executing it. |
 | `npm run studio:launch:smoke` | Runs launcher checks plus route/BFF and browser smokes. |
 | `npm run check:studio-launch` | Verifies the launcher help, base URL, JSON, redaction, recovery, and safety contract. |
+| `npm run studio:web` | Optional explicit wrapper that starts only the Web UI dev server after checking the selected port. |
+| `npm run studio:web:3002` | Convenience wrapper for starting only the Web UI on port `3002`. |
 | `npm run dev` | Starts the Next.js Web UI on port 3000. |
 | `npm run studio:open` | Opens `http://127.0.0.1:3000` in the local browser. |
 | `npm run smoke:mvp` | Runs source, route, BFF, Hermes stream-if-live, and Brain Memory normalization smoke. |
@@ -65,7 +67,7 @@ curl http://127.0.0.1:8642/health
 4. Start the Web UI:
 
 ```powershell
-npm run dev
+npm run studio:web
 ```
 
 5. In another terminal, run the launch checks:
@@ -143,6 +145,17 @@ Launcher help and contract checks are documented in
 stale/broken servers to one healthy selected server is documented in
 `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`.
 
+When you explicitly want tooling to start only the Web UI, use:
+
+```powershell
+npm run studio:web -- --port 3002 --open --ui-smoke
+```
+
+`studio:web` refuses stale/broken or occupied selected ports, never kills
+existing processes, never deletes `.next`, never modifies env files, and does
+not manage Hermes, Brain Memory, Docker, or systemd services. See
+`docs/packaging/STUDIO_WEB_DEV_14J.md`.
+
 ## Web UI Standalone / Mock Mode
 
 Use this when Hermes or Brain Memory Gateway is not part of the current run:
@@ -150,7 +163,7 @@ Use this when Hermes or Brain Memory Gateway is not part of the current run:
 ```powershell
 npm install
 npm run studio:env -- --mode web-ui-only
-npm run dev
+npm run studio:web
 npm run studio:doctor
 npm run smoke:mvp
 npm run smoke:ui
@@ -317,14 +330,15 @@ npm run studio:launch -- --check --print-recovery-plan
 
 If no healthy Studio server is found, follow
 `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`: identify listener ownership,
-stop stale servers manually after verifying ownership, start a fresh server,
-then verify a selected base URL before running browser smokes.
+stop stale servers manually after verifying ownership if needed, start only the
+Web UI with `studio:web`, then verify a selected base URL before running
+browser smokes.
 
 If port `3000` is stale, start a fresh server on an unused explicit port such
 as `3002`:
 
 ```powershell
-npm run dev -- --port 3002
+npm run studio:web -- --port 3002 --open --ui-smoke
 npm run studio:launch -- --check --base-url http://127.0.0.1:3002
 ```
 
@@ -366,7 +380,7 @@ manually from the terminal that owns it, or use your OS process manager after
 verifying the PID. Then restart:
 
 ```powershell
-npm run dev
+npm run studio:web
 ```
 
 If stale assets persist, stop the server, confirm the repo path, remove only the
@@ -374,7 +388,7 @@ web app build cache as a last manual/destructive step, then restart:
 
 ```powershell
 Remove-Item -Recurse -Force apps\web\.next
-npm run dev
+npm run studio:web
 ```
 
 Do not run broad recursive delete commands outside the repo or without checking

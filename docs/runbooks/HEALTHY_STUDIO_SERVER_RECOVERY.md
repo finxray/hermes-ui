@@ -73,20 +73,29 @@ The launcher does not stop processes automatically.
 
 ## 4. Start A Fresh Server
 
-Default dev server:
+Preferred optional wrapper:
 
 ```powershell
-npm run dev
+npm run studio:web
 ```
 
 Explicit alternate port, useful when `3000` remains stale or occupied:
 
 ```powershell
-npm run dev -- --port 3002
+npm run studio:web -- --port 3002 --open --ui-smoke
 ```
 
-This works through the root `dev` script because it delegates to
-`@hermes-ui/web`, whose `dev` script is `next dev`.
+The wrapper starts only the Web UI dev server. It checks whether the selected
+port is stale, broken, or occupied before starting, and it refuses to stop
+existing processes. If you only want to preview the decision:
+
+```powershell
+npm run studio:web -- --port 3002 --dry-run
+```
+
+The wrapper ultimately runs the root `dev` script because it delegates to
+`@hermes-ui/web`, whose `dev` script is `next dev`. You can still run
+`npm run dev` manually, but `studio:web` is the safer recovery entry point.
 
 There is currently no committed root or web `start` script for `next start`, so
 production-server recovery is not documented as a runnable command in this
@@ -148,11 +157,14 @@ rm -rf apps/web/.next
 Then restart the dev server and verify again:
 
 ```powershell
-npm run dev
+npm run studio:web
 npm run studio:launch -- --check --base-url http://127.0.0.1:3000
 ```
 
 The launcher never runs cache cleanup automatically.
+
+The Web UI wrapper also never runs cache cleanup. When the wrapper starts a dev
+server, pressing `Ctrl+C` stops only the child process that wrapper started.
 
 ## Safety Boundary
 

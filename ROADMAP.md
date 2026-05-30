@@ -409,6 +409,18 @@ Hermes/Brain Memory change, direct browser-to-service path, or export/import
 was added. See
 `docs/packaging/STUDIO_LAUNCHER_14I_HEALTHY_SERVER_RECOVERY.md`.
 
+## Checkpoint: Slice 14J optional Web UI dev-server wrapper
+
+Slice 14J added an explicit optional wrapper for starting only the Web UI dev
+server on 2026-05-31. `npm run studio:web` checks the selected port, refuses
+stale/broken or occupied targets, starts the root Next.js dev command only when
+safe, supports `--port`, `--host`, `--open`, `--smoke`, `--ui-smoke`,
+`--dry-run`, and forwards Ctrl+C only to the child process it started.
+`npm run studio:web:3002` provides the common recovery-port shortcut. The
+wrapper does not kill existing processes, delete `.next`, modify env files,
+manage Hermes/Brain Memory/Docker/systemd, change backend/Hermes/Brain Memory
+logic, or implement export/import. See `docs/packaging/STUDIO_WEB_DEV_14J.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

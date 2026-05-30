@@ -37,7 +37,7 @@ Quick MVP path:
 ```powershell
 npm install
 npm run studio:env -- --mode web-ui-with-hermes
-npm run dev
+npm run studio:web
 npm run studio:launch -- --check
 npm run check:studio-launch
 npm run studio:launch -- --open
@@ -70,8 +70,8 @@ npm run smoke:ui -- --base-url http://127.0.0.1:3000
 Browser smokes fail early on stale Next static chunks and print manual recovery
 guidance instead of continuing into misleading click failures.
 If no healthy Studio server is detected, follow
-`docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`, start a fresh server on an
-unused port such as `npm run dev -- --port 3002`, verify it with
+`docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`, start only the Web UI on an
+unused port such as `npm run studio:web -- --port 3002 --open --ui-smoke`, verify it with
 `npm run studio:launch -- --check --base-url http://127.0.0.1:3002`, then run
 smokes with the same `--base-url`.
 
@@ -119,7 +119,7 @@ npm run studio:doctor
 5. Start the Web UI:
 
 ```powershell
-npm run dev
+npm run studio:web
 ```
 
 6. Run the MVP smoke harness:

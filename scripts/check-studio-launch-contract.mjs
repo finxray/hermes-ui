@@ -8,15 +8,21 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const root = resolve(process.cwd());
 const launcherPath = join(root, "scripts", "studio-launch.mjs");
+const studioWebPath = join(root, "scripts", "studio-web-dev.mjs");
 const smokeBaseUrlPath = join(root, "scripts", "smoke-base-url.mjs");
 const packagePath = join(root, "package.json");
 const healthyServerRunbookPath = join(root, "docs", "runbooks", "HEALTHY_STUDIO_SERVER_RECOVERY.md");
+const studioWebDocPath = join(root, "docs", "packaging", "STUDIO_WEB_DEV_14J.md");
 
 const launcher = readFileSync(launcherPath, "utf8");
+const studioWeb = existsSync(studioWebPath) ? readFileSync(studioWebPath, "utf8") : "";
 const smokeBaseUrl = readFileSync(smokeBaseUrlPath, "utf8");
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
 const healthyServerRunbook = existsSync(healthyServerRunbookPath)
   ? readFileSync(healthyServerRunbookPath, "utf8")
+  : "";
+const studioWebDoc = existsSync(studioWebDocPath)
+  ? readFileSync(studioWebDocPath, "utf8")
   : "";
 
 const results = [];
@@ -30,6 +36,7 @@ async function main() {
   checkJsonShapeContract();
   checkSecretRedactionContract();
   checkRecoveryContract();
+  checkStudioWebContract();
   checkSafetyContract();
   checkPackageScripts();
   printResults();
@@ -142,7 +149,37 @@ function checkRecoveryContract() {
   passIf("recovery-rm-marked", /command:\s*"rm -rf apps\/web\/\.next"[\s\S]*?destructive:\s*true/.test(launcher), "POSIX cache cleanup is marked destructive.");
   passIf("recovery-note", launcher.includes("Print-only. Do not run until the server is stopped and the path is confirmed."), "Destructive recovery commands carry guarded notes.");
   passIf("recovery-runbook-manual-stop", healthyServerRunbook.includes("The launcher does not stop processes automatically."), "Runbook keeps process stopping manual.");
+  passIf("recovery-runbook-web-wrapper", healthyServerRunbook.includes("npm run studio:web -- --port 3002 --open --ui-smoke"), "Runbook documents the optional Web UI wrapper.");
   passIf("recovery-runbook-no-start-script", healthyServerRunbook.includes("There is currently no committed root or web `start` script"), "Runbook does not document unsupported npm start flow.");
+}
+
+function checkStudioWebContract() {
+  const expectedFlags = [
+    "--dry-run",
+    "--port",
+    "--host",
+    "--open",
+    "--smoke",
+    "--ui-smoke",
+    "--no-open",
+    "--json",
+    "--verbose",
+    "--help"
+  ];
+
+  passIf("studio-web-script-exists", existsSync(studioWebPath), "Optional Web UI dev wrapper script exists.");
+  passIf("studio-web-uses-spawn", studioWeb.includes("import { spawn }") && studioWeb.includes("spawn(command"), "Wrapper starts child processes with spawn.");
+  passIf("studio-web-own-child", studioWeb.includes("startedChild") && studioWeb.includes('startedChild.kill("SIGINT")'), "Wrapper only signals the child process it started.");
+  passIf("studio-web-start-command", studioWeb.includes('"run", "dev"') && studioWeb.includes("--hostname") && studioWeb.includes("--port"), "Wrapper starts the root npm dev script with host and port.");
+  passIf("studio-web-refuses-stale", studioWeb.includes("stale-or-broken-studio") && studioWeb.includes("Refusing to start Web UI"), "Wrapper refuses stale/broken selected servers.");
+  passIf("studio-web-dry-run", studioWeb.includes("--dry-run") && studioWeb.includes('action: "dry-run"'), "Wrapper supports dry-run mode.");
+  passIf("studio-web-json-limited", studioWeb.includes("--json is supported with --dry-run"), "Wrapper documents JSON limitation for long-running logs.");
+  passIf("studio-web-smoke-base-url", studioWeb.includes("smoke:mvp") && studioWeb.includes("smoke:ui") && studioWeb.includes("--base-url"), "Wrapper runs smokes against the selected base URL.");
+  for (const flag of expectedFlags) {
+    passIf(`studio-web-flag-${flag}`, studioWeb.includes(flag), `Wrapper source/help includes ${flag}.`);
+  }
+  passIf("studio-web-doc-exists", existsSync(studioWebDocPath), "Studio Web 14J documentation exists.");
+  passIf("studio-web-doc-boundary", studioWebDoc.includes("does not manage Hermes") && studioWebDoc.includes("does not implement export/import"), "Studio Web docs state service and export/import boundaries.");
 }
 
 function checkSafetyContract() {
@@ -155,6 +192,7 @@ function checkSafetyContract() {
     /\brename(?:Sync)?\s*\(/
   ];
   passIf("safety-no-file-mutation-calls", forbiddenWriteCalls.every((pattern) => !pattern.test(launcher)), "Launcher has no file mutation calls.");
+  passIf("safety-studio-web-no-file-mutation-calls", forbiddenWriteCalls.every((pattern) => !pattern.test(studioWeb)), "Web wrapper has no file mutation calls.");
 
   const destructiveExecPatterns = [
     /execFileAsync\([^)]*Stop-Process/s,
@@ -166,12 +204,24 @@ function checkSafetyContract() {
     /execFileAsync\([^)]*hermes\s+(?:start|serve|run)/s
   ];
   passIf("safety-no-destructive-exec", destructiveExecPatterns.every((pattern) => !pattern.test(launcher)), "Launcher does not execute destructive recovery/service commands.");
+  passIf("safety-studio-web-no-destructive-text", [
+    "Stop-Process",
+    "taskkill",
+    "Remove-Item",
+    "rm -rf",
+    "docker",
+    "systemctl",
+    ".hermes"
+  ].every((value) => !studioWeb.includes(value)), "Web wrapper does not contain destructive/service-management command text.");
   passIf("safety-no-env-write", !launcher.includes(".env.local") || !/writeFile|appendFile/.test(launcher), "Launcher does not write apps/web/.env.local.");
+  passIf("safety-studio-web-no-env-write", !/\.env\.local|writeFile|appendFile/.test(studioWeb), "Web wrapper does not write env files.");
   passIf("safety-no-hermes-home-write", !/join\([^)]*\.hermes|homedir\(\)|process\.env\.HOME/.test(launcher), "Launcher does not modify ~/.hermes.");
 }
 
 function checkPackageScripts() {
   passIf("package-studio-launch", packageJson.scripts?.["studio:launch"] === "node scripts/studio-launch.mjs", "package.json keeps studio:launch.");
+  passIf("package-studio-web", packageJson.scripts?.["studio:web"] === "node scripts/studio-web-dev.mjs", "package.json exposes studio:web.");
+  passIf("package-studio-web-3002", packageJson.scripts?.["studio:web:3002"] === "node scripts/studio-web-dev.mjs --port 3002", "package.json exposes studio:web:3002.");
   passIf("package-contract-check", packageJson.scripts?.["check:studio-launch"] === "node scripts/check-studio-launch-contract.mjs", "package.json exposes check:studio-launch.");
 }
 

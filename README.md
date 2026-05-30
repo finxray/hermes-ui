@@ -38,6 +38,18 @@ Quick MVP path:
 npm install
 npm run studio:env -- --mode web-ui-with-hermes
 npm run dev
+npm run studio:launch -- --check
+npm run studio:launch -- --open
+```
+
+The local launcher is a safe checklist for daily use. It checks env, Web UI,
+Hermes, optional Brain Memory state, stale Next static chunks, and prints next
+commands. It does not install or start Hermes/Brain Memory, does not kill
+servers, and does not implement export/import.
+
+Manual smoke path:
+
+```powershell
 npm run studio:doctor
 npm run smoke:mvp
 npm run smoke:ui
@@ -51,6 +63,9 @@ at `http://127.0.0.1:8080` when live.
 For the full local launch flow, service modes, smoke matrix, stale-server
 troubleshooting, browser scaling notes, and secrets guidance, see
 `docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
+
+For the launcher details, flags, safety boundaries, and relationship to the
+future one-command CLI, see `docs/packaging/STUDIO_LAUNCHER_14A.md`.
 
 1. Install dependencies:
 

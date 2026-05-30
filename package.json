@@ -11,6 +11,8 @@
     "studio:dev": "npm run dev",
     "studio:doctor": "node scripts/studio-doctor.mjs",
     "studio:env": "node scripts/studio-env.mjs",
+    "studio:launch": "node scripts/studio-launch.mjs",
+    "studio:launch:smoke": "node scripts/studio-launch.mjs --check --smoke --ui-smoke",
     "studio:open": "node scripts/open-studio-browser.mjs",
     "build": "npm run build -w @hermes-ui/web",
     "check:agent-activity": "node scripts/check-agent-activity-events.mjs",

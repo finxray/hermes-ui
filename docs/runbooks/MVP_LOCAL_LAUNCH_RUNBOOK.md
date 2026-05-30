@@ -22,6 +22,8 @@ the deferred production one-command CLI.
 | `npm run studio:env -- --list` | Lists available `.env.local` templates. |
 | `npm run studio:env -- --mode web-ui-with-hermes` | Creates `apps/web/.env.local` for Web UI plus live Hermes. Refuses to overwrite without `--force`. |
 | `npm run studio:doctor` | Checks repo shape, env, Hermes status, Brain Memory status, and BFF reachability without printing secrets. |
+| `npm run studio:launch` | Safe launcher/checklist for env, Web UI, Hermes, Brain Memory mock/live state, stale static chunks, optional smoke, and browser open. |
+| `npm run studio:launch:smoke` | Runs launcher checks plus route/BFF and browser smokes. |
 | `npm run dev` | Starts the Next.js Web UI on port 3000. |
 | `npm run studio:open` | Opens `http://127.0.0.1:3000` in the local browser. |
 | `npm run smoke:mvp` | Runs source, route, BFF, Hermes stream-if-live, and Brain Memory normalization smoke. |
@@ -65,6 +67,7 @@ npm run dev
 5. In another terminal, run the launch checks:
 
 ```powershell
+npm run studio:launch -- --check
 npm run studio:doctor
 npm run smoke:mvp
 npm run smoke:ui
@@ -77,6 +80,43 @@ npm run studio:open
 ```
 
 The browser should open `http://127.0.0.1:3000`.
+
+## Local Studio Launcher
+
+Slice 14A adds:
+
+```powershell
+npm run studio:launch
+```
+
+The launcher is a non-destructive local checklist. By default it:
+
+- prints the inferred mode;
+- checks Node/npm and `apps/web/.env.local`;
+- checks the Web UI root at `http://127.0.0.1:3000`;
+- checks referenced `/_next/static/**` assets to catch stale Next servers;
+- checks Hermes through the Web UI BFF when the server is running;
+- checks direct Hermes `/health` when `HERMES_API_BASE_URL` is configured;
+- checks Brain Memory through the Web UI BFF when the server is running;
+- checks direct Brain Memory `/health` only when live Gateway mode is enabled;
+- prints next commands.
+
+Useful variants:
+
+```powershell
+npm run studio:launch -- --check --verbose
+npm run studio:launch -- --check --require-hermes
+npm run studio:launch -- --smoke
+npm run studio:launch -- --ui-smoke
+npm run studio:launch -- --open
+npm run studio:launch -- --dev-command
+npm run studio:launch:smoke
+```
+
+The launcher does not start long-running services, install Hermes, install
+Brain Memory, start Docker, stop Docker, modify `~/.hermes`, kill stale Next
+processes, delete `.next`, print API keys, or implement export/import. See
+`docs/packaging/STUDIO_LAUNCHER_14A.md`.
 
 ## Web UI Standalone / Mock Mode
 
@@ -260,6 +300,9 @@ npm run dev
 
 Do not run broad recursive delete commands outside the repo or without checking
 the path first.
+
+`npm run studio:launch -- --check` also checks static assets and will suggest a
+server restart when the root route is reachable but current chunks fail.
 
 ## WSL / Windows Notes
 

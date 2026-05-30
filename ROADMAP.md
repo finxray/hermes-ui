@@ -299,6 +299,18 @@ backend export, import, command rerun, direct browser-to-service call, storage
 access, or memory mutation/admin action was added. See
 `docs/product/RELOAD_REPLAY_EXPORT_PREVIEW_13O.md`.
 
+## Checkpoint: Slice 14A local studio launcher
+
+Slice 14A added a lightweight local launcher foundation on 2026-05-31.
+`npm run studio:launch` now provides a safe daily checklist for env, Node/npm,
+Web UI reachability, Next static chunk freshness, Hermes direct/BFF status,
+Brain Memory mock/live state, optional smoke commands, browser open flow, and
+clear next commands. `npm run studio:launch:smoke` runs the launcher plus the
+route/BFF and browser smoke checks. The launcher does not install or start
+Hermes/Brain Memory, modify `~/.hermes`, manage Docker/systemd, kill stale
+servers, delete `.next`, change UI/backend behavior, or implement
+export/import. See `docs/packaging/STUDIO_LAUNCHER_14A.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

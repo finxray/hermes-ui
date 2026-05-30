@@ -94,6 +94,14 @@ Web UI startup, Hermes live checks, optional Brain Memory Gateway checks, smoke
 commands, stale dev-server recovery, browser scaling, Playwright install, and
 secrets safety. See `docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
 
+## Checkpoint: Slice 12G optional live composer send smoke
+
+Slice 12G added an opt-in browser smoke gate on 2026-05-30 for live composer
+send behavior. `npm run smoke:ui:send` requires real, reachable Hermes, sends
+one unique message through the UI/BFF path, waits for a non-empty assistant
+response, and keeps the default browser smoke non-mutating. Details are
+documented in `docs/checkpoints/LIVE_SEND_SMOKE_12G.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

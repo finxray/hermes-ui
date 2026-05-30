@@ -5,12 +5,14 @@ import { chromium } from "playwright";
 const args = parseArgs(process.argv.slice(2));
 const baseUrl = trimSlash(args.baseUrl || "http://127.0.0.1:3000");
 const timeoutMs = 10_000;
+const liveSendTimeoutMs = 60_000;
 
 const report = {
   baseUrl,
   checks: [],
   mode: {
     headed: args.headed,
+    requireHermes: args.requireHermes,
     sendTest: args.sendTest
   },
   summary: {
@@ -21,7 +23,10 @@ const report = {
 };
 
 const browserIssues = [];
+const networkIssues = [];
+const streamResponses = [];
 let browser;
+let context;
 let page;
 
 await main();
@@ -37,9 +42,21 @@ async function main() {
     return;
   }
 
+  const hermesStatus = await checkHermesRequirement();
+  if (args.sendTest && !canUseLiveHermes(hermesStatus)) {
+    addResult(
+      "hermes-send-precondition",
+      "fail",
+      "Live send requires /api/hermes/status to report mode=real and reachable=true."
+    );
+    finalize();
+    return;
+  }
+
   try {
     browser = await launchBrowser();
-    page = await browser.newPage({ viewport: { height: 900, width: 1440 } });
+    context = await browser.newContext({ viewport: { height: 900, width: 1440 } });
+    page = await context.newPage();
     page.on("console", (message) => {
       if (message.type() === "error" && !isIgnoredConsoleError(message.text())) {
         browserIssues.push(`console error: ${message.text()}`);
@@ -47,6 +64,16 @@ async function main() {
     });
     page.on("pageerror", (error) => {
       browserIssues.push(`page error: ${error.message}`);
+    });
+    page.on("response", (response) => {
+      const url = response.url();
+      const status = response.status();
+      if (url.includes("/api/hermes/chat/stream")) {
+        streamResponses.push(status);
+      }
+      if (status >= 400 && !isIgnoredNetworkResponse(url, status)) {
+        networkIssues.push(`HTTP ${status}: ${safeDisplayUrl(url)}`);
+      }
     });
 
     await loadRoot();
@@ -61,6 +88,9 @@ async function main() {
   } catch (error) {
     addResult("browser-run", "fail", safeErrorMessage(error));
   } finally {
+    if (context) {
+      await context.close();
+    }
     if (browser) {
       await browser.close();
     }
@@ -74,6 +104,7 @@ function parseArgs(values) {
     baseUrl: "",
     headed: false,
     json: false,
+    requireHermes: false,
     sendTest: false,
     unknown: []
   };
@@ -84,6 +115,8 @@ function parseArgs(values) {
       parsed.headed = true;
     } else if (arg === "--json") {
       parsed.json = true;
+    } else if (arg === "--require-hermes") {
+      parsed.requireHermes = true;
     } else if (arg === "--send-test") {
       parsed.sendTest = true;
     } else if (arg === "--base-url") {
@@ -97,6 +130,32 @@ function parseArgs(values) {
   }
 
   return parsed;
+}
+
+async function checkHermesRequirement() {
+  if (!args.requireHermes && !args.sendTest) {
+    return null;
+  }
+
+  const result = await fetchJsonWithTimeout(`${baseUrl}/api/hermes/status`);
+  if (!result.ok) {
+    addResult(
+      "GET /api/hermes/status",
+      "fail",
+      `Hermes status was required but returned ${result.status || result.error}.`
+    );
+    return null;
+  }
+
+  const mode = result.body?.mode || "unknown";
+  const reachable = result.body?.reachable === true;
+  const ok = mode === "real" && reachable;
+  addResult(
+    "GET /api/hermes/status",
+    ok ? "pass" : "fail",
+    `Hermes status mode=${mode}, reachable=${String(reachable)}.`
+  );
+  return result.body;
 }
 
 async function checkServer() {
@@ -283,8 +342,12 @@ async function checkRightRailTabs() {
 async function checkComposer() {
   const textarea = page.getByLabel("Message", { exact: true });
   const sendButton = page.getByRole("button", { name: "Send message", exact: true });
+  const message = args.sendTest
+    ? `UI_SMOKE_SEND_${Date.now()} please reply with UI_SMOKE_SEND_OK.`
+    : "hello smoke test";
 
-  await textarea.fill("hello smoke test", { timeout: timeoutMs });
+  await textarea.fill(message, { timeout: timeoutMs });
+  addResult("composer-message-typed", "pass", `Typed composer message marker ${message.split(" ")[0]}.`);
   await page.waitForFunction(() => {
     const button = document.querySelector('button[aria-label="Send message"]');
     return button instanceof HTMLButtonElement && !button.disabled;
@@ -294,12 +357,107 @@ async function checkComposer() {
   check("composer-send-enabled", enabled, "Typing into the composer enables Send message.");
 
   if (args.sendTest) {
-    await sendButton.click({ timeout: timeoutMs });
-    await page.getByText("hello smoke test", { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
-    addResult("composer-send-click", "pass", "Optional send test clicked Send and rendered the user message.");
+    await runLiveSendSmoke({ message, sendButton });
   } else {
     await textarea.fill("", { timeout: timeoutMs });
     addResult("composer-send-click", "warn", "Optional send click skipped; pass --send-test to exercise Hermes.");
+  }
+}
+
+async function runLiveSendSmoke({ message, sendButton }) {
+  const startedAt = Date.now();
+  const initialAssistantCount = await page.locator('article[data-role="assistant"]').count();
+
+  await sendButton.click({ timeout: timeoutMs });
+  addResult("composer-send-click", "pass", "Clicked Send for opt-in live Hermes smoke.");
+
+  await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("composer-user-message", "pass", "Unique user smoke message rendered in the transcript.");
+
+  await page.waitForFunction(
+    ({ initialCount }) => document.querySelectorAll('article[data-role="assistant"]').length > initialCount,
+    { initialCount: initialAssistantCount },
+    { timeout: liveSendTimeoutMs }
+  );
+  addResult("composer-assistant-created", "pass", "A new assistant message was created after Send.");
+
+  const assistantResult = await waitForAssistantResponse(initialAssistantCount);
+  if (!assistantResult.ok) {
+    addResult("composer-assistant-response", "fail", assistantResult.message);
+    return;
+  }
+
+  addResult(
+    "composer-assistant-response",
+    "pass",
+    `Observed non-empty assistant response after ${Date.now() - startedAt}ms: ${assistantResult.preview}`
+  );
+  if (assistantResult.hasMarker) {
+    addResult("composer-assistant-marker", "pass", "Assistant response included UI_SMOKE_SEND_OK.");
+  } else {
+    addResult(
+      "composer-assistant-marker",
+      "warn",
+      "Assistant response did not include UI_SMOKE_SEND_OK; non-empty assistant content was accepted."
+    );
+  }
+
+  const streamStatus = streamResponses.at(-1);
+  addResult(
+    "composer-stream-response",
+    streamStatus && streamStatus < 400 ? "pass" : "fail",
+    streamStatus
+      ? `/api/hermes/chat/stream returned HTTP ${streamStatus}.`
+      : "No /api/hermes/chat/stream response was observed."
+  );
+}
+
+async function waitForAssistantResponse(initialAssistantCount) {
+  try {
+    await page.waitForFunction(
+      ({ initialCount }) => {
+        const messages = Array.from(document.querySelectorAll('article[data-role="assistant"]'));
+        const latest = messages[initialCount];
+        if (!latest) {
+          return false;
+        }
+        const text = latest.textContent?.replace(/\s+/g, " ").trim() || "";
+        return text.length > 0 && !text.includes("Waiting for Hermes...");
+      },
+      { initialCount: initialAssistantCount },
+      { timeout: liveSendTimeoutMs }
+    );
+
+    await page.waitForFunction(
+      ({ initialCount }) => {
+        const messages = Array.from(document.querySelectorAll('article[data-role="assistant"]'));
+        const latest = messages[initialCount];
+        const status = latest?.getAttribute("data-status");
+        return status === "complete" || status === "mock" || status === "error";
+      },
+      { initialCount: initialAssistantCount },
+      { timeout: liveSendTimeoutMs }
+    ).catch(() => undefined);
+
+    const text = await page.evaluate(({ initialCount }) => {
+      const messages = Array.from(document.querySelectorAll('article[data-role="assistant"]'));
+      const latest = messages[initialCount];
+      return latest?.textContent?.replace(/\s+/g, " ").trim() || "";
+    }, { initialCount: initialAssistantCount });
+
+    return {
+      hasMarker: text.includes("UI_SMOKE_SEND_OK"),
+      message: "Assistant response was observed.",
+      ok: text.length > 0,
+      preview: truncate(text, 160)
+    };
+  } catch {
+    return {
+      hasMarker: false,
+      message: "Timed out waiting for non-empty assistant response.",
+      ok: false,
+      preview: ""
+    };
   }
 }
 
@@ -346,11 +504,12 @@ async function checkNoHorizontalOverflow(name) {
 }
 
 function checkBrowserIssues() {
-  if (browserIssues.length === 0) {
-    addResult("browser-console-errors", "pass", "No browser console errors or page errors were captured.");
+  const issues = [...browserIssues, ...networkIssues];
+  if (issues.length === 0) {
+    addResult("browser-console-errors", "pass", "No browser console errors, page errors, or HTTP errors were captured.");
     return;
   }
-  addResult("browser-console-errors", "fail", browserIssues.slice(0, 5).join(" | "));
+  addResult("browser-console-errors", "fail", issues.slice(0, 5).join(" | "));
 }
 
 function isIgnoredConsoleError(message) {
@@ -358,6 +517,10 @@ function isIgnoredConsoleError(message) {
     message.includes("Failed to load resource: the server responded with a status of 404") ||
     message.includes("/_next/webpack-hmr")
   );
+}
+
+function isIgnoredNetworkResponse(url, status) {
+  return status === 404 && /favicon|apple-touch-icon|icon/i.test(url);
 }
 
 async function expectVisible(name, locator, message) {
@@ -463,6 +626,55 @@ async function fetchWithTimeout(url) {
   }
 }
 
+async function fetchJsonWithTimeout(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal
+    });
+    const text = await response.text();
+    return {
+      body: parseJson(text),
+      ok: response.ok,
+      status: response.status
+    };
+  } catch (error) {
+    return {
+      body: null,
+      error: error instanceof Error && error.name === "AbortError" ? "timeout" : "unreachable",
+      ok: false,
+      status: 0
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function canUseLiveHermes(status) {
+  return status?.mode === "real" && status.reachable === true;
+}
+
+function safeDisplayUrl(value) {
+  try {
+    const url = new URL(value);
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 function safeErrorMessage(error) {
   if (!(error instanceof Error)) {
     return "Unknown error.";
@@ -472,6 +684,10 @@ function safeErrorMessage(error) {
 
 function trimSlash(value) {
   return value.replace(/\/$/, "");
+}
+
+function truncate(value, maxLength) {
+  return value.length > maxLength ? `${value.slice(0, maxLength - 3)}...` : value;
 }
 
 function icon(status) {

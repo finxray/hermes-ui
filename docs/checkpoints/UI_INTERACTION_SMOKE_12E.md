@@ -49,10 +49,19 @@ npm run smoke:ui -- --json
 Optional live send:
 
 ```text
-npm run smoke:ui -- --send-test
+npm run smoke:ui:send
 ```
 
-The default run does not click Send, so it does not require live Hermes.
+Headed optional live send:
+
+```text
+npm run smoke:ui:send:headed
+```
+
+The default run does not click Send, so it does not require live Hermes. The
+live send run passes `--send-test --require-hermes`; it requires the Web UI BFF
+Hermes status route to report `mode=real` and `reachable=true` before it sends
+one real composer message.
 
 ## Interactions Covered
 
@@ -69,10 +78,13 @@ The default run does not click Send, so it does not require live Hermes.
 - Settings popover opens and closes with Escape.
 - Right rail `Context`, `Memory`, `Tools`, and `Files` controls switch active panels.
 - Composer typing enables the Send button.
+- Optional live-send mode clicks Send, renders a unique user smoke message,
+  waits for a new assistant message, requires non-empty assistant content, and
+  verifies `/api/hermes/chat/stream` returned HTTP 200.
 - Deferred top menu placeholders remain disabled and labelled coming soon.
 - Deferred composer controls remain disabled and honestly labelled.
 - Stop response placeholder is not exposed outside generation state.
-- Serious browser console/page errors are captured.
+- Serious browser console/page errors and unexpected HTTP errors are captured.
 
 ## Accessibility/Test Target Changes
 
@@ -86,6 +98,7 @@ The default run does not click Send, so it does not require live Hermes.
 
 - Default mode does not send a message to Hermes.
 - Default mode does not require live Brain Memory Gateway search/detail.
+- Live-send mode does not require Brain Memory Gateway.
 - Default mode does not exercise real stop/cancel streaming.
 - The harness does not stress-test high-token streaming throughput.
 - The harness does not validate mobile layouts.
@@ -100,6 +113,10 @@ http://127.0.0.1:3000
 
 It exits nonzero on true interaction failures. It prints `[ok]`, `[--]`, and
 `[!!]` lines and never prints API keys or environment secrets.
+
+The harness creates a fresh Playwright browser context for each run. This keeps
+localStorage/sessionStorage/cookies isolated from the user's existing browser
+profile and avoids polluting the in-app browser session.
 
 ## Known Limitations
 
@@ -121,3 +138,12 @@ npm run smoke:mvp
 ```
 
 Use `npm run smoke:ui:headed` when debugging a browser-only regression.
+
+When Hermes is intentionally live and reachable, add:
+
+```text
+npm run smoke:ui:send
+```
+
+Use the live send gate before changing composer send behavior, BFF stream route
+plumbing, or UI transcript rendering.

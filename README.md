@@ -93,6 +93,13 @@ npm run smoke:mvp
 npm run smoke:ui
 ```
 
+When Hermes is intentionally live and reachable, run the opt-in composer send
+gate:
+
+```powershell
+npm run smoke:ui:send
+```
+
 Use `npm run smoke:mvp:live` only when both Hermes and Brain Memory Gateway are
 configured and expected to be reachable.
 

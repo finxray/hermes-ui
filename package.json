@@ -20,6 +20,8 @@
     "smoke:mvp:live": "node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory",
     "smoke:ui": "node scripts/ui-interaction-smoke.mjs",
     "smoke:ui:headed": "node scripts/ui-interaction-smoke.mjs --headed",
+    "smoke:ui:send": "node scripts/ui-interaction-smoke.mjs --send-test --require-hermes",
+    "smoke:ui:send:headed": "node scripts/ui-interaction-smoke.mjs --send-test --require-hermes --headed",
     "typecheck": "npm run typecheck -w @hermes-ui/web"
   },
   "overrides": {

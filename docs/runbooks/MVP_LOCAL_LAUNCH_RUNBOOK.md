@@ -27,6 +27,8 @@ the deferred production one-command CLI.
 | `npm run smoke:mvp` | Runs source, route, BFF, Hermes stream-if-live, and Brain Memory normalization smoke. |
 | `npm run smoke:ui` | Runs browser-level interaction smoke with Playwright. |
 | `npm run smoke:ui:headed` | Runs the browser smoke visibly for debugging. |
+| `npm run smoke:ui:send` | Opt-in live composer send smoke. Requires real, reachable Hermes. |
+| `npm run smoke:ui:send:headed` | Visible live composer send smoke for debugging. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Requires Hermes BFF status and stream to be live. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Requires live Brain Memory Gateway search/inspect through the BFF. |
 
@@ -119,10 +121,16 @@ Verify through the Web UI BFF:
 ```powershell
 npm run studio:doctor
 node scripts/mvp-smoke.mjs --require-hermes
+npm run smoke:ui:send
 ```
 
 If `--require-hermes` fails, check that Hermes is running, the API URL matches
 `apps/web/.env.local`, and the Web UI server was restarted after env changes.
+
+`npm run smoke:ui:send` opens an isolated Playwright browser context, types one
+unique smoke message into the composer, clicks Send, waits for a new non-empty
+assistant message, and verifies the BFF stream route returned HTTP 200. It does
+not use the user's existing browser profile or localStorage.
 
 ## Live Brain Memory Mode
 
@@ -170,6 +178,8 @@ Do not add direct browser-to-Gateway calls or direct storage access.
 | `npm run smoke:mvp` | Default route/source/BFF smoke. Accepts Brain Memory mock mode. |
 | `npm run smoke:ui` | Browser interaction smoke for the MVP shell. |
 | `npm run smoke:ui:headed` | Visible browser smoke for debugging layout or click issues. |
+| `npm run smoke:ui:send` | Optional live composer send smoke. Requires real Hermes and sends one message. |
+| `npm run smoke:ui:send:headed` | Visible optional live composer send smoke. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Live Hermes gate. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Live Brain Memory Gateway gate. |
 | `npm run check:workspace-state` | Project/session reducer and local state contract. |
@@ -192,6 +202,7 @@ Bundle-ready gate when both services are live:
 ```powershell
 node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory
 npm run smoke:ui
+npm run smoke:ui:send
 ```
 
 ## Browser Troubleshooting

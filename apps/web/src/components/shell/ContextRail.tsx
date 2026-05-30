@@ -2,13 +2,16 @@
 
 import { Activity, Database, FileText, FolderGit2, KeyRound, ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import { BrainMemoryConsole } from "@/components/BrainMemoryConsole";
-import { HermesStatusPanel } from "@/components/HermesStatusPanel";
+import type { ReactNode } from "react";
+import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session } from "@/data/types";
+import styles from "./ContextRail.module.css";
 
-type ContextPanelProps = {
+type ContextRailProps = {
   activeProject: Project;
   activeSession: Session | null;
   brainMemoryStatus: NormalizedBrainMemoryStatus | null;
@@ -21,7 +24,7 @@ type ContextPanelProps = {
 
 type PanelTab = "context" | "memory" | "tools" | "files";
 
-export function ContextPanel({
+export function ContextRail({
   activeProject,
   activeSession,
   brainMemoryStatus,
@@ -30,18 +33,18 @@ export function ContextPanel({
   isHermesStatusLoading,
   refreshBrainMemoryStatus,
   refreshHermesStatus
-}: ContextPanelProps) {
+}: ContextRailProps) {
   const [activeTab, setActiveTab] = useState<PanelTab>("context");
   const memoryEvidence = activeSession?.memoryEvidence ?? [];
   const toolEvents = activeSession?.toolEvents ?? [];
   const artifacts = activeSession?.artifacts ?? [];
 
   return (
-    <aside className="context-panel" aria-label="Context, memory, tools, and files">
-      <header className="panel-head">
+    <aside className={styles.rail} data-shell-rail="right" aria-label="Context, memory, tools, and files">
+      <header className={styles.head}>
         <h2>Context console</h2>
         <p>Hermes can stream live; Brain Memory inspection is read-only and Gateway-mediated.</p>
-        <div className="panel-tabs" aria-label="Panel sections">
+        <div className={styles.tabs} aria-label="Panel sections">
           <TabButton active={activeTab === "context"} onClick={() => setActiveTab("context")}>
             Context
           </TabButton>
@@ -57,7 +60,7 @@ export function ContextPanel({
         </div>
       </header>
 
-      <div className="panel-scroll">
+      <div className={styles.scroll}>
         {activeTab === "context" ? (
           <>
             <HermesStatusPanel
@@ -82,7 +85,6 @@ export function ContextPanel({
         ) : null}
 
         {activeTab === "tools" ? <ToolActivitySection toolEvents={toolEvents} /> : null}
-
         {activeTab === "files" ? <FilesSection artifacts={artifacts} /> : null}
       </div>
     </aside>
@@ -99,7 +101,7 @@ function TabButton({
   onClick: () => void;
 }) {
   return (
-    <button className={`tab-button ${active ? "is-active" : ""}`} type="button" onClick={onClick}>
+    <button className={`${styles.tab} ${active ? styles.activeTab : ""}`} type="button" onClick={onClick}>
       {children}
     </button>
   );
@@ -115,30 +117,21 @@ function ActiveContextSection({
   const memoryEvidence = activeSession?.memoryEvidence ?? [];
 
   return (
-    <section className="panel-section" aria-labelledby="active-context-heading">
-      <div className="section-label" id="active-context-heading">
-        <span>Active context</span>
-        <ShieldCheck size={13} aria-hidden="true" />
-      </div>
-      <div className="summary-card">
+    <section className={styles.section} aria-labelledby="active-context-heading">
+      <SectionLabel id="active-context-heading" icon={<ShieldCheck size={13} />} label="Active context" />
+      <div className={styles.card}>
         <div>
-          <div className="card-title">
+          <div className={styles.cardTitle}>
             <span>{activeProject.name}</span>
-            <span className="pill">mock</span>
+            <span className={styles.pill}>mock</span>
           </div>
-          <div className="card-body">{activeProject.description}</div>
+          <div className={styles.cardBody}>{activeProject.description}</div>
         </div>
-        <div className="summary-grid">
-          <div className="metric">
-            <div className="metric-value">{activeSession?.messages.length ?? 0}</div>
-            <div className="metric-label">session messages</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{memoryEvidence.length}</div>
-            <div className="metric-label">memory refs</div>
-          </div>
+        <div className={styles.metrics}>
+          <Metric label="session messages" value={activeSession?.messages.length ?? 0} />
+          <Metric label="memory refs" value={memoryEvidence.length} />
         </div>
-        <div className="card-meta">{activeProject.memoryScopeKey}</div>
+        <div className={styles.meta}>{activeProject.memoryScopeKey}</div>
       </div>
     </section>
   );
@@ -152,17 +145,18 @@ function ContextContractSection({
   activeSession: Session | null;
 }) {
   return (
-    <section className="panel-section" aria-labelledby="context-contract-heading">
-      <div className="section-label" id="context-contract-heading">
-        <span>Active context contract</span>
-        <KeyRound size={13} aria-hidden="true" />
-      </div>
-      <div className="summary-card">
-        <div className="card-title">
+    <section className={styles.section} aria-labelledby="context-contract-heading">
+      <SectionLabel
+        id="context-contract-heading"
+        icon={<KeyRound size={13} />}
+        label="Active context contract"
+      />
+      <div className={styles.card}>
+        <div className={styles.cardTitle}>
           <span>Prepared scope</span>
-          <span className="pill">Brain Memory later</span>
+          <span className={styles.pill}>Brain Memory later</span>
         </div>
-        <div className="context-contract-grid">
+        <div className={styles.fieldGrid}>
           <ContextField label="Tenant" value={activeProject.memoryScope.tenantId} />
           <ContextField label="Project" value={activeProject.memoryScope.projectId} />
           <ContextField label="Project key" value={activeProject.memoryScope.stableProjectKey} />
@@ -195,7 +189,7 @@ function ContextContractSection({
           />
           <ContextField label="Status" value="Prepared, not connected to Brain Memory" />
         </div>
-        <div className="card-body">
+        <div className={styles.cardBody}>
           {activeSession?.memoryScope.userVisibleSummary ??
             activeProject.memoryScope.userVisibleSummary ??
             "This scope is ready to travel with Hermes requests."}
@@ -207,26 +201,20 @@ function ContextContractSection({
 
 function RetrievedMemorySection({ memoryEvidence }: { memoryEvidence: Session["memoryEvidence"] }) {
   return (
-    <section className="panel-section" aria-labelledby="retrieved-memory-heading">
-      <div className="section-label" id="retrieved-memory-heading">
-        <span>Retrieved memory</span>
-        <Database size={13} aria-hidden="true" />
-      </div>
+    <section className={styles.section} aria-labelledby="retrieved-memory-heading">
+      <SectionLabel id="retrieved-memory-heading" icon={<Database size={13} />} label="Retrieved memory" />
       {memoryEvidence.length === 0 ? (
-        <div className="empty-state compact">
-          <div className="empty-state-title">No retrieved memory</div>
-          <p>This project/session has no mock evidence yet.</p>
-        </div>
+        <EmptyState compact title="No retrieved memory" body="This project/session has no mock evidence yet." />
       ) : (
-        <ul className="memory-list">
+        <ul className={styles.list}>
           {memoryEvidence.map((memory) => (
-            <li className="memory-card" key={memory.id}>
-              <div className="card-title">
+            <li className={styles.listCard} key={memory.id}>
+              <div className={styles.cardTitle}>
                 <span>{memory.title}</span>
-                <span className="pill">{memory.layer}</span>
+                <span className={styles.pill}>{memory.layer}</span>
               </div>
-              <div className="card-body">{memory.excerpt}</div>
-              <div className="card-meta">
+              <div className={styles.cardBody}>{memory.excerpt}</div>
+              <div className={styles.meta}>
                 {memory.source} - score {memory.score} - {memory.timestamp}
               </div>
             </li>
@@ -239,30 +227,28 @@ function RetrievedMemorySection({ memoryEvidence }: { memoryEvidence: Session["m
 
 function ToolActivitySection({ toolEvents }: { toolEvents: Session["toolEvents"] }) {
   return (
-    <section className="panel-section" aria-labelledby="tool-activity-heading">
-      <div className="section-label" id="tool-activity-heading">
-        <span>Tool activity</span>
-        <Activity size={13} aria-hidden="true" />
-      </div>
+    <section className={styles.section} aria-labelledby="tool-activity-heading">
+      <SectionLabel id="tool-activity-heading" icon={<Activity size={13} />} label="Tool activity" />
       {toolEvents.length === 0 ? (
-        <div className="empty-state compact">
-          <div className="empty-state-title">No tool activity</div>
-          <p>Hermes stream tool events will appear here when a connected agent emits them.</p>
-        </div>
+        <EmptyState
+          compact
+          title="No tool activity"
+          body="Hermes stream tool events will appear here when a connected agent emits them."
+        />
       ) : (
-        <ul className="tool-list">
+        <ul className={styles.list}>
           {toolEvents.map((event) => (
-            <li className="tool-card" data-status={event.status} key={event.id}>
-              <span className="tool-icon" aria-hidden="true">
+            <li className={styles.toolRow} data-status={event.status} key={event.id}>
+              <span className={styles.toolIcon} aria-hidden="true">
                 <Activity size={14} />
               </span>
               <span>
-                <span className="card-title">
+                <span className={styles.cardTitle}>
                   <span>{event.name}</span>
-                  <span className="pill">{event.status}</span>
+                  <span className={styles.pill}>{event.status}</span>
                 </span>
-                <span className="card-body">{event.detail}</span>
-                <span className="card-meta">{event.time}</span>
+                <span className={styles.cardBody}>{event.detail}</span>
+                <span className={styles.meta}>{event.time}</span>
               </span>
             </li>
           ))}
@@ -274,27 +260,21 @@ function ToolActivitySection({ toolEvents }: { toolEvents: Session["toolEvents"]
 
 function FilesSection({ artifacts }: { artifacts: Session["artifacts"] }) {
   return (
-    <section className="panel-section" aria-labelledby="files-heading">
-      <div className="section-label" id="files-heading">
-        <span>Files and artifacts</span>
-        <FolderGit2 size={13} aria-hidden="true" />
-      </div>
+    <section className={styles.section} aria-labelledby="files-heading">
+      <SectionLabel id="files-heading" icon={<FolderGit2 size={13} />} label="Files and artifacts" />
       {artifacts.length === 0 ? (
-        <div className="empty-state compact">
-          <div className="empty-state-title">No files attached</div>
-          <p>Artifacts are local mock metadata for now.</p>
-        </div>
+        <EmptyState compact title="No files attached" body="Artifacts are local mock metadata for now." />
       ) : (
-        <ul className="artifact-list">
+        <ul className={styles.list}>
           {artifacts.map((artifact) => (
-            <li className="artifact-card" key={artifact.id}>
-              <FileText className="artifact-icon" size={18} aria-hidden="true" />
+            <li className={styles.artifactRow} key={artifact.id}>
+              <FileText className={styles.artifactIcon} size={18} aria-hidden="true" />
               <span>
-                <span className="card-title">
+                <span className={styles.cardTitle}>
                   <span>{artifact.name}</span>
-                  <span className="pill">{artifact.status}</span>
+                  <span className={styles.pill}>{artifact.status}</span>
                 </span>
-                <span className="card-meta">{artifact.kind}</span>
+                <span className={styles.meta}>{artifact.kind}</span>
               </span>
             </li>
           ))}
@@ -304,11 +284,29 @@ function FilesSection({ artifacts }: { artifacts: Session["artifacts"] }) {
   );
 }
 
+function SectionLabel({ icon, id, label }: { icon?: ReactNode; id: string; label: string }) {
+  return (
+    <div className={styles.sectionLabel} id={id}>
+      <span>{label}</span>
+      {icon}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className={styles.metric}>
+      <div className={styles.metricValue}>{value}</div>
+      <div className={styles.metricLabel}>{label}</div>
+    </div>
+  );
+}
+
 function ContextField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="context-field">
-      <span className="context-field-label">{label}</span>
-      <span className="context-field-value">{value}</span>
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <span className={styles.fieldValue}>{value}</span>
     </div>
   );
 }

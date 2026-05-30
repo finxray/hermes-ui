@@ -1,0 +1,147 @@
+.shell {
+  --density-scale: clamp(1, calc(0.82 + 0.018vw), 1.42);
+  --content-width: clamp(560px, 30vw, 912px);
+  --composer-width: var(--content-width);
+  --font-xs: clamp(13px, calc(12px + 0.08vw), 16px);
+  --font-small: clamp(14px, calc(12.8px + 0.11vw), 18px);
+  --font-body: clamp(16px, calc(14px + 0.16vw), 22px);
+  --font-ui: clamp(17px, calc(14.5px + 0.18vw), 23px);
+  --font-title: clamp(21px, calc(16.5px + 0.22vw), 28px);
+  --font-section-title: clamp(18px, calc(15px + 0.16vw), 24px);
+  --icon-sm: clamp(16px, calc(14px + 0.12vw), 21px);
+  --icon-md: clamp(19px, calc(16px + 0.16vw), 25px);
+  --icon-lg: clamp(24px, calc(20px + 0.22vw), 32px);
+  --control-height: clamp(38px, calc(32px + 0.42vw), 52px);
+  --row-height: clamp(40px, calc(34px + 0.4vw), 54px);
+  --topbar-height: clamp(64px, calc(54px + 0.65vw), 88px);
+  --rail-width-left: clamp(272px, 14.4vw, 416px);
+  --rail-width-right: clamp(336px, 16.8vw, 496px);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-areas:
+    "top top top"
+    "left main right";
+  grid-template-columns:
+    minmax(0, var(--rail-width-left))
+    minmax(0, 1fr)
+    minmax(0, var(--rail-width-right));
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 42% -18%, rgba(92, 76, 148, 0.18), transparent 38%),
+    linear-gradient(90deg, #1d1719, #07080a 32%, #07080a);
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  transition: grid-template-columns 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.shell[data-left-collapsed="true"] {
+  grid-template-columns:
+    minmax(0, 0px)
+    minmax(0, 1fr)
+    minmax(0, var(--rail-width-right));
+}
+
+.shell:has(.leftToggle:checked) {
+  grid-template-columns:
+    minmax(0, 0px)
+    minmax(0, 1fr)
+    minmax(0, var(--rail-width-right));
+}
+
+.shell[data-right-collapsed="true"] {
+  grid-template-columns:
+    minmax(0, var(--rail-width-left))
+    minmax(0, 1fr)
+    minmax(0, 0px);
+}
+
+.shell:has(.rightToggle:checked) {
+  grid-template-columns:
+    minmax(0, var(--rail-width-left))
+    minmax(0, 1fr)
+    minmax(0, 0px);
+}
+
+.shell[data-left-collapsed="true"][data-right-collapsed="true"] {
+  grid-template-columns:
+    minmax(0, 0px)
+    minmax(0, 1fr)
+    minmax(0, 0px);
+}
+
+.shell:has(.leftToggle:checked):has(.rightToggle:checked) {
+  grid-template-columns:
+    minmax(0, 0px)
+    minmax(0, 1fr)
+    minmax(0, 0px);
+}
+
+.toggleInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shell:has(.leftToggle:checked) :global([data-shell-rail="left"]) {
+  width: 0;
+  padding-right: 0;
+  padding-left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+
+.shell:has(.rightToggle:checked) :global([data-shell-rail="right"]) {
+  width: 0;
+  padding-right: 0;
+  padding-left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(100%);
+}
+
+.shell :global(svg) {
+  width: var(--icon-md);
+  height: var(--icon-md);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1180px) {
+  .shell {
+    --rail-width-left: 300px;
+    --rail-width-right: 0px;
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr) minmax(0, 0px);
+  }
+
+  .shell[data-left-collapsed="true"],
+  .shell[data-right-collapsed="true"],
+  .shell[data-left-collapsed="true"][data-right-collapsed="true"],
+  .shell:has(.leftToggle:checked),
+  .shell:has(.rightToggle:checked),
+  .shell:has(.leftToggle:checked):has(.rightToggle:checked) {
+    grid-template-columns: minmax(0, 0px) minmax(0, 1fr) minmax(0, 0px);
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    --topbar-height: 72px;
+    grid-template-areas:
+      "top"
+      "main";
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    transition-duration: 1ms;
+  }
+}

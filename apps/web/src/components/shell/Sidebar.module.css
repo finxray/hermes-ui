@@ -1,0 +1,124 @@
+.sidebar {
+  grid-area: left;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden auto;
+  padding: 26px 15px 20px;
+  background: transparent;
+  border: 0;
+  transition:
+    opacity 500ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 500ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    padding 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:global([data-left-collapsed="true"]) .sidebar {
+  width: 0;
+  padding-right: 0;
+  padding-left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+
+.brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 36px;
+}
+
+.brandIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  color: var(--accent);
+}
+
+.brandTitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-ui);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickActions,
+.statusStack {
+  display: grid;
+  gap: 2px;
+}
+
+.quickActions {
+  margin-bottom: 28px;
+}
+
+.section {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 28px;
+}
+
+.sectionLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.footer {
+  display: grid;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+.renameInput {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(142, 230, 198, 0.38);
+  border-radius: 6px;
+  outline: 0;
+  background: rgba(8, 9, 10, 0.72);
+  color: var(--text-primary);
+  font-size: var(--font-xs);
+}
+
+.renameInput:focus {
+  box-shadow: 0 0 0 2px rgba(142, 230, 198, 0.12);
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition-duration: 1ms;
+  }
+}

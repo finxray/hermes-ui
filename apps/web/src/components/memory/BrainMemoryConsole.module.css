@@ -1,0 +1,233 @@
+.section {
+  margin-bottom: 28px;
+}
+
+.sectionLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.card,
+.detailPanel {
+  display: grid;
+  gap: 12px;
+  background: transparent;
+}
+
+.detailPanel {
+  padding: 0 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.cardTitle {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-xs);
+  font-weight: 650;
+}
+
+.cardBody,
+.meta {
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+  line-height: 1.5;
+}
+
+.meta {
+  color: var(--text-muted);
+}
+
+.fieldGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fieldLabel {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.fieldValue {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  line-height: 1.35;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  white-space: nowrap;
+}
+
+.searchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.searchInput {
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  outline: 0;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-primary);
+  font-size: var(--font-small);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:focus {
+  box-shadow: 0 0 0 2px rgba(142, 230, 198, 0.1);
+}
+
+.searchButton,
+.iconButton {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.searchButton {
+  min-height: var(--control-height);
+  padding: 0 14px;
+  border-radius: 17px;
+  font-size: var(--font-body);
+}
+
+.iconButton {
+  display: grid;
+  width: calc(var(--control-height) * 0.68);
+  height: calc(var(--control-height) * 0.68);
+  place-items: center;
+  border-radius: 10px;
+}
+
+.searchButton:hover,
+.searchButton:focus-visible,
+.iconButton:hover,
+.iconButton:focus-visible {
+  outline: 0;
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
+}
+
+.searchButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.resultList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resultButton {
+  display: block;
+  width: 100%;
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.resultButton:hover,
+.resultButton:focus-visible,
+.resultActive {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.detailContent {
+  max-height: 240px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.034);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 9, 10, 0.3);
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.readonlySection,
+.metadata {
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.038);
+}
+
+.metadata {
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+}
+
+.metadata summary {
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.metadata pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.032);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 9, 10, 0.42);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 107, 107, 0.24);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffb4b4;
+  font-size: var(--font-small);
+  line-height: 1.45;
+}

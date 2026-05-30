@@ -1,0 +1,123 @@
+.message {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+}
+
+.message[data-role="user"] {
+  justify-items: end;
+}
+
+.message[data-role="assistant"] {
+  justify-items: start;
+}
+
+.card {
+  min-width: 0;
+  width: 100%;
+  padding: clamp(18px, calc(12px + 0.35vw), 28px) clamp(22px, calc(14px + 0.5vw), 36px);
+  border: 1px solid transparent;
+  border-radius: 22px;
+}
+
+.message[data-role="user"] .card {
+  width: fit-content;
+  max-width: min(72%, 720px);
+  background: rgba(255, 255, 255, 0.085);
+}
+
+.message[data-role="assistant"] .card {
+  max-width: 100%;
+  padding-right: 0;
+  padding-left: 0;
+  background: transparent;
+}
+
+.message[data-status="streaming"] .card {
+  position: relative;
+  overflow: hidden;
+}
+
+.message[data-status="streaming"] .card::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.035), transparent);
+  animation: shimmer 1.2s linear infinite;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.author {
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.meta {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.content {
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+  line-height: 1.65;
+}
+
+.content p {
+  margin: 0 0 12px;
+}
+
+.content p:last-child {
+  margin-bottom: 0;
+}
+
+.streamPlaceholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.pill {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.referenceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.referenceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}

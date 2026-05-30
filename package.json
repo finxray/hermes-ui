@@ -14,6 +14,7 @@
     "studio:open": "node scripts/open-studio-browser.mjs",
     "build": "npm run build -w @hermes-ui/web",
     "check:brain-memory-client": "node scripts/check-brain-memory-client-shapes.mjs",
+    "check:ui-structure": "node scripts/check-ui-structure.mjs",
     "check:workspace-state": "node --no-warnings scripts/check-workspace-state.mjs",
     "typecheck": "npm run typecheck -w @hermes-ui/web"
   },

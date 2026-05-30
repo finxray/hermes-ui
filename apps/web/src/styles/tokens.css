@@ -18,6 +18,7 @@
   --text-primary: #f4f4f5;
   --text-secondary: #bbbfc7;
   --text-muted: #7b818c;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   --accent: #8ee6c6;
   --accent-2: #91b8ff;

@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import styles from "./StatusPanel.module.css";
 
 type HermesStatusPanelProps = {
   status: NormalizedHermesStatus | null;
@@ -7,20 +8,16 @@ type HermesStatusPanelProps = {
   onRefresh: () => void;
 };
 
-export function HermesStatusPanel({
-  status,
-  isLoading,
-  onRefresh
-}: HermesStatusPanelProps) {
+export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatusPanelProps) {
   const capabilityFlags = getCapabilityFlags(status);
   const checkedAt = status?.checkedAt ? new Date(status.checkedAt).toLocaleTimeString() : "Never";
 
   return (
-    <section className="panel-section" aria-labelledby="hermes-status-heading">
-      <div className="section-label" id="hermes-status-heading">
+    <section className={styles.section} aria-labelledby="hermes-status-heading">
+      <div className={styles.sectionLabel} id="hermes-status-heading">
         <span>Hermes status</span>
         <button
-          className="mini-action"
+          className={styles.iconButton}
           type="button"
           aria-label="Refresh Hermes status"
           onClick={onRefresh}
@@ -29,39 +26,42 @@ export function HermesStatusPanel({
           <RefreshCw size={13} aria-hidden="true" />
         </button>
       </div>
-      <div className="summary-card">
-        <div className="card-title">
+      <div className={styles.card}>
+        <div className={styles.cardTitle}>
           <span>{statusLabel(status, isLoading)}</span>
-          <span className="pill">{status?.mode ?? "checking"}</span>
+          <span className={styles.pill}>{status?.mode ?? "checking"}</span>
         </div>
-        <div className="summary-grid">
-          <div className="metric">
-            <div className="metric-value">{status?.configured ? "Yes" : "No"}</div>
-            <div className="metric-label">configured</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{status?.reachable ? "Yes" : "No"}</div>
-            <div className="metric-label">reachable</div>
-          </div>
+        <div className={styles.metrics}>
+          <Metric label="configured" value={status?.configured ? "Yes" : "No"} />
+          <Metric label="reachable" value={status?.reachable ? "Yes" : "No"} />
         </div>
-        <div className="card-body">
+        <div className={styles.cardBody}>
           {status?.baseUrl ? `Base URL: ${status.baseUrl}` : "Set HERMES_API_BASE_URL to enable real checks."}
         </div>
-        {status?.error ? <div className="status-error">{status.error.message}</div> : null}
+        {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
         {capabilityFlags.length > 0 ? (
-          <div className="capability-list" aria-label="Hermes capabilities">
+          <div className={styles.capabilities} aria-label="Hermes capabilities">
             {capabilityFlags.slice(0, 8).map((flag) => (
-              <span className="pill" key={flag}>
+              <span className={styles.pill} key={flag}>
                 {flag}
               </span>
             ))}
           </div>
         ) : (
-          <div className="card-meta">Capabilities unavailable until Hermes responds.</div>
+          <div className={styles.meta}>Capabilities unavailable until Hermes responds.</div>
         )}
-        <div className="card-meta">Last checked: {checkedAt}</div>
+        <div className={styles.meta}>Last checked: {checkedAt}</div>
       </div>
     </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.metric}>
+      <div className={styles.metricValue}>{value}</div>
+      <div className={styles.metricLabel}>{label}</div>
+    </div>
   );
 }
 

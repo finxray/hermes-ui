@@ -1,0 +1,46 @@
+.empty {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.compact {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.title {
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.5;
+}
+
+.button {
+  min-height: var(--row-height);
+  justify-self: start;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 17px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+}
+
+.button:hover,
+.button:focus-visible {
+  outline: 0;
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
+}

@@ -1,6 +1,7 @@
 import { ArrowUp, Mic, Plus, Square } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import styles from "./Composer.module.css";
 
 type ComposerProps = {
   disabled?: boolean;
@@ -28,9 +29,9 @@ export function Composer({
   }
 
   return (
-    <div className="composer-wrap">
-      <form className="composer" aria-label="Message composer" onSubmit={submit}>
-        <div className="composer-box">
+    <div className={styles.wrap}>
+      <form className={styles.composer} aria-label="Message composer" onSubmit={submit}>
+        <div className={styles.box}>
           <textarea
             aria-label="Message"
             disabled={disabled || isGenerating}
@@ -48,32 +49,36 @@ export function Composer({
               }
             }}
           />
-          <div className="composer-controls" aria-label="Composer controls">
-            <div className="composer-controls-left">
-              <button className="composer-tool-button" type="button" aria-label="Attach context">
+          <div className={styles.controls} aria-label="Composer controls">
+            <div className={styles.controlsLeft}>
+              <button className={styles.toolButton} type="button" aria-label="Attach context">
                 <Plus size={17} />
               </button>
-              <button className="composer-model-button" type="button" aria-label="Selected model">
+              <button className={styles.modelButton} type="button" aria-label="Selected model">
                 {modelLabel}
               </button>
             </div>
-            <div className="composer-controls-right">
-              <button className="composer-tool-button" type="button" aria-label="Voice input">
+            <div className={styles.controlsRight}>
+              <button className={styles.toolButton} type="button" aria-label="Voice input">
                 <Mic size={16} />
               </button>
               <button
-                className={`send-button${isGenerating ? " is-stop" : ""}`}
+                className={`${styles.sendButton} ${isGenerating ? styles.stopButton : ""}`}
                 type="submit"
                 disabled={disabled || isGenerating || draft.trim().length === 0}
                 aria-label={isGenerating ? "Stop response placeholder" : "Send message"}
-                title={isGenerating ? "Stop response will be wired with streaming cancellation." : undefined}
+                title={
+                  isGenerating
+                    ? "Stop response will be wired with streaming cancellation."
+                    : undefined
+                }
               >
                 {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
               </button>
             </div>
           </div>
         </div>
-        <div className="composer-note">
+        <div className={styles.note}>
           {isGenerating
             ? "Hermes is responding. Deltas are buffered and flushed on animation frames."
             : "Streaming batches deltas with an animation-frame flush, not one React update per token."}

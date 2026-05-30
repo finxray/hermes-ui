@@ -1,17 +1,14 @@
-import {
-  AlertTriangle,
-  BookOpenText,
-  SendHorizontal
-} from "lucide-react";
+import { AlertTriangle, BookOpenText, SendHorizontal } from "lucide-react";
 import { useRef, useState } from "react";
-import { Composer } from "@/components/Composer";
-import { EmptyState } from "@/components/EmptyState";
-import { MessageBubble } from "@/components/MessageBubble";
+import { ChatHeader } from "@/components/chat/ChatHeader";
+import { ChatTranscript } from "@/components/chat/ChatTranscript";
+import { Composer } from "@/components/chat/Composer";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesChatStreamEvent, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { ChatMessage, ModelChoice, Project, Session, ToolEvent } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
+import styles from "./ChatView.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 
@@ -170,56 +167,16 @@ export function ChatView({
   }
 
   return (
-    <section className="chat-view" aria-label="Chat workspace">
-      <header className="topbar">
-        <div className="topbar-left">
-          <div className="topbar-title">
-            <h1>{activeSession?.title ?? "No chat selected"}</h1>
-          </div>
-        </div>
-      </header>
-
-      <div className="transcript" aria-label="Chat transcript">
-        <div className="transcript-inner">
-          <div className="mock-banner" role="status">
-            <AlertTriangle size={15} aria-hidden="true" />
-            <span>
-              Chat sends through the server-side BFF when Hermes is connected. If Hermes is
-              unavailable, this session stays local with a clear mock fallback.
-            </span>
-          </div>
-          {activeSession ? (
-            activeSession.messages.length > 0 ? (
-              activeSession.messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))
-            ) : (
-              <EmptyState
-                title="New chat is empty"
-                body="Send a message to use real Hermes when configured, or a local mock fallback when unavailable."
-              />
-            )
-          ) : (
-            <EmptyState
-              title="No chats in this project"
-              body="Projects can exist without sessions. Create a new local mock chat when you want a transcript under this project."
-              actionLabel="New chat"
-              onAction={createSession}
-            />
-          )}
-          <div className="reference-row" aria-label="Active scope references">
-            <span className="reference-chip">
-              <BookOpenText size={14} aria-hidden="true" />
-              Scope: {activeProject.memoryScope.stableProjectKey}
-            </span>
-            <span className="reference-chip">
-              <SendHorizontal size={14} aria-hidden="true" />
-              Route: Browser to BFF to Hermes
-            </span>
-          </div>
-        </div>
-      </div>
-
+    <section className={styles.workspace} aria-label="Chat workspace">
+      <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+      <ChatTranscript
+        activeProject={activeProject}
+        activeSession={activeSession}
+        bannerIcon={<AlertTriangle size={15} />}
+        createSession={createSession}
+        routeIcon={<SendHorizontal size={14} />}
+        scopeIcon={<BookOpenText size={14} />}
+      />
       <Composer
         disabled={!activeSession}
         isGenerating={isGenerating}

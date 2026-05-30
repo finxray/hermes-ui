@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
+import styles from "@/components/shell/StatusPanel.module.css";
 
 type BrainMemoryStatusPanelProps = {
   status: NormalizedBrainMemoryStatus | null;
@@ -16,11 +17,11 @@ export function BrainMemoryStatusPanel({
   const capabilities = formatCapabilities(status?.capabilities ?? null);
 
   return (
-    <section className="panel-section" aria-labelledby="brain-memory-status-heading">
-      <div className="section-label" id="brain-memory-status-heading">
+    <section className={styles.section} aria-labelledby="brain-memory-status-heading">
+      <div className={styles.sectionLabel} id="brain-memory-status-heading">
         <span>Brain Memory status</span>
         <button
-          className="mini-action"
+          className={styles.iconButton}
           type="button"
           aria-label="Refresh Brain Memory status"
           onClick={onRefresh}
@@ -29,47 +30,50 @@ export function BrainMemoryStatusPanel({
           <RefreshCw size={13} aria-hidden="true" />
         </button>
       </div>
-      <div className="summary-card">
-        <div className="card-title">
+      <div className={styles.card}>
+        <div className={styles.cardTitle}>
           <span>{statusLabel(status, isLoading)}</span>
-          <span className="pill">{status?.mode ?? "checking"}</span>
+          <span className={styles.pill}>{status?.mode ?? "checking"}</span>
         </div>
-        <div className="summary-grid">
-          <div className="metric">
-            <div className="metric-value">{status?.configured ? "Yes" : "No"}</div>
-            <div className="metric-label">configured</div>
-          </div>
-          <div className="metric">
-            <div className="metric-value">{status?.reachable ? "Yes" : "No"}</div>
-            <div className="metric-label">reachable</div>
-          </div>
+        <div className={styles.metrics}>
+          <Metric label="configured" value={status?.configured ? "Yes" : "No"} />
+          <Metric label="reachable" value={status?.reachable ? "Yes" : "No"} />
         </div>
-        <div className="card-body">
+        <div className={styles.cardBody}>
           {status?.baseUrl
             ? `Gateway URL: ${status.baseUrl}`
             : "Brain Memory is optional. The Web UI can run standalone; set BRAIN_MEMORY_GATEWAY_URL and enable the Gateway flag when you connect Brain Memory later."}
         </div>
-        {status?.error ? <div className="status-error">{status.error.message}</div> : null}
+        {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
         {status?.mode === "mock" || status?.mode === "unconfigured" ? (
-          <div className="card-meta">
-            Connect later with npm run studio:env -- --mode attach-brain-memory-later,
-            then set BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true when Gateway is reachable.
+          <div className={styles.meta}>
+            Connect later with npm run studio:env -- --mode attach-brain-memory-later, then set
+            BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true when Gateway is reachable.
           </div>
         ) : null}
         {status?.mode === "real" ? (
-          <div className="card-meta">
+          <div className={styles.meta}>
             {capabilities.length > 0
               ? `Capabilities: ${capabilities.join(", ")}`
               : "Capabilities endpoint unavailable or protected; status is still read from /health."}
           </div>
         ) : null}
-        <div className="card-meta">
+        <div className={styles.meta}>
           Real memory search may require both an optional UI API bearer and a tenant-bound Gateway
           memory key.
         </div>
-        <div className="card-meta">Last checked: {checkedAt}</div>
+        <div className={styles.meta}>Last checked: {checkedAt}</div>
       </div>
     </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.metric}>
+      <div className={styles.metricValue}>{value}</div>
+      <div className={styles.metricLabel}>{label}</div>
+    </div>
   );
 }
 

@@ -188,6 +188,10 @@ export function makeElapsedActivityEvent(args: {
   };
 }
 
+export function formatActivityDuration(durationMs: number) {
+  return formatDuration(durationMs);
+}
+
 export function classifyToolEventSource(
   toolName: string,
   payload: Record<string, unknown> = {}

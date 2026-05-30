@@ -60,6 +60,9 @@ Deliver:
 
 Goal: convert real Hermes tool/memory events into useful activity rows.
 
+Status: completed in Slice 13E. See
+`docs/product/AGENT_ACTIVITY_BLOCKS_13E.md`.
+
 Deliver:
 
 - `tool.progress`, `tool.started`, `tool.completed`, `tool.failed` mapping;
@@ -163,12 +166,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13E - Render Hermes tool/memory events as Codex-like activity blocks.
+Slice 13F - Thinking/Reasoning Shimmer And Elapsed-Time Separators.
 
 Reason:
 
-- Slice 13D added a stable runtime event model and mapper.
-- The next orchestration risk is rendering real mapped tool and memory events
-  more usefully while preserving the current Hermes streaming path.
-- This prepares richer activity UI without jumping ahead to approvals, real
-  stop/cancel, provider switching, or artifact management.
+- Slice 13E added the first collapsed activity block renderer.
+- The next orchestration risk is improving progress and elapsed-time behavior
+  from real `message.started`, `tool.progress`, and timestamped event data.
+- This keeps the UI honest without exposing private reasoning or changing
+  streaming mechanics.

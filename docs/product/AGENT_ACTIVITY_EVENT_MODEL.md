@@ -125,9 +125,11 @@ Proposed mapping:
 
 Slice 13D added runtime helpers in
 `apps/web/src/lib/agentActivityEvents.ts` that implement this mapping for the
-currently exposed UI-facing events. `ChatView` uses the mapper only to project
-`tool_event` and `run_event` into the existing compact `Session.toolEvents[]`
-state. It does not persist full `AgentActivityEvent` objects yet.
+currently exposed UI-facing events. Slice 13E added `AgentActivityBlock` to
+render live `AgentActivityEvent` objects in the chat transcript while still
+projecting events into the existing compact `Session.toolEvents[]` state for
+right-rail compatibility. It does not persist full `AgentActivityEvent` objects
+yet.
 
 ## Mapping From Hermes Run Events
 
@@ -215,6 +217,6 @@ Expanded by default:
 ## Non-Goals For This Slice
 
 - No BFF normalization change is made.
-- No full activity timeline UI is added.
+- No persisted activity timeline is added.
 - No persisted activity-event array is added to workspace state.
 - No approvals, stop/cancel, file upload, or memory mutation is implemented.

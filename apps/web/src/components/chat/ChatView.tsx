@@ -34,6 +34,8 @@ export function ChatView({
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [assistantHasContent, setAssistantHasContent] = useState(false);
+  const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
   const flushFrameRef = useRef<number | null>(null);
   const selectedModel = modelChoices.find((choice) => choice.id === "hermes-default");
   const modelLabel = selectedModel
@@ -59,6 +61,7 @@ export function ChatView({
 
     workspaceActions.appendMessage(session.id, userMessage);
     workspaceActions.appendMessage(session.id, assistantMessage);
+    setAssistantHasContent(false);
     setIsGenerating(true);
 
     if (!canUseRealHermes(hermesStatus)) {
@@ -125,10 +128,16 @@ export function ChatView({
         onEvent: (event) => {
           if (event.type === "message_delta") {
             accumulated += event.delta;
+            if (event.delta.trim()) {
+              setAssistantHasContent(true);
+            }
             flush("streaming");
           } else if (event.type === "message_done") {
             completedAssistant = true;
             accumulated = event.message.content || accumulated;
+            if (accumulated.trim()) {
+              setAssistantHasContent(true);
+            }
             workspaceActions.updateMessage(session.id, assistantId, accumulated, "complete", [
               "Hermes session stream",
               activeProject.memoryScope.stableProjectKey
@@ -136,11 +145,17 @@ export function ChatView({
           } else if (event.type === "tool_event" || event.type === "run_event") {
             const activityEvent = createActivityEventFromHermesStreamEvent(event);
             if (activityEvent) {
+              appendActivityEvent(session.id, activityEvent);
               workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
             }
           } else if (event.type === "error") {
             hadStreamError = true;
             accumulated = event.error.message;
+            setAssistantHasContent(true);
+            const activityEvent = createActivityEventFromHermesStreamEvent(event);
+            if (activityEvent) {
+              appendActivityEvent(session.id, activityEvent);
+            }
             workspaceActions.updateMessage(session.id, assistantId, accumulated, "error", [
               "Hermes stream error"
             ]);
@@ -171,14 +186,25 @@ export function ChatView({
     setIsGenerating(false);
   }
 
+  function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
+    setActivityEventsBySession((current) => ({
+      ...current,
+      [sessionId]: [...(current[sessionId] ?? []), event].slice(-80)
+    }));
+  }
+
+  const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
+
   return (
     <section className={styles.workspace} aria-label="Chat workspace">
       <ChatHeader title={activeSession?.title ?? "No chat selected"} />
       <ChatTranscript
         activeProject={activeProject}
         activeSession={activeSession}
+        activityEvents={activeActivityEvents}
         bannerIcon={<AlertTriangle size={15} />}
         createSession={createSession}
+        isThinking={isGenerating && !assistantHasContent}
         routeIcon={<SendHorizontal size={14} />}
         scopeIcon={<BookOpenText size={14} />}
       />

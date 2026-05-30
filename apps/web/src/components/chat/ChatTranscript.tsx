@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
-import { ChatActivityBlock } from "@/components/chat/ChatActivityBlock";
+import { AgentActivityBlock } from "@/components/chat/AgentActivityBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import type { Project, Session } from "@/data/types";
+import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
 type ChatTranscriptProps = {
   activeProject: Project;
   activeSession: Session | null;
+  activityEvents: AgentActivityEvent[];
   bannerIcon: ReactNode;
   createSession: () => void;
+  isThinking: boolean;
   routeIcon: ReactNode;
   scopeIcon: ReactNode;
 };
@@ -17,8 +20,10 @@ type ChatTranscriptProps = {
 export function ChatTranscript({
   activeProject,
   activeSession,
+  activityEvents,
   bannerIcon,
   createSession,
+  isThinking,
   routeIcon,
   scopeIcon
 }: ChatTranscriptProps) {
@@ -51,7 +56,13 @@ export function ChatTranscript({
             onAction={createSession}
           />
         )}
-        {activeSession ? <ChatActivityBlock events={activeSession.toolEvents} /> : null}
+        {activeSession ? (
+          <AgentActivityBlock
+            events={activityEvents}
+            legacyEvents={activeSession.toolEvents}
+            showThinking={isThinking}
+          />
+        ) : null}
         <div className={styles.referenceRow} aria-label="Active scope references">
           <span className={styles.referenceChip}>
             {scopeIcon}

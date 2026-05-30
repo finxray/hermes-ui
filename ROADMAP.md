@@ -163,6 +163,19 @@ workspace schema change, Hermes streaming change, Brain Memory BFF change, or
 memory mutation/admin action was added. See
 `docs/product/AGENT_ACTIVITY_EVENT_MODEL_13D.md`.
 
+## Checkpoint: Slice 13E agent activity blocks
+
+Slice 13E added collapsed Codex-like `AgentActivityBlock` rendering on
+2026-05-30. Live Hermes `tool_event`, `run_event`, and `error` events now feed
+non-persisted `AgentActivityEvent` blocks in the chat transcript, while
+existing compact `Session.toolEvents` remain available for compatibility and
+right-rail state. Brain Memory-classified events render as memory activity,
+generic tools render as tool activity, command-like payloads render as command
+activity, and expanded details use redacted JSON. No persisted workspace schema
+change, Hermes streaming change, Brain Memory BFF change, or memory
+mutation/admin action was added. See
+`docs/product/AGENT_ACTIVITY_BLOCKS_13E.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

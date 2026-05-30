@@ -201,6 +201,10 @@ the existing compact `Session.toolEvents[]` shape.
 This gives the current right rail better source classification without creating
 a new visual timeline or changing localStorage schema.
 
+Slice 13E later added `AgentActivityBlock` rendering for live
+`AgentActivityEvent` objects while preserving this compact `Session.toolEvents[]`
+compatibility path.
+
 ## Persisted State
 
 Persisted workspace state did not change.

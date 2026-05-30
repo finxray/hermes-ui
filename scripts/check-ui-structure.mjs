@@ -8,6 +8,8 @@ const requiredFiles = [
   "apps/web/src/components/shell/SidebarRow.tsx",
   "apps/web/src/components/shell/SidebarRow.module.css",
   "apps/web/src/components/chat/Composer.module.css",
+  "apps/web/src/components/chat/AgentActivityBlock.tsx",
+  "apps/web/src/components/chat/AgentActivityBlock.module.css",
   "apps/web/src/components/chat/MessageBubble.module.css",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];

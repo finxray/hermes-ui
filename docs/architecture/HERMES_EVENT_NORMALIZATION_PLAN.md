@@ -54,8 +54,9 @@ The current normalizer does not yet fully cover Hermes-native orchestration:
 
 Slice 13D reduces one gap by mapping the current `tool_event`, `run_event`, and
 `error` stream events into `AgentActivityEvent` objects in the frontend before
-projecting them back into the existing compact `ToolEvent` state. Full
-activity-event persistence and rendering remain future work.
+projecting them back into the existing compact `ToolEvent` state. Slice 13E
+renders live `AgentActivityEvent` objects in collapsed chat activity blocks
+while leaving full activity-event persistence as future work.
 
 ## Target Normalization Boundary
 
@@ -213,8 +214,8 @@ Target artifact fields:
 Chat timeline:
 
 - user and assistant messages;
-- compact tool rows;
-- compact memory rows;
+- compact collapsed tool rows;
+- compact collapsed memory rows;
 - approval requests;
 - fatal errors;
 - elapsed-time separators for longer runs.
@@ -239,6 +240,11 @@ Right rail:
 - memory evidence bodies beyond summary;
 - stack traces;
 - low-level keepalive/status events.
+
+Slice 13E implements collapsed-by-default details in `AgentActivityBlock` using
+native `details`/`summary` and redacted JSON details. It renders current
+session-level activity after transcript messages; precise timestamp interleaving
+is deferred.
 
 ## Visible By Default
 

@@ -117,7 +117,7 @@ textarea:disabled {
   grid-template-areas:
     "top top top"
     "left main right";
-  grid-template-columns: var(--rail-width-left) minmax(0, 1fr) var(--rail-width-right);
+  grid-template-columns: minmax(0, var(--rail-width-left)) minmax(0, 1fr) minmax(0, var(--rail-width-right));
   column-gap: 0;
   height: 100dvh;
   min-height: 0;
@@ -148,15 +148,15 @@ textarea:disabled {
 }
 
 .app-shell.is-left-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) var(--rail-width-right);
+  grid-template-columns: minmax(0, 0px) minmax(0, 1fr) minmax(0, var(--rail-width-right));
 }
 
 .app-shell.is-right-collapsed {
-  grid-template-columns: var(--rail-width-left) minmax(0, 1fr) 0px;
+  grid-template-columns: minmax(0, var(--rail-width-left)) minmax(0, 1fr) minmax(0, 0px);
 }
 
 .app-shell.is-left-collapsed.is-right-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) 0px;
+  grid-template-columns: minmax(0, 0px) minmax(0, 1fr) minmax(0, 0px);
 }
 
 .app-topbar {
@@ -279,6 +279,7 @@ textarea:disabled {
 }
 
 .app-shell.is-left-collapsed .sidebar {
+  width: 0;
   opacity: 0;
   pointer-events: none;
   padding-right: 0;
@@ -287,6 +288,7 @@ textarea:disabled {
 }
 
 .app-shell.is-right-collapsed .context-panel {
+  width: 0;
   opacity: 0;
   pointer-events: none;
   padding-right: 0;
@@ -547,6 +549,7 @@ textarea:disabled {
   color: var(--text-muted);
   font-size: var(--font-body);
   text-align: right;
+  transition: opacity 100ms ease;
 }
 
 .inline-actions {
@@ -567,6 +570,11 @@ textarea:disabled {
 .row-with-actions:focus-within > .mini-action {
   opacity: 1;
   pointer-events: auto;
+}
+
+.row-with-actions:hover .project-count,
+.row-with-actions:focus-within .project-count {
+  opacity: 0;
 }
 
 .mini-action {
@@ -636,22 +644,29 @@ textarea:disabled {
 
 .sidebar-foot .status-badge {
   width: 100%;
-  min-height: calc(var(--row-height) * 0.86);
+  min-height: var(--row-height);
   justify-content: flex-start;
   padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  border-radius: 17px;
   background: transparent;
+  font-size: var(--font-body);
 }
 
 .status-stack {
   display: grid;
-  gap: 8px;
+  gap: 2px;
   background: transparent;
 }
 
 .sidebar-foot .text-button {
-  min-height: calc(var(--row-height) * 0.9);
+  min-height: var(--row-height);
   justify-content: flex-start;
   padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  border-radius: 17px;
+}
+
+.sidebar-foot .status-dot {
+  margin-right: 2px;
 }
 
 .full-width {
@@ -729,7 +744,7 @@ textarea:disabled {
   display: block;
   width: auto;
   min-height: auto;
-  margin: clamp(24px, calc(18px + 0.45vw), 38px) clamp(28px, 4vw, 64px) 0;
+  margin: clamp(24px, calc(18px + 0.45vw), 38px) clamp(22px, 2.6vw, 42px) 0;
   padding: 0 0 0 0;
   border-bottom: 0;
   background: transparent;
@@ -815,11 +830,7 @@ textarea:disabled {
 }
 
 .mock-banner,
-.empty-state,
-.summary-card,
-.memory-card,
-.tool-card,
-.artifact-card {
+.empty-state {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
@@ -1026,20 +1037,16 @@ textarea:disabled {
   padding: clamp(13px, calc(9px + 0.28vw), 21px);
   border: 0;
   border-radius: 26px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 58%),
-    rgba(27, 29, 33, 0.96);
+  background: rgba(29, 30, 34, 0.98);
   box-shadow:
-    0 22px 72px rgba(0, 0, 0, 0.54),
-    0 0 0 1px rgba(255, 255, 255, 0.045),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 22px 72px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .composer-box:focus-within {
   box-shadow:
-    0 24px 78px rgba(0, 0, 0, 0.56),
-    0 0 0 1px rgba(255, 255, 255, 0.075),
-    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    0 24px 78px rgba(0, 0, 0, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .composer textarea {
@@ -1140,6 +1147,11 @@ textarea:disabled {
   box-shadow: none;
 }
 
+.send-button.is-stop:disabled {
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .composer-note {
   color: var(--text-muted);
   font-size: var(--font-small);
@@ -1216,17 +1228,16 @@ textarea:disabled {
 .memory-card,
 .tool-card,
 .artifact-card {
-  border: 1px solid rgba(255, 255, 255, 0.025);
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent),
-    rgba(255, 255, 255, 0.014);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .summary-card {
   display: grid;
   gap: 12px;
-  padding: clamp(16px, calc(11px + 0.35vw), 24px);
+  padding: 0;
 }
 
 .summary-grid {
@@ -1236,10 +1247,10 @@ textarea:disabled {
 }
 
 .metric {
-  padding: 10px;
+  padding: 4px 0;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.018);
+  border-radius: 0;
+  background: transparent;
 }
 
 .metric-value {
@@ -1257,7 +1268,8 @@ textarea:disabled {
 .memory-card,
 .tool-card,
 .artifact-card {
-  padding: clamp(16px, calc(11px + 0.35vw), 24px);
+  padding: 0 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
 .memory-card-button {
@@ -1274,17 +1286,13 @@ textarea:disabled {
 .memory-card-button:hover,
 .memory-card-button:focus-visible {
   border-color: transparent;
-  background:
-    linear-gradient(180deg, rgba(142, 230, 198, 0.055), transparent),
-    var(--bg-control-hover);
+  background: rgba(255, 255, 255, 0.045);
   outline: 0;
 }
 
 .memory-card-button.is-active {
   border-color: transparent;
-  background:
-    linear-gradient(90deg, rgba(142, 230, 198, 0.115), rgba(145, 184, 255, 0.038)),
-    var(--bg-control-active);
+  background: rgba(255, 255, 255, 0.065);
   box-shadow: none;
 }
 
@@ -1419,10 +1427,11 @@ textarea:disabled {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.028);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.014);
+  padding: 4px 0 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 0;
+  background: transparent;
 }
 
 .context-field-label {
@@ -1473,8 +1482,8 @@ textarea:disabled {
   width: 28px;
   height: 28px;
   place-items: center;
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface-2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
   color: var(--accent);
 }
 

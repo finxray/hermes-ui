@@ -1,4 +1,4 @@
-import { ArrowUp, Mic, Plus } from "lucide-react";
+import { ArrowUp, Mic, Plus, Square } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
@@ -62,12 +62,13 @@ export function Composer({
                 <Mic size={16} />
               </button>
               <button
-                className="send-button"
+                className={`send-button${isGenerating ? " is-stop" : ""}`}
                 type="submit"
                 disabled={disabled || isGenerating || draft.trim().length === 0}
-                aria-label="Send message"
+                aria-label={isGenerating ? "Stop response placeholder" : "Send message"}
+                title={isGenerating ? "Stop response will be wired with streaming cancellation." : undefined}
               >
-                <ArrowUp size={17} />
+                {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
               </button>
             </div>
           </div>

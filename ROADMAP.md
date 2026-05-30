@@ -249,6 +249,19 @@ mutation/admin actions, direct Gateway/storage paths, provider calls, or Hermes
 streaming changes were added. See
 `docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md`.
 
+## Checkpoint: Slice 13L command execution details
+
+Slice 13L added first-class command execution detail rendering on 2026-05-31.
+Command-like Hermes/MCP tool events now extract structured command metadata
+including command text, args, cwd, exit code, duration, stdout/stderr/output
+previews, and future source/channel labels such as web-ui, telegram, cli, and
+api. The chat transcript renders command details collapsed by default with
+redacted/truncated previews, and the Tools tab now includes a read-only Recent
+commands summary with an honest empty state. No browser command execution,
+direct browser-to-Hermes/Gateway/storage path, Hermes streaming change, Brain
+Memory logic change, Telegram integration, or provider integration was added.
+See `docs/product/COMMAND_EXECUTION_DETAILS_13L.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

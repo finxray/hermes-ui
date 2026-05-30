@@ -195,12 +195,14 @@
 
 .listCard,
 .toolRow,
+.commandRow,
 .artifactRow {
   padding: 0 0 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
 .toolRow,
+.commandRow,
 .artifactRow {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -220,6 +222,24 @@
   gap: 6px;
 }
 
+.commandContent {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.commandPreview {
+  display: block;
+  max-height: 56px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .toolIcon {
   display: grid;
   width: 28px;
@@ -228,6 +248,10 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.035);
   color: var(--accent);
+}
+
+.commandRow[data-status="failed"] .toolIcon {
+  color: var(--danger);
 }
 
 .artifactIcon {

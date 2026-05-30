@@ -60,6 +60,19 @@ export type AgentActivityEvent = {
     actionAvailable: boolean;
     unavailableReason?: string;
   };
+  command?: {
+    command?: string;
+    args?: string[];
+    cwd?: string;
+    exitCode?: number;
+    durationMs?: number;
+    stdoutPreview?: string;
+    stderrPreview?: string;
+    outputPreview?: string;
+    sourceChannel?: "web-ui" | "telegram" | "cli" | "api" | "unknown";
+    toolName?: string;
+    truncated?: boolean;
+  };
   artifact?: {
     artifactId?: string;
     fileId?: string;

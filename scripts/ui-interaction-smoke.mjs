@@ -399,6 +399,18 @@ async function checkRightRailTabs() {
         "Memory timeline empty state is honest when no session memory events exist."
       );
     }
+    if (name === "tools") {
+      await expectVisible(
+        "right-rail-command-activity",
+        page.getByText("Recent commands", { exact: true }).first(),
+        "Tools tab exposes the session command activity summary."
+      );
+      await expectVisible(
+        "right-rail-command-empty-state",
+        page.getByText("No command activity in this session yet.", { exact: true }).first(),
+        "Command activity empty state is honest when no session command events exist."
+      );
+    }
   }
 }
 

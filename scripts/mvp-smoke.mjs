@@ -112,6 +112,7 @@ async function checkSourceSmokeTargets() {
     "apps/web/src/components/chat/Composer.tsx",
     "apps/web/src/lib/memoryTimeline.ts",
     "docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md",
+    "docs/product/COMMAND_EXECUTION_DETAILS_13L.md",
     "docs/product/PROVIDER_MODEL_SELECTOR_13J.md"
   ];
 
@@ -184,6 +185,15 @@ async function checkSourceSmokeTargets() {
       !memoryTimeline.includes("localStorage") &&
       !memoryConsole.includes("/api/brain-memory"),
     "Memory timeline derives from activity events without direct Gateway/storage calls."
+  );
+  checkSource(
+    "ui:command-detail-rendering",
+    contextRail.includes("Recent commands") &&
+      contextRail.includes("No command activity in this session yet.") &&
+      contextRail.includes("extractCommandDetails") &&
+      readFile("apps/web/src/components/chat/AgentActivityBlock.tsx").includes("stdoutPreview") &&
+      readFile("apps/web/src/lib/agentActivityEvents.ts").includes("sourceChannel"),
+    "Command activity exposes structured details, stdout/stderr previews, and source channel metadata."
   );
   checkSource(
     "ui:composer-textarea-label",

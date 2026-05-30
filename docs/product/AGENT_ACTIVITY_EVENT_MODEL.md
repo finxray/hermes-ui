@@ -162,19 +162,35 @@ after refresh.
 Approval fields:
 
 ```ts
-approval?: {
-  approvalId?: string;
-  action?: string;
+  approval?: {
+    approvalId?: string;
+    action?: string;
   choices?: string[];
   decision?: string;
   prompt?: string;
   reason?: string;
   respondedAt?: string;
   riskLevel?: string;
-  actionAvailable: boolean;
-  unavailableReason?: string;
-}
+    actionAvailable: boolean;
+    unavailableReason?: string;
+  }
+  command?: {
+    command?: string;
+    args?: string[];
+    cwd?: string;
+    exitCode?: number;
+    durationMs?: number;
+    stdoutPreview?: string;
+    stderrPreview?: string;
+    outputPreview?: string;
+    sourceChannel?: "web-ui" | "telegram" | "cli" | "api" | "unknown";
+    toolName?: string;
+    truncated?: boolean;
+  }
 ```
+
+Slice 13L added the optional `command` object. Command metadata is display-only
+and derived from Hermes/tool payloads; the browser does not execute commands.
 
 ## Duration Semantics
 
@@ -244,6 +260,22 @@ Artifact events should distinguish:
 Current Hermes API server does not support uploaded file inputs through the API.
 The UI should not model uploads as real until a safe BFF/file contract exists.
 
+## Command Fields
+
+Command-like events may preserve:
+
+- command text;
+- args;
+- cwd;
+- exit code;
+- duration;
+- stdout/stderr/output previews;
+- source channel such as `web-ui`, `telegram`, `cli`, or `api`;
+- source tool name.
+
+Stdout/stderr/output previews must be redacted and truncated before display.
+Do not invent stdout/stderr when Hermes/tool payloads do not provide them.
+
 ## Visibility Rules
 
 Render in chat timeline:
@@ -261,6 +293,8 @@ Render in right rail:
 - full tool registry/activity;
 - raw event payloads;
 - stdout/stderr;
+- recent read-only command activity summary derived from normalized
+  `AgentActivityEvent` objects;
 - memory evidence and scopes;
 - recent read-only memory activity timeline derived from normalized
   `AgentActivityEvent` objects;

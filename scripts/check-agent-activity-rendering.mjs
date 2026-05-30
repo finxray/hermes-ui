@@ -108,6 +108,22 @@ function checkComponentSource() {
     "Component renders scope/approval metadata and compact JSON details."
   );
   record(
+    "command-detail-rendering",
+    component.includes("extractCommandDetails") &&
+      component.includes("CommandDetails") &&
+      component.includes("stdoutPreview") &&
+      component.includes("stderrPreview") &&
+      component.includes("exitCode") &&
+      css.includes(".commandDetails") &&
+      css.includes(".outputBlock"),
+    "Command activity blocks render structured command metadata and stdout/stderr previews."
+  );
+  record(
+    "command-right-rail-summary",
+    contextRailHasRecentCommands(),
+    "Tools rail exposes a compact Recent commands section with an honest empty state."
+  );
+  record(
     "memory-timeline-right-rail",
     memoryConsole.includes("Memory activity") &&
       memoryConsole.includes("No memory activity in this session yet.") &&
@@ -209,6 +225,50 @@ async function checkHelperBehavior() {
     "Approval helper produces a waiting display-only activity event for rendering."
   );
 
+  const command = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "run_command",
+    status: "completed",
+    payload: {
+      channel: "cli",
+      command: "npm test",
+      cwd: "C:/repo",
+      exitCode: 0,
+      stderr: "",
+      stdout: "ok"
+    }
+  }, { id: "render-command" });
+
+  record(
+    "command-helper-render-shape",
+    command.type === "command" &&
+      command.command?.command === "npm test" &&
+      command.command?.cwd === "C:/repo" &&
+      command.command?.stdoutPreview === "ok" &&
+      command.command?.sourceChannel === "cli",
+    "Command helper provides render-ready command metadata and source channel."
+  );
+
+  const failedCommand = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "powershell",
+    status: "completed",
+    payload: {
+      command: "npm run build",
+      exit_code: 1,
+      stderr: "Authorization: Bearer abc123"
+    }
+  }, { id: "render-failed-command" });
+
+  record(
+    "command-helper-redaction-status",
+    failedCommand.status === "failed" &&
+      failedCommand.title === "Command failed" &&
+      failedCommand.command?.stderrPreview === "Authorization: Bearer [redacted]" &&
+      !JSON.stringify(failedCommand).includes("abc123"),
+    "Failed command metadata is status-correct and redacted before rendering."
+  );
+
   const memoryStore = activity.createActivityEventFromHermesToolEvent({
     type: "tool_event",
     name: "memory_store",
@@ -295,4 +355,19 @@ async function importHelperModule(path) {
 
 function record(name, ok, message) {
   checks.push({ message, name, ok });
+}
+
+function contextRailHasRecentCommands() {
+  const contextRailPath = resolve(root, "apps/web/src/components/shell/ContextRail.tsx");
+  if (!existsSync(contextRailPath)) {
+    return false;
+  }
+  const contextRail = readFileSync(contextRailPath, "utf8");
+  return (
+    contextRail.includes("Recent commands") &&
+    contextRail.includes("No command activity in this session yet.") &&
+    contextRail.includes("extractCommandDetails") &&
+    contextRail.includes("CommandActivityRow") &&
+    !contextRail.includes("exec(")
+  );
 }

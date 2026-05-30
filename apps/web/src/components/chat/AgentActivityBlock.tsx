@@ -9,7 +9,12 @@ import {
   ShieldAlert,
   Terminal
 } from "lucide-react";
-import { computeActivityDuration, computeRunElapsed, formatActivityDuration } from "@/lib/agentActivityEvents";
+import {
+  computeActivityDuration,
+  computeRunElapsed,
+  extractCommandDetails,
+  formatActivityDuration
+} from "@/lib/agentActivityEvents";
 import type { ToolEvent } from "@/data/types";
 import type { AgentActivityEvent, AgentActivityStatus, AgentActivityType } from "@/types/agentActivity";
 import styles from "./AgentActivityBlock.module.css";
@@ -63,6 +68,7 @@ function ActivityDetails({ group }: { group: ActivityGroup }) {
   const { primary } = group;
   const status = groupStatus(group.events);
   const summary = groupSummary(group.events, primary);
+  const command = primary.type === "command" ? extractCommandDetails(primary) : undefined;
   const detailPayload = group.events.map((event) => ({
     id: event.id,
     type: event.type,
@@ -73,6 +79,7 @@ function ActivityDetails({ group }: { group: ActivityGroup }) {
     hermes: event.hermes,
     memory: event.memory,
     approval: event.approval,
+    command: event.command,
     artifact: event.artifact,
     metadata: event.metadata,
     details: event.details
@@ -103,14 +110,49 @@ function ActivityDetails({ group }: { group: ActivityGroup }) {
           {primary.memory?.operation ? <Meta label="operation" value={primary.memory.operation} /> : null}
           {primary.memory?.projectKey ? <Meta label="project" value={primary.memory.projectKey} /> : null}
           {primary.memory?.sessionKey ? <Meta label="session" value={primary.memory.sessionKey} /> : null}
+          {command?.cwd ? <Meta label="cwd" value={command.cwd} /> : null}
+          {command?.exitCode !== undefined ? <Meta label="exit" value={String(command.exitCode)} /> : null}
+          {command?.sourceChannel ? <Meta label="channel" value={command.sourceChannel} /> : null}
           {primary.approval?.approvalId ? <Meta label="approval" value={primary.approval.approvalId} /> : null}
           {primary.approval?.decision ? <Meta label="decision" value={primary.approval.decision} /> : null}
           {primary.approval?.riskLevel ? <Meta label="risk" value={primary.approval.riskLevel} /> : null}
           {primary.hermes?.runId ? <Meta label="run" value={primary.hermes.runId} /> : null}
         </dl>
+        {command ? <CommandDetails command={command} /> : null}
         <pre className={styles.pre}>{safeJson(detailPayload)}</pre>
       </div>
     </details>
+  );
+}
+
+function CommandDetails({ command }: { command: NonNullable<AgentActivityEvent["command"]> }) {
+  return (
+    <div className={styles.commandDetails} aria-label="Command execution details">
+      {command.command ? (
+        <div className={styles.commandLine}>
+          <span className={styles.commandLabel}>command</span>
+          <code>{command.command}</code>
+        </div>
+      ) : null}
+      {command.args?.length ? (
+        <div className={styles.commandLine}>
+          <span className={styles.commandLabel}>args</span>
+          <code>{command.args.join(" ")}</code>
+        </div>
+      ) : null}
+      {command.stdoutPreview ? <OutputBlock label="stdout" value={command.stdoutPreview} /> : null}
+      {command.stderrPreview ? <OutputBlock label="stderr" value={command.stderrPreview} tone="error" /> : null}
+      {command.outputPreview ? <OutputBlock label="output" value={command.outputPreview} /> : null}
+    </div>
+  );
+}
+
+function OutputBlock({ label, tone, value }: { label: string; tone?: "error"; value: string }) {
+  return (
+    <div className={styles.outputBlock} data-tone={tone}>
+      <span className={styles.commandLabel}>{label}</span>
+      <pre>{value}</pre>
+    </div>
   );
 }
 
@@ -149,7 +191,7 @@ function groupKey(event: AgentActivityEvent) {
     return `memory:${event.memory?.operation ?? event.title}:${event.memory?.memoryId ?? event.hermes?.toolName ?? event.title}`;
   }
   if (event.type === "tool" || event.type === "command") {
-    return `${event.type}:${event.hermes?.toolCallId ?? event.hermes?.toolName ?? event.title}`;
+    return `${event.type}:${event.hermes?.toolCallId ?? event.command?.command ?? event.hermes?.toolName ?? event.title}`;
   }
   if (event.type === "approval") {
     return `approval:${event.approval?.approvalId ?? event.hermes?.runId ?? event.hermes?.eventType ?? event.title}`;
@@ -191,10 +233,13 @@ function groupSummary(events: AgentActivityEvent[], primary: AgentActivityEvent)
   const last = events.at(-1) ?? first;
   const durationMs = computeActivityDuration(primary) ?? computeRunElapsed(first.startedAt, last.completedAt);
   const eventCount = events.length > 1 ? `${events.length} events` : sourceLabel(primary);
+  const commandDetails = primary.type === "command" ? extractCommandDetails(primary) : undefined;
   const subtitleParts = [
-    primary.summary,
+    commandDetails ? commandSubtitle(commandDetails) : primary.summary,
     primary.type === "approval" ? approvalAvailabilityLabel(primary) : null,
     primary.type === "memory" ? memoryScopeLabel(primary) : null,
+    primary.type === "command" && commandDetails?.exitCode !== undefined ? `exit ${commandDetails.exitCode}` : null,
+    primary.type === "command" && commandDetails?.sourceChannel ? `source ${commandDetails.sourceChannel}` : null,
     eventCount
   ].filter(Boolean);
 
@@ -203,6 +248,22 @@ function groupSummary(events: AgentActivityEvent[], primary: AgentActivityEvent)
     subtitle: subtitleParts.join(" - "),
     title: primary.title
   };
+}
+
+function commandSubtitle(command: NonNullable<AgentActivityEvent["command"]>) {
+  if (command.command) {
+    return command.command;
+  }
+  if (command.outputPreview) {
+    return command.outputPreview.split("\n")[0];
+  }
+  if (command.stdoutPreview) {
+    return command.stdoutPreview.split("\n")[0];
+  }
+  if (command.stderrPreview) {
+    return command.stderrPreview.split("\n")[0];
+  }
+  return "Command output unavailable";
 }
 
 function approvalAvailabilityLabel(event: AgentActivityEvent) {

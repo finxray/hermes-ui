@@ -83,6 +83,10 @@ Memory event timeline derived from the frontend `AgentActivityEvent` model.
 The timeline consumes normalized memory events only; it does not inspect raw
 token deltas, call Gateway directly, or persist full activity events.
 
+Slice 13L keeps the BFF normalizer unchanged and adds structured command
+metadata extraction in the frontend activity mapper. Command output rendering
+is display-only; the browser does not execute commands or call Hermes directly.
+
 ## Target Normalization Boundary
 
 Future boundary:
@@ -189,6 +193,15 @@ Default UI:
 - stdout/stderr collapsed;
 - failure expanded enough to see the error summary.
 
+Slice 13L recognizes command-like tool names such as `shell`, `terminal`,
+`powershell`, `bash`, `python`, `npm`, `run_command`, `command`, and `exec`.
+It also recognizes payload fields such as `command`, `cmd`, `args`, `argv`,
+`cwd`, `stdout`, `stderr`, `output`, `exit_code`, `exitCode`, `return_code`,
+and `returnCode`. Non-zero exit codes map completed command payloads to failed
+command activity. Output previews are redacted and truncated before rendering.
+Source/channel labels such as `web-ui`, `telegram`, `cli`, and `api` are
+preserved when present, but no Telegram ingestion is implemented.
+
 ## Memory Event Mapping
 
 Memory event sources:
@@ -262,7 +275,7 @@ Right rail:
 - capabilities;
 - tool registry;
 - running/completed tools;
-- full command output;
+- command history and preview output;
 - memory evidence and scope;
 - artifact detail;
 - approval history;

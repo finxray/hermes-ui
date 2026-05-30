@@ -181,6 +181,53 @@
   overflow-wrap: anywhere;
 }
 
+.commandDetails {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.commandLine,
+.outputBlock {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.commandLabel {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.commandLine code,
+.outputBlock pre {
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.outputBlock pre {
+  max-height: 180px;
+}
+
+.outputBlock[data-tone="error"] pre {
+  border-color: rgba(255, 107, 107, 0.18);
+  color: #ffb4b4;
+}
+
 .thinking {
   display: flex;
   align-items: center;

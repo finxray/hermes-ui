@@ -26,6 +26,10 @@ checkMemoryStoreCompleted();
 checkMemorySearch();
 checkGenericTool();
 checkCommandTool();
+checkCommandDetails();
+checkCommandFailureExitCode();
+checkCommandOutputRedaction();
+checkCommandSourceChannel();
 checkArtifactPayload();
 checkRunEvent();
 checkApprovalRequested();
@@ -138,6 +142,103 @@ function checkCommandTool() {
     "command-tool",
     event.type === "command" && event.status === "completed" && event.source === "mcp",
     "command-like tool payload maps to a command activity event."
+  );
+}
+
+function checkCommandDetails() {
+  const event = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "run_command",
+    status: "completed",
+    payload: {
+      args: ["run", "build"],
+      command: "npm",
+      cwd: "C:/repo",
+      durationMs: 1250,
+      exitCode: 0,
+      stderr: "",
+      stdout: "Build completed"
+    }
+  }, { id: "command-details" });
+
+  record(
+    "command-details",
+    event.type === "command" &&
+      event.title === "Command completed" &&
+      event.command?.command === "npm" &&
+      event.command?.args?.join(" ") === "run build" &&
+      event.command?.cwd === "C:/repo" &&
+      event.command?.exitCode === 0 &&
+      event.command?.durationMs === 1250 &&
+      event.command?.stdoutPreview === "Build completed",
+    "command payload extracts command, args, cwd, exit code, duration, and stdout preview."
+  );
+}
+
+function checkCommandFailureExitCode() {
+  const event = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "python",
+    status: "completed",
+    payload: {
+      command: "python -m pytest",
+      return_code: 2,
+      stderr: "tests failed"
+    }
+  }, { id: "command-failure" });
+
+  record(
+    "command-failure-exit-code",
+    event.type === "command" &&
+      event.status === "failed" &&
+      event.title === "Command failed" &&
+      event.command?.exitCode === 2 &&
+      event.command?.stderrPreview === "tests failed",
+    "non-zero command exit code maps completed tool payloads to failed command activity."
+  );
+}
+
+function checkCommandOutputRedaction() {
+  const longOutput = `${"line\n".repeat(400)}Authorization: Bearer abc123`;
+  const event = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "shell",
+    status: "completed",
+    payload: {
+      command: "echo secret",
+      stdout: longOutput,
+      stderr: "token=Bearer abc123"
+    }
+  }, { id: "command-redaction" });
+  const serialized = JSON.stringify(event);
+
+  record(
+    "command-output-redaction",
+    event.command?.stdoutPreview?.includes("... truncated") &&
+      event.command?.stderrPreview === "token=Bearer [redacted]" &&
+      serialized.includes("[redacted]") &&
+      !serialized.includes("abc123"),
+    "stdout/stderr previews are truncated and bearer-like secrets are redacted."
+  );
+}
+
+function checkCommandSourceChannel() {
+  const event = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "bash",
+    status: "started",
+    payload: {
+      channel: "telegram",
+      command: "pwd"
+    }
+  }, { id: "command-channel" });
+
+  record(
+    "command-source-channel",
+    event.type === "command" &&
+      event.status === "running" &&
+      event.command?.sourceChannel === "telegram",
+    "command metadata preserves future source/channel labels without Telegram integration."
   );
 }
 

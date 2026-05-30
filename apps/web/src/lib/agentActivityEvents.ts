@@ -20,8 +20,11 @@ type MemoryOperation =
   | "delete"
   | "unknown";
 
+type CommandDetails = NonNullable<AgentActivityEvent["command"]>;
+
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|credential|password|secret|token/i;
 const BEARER_VALUE_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const COMMAND_OUTPUT_PREVIEW_LIMIT = 1200;
 
 export function createActivityEventFromHermesStreamEvent(
   event: HermesChatStreamEvent,
@@ -77,9 +80,10 @@ export function createActivityEventFromHermesToolEvent(
   const classification = classifyToolEventSource(event.name, payload);
   const memoryOperation =
     classification.type === "memory" ? classifyMemoryOperation(event.name, payload) : "unknown";
-  const status = normalizeActivityStatus(event.status);
   const occurredAt = getPayloadTime(payload) ?? options.now;
-  const title = activityTitleForTool(event.name, classification.type, memoryOperation);
+  const command = classification.type === "command" ? extractCommandDetailsFromPayload(event.name, payload) : undefined;
+  const status = normalizeCommandStatus(normalizeActivityStatus(event.status), command);
+  const title = activityTitleForTool(event.name, classification.type, memoryOperation, command, status);
   const details = redactActivityDetails(payload);
   const artifact = getArtifactData(payload, status);
 
@@ -93,6 +97,7 @@ export function createActivityEventFromHermesToolEvent(
     completedAt: status === "completed" || status === "failed" ? occurredAt : undefined,
     collapsedByDefault: true,
     details,
+    durationMs: command?.durationMs,
     source: classification.source,
     hermes: {
       eventType: `tool.${event.status}`,
@@ -111,6 +116,7 @@ export function createActivityEventFromHermesToolEvent(
             sessionKey: asString(payload.session_key) || asString(payload.sessionKey)
           }
         : undefined,
+    command,
     artifact,
     metadata: getActivityMetadata(payload)
   };
@@ -295,6 +301,49 @@ export function classifyToolEventSource(
   return { source: "hermes", type: "tool" };
 }
 
+export function isCommandActivityEvent(event: AgentActivityEvent) {
+  return event.type === "command" || Boolean(event.command);
+}
+
+export function extractCommandDetails(event: AgentActivityEvent): CommandDetails | undefined {
+  if (event.command) {
+    return event.command;
+  }
+  const details = objectRecord(event.details);
+  if (!details) {
+    return undefined;
+  }
+  return extractCommandDetailsFromPayload(event.hermes?.toolName ?? event.title, details);
+}
+
+export function formatCommandTitle(details?: CommandDetails, status: AgentActivityStatus = "info") {
+  if (status === "failed") {
+    return "Command failed";
+  }
+  if (status === "running" || status === "queued") {
+    return "Running command";
+  }
+  if (status === "completed") {
+    return "Command completed";
+  }
+  return details?.command ? "Ran command" : "Command activity";
+}
+
+export function normalizeExitCode(details?: CommandDetails) {
+  return typeof details?.exitCode === "number" && Number.isFinite(details.exitCode)
+    ? details.exitCode
+    : undefined;
+}
+
+export function truncateCommandOutput(text: string, maxLength = COMMAND_OUTPUT_PREVIEW_LIMIT) {
+  const clean = text.replace(/\r\n/g, "\n");
+  return clean.length > maxLength ? `${clean.slice(0, maxLength)}\n... truncated` : clean;
+}
+
+export function redactCommandOutput(text: string) {
+  return redactText(text);
+}
+
 export function classifyMemoryOperation(
   toolName: string,
   payload: Record<string, unknown> = {}
@@ -354,7 +403,9 @@ export function redactActivityDetails(value: unknown): unknown {
 function activityTitleForTool(
   toolName: string,
   type: Extract<AgentActivityType, "command" | "memory" | "tool">,
-  operation: MemoryOperation
+  operation: MemoryOperation,
+  command?: CommandDetails,
+  status?: AgentActivityStatus
 ) {
   if (type === "memory") {
     if (operation === "store") {
@@ -378,7 +429,7 @@ function activityTitleForTool(
     return "Memory activity";
   }
   if (type === "command") {
-    return getCommandTitle(toolName);
+    return formatCommandTitle(command, status);
   }
   return toolName || "Hermes tool";
 }
@@ -432,14 +483,23 @@ function isCommandTool(normalizedToolName: string, payload: Record<string, unkno
     normalizedToolName.includes("terminal") ||
     normalizedToolName.includes("powershell") ||
     normalizedToolName.includes("bash") ||
+    normalizedToolName.includes("python") ||
+    normalizedToolName.includes("npm") ||
+    normalizedToolName.includes("run_command") ||
     normalizedToolName.includes("command") ||
     normalizedToolName.includes("exec") ||
     typeof payload.command === "string" ||
     typeof payload.cmd === "string" ||
+    typeof payload.args === "string" ||
+    Array.isArray(payload.args) ||
     typeof payload.cwd === "string" ||
     typeof payload.stdout === "string" ||
     typeof payload.stderr === "string" ||
-    typeof payload.exit_code === "number"
+    typeof payload.output === "string" ||
+    typeof payload.exit_code === "number" ||
+    typeof payload.exitCode === "number" ||
+    typeof payload.return_code === "number" ||
+    typeof payload.returnCode === "number"
   );
 }
 
@@ -469,12 +529,126 @@ function getPayloadTime(payload: Record<string, unknown>) {
 
 function getActivityMetadata(payload: Record<string, unknown>): Record<string, unknown> | undefined {
   const metadata: Record<string, unknown> = {};
-  for (const key of ["seq", "message_id", "layer", "memory_layer", "result_count", "exit_code", "approval_id", "choice", "risk_level", "resolved"]) {
+  for (const key of ["seq", "message_id", "layer", "memory_layer", "result_count", "exit_code", "exitCode", "return_code", "returnCode", "approval_id", "choice", "risk_level", "resolved", "channel", "source_channel", "caller"]) {
     if (payload[key] !== undefined) {
       metadata[key] = redactActivityDetails(payload[key]);
     }
   }
   return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+function extractCommandDetailsFromPayload(
+  toolName: string,
+  payload: Record<string, unknown>
+): CommandDetails | undefined {
+  const nested = objectRecord(payload.command_result) ?? objectRecord(payload.result);
+  const source = nested ? { ...payload, ...nested } : payload;
+  const command = commandText(source);
+  const args = commandArgs(source);
+  const cwd = asString(source.cwd) || asString(source.working_directory) || asString(source.workingDirectory);
+  const stdout = asString(source.stdout);
+  const stderr = asString(source.stderr);
+  const output = asString(source.output) || asString(source.result_text) || asString(source.resultText);
+  const exitCode = exitCodeFromPayload(source);
+  const durationMs = asNumber(source.duration_ms) ?? asNumber(source.durationMs) ?? asNumber(source.elapsed_ms) ?? asNumber(source.elapsedMs);
+  const sourceChannel = normalizeSourceChannel(
+    asString(source.source_channel) ||
+      asString(source.sourceChannel) ||
+      asString(source.channel) ||
+      asString(source.caller) ||
+      asString(source.source)
+  );
+  const stdoutPreview = previewCommandOutput(stdout);
+  const stderrPreview = previewCommandOutput(stderr);
+  const outputPreview = previewCommandOutput(output);
+  const truncated =
+    isTruncated(stdout, stdoutPreview) ||
+    isTruncated(stderr, stderrPreview) ||
+    isTruncated(output, outputPreview);
+
+  if (!command && args.length === 0 && !cwd && !stdoutPreview && !stderrPreview && !outputPreview && exitCode === undefined) {
+    return undefined;
+  }
+
+  return {
+    args: args.length > 0 ? args : undefined,
+    command: command || undefined,
+    cwd: cwd || undefined,
+    durationMs,
+    exitCode,
+    outputPreview,
+    sourceChannel,
+    stderrPreview,
+    stdoutPreview,
+    toolName: toolName || undefined,
+    truncated: truncated || undefined
+  };
+}
+
+function normalizeCommandStatus(status: AgentActivityStatus, command?: CommandDetails): AgentActivityStatus {
+  const exitCode = normalizeExitCode(command);
+  if (typeof exitCode === "number" && exitCode !== 0 && status === "completed") {
+    return "failed";
+  }
+  return status;
+}
+
+function commandText(payload: Record<string, unknown>) {
+  const command =
+    asString(payload.command) ||
+    asString(payload.cmd) ||
+    asString(payload.shell_command) ||
+    asString(payload.shellCommand);
+  return redactCommandOutput(command).trim();
+}
+
+function commandArgs(payload: Record<string, unknown>) {
+  const raw = payload.args ?? payload.argv;
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((item): item is string | number | boolean => ["string", "number", "boolean"].includes(typeof item))
+      .map((item) => redactCommandOutput(String(item)));
+  }
+  const text = asString(raw);
+  return text ? [redactCommandOutput(text)] : [];
+}
+
+function exitCodeFromPayload(payload: Record<string, unknown>) {
+  return (
+    asNumber(payload.exit_code) ??
+    asNumber(payload.exitCode) ??
+    asNumber(payload.return_code) ??
+    asNumber(payload.returnCode) ??
+    asNumber(payload.code)
+  );
+}
+
+function previewCommandOutput(value: string) {
+  if (!value.trim()) {
+    return undefined;
+  }
+  return truncateCommandOutput(redactCommandOutput(value.trim()));
+}
+
+function isTruncated(raw: string, preview?: string) {
+  return Boolean(preview && raw.trim().length > preview.length);
+}
+
+function normalizeSourceChannel(value: string): CommandDetails["sourceChannel"] {
+  const normalized = normalizeName(value);
+  if (normalized === "web_ui" || normalized === "web") {
+    return "web-ui";
+  }
+  if (normalized === "telegram") {
+    return "telegram";
+  }
+  if (normalized === "cli" || normalized === "terminal") {
+    return "cli";
+  }
+  if (normalized === "api") {
+    return "api";
+  }
+  return value ? "unknown" : undefined;
 }
 
 function getApprovalData(
@@ -604,10 +778,6 @@ function normalizeApprovalStatus(eventType: string, status: string): AgentActivi
     return "failed";
   }
   return "info";
-}
-
-function getCommandTitle(toolName: string) {
-  return toolName ? `Ran ${toolName}` : "Ran command";
 }
 
 function makeActivityId(

@@ -1,11 +1,12 @@
 "use client";
 
-import { Activity, Database, FileText, FolderGit2, KeyRound, ShieldCheck } from "lucide-react";
+import { Activity, Database, FileText, FolderGit2, KeyRound, ShieldCheck, Terminal } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
+import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session } from "@/data/types";
@@ -89,7 +90,11 @@ export function ContextRail({
         ) : null}
 
         {activeTab === "tools" ? (
-          <ToolActivitySection hermesStatus={hermesStatus} toolEvents={toolEvents} />
+          <ToolActivitySection
+            activityEvents={activityEvents}
+            hermesStatus={hermesStatus}
+            toolEvents={toolEvents}
+          />
         ) : null}
         {activeTab === "files" ? <FilesSection artifacts={artifacts} hermesStatus={hermesStatus} /> : null}
       </div>
@@ -238,42 +243,85 @@ function RetrievedMemorySection({ memoryEvidence }: { memoryEvidence: Session["m
 }
 
 function ToolActivitySection({
+  activityEvents,
   hermesStatus,
   toolEvents
 }: {
+  activityEvents: AgentActivityEvent[];
   hermesStatus: NormalizedHermesStatus | null;
   toolEvents: Session["toolEvents"];
 }) {
   const toolState = hermesStatus?.uiCapabilities.tools.uiState ?? "unknown";
+  const commandEvents = activityEvents.filter((event) => event.type === "command").slice(-8);
   return (
-    <section className={styles.section} aria-labelledby="tool-activity-heading">
-      <SectionLabel id="tool-activity-heading" icon={<Activity size={13} />} label="Tool activity" />
-      {toolEvents.length === 0 ? (
-        <EmptyState
-          compact
-          title="No tool activity"
-          body={`Hermes stream tool events will appear here when emitted. Tool event UI is ${toolState}.`}
-        />
-      ) : (
-        <ul className={styles.list}>
-          {toolEvents.map((event) => (
-            <li className={styles.toolRow} data-status={event.status} key={event.id}>
-              <span className={styles.toolIcon} aria-hidden="true">
-                <Activity size={14} />
-              </span>
-              <span>
-                <span className={styles.cardTitle}>
-                  <span>{event.name}</span>
-                  <span className={styles.pill}>{event.status}</span>
+    <>
+      <section className={styles.section} aria-labelledby="command-activity-heading">
+        <SectionLabel id="command-activity-heading" icon={<Terminal size={13} />} label="Recent commands" />
+        {commandEvents.length === 0 ? (
+          <EmptyState compact title="No command activity" body="No command activity in this session yet." />
+        ) : (
+          <ul className={styles.list}>
+            {commandEvents.map((event) => (
+              <CommandActivityRow event={event} key={event.id} />
+            ))}
+          </ul>
+        )}
+      </section>
+      <section className={styles.section} aria-labelledby="tool-activity-heading">
+        <SectionLabel id="tool-activity-heading" icon={<Activity size={13} />} label="Tool activity" />
+        {toolEvents.length === 0 ? (
+          <EmptyState
+            compact
+            title="No tool activity"
+            body={`Hermes stream tool events will appear here when emitted. Tool event UI is ${toolState}.`}
+          />
+        ) : (
+          <ul className={styles.list}>
+            {toolEvents.map((event) => (
+              <li className={styles.toolRow} data-status={event.status} key={event.id}>
+                <span className={styles.toolIcon} aria-hidden="true">
+                  <Activity size={14} />
                 </span>
-                <span className={styles.cardBody}>{event.detail}</span>
-                <span className={styles.meta}>{event.time}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+                <span>
+                  <span className={styles.cardTitle}>
+                    <span>{event.name}</span>
+                    <span className={styles.pill}>{event.status}</span>
+                  </span>
+                  <span className={styles.cardBody}>{event.detail}</span>
+                  <span className={styles.meta}>{event.time}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
+  );
+}
+
+function CommandActivityRow({ event }: { event: AgentActivityEvent }) {
+  const command = extractCommandDetails(event);
+  const durationMs = computeActivityDuration(event);
+  return (
+    <li className={styles.commandRow} data-status={event.status}>
+      <span className={styles.toolIcon} aria-hidden="true">
+        <Terminal size={14} />
+      </span>
+      <span className={styles.commandContent}>
+        <span className={styles.cardTitle}>
+          <span>{event.title}</span>
+          <span className={styles.pill}>{event.status}</span>
+        </span>
+        <span className={styles.commandPreview}>
+          {command?.command ?? command?.outputPreview ?? command?.stdoutPreview ?? "Command output unavailable"}
+        </span>
+        <span className={styles.meta}>
+          {command?.exitCode !== undefined ? `exit ${command.exitCode}` : "exit unknown"}
+          {durationMs !== undefined ? ` - ${formatActivityDuration(durationMs)}` : ""}
+          {command?.sourceChannel ? ` - ${command.sourceChannel}` : ""}
+        </span>
+      </span>
+    </li>
   );
 }
 

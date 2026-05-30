@@ -164,6 +164,9 @@ Deliver:
 
 Goal: render command/tool output in a Codex-like, inspectable way.
 
+Status: completed in Slice 13L. See
+`docs/product/COMMAND_EXECUTION_DETAILS_13L.md`.
+
 Deliver:
 
 - command event detection;
@@ -186,12 +189,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13L - Command Execution Details/stdout/stderr UI.
+Slice 13M - Production-Grade Run History/Session Replay.
 
 Reason:
 
-- Slice 13K added a read-only Brain Memory event timeline in the right rail
-  without changing Hermes streaming or Brain Memory Gateway behavior.
-- Command/tool output is the next orchestration surface that needs compact
-  transcript rows and richer right-rail detail without unsafe execution or
-  storage shortcuts.
+- Slice 13L added first-class command detail rendering and recent command
+  summaries without adding browser command execution or backend changes.
+- The next orchestration gap is durable normalized run/session replay so users
+  can revisit transcript, activity, command, memory, approval, and artifact
+  history coherently.

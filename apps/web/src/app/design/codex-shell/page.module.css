@@ -1,5 +1,9 @@
 .shell {
-  --content-width: 846px;
+  --content-width: 973px;
+  --font-body: 16.1px;
+  --font-ui: 17.25px;
+  --font-title: 19.55px;
+  --icon-scale: 1.15;
   --canvas: #07080a;
   --window: #101114;
   --window-2: #15171b;
@@ -18,7 +22,7 @@
   grid-template-areas:
     "top top top"
     "left main right";
-  grid-template-columns: 340px minmax(760px, 1fr) 420px;
+  grid-template-columns: clamp(340px, 20.4vw, 391px) minmax(0, 1fr) clamp(420px, 25.2vw, 483px);
   grid-template-rows: 64px minmax(0, 1fr);
   height: 100dvh;
   min-height: 0;
@@ -28,12 +32,17 @@
     radial-gradient(circle at 42% -18%, rgba(92, 76, 148, 0.18), transparent 38%),
     linear-gradient(90deg, var(--rail-warm), var(--canvas) 32%, var(--canvas));
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--font-body);
 }
 
 .shell button,
 .shell textarea {
   font: inherit;
+}
+
+.shell svg {
+  transform: scale(var(--icon-scale));
+  transform-origin: center;
 }
 
 .topbar {
@@ -65,7 +74,7 @@
   min-height: 32px;
   padding: 0 10px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: var(--font-ui);
   font-weight: 400;
 }
 
@@ -112,7 +121,7 @@
   gap: 14px;
   min-height: 42px;
   margin-bottom: 36px;
-  font-size: 15px;
+  font-size: var(--font-ui);
 }
 
 .brandRow strong {
@@ -158,7 +167,7 @@
   justify-content: space-between;
   margin-bottom: 10px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--font-body);
   font-weight: 500;
 }
 
@@ -292,7 +301,7 @@
 .workspaceHeader h1,
 .panelHeader h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--font-title);
   font-weight: 560;
   line-height: 1.2;
 }
@@ -301,7 +310,7 @@
 .panelHeader p {
   margin: 7px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--font-body);
 }
 
 .warning {
@@ -389,7 +398,7 @@
 
 @keyframes spin {
   to {
-    transform: rotate(360deg);
+    transform: rotate(360deg) scale(var(--icon-scale));
   }
 }
 
@@ -530,7 +539,7 @@
 .panelSection h3 {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--font-body);
   font-weight: 500;
 }
 
@@ -589,7 +598,7 @@
 
 @media (max-width: 1280px) {
   .shell {
-    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-columns: 345px minmax(0, 1fr);
     grid-template-areas:
       "top top"
       "left main"

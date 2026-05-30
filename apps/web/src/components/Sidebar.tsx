@@ -109,7 +109,6 @@ export function Sidebar({
       <section className="sidebar-section" aria-labelledby="projects-heading">
         <div className="section-label" id="projects-heading">
           <span>Projects</span>
-          <span>{projects.length}</span>
         </div>
         <ul className="project-list">
           {projects.map((project) => (

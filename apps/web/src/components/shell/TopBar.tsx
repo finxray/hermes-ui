@@ -40,10 +40,22 @@ export function TopBar({
           <PanelToggleIcon side="left" />
         </label>
         <nav className={styles.menu} aria-label="Workspace sections">
-          {["Workspace", "Memory", "Projects", "Tools", "Help"].map((item) => (
+          <button
+            aria-current="page"
+            aria-label="Workspace section current"
+            className={`${styles.menuItem} ${styles.active}`}
+            title="Current workspace section"
+            type="button"
+          >
+            Workspace
+          </button>
+          {["Memory", "Projects", "Tools", "Help"].map((item) => (
             <button
-              className={`${styles.menuItem} ${item === "Workspace" ? styles.active : ""}`}
+              aria-label={`${item} section coming soon`}
+              className={styles.menuItem}
+              disabled
               key={item}
+              title={`${item} section navigation is coming soon.`}
               type="button"
             >
               {item}

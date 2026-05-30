@@ -28,10 +28,14 @@ Source-level UI smoke:
 
 - required shell/composer files exist,
 - left and right rail toggle labels are present,
+- current Workspace top menu label is present,
+- deferred top menu sections are disabled and labelled as coming soon,
 - settings control has a deterministic accessible label,
 - settings popover keeps an accessible dialog label,
 - right rail panel tabs expose deterministic accessible labels,
-- composer textarea and send button have accessible labels.
+- composer textarea and send button have accessible labels,
+- deferred composer controls are disabled and labelled as placeholders,
+- stop/cancel remains explicitly documented as deferred.
 
 Route/BFF smoke:
 

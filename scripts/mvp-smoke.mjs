@@ -122,6 +122,16 @@ async function checkSourceSmokeTargets() {
     "Top bar exposes right rail toggle labels."
   );
   checkSource(
+    "ui:top-menu-current-label",
+    topBar.includes('aria-label="Workspace section current"'),
+    "Top menu marks the current Workspace section explicitly."
+  );
+  checkSource(
+    "ui:top-menu-placeholders-disabled",
+    topBar.includes("section coming soon") && topBar.includes("disabled"),
+    "Deferred top menu sections are disabled and labelled as coming soon."
+  );
+  checkSource(
     "ui:settings-button-label",
     sidebar.includes('aria-label="Open settings and connection status"'),
     "Settings control has a deterministic accessible label."
@@ -148,6 +158,19 @@ async function checkSourceSmokeTargets() {
     "ui:composer-send-label",
     composer.includes("Send message"),
     "Composer send button has an accessible label."
+  );
+  checkSource(
+    "ui:composer-placeholders-disabled",
+    composer.includes("Attach context coming soon") &&
+      composer.includes("Selected model placeholder") &&
+      composer.includes("Voice input coming soon"),
+    "Deferred composer controls are disabled and labelled as placeholders."
+  );
+  checkSource(
+    "ui:composer-stop-placeholder",
+    composer.includes("Stop response coming soon") &&
+      composer.includes("real cancellation is deferred"),
+    "Composer stop state is explicitly documented as deferred."
   );
 }
 

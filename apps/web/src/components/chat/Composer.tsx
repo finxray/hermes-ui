@@ -52,15 +52,33 @@ export function Composer({
           />
           <div className={styles.controls} aria-label="Composer controls">
             <div className={styles.controlsLeft}>
-              <button className={styles.toolButton} type="button" aria-label="Attach context">
+              <button
+                className={styles.toolButton}
+                type="button"
+                aria-label="Attach context coming soon"
+                title="Attach context controls are coming soon."
+                disabled
+              >
                 <Plus size={17} />
               </button>
-              <button className={styles.modelButton} type="button" aria-label="Selected model">
+              <button
+                className={styles.modelButton}
+                type="button"
+                aria-label="Selected model placeholder"
+                title="Provider and model switching is coming soon."
+                disabled
+              >
                 {modelLabel}
               </button>
             </div>
             <div className={styles.controlsRight}>
-              <button className={styles.toolButton} type="button" aria-label="Voice input">
+              <button
+                className={styles.toolButton}
+                type="button"
+                aria-label="Voice input coming soon"
+                title="Voice input is coming soon."
+                disabled
+              >
                 <Mic size={16} />
               </button>
               <button
@@ -73,10 +91,10 @@ export function Composer({
                   .join(" ")}
                 type="submit"
                 disabled={disabled || isGenerating || draft.trim().length === 0}
-                aria-label={isGenerating ? "Stop response placeholder" : "Send message"}
+                aria-label={isGenerating ? "Stop response coming soon" : "Send message"}
                 title={
                   isGenerating
-                    ? "Stop response will be wired with streaming cancellation."
+                    ? "Stop response is not wired yet; real cancellation is deferred."
                     : undefined
                 }
               >

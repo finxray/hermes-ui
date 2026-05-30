@@ -1,6 +1,6 @@
 # Roadmap — Hermes UI + Brain Memory Studio
 
-Last updated: 2026-05-29  
+Last updated: 2026-05-30
 Target local path: `C:\Users\Alexey\.cursor\projects\hermes-ui`
 
 ## 1. Goal
@@ -71,6 +71,13 @@ production shell, Hermes live status/streaming path, project/session state,
 Brain Memory BFF mock/unconfigured behavior, route matrix, and regression check
 matrix are documented in
 `docs/checkpoints/MVP_CHECKPOINT_12A.md`.
+
+## Checkpoint: Slice 12D UI interaction contract
+
+Slice 12D captured the MVP UI interaction contract on 2026-05-30. The audit
+separates working behavior, mock/local behavior, placeholders, broken controls,
+and hidden/removed controls so future slices can change behavior intentionally.
+The contract is documented in `docs/product/UI_INTERACTION_CONTRACT_12D.md`.
 
 ## 5. Recommended technical direction
 

@@ -4,14 +4,15 @@ Date: 2026-05-30
 
 ## Purpose
 
-This document proposes a stable frontend event model for Hermes-native agent
-activity. It is a docs-only contract for future implementation.
+This document defines the stable frontend event model for Hermes-native agent
+activity. Slice 13D added the first runtime type and mapping helpers; see
+`docs/product/AGENT_ACTIVITY_EVENT_MODEL_13D.md`.
 
 The model should let the UI render chat text, reasoning, tools, commands,
 memory, files, approvals, errors, elapsed time, and status updates without
 binding React components directly to raw Hermes event payloads.
 
-## Proposed Type
+## Runtime Type
 
 ```ts
 type AgentActivityEvent = {
@@ -25,43 +26,43 @@ type AgentActivityEvent = {
     | "approval"
     | "error"
     | "elapsed"
-    | "status";
+    | "status"
+    | "stream";
   status:
     | "queued"
     | "running"
     | "completed"
     | "failed"
     | "cancelled"
-    | "waiting_for_approval";
+    | "waiting_for_approval"
+    | "info";
   title: string;
   summary?: string;
   startedAt?: string;
   completedAt?: string;
   durationMs?: number;
-  details?: Record<string, unknown>;
+  details?: unknown;
   collapsedByDefault: boolean;
-  source: "Hermes" | "Brain Memory" | "UI" | "MCP";
+  source: "hermes" | "brain-memory" | "ui" | "mcp" | "unknown";
   hermes?: {
     sessionId?: string;
     runId?: string;
     eventType?: string;
     toolName?: string;
+    toolCallId?: string;
     messageId?: string;
-    seq?: number;
   };
   memory?: {
     memoryId?: string;
     projectKey?: string;
     sessionKey?: string;
     scopeStatus?: string;
-    layer?: string;
-    source?: string;
+    operation?: string;
   };
   artifact?: {
     fileId?: string;
     path?: string;
     kind?: string;
-    action?: string;
   };
   metadata?: Record<string, unknown>;
 };
@@ -80,6 +81,7 @@ type AgentActivityEvent = {
 | `error` | Explain failure/retry state. | Hermes `error`, `run.failed`, tool failed events. | Expanded summary, raw collapsed. |
 | `elapsed` | Mark time spent. | UI derived from start/end timestamps. | Separator row. |
 | `status` | Show lifecycle/status transitions. | Hermes run/session stream events. | Compact row or rail badge. |
+| `stream` | Track low-level stream lifecycle when useful. | UI-facing BFF stream events. | Compact or hidden. |
 
 ## Status Semantics
 
@@ -91,6 +93,7 @@ type AgentActivityEvent = {
 | `failed` | Work failed and may include retry details. |
 | `cancelled` | Hermes or the UI confirmed cancellation. |
 | `waiting_for_approval` | Work is blocked on a user approval response. |
+| `info` | Informational lifecycle event that is neither running nor terminal. |
 
 ## Mapping From Current Hermes UI Events
 
@@ -119,6 +122,12 @@ Proposed mapping:
 | `run_event` `run.completed` | `type: "status"`, `status: "completed"`. |
 | `error` | `type: "error"`, `status: "failed"`. |
 | `done` | Stream lifecycle marker, not usually rendered directly. |
+
+Slice 13D added runtime helpers in
+`apps/web/src/lib/agentActivityEvents.ts` that implement this mapping for the
+currently exposed UI-facing events. `ChatView` uses the mapper only to project
+`tool_event` and `run_event` into the existing compact `Session.toolEvents[]`
+state. It does not persist full `AgentActivityEvent` objects yet.
 
 ## Mapping From Hermes Run Events
 
@@ -205,7 +214,7 @@ Expanded by default:
 
 ## Non-Goals For This Slice
 
-- No runtime TypeScript type is added yet.
 - No BFF normalization change is made.
-- No UI component is changed.
+- No full activity timeline UI is added.
+- No persisted activity-event array is added to workspace state.
 - No approvals, stop/cancel, file upload, or memory mutation is implemented.

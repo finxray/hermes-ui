@@ -45,6 +45,9 @@ Deliver:
 
 Goal: introduce the stable activity model without changing production behavior.
 
+Status: completed in Slice 13D. See
+`docs/product/AGENT_ACTIVITY_EVENT_MODEL_13D.md`.
+
 Deliver:
 
 - runtime TypeScript type;
@@ -160,12 +163,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13D - AgentActivityEvent frontend type/model.
+Slice 13E - Render Hermes tool/memory events as Codex-like activity blocks.
 
 Reason:
 
-- Slice 13C made Hermes capability interpretation typed and visible to the UI.
-- The next orchestration risk is defining stable frontend activity events before
-  adding richer tool, memory, run, approval, command, and artifact rendering.
-- This keeps later UI work contract-driven without changing Hermes streaming
-  logic prematurely.
+- Slice 13D added a stable runtime event model and mapper.
+- The next orchestration risk is rendering real mapped tool and memory events
+  more usefully while preserving the current Hermes streaming path.
+- This prepares richer activity UI without jumping ahead to approvals, real
+  stop/cancel, provider switching, or artifact management.

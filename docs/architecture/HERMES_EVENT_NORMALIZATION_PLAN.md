@@ -8,7 +8,8 @@ Hermes UI should not bind React components directly to raw Hermes SSE frames.
 The BFF should normalize Hermes session, run, tool, approval, memory, and file
 signals into stable frontend events.
 
-This plan is docs-only. No runtime normalization code is changed in Slice 13A.
+Slice 13D added the first frontend runtime activity model and mapping helpers.
+The BFF stream normalizer itself is still unchanged.
 
 ## Current Normalized Events
 
@@ -50,6 +51,11 @@ The current normalizer does not yet fully cover Hermes-native orchestration:
 - File/artifact events are local mock metadata only.
 - The right rail and chat timeline share a small `ToolEvent` shape that is not
   rich enough for commercial-grade agent activity.
+
+Slice 13D reduces one gap by mapping the current `tool_event`, `run_event`, and
+`error` stream events into `AgentActivityEvent` objects in the frontend before
+projecting them back into the existing compact `ToolEvent` state. Full
+activity-event persistence and rendering remain future work.
 
 ## Target Normalization Boundary
 
@@ -177,6 +183,11 @@ Target memory event fields:
 
 Memory store/admin events must remain audited and Gateway-mediated. Do not add
 direct storage calls.
+
+Slice 13D frontend classification recognizes Brain Memory-like tool names such
+as `memory_store`, `memory_search`, and `memory_health_check` and maps them to
+memory activity labels. This is classification only; no memory mutation/admin UI
+or direct storage access is added.
 
 ## File And Artifact Mapping
 

@@ -151,6 +151,18 @@ headers. Hermes streaming, Brain Memory BFF logic, memory scope bridge behavior,
 stable keys, and admin/mutation boundaries remain unchanged. See
 `docs/architecture/HERMES_CAPABILITY_MAPPING_13C.md`.
 
+## Checkpoint: Slice 13D AgentActivityEvent model
+
+Slice 13D added the first runtime `AgentActivityEvent` frontend type and Hermes
+stream mapping helpers on 2026-05-30. Current `tool_event`, `run_event`, and
+`error` stream events can now be normalized into a stable activity model with
+Brain Memory tool classification, command-like detection, run/status mapping,
+elapsed-event support, and redacted raw details. The UI still projects mapped
+events into the existing compact session `toolEvents` state; no persisted
+workspace schema change, Hermes streaming change, Brain Memory BFF change, or
+memory mutation/admin action was added. See
+`docs/product/AGENT_ACTIVITY_EVENT_MODEL_13D.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

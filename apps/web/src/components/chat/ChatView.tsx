@@ -3,11 +3,13 @@ import { useRef, useState } from "react";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { Composer } from "@/components/chat/Composer";
+import { createActivityEventFromHermesStreamEvent } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
-import type { HermesChatStreamEvent, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { ChatMessage, ModelChoice, Project, Session, ToolEvent } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
+import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
@@ -132,7 +134,10 @@ export function ChatView({
               activeProject.memoryScope.stableProjectKey
             ]);
           } else if (event.type === "tool_event" || event.type === "run_event") {
-            workspaceActions.appendToolEvent(session.id, toToolEvent(event));
+            const activityEvent = createActivityEventFromHermesStreamEvent(event);
+            if (activityEvent) {
+              workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
+            }
           } else if (event.type === "error") {
             hadStreamError = true;
             accumulated = event.error.message;
@@ -232,46 +237,30 @@ function mockUnavailableResponse(
   return "Hermes is currently unreachable. Your message stayed in this local session; retry after the status panel reports connected.";
 }
 
-function toToolEvent(
-  event:
-    | Extract<HermesChatStreamEvent, { type: "tool_event" }>
-    | Extract<HermesChatStreamEvent, { type: "run_event" }>
-): ToolEvent {
+function toToolEvent(event: AgentActivityEvent): ToolEvent {
   const now = currentTimeLabel();
-  if (event.type === "tool_event") {
-    return {
-      id: `tool-${crypto.randomUUID()}`,
-      name: event.name,
-      status: event.status,
-      detail: describePayload(event.payload),
-      time: now
-    };
-  }
-
   return {
     id: `tool-${crypto.randomUUID()}`,
-    name: event.name,
+    name: event.title,
     status: normalizeToolStatus(event.status),
-    detail: describePayload(event.payload),
+    detail: event.summary ?? describeActivity(event),
     time: now
   };
 }
 
-function normalizeToolStatus(status: string): ToolEvent["status"] {
-  if (status === "started" || status === "completed" || status === "failed") {
+function normalizeToolStatus(status: AgentActivityEvent["status"]): ToolEvent["status"] {
+  if (status === "running") {
+    return "started";
+  }
+  if (status === "completed" || status === "failed") {
     return status;
   }
   return "pending";
 }
 
-function describePayload(payload: Record<string, unknown>) {
-  const preview = payload.preview;
-  if (typeof preview === "string" && preview.trim()) {
-    return preview;
+function describeActivity(event: AgentActivityEvent) {
+  if (event.type === "memory" && event.memory?.operation) {
+    return `Memory ${event.memory.operation} activity`;
   }
-  const message = payload.message;
-  if (typeof message === "string" && message.trim()) {
-    return message;
-  }
-  return "Normalized Hermes stream event";
+  return "Normalized Hermes activity event";
 }

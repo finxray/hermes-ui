@@ -25,6 +25,7 @@ const report = {
     baseUrl: args.baseUrl,
     check: args.check,
     devCommand: args.devCommand,
+    help: args.help,
     json: args.json,
     noPortScan: args.noPortScan,
     open: args.open,
@@ -74,6 +75,11 @@ const report = {
 await main();
 
 async function main() {
+  if (args.help) {
+    printHelp();
+    return;
+  }
+
   for (const arg of args.unknown) {
     addCheck("cli-args", "fail", `Unknown argument: ${arg}`);
   }
@@ -172,6 +178,7 @@ function parseArgs(values) {
     baseUrl: "",
     check: false,
     devCommand: false,
+    help: false,
     json: false,
     noPortScan: false,
     open: false,
@@ -186,7 +193,9 @@ function parseArgs(values) {
 
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index];
-    if (value === "--check") {
+    if (value === "--help" || value === "-h") {
+      parsed.help = true;
+    } else if (value === "--check") {
       parsed.check = true;
     } else if (value === "--base-url") {
       parsed.baseUrl = values[index + 1] || "";
@@ -1390,6 +1399,46 @@ function addCommand(name, status, command, detail) {
     name,
     status
   });
+}
+
+function printHelp() {
+  console.log(`Brain Memory Studio launcher
+============================
+
+Purpose:
+  Safe local checklist for the Web UI, Hermes status, optional Brain Memory
+  state, stale Next static chunks, smoke commands, and browser open flow.
+
+Usage:
+  node scripts/studio-launch.mjs [flags]
+  npm run studio:launch -- [flags]
+
+Flags:
+  --help                         Print this help and exit without diagnostics.
+  --check                        Run launcher checks (default behavior).
+  --open                         Open the selected Studio URL in the browser.
+  --smoke                        Run MVP route/BFF and markdown smokes.
+  --ui-smoke                     Run the browser interaction smoke.
+  --require-hermes               Fail unless Hermes is real/reachable via BFF.
+  --require-brain-memory         Fail unless Brain Memory is real/reachable via BFF.
+  --base-url <url>               Select the Web UI URL for checks and smokes.
+  --no-port-scan                 Skip nearby localhost Studio port diagnostics.
+  --json                         Print the structured launcher report as JSON.
+  --verbose                      Include extra failure detail in text output.
+  --dev-command                  Print npm run dev as a next command only.
+  --recovery                     Emphasize print-only recovery commands.
+
+Examples:
+  npm run studio:launch -- --check
+  npm run studio:launch -- --check --base-url http://127.0.0.1:3000
+  npm run studio:launch -- --check --recovery
+  npm run studio:launch -- --open
+  npm run studio:launch -- --check --smoke --ui-smoke --base-url http://127.0.0.1:3000
+
+Safety:
+  The launcher does not kill processes, delete .next, start or stop services,
+  start or stop Docker, modify ~/.hermes, write env files, install services,
+  print API keys, or implement export/import. Recovery commands are print-only.`);
 }
 
 function printReport() {

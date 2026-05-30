@@ -39,13 +39,16 @@ npm install
 npm run studio:env -- --mode web-ui-with-hermes
 npm run dev
 npm run studio:launch -- --check
+npm run check:studio-launch
 npm run studio:launch -- --open
 ```
 
 The local launcher is a safe checklist for daily use. It checks env, Web UI,
 Hermes, optional Brain Memory state, stale Next static chunks, and prints next
 commands. It does not install or start Hermes/Brain Memory, does not kill
-servers, and does not implement export/import.
+servers, and does not implement export/import. Use
+`npm run studio:launch -- --help` for launcher flags and
+`npm run check:studio-launch` for the launcher help/JSON/safety contract.
 
 Manual smoke path:
 
@@ -76,7 +79,8 @@ troubleshooting, browser scaling notes, and secrets guidance, see
 `docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
 
 For the launcher details, flags, safety boundaries, and relationship to the
-future one-command CLI, see `docs/packaging/STUDIO_LAUNCHER_14A.md`.
+future one-command CLI, see `docs/packaging/STUDIO_LAUNCHER_14A.md` and
+`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.
 
 1. Install dependencies:
 

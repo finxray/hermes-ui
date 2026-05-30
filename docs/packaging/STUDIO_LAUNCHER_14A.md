@@ -256,3 +256,17 @@ Detailed behavior is documented in
 The Slice 14A safety boundary remains unchanged: the launcher still does not
 install, start, stop, kill, delete, mutate external services, change backend
 logic, or implement export/import.
+
+## Slice 14H Follow-Up
+
+Slice 14H added `--help` output and a safe launcher contract check:
+
+```powershell
+npm run studio:launch -- --help
+npm run check:studio-launch
+```
+
+The contract check verifies help coverage, selected base URL handling, JSON
+report fields, print-only recovery wording, secret redaction shape, and the
+non-destructive launcher boundary. Detailed behavior is documented in
+`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.

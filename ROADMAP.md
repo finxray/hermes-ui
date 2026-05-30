@@ -384,6 +384,17 @@ deletion, service start/stop, backend logic change, Hermes/Brain Memory change,
 or export/import was added. See
 `docs/packaging/STUDIO_SMOKE_BASE_URL_HYGIENE_14G.md`.
 
+## Checkpoint: Slice 14H launcher contract tests and help output
+
+Slice 14H added `npm run studio:launch -- --help` and
+`npm run check:studio-launch` on 2026-05-31. The contract check verifies help
+coverage, selected base URL handling, JSON report fields, secret redaction
+shape, print-only recovery guidance, package script wiring, and the
+non-destructive launcher safety boundary. It does not start/stop services,
+delete `.next`, modify env files, change backend/Hermes/Brain Memory logic, or
+implement export/import. See
+`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

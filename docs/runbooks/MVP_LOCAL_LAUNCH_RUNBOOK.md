@@ -24,7 +24,9 @@ the deferred production one-command CLI.
 | `npm run studio:env -- --mode web-ui-with-hermes` | Creates `apps/web/.env.local` for Web UI plus live Hermes. Refuses to overwrite without `--force`. |
 | `npm run studio:doctor` | Checks repo shape, env, Hermes status, Brain Memory status, and BFF reachability without printing secrets. |
 | `npm run studio:launch` | Safe launcher/checklist for env, Web UI, Hermes, Brain Memory mock/live state, stale static chunks, optional smoke, and browser open. |
+| `npm run studio:launch -- --help` | Prints launcher usage, examples, flags, and safety boundaries without running diagnostics. |
 | `npm run studio:launch:smoke` | Runs launcher checks plus route/BFF and browser smokes. |
+| `npm run check:studio-launch` | Verifies the launcher help, base URL, JSON, redaction, recovery, and safety contract. |
 | `npm run dev` | Starts the Next.js Web UI on port 3000. |
 | `npm run studio:open` | Opens `http://127.0.0.1:3000` in the local browser. |
 | `npm run smoke:mvp` | Runs source, route, BFF, Hermes stream-if-live, and Brain Memory normalization smoke. |
@@ -116,6 +118,7 @@ The launcher is a non-destructive local checklist. By default it:
 Useful variants:
 
 ```powershell
+npm run studio:launch -- --help
 npm run studio:launch -- --check --verbose
 npm run studio:launch -- --check --base-url http://127.0.0.1:3000
 npm run studio:launch -- --check --recovery
@@ -133,6 +136,8 @@ processes, delete `.next`, print API keys, or implement export/import. See
 `docs/packaging/STUDIO_LAUNCHER_14A.md` and
 `docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`. Guided recovery is
 documented in `docs/packaging/STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md`.
+Launcher help and contract checks are documented in
+`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.
 
 ## Web UI Standalone / Mock Mode
 
@@ -240,6 +245,7 @@ Do not add direct browser-to-Gateway calls or direct storage access.
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Live Brain Memory Gateway gate. |
 | `npm run check:workspace-state` | Project/session reducer and local state contract. |
 | `npm run check:brain-memory-client` | Brain Memory client response shape contract. |
+| `npm run check:studio-launch` | Studio launcher help, JSON shape, base URL, redaction, recovery, and safety contract. |
 | `npm run check:ui-structure` | UI component structure and accessibility markers. |
 | `npm run typecheck` | TypeScript validation. |
 | `npm run build` | Production Next.js build. |

@@ -26,6 +26,7 @@ export function AppShell() {
     >
       <input
         aria-hidden="true"
+        checked={leftCollapsed}
         className={`${styles.toggleInput} ${styles.leftToggle}`}
         id="studio-left-rail-toggle"
         onChange={(event) => setLeftCollapsed(event.currentTarget.checked)}
@@ -34,6 +35,7 @@ export function AppShell() {
       />
       <input
         aria-hidden="true"
+        checked={rightCollapsed}
         className={`${styles.toggleInput} ${styles.rightToggle}`}
         id="studio-right-rail-toggle"
         onChange={(event) => setRightCollapsed(event.currentTarget.checked)}

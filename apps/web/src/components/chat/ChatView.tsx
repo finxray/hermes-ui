@@ -156,7 +156,7 @@ export function ChatView({
               "Hermes session stream",
               activeProject.memoryScope.stableProjectKey
             ]);
-          } else if (event.type === "tool_event" || event.type === "run_event") {
+          } else if (event.type === "tool_event" || event.type === "run_event" || event.type === "approval_event") {
             const activityEvent = createActivityEventFromHermesStreamEvent(event, {
               now: new Date().toISOString()
             });

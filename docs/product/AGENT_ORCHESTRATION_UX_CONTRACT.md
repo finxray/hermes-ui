@@ -110,7 +110,7 @@ right-rail detail.
 | Tool execution row | Show tool lifecycle. | toolName, args preview, status, startedAt/completedAt, payload. | `tool.started`, `tool.completed`, `tool.failed`, run tool events. | Status icon and short summary; raw args hidden. | Partially implemented | 13E |
 | Memory event row | Show retrieval/store/update activity. | memory id, action, scope, result count, layer/source. | Hermes Brain Memory tool events and Brain Memory Gateway responses. | Visible scope and outcome; details expandable. | Planned | 13K |
 | File/artifact event row | Show file creation/update/read artifacts. | file id/path, kind, action, status, preview. | Tool events or future Hermes file/artifact API. | Opens right-rail artifact detail. | Future | 13I |
-| Approval request | Block on user permission. | runId, approval id/session key, action, risk, choices. | `approval.request`. | Prominent waiting row with choices. | Future | 13H |
+| Approval request | Block on user permission. | runId, approval id/session key, action, risk, choices. | `approval.request`. | Display-only waiting row on session stream; choices deferred until run-backed BFF route. | Partially implemented | 13H |
 | Retry/error row | Explain failures and retry state. | error kind, message, retryable, source, raw payload. | `error`, `run.failed`, tool failed events. | Red/amber row with details collapsed. | Partially implemented | 13E |
 | Elapsed time separator | Explain long-running work duration. | startedAt, completedAt, durationMs. | UI derived from run/tool events. | Text separator such as `Worked for 2m 13s`. | Future | 13F |
 | Collapsed-by-default details | Prevent noisy timelines. | details payload, sensitive flag, default state. | All event types. | Details disclosure closed by default for raw payloads. | Planned | 13D |
@@ -118,7 +118,7 @@ right-rail detail.
 | Stdout/stderr preview | Show command output safely. | stdout, stderr, truncation, exit code. | Command/tool event payloads. | First lines inline; full output expanded. | Future | 13L |
 | Run summary | Summarize completed work. | runId, status, output, usage, counts, duration. | `run.completed`, polled run status. | Final row or right-rail summary. | Future | 13M |
 | Streaming status | Show active generation. | active run/message id, delta state, connection state. | session stream or run events. | Live status in composer/header. | Partially implemented | 13F |
-| Cancellation status | Confirm real stop/cancel result. | runId, requestedAt, completedAt, final status. | `/v1/runs/{id}/stop`, `run.cancelled`, polled run status. | Clear stopped/stopping/cancelled state. | Future | 13G |
+| Cancellation status | Confirm real stop/cancel result. | runId, requestedAt, completedAt, final status. | `/v1/runs/{id}/stop`, `run.cancelled`, polled run status. | Clear stopped/stopping/cancelled state. | Partially implemented | 13G |
 
 ## Orchestration Tools Surface
 

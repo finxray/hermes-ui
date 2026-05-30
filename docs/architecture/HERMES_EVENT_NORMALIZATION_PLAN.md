@@ -9,7 +9,7 @@ The BFF should normalize Hermes session, run, tool, approval, memory, and file
 signals into stable frontend events.
 
 Slice 13D added the first frontend runtime activity model and mapping helpers.
-The BFF stream normalizer itself is still unchanged.
+Slice 13H added `approval.*` preservation in the BFF stream normalizer.
 
 ## Current Normalized Events
 
@@ -22,6 +22,7 @@ type HermesChatStreamEvent =
   | { type: "message_done"; message: { role: "assistant"; content: string }; messageId?: string; runId?: string }
   | { type: "tool_event"; name: string; status: "started" | "completed" | "failed"; payload: object }
   | { type: "run_event"; name: string; status: string; payload: object }
+  | { type: "approval_event"; name: string; status: string; payload: object }
   | { type: "error"; error: { kind: string; message: string } }
   | { type: "done" };
 ```
@@ -31,6 +32,7 @@ Current upstream mapping:
 - `assistant.delta` -> `message_delta`
 - `assistant.completed` -> `message_done`
 - `tool.started`, `tool.completed`, `tool.failed` -> `tool_event`
+- `approval.*` -> `approval_event`
 - `run.*` -> `run_event`
 - `error` -> `error`
 - `done` -> `done`
@@ -44,7 +46,8 @@ The current normalizer does not yet fully cover Hermes-native orchestration:
 - `reasoning.available` is only visible indirectly when Hermes maps it to tool
   progress.
 - `/v1/runs/{id}/events` is not consumed.
-- `approval.request` and `approval.responded` are not represented.
+- `approval.request` and `approval.responded` are represented only as
+  display-only activity rows on the current session-stream path.
 - `run.cancelled` and real stop state are not represented.
 - Command stdout/stderr has no structured model.
 - Memory retrieval/store tool events are not normalized as memory events.
@@ -69,6 +72,11 @@ Slice 13G keeps the normalizer shape unchanged but adds an intentional
 client-abort path. When the user stops the current session stream, the UI
 records a `status` / `cancelled` activity titled `Stopped` with details marking
 `stopStrategy: "client_stream_abort"` and `serverSideRunStop: false`.
+
+Slice 13H adds normalized `approval_event` handling and display-only approval
+activity rows. It does not add approval action routes because the current
+production chat path uses `/api/sessions/{session_id}/chat/stream`, while
+Hermes approval responses are scoped to active `/v1/runs` records.
 
 ## Target Normalization Boundary
 

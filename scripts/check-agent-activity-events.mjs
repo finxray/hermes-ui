@@ -27,6 +27,10 @@ checkMemorySearch();
 checkGenericTool();
 checkCommandTool();
 checkRunEvent();
+checkApprovalRequested();
+checkApprovalResponded();
+checkApprovalDenied();
+checkApprovalWithoutId();
 checkErrorEvent();
 checkUnknownRunFallback();
 checkElapsedEvent();
@@ -151,6 +155,100 @@ function checkRunEvent() {
       event.title === "Run Started" &&
       event.hermes?.runId === "run-1",
     "run.started maps to a running status event."
+  );
+}
+
+function checkApprovalRequested() {
+  const event = activity.createActivityEventFromHermesApprovalEvent({
+    type: "approval_event",
+    name: "approval.request",
+    status: "request",
+    payload: {
+      approval_id: "approval-1",
+      choices: ["once", "session", "always", "deny"],
+      prompt: "Allow command npm test?",
+      risk_level: "medium",
+      run_id: "run-approval"
+    }
+  }, { id: "approval-requested", now: "2026-05-30T00:00:00.000Z" });
+
+  record(
+    "approval-requested",
+    event.type === "approval" &&
+      event.status === "waiting_for_approval" &&
+      event.title === "Approval required" &&
+      event.approval?.approvalId === "approval-1" &&
+      event.approval?.actionAvailable === false &&
+      event.approval?.unavailableReason === "Approval action unavailable in current stream path",
+    "approval.request maps to a waiting display-only approval event."
+  );
+}
+
+function checkApprovalResponded() {
+  const event = activity.createActivityEventFromHermesApprovalEvent({
+    type: "approval_event",
+    name: "approval.responded",
+    status: "responded",
+    payload: {
+      choice: "once",
+      resolved: 1,
+      run_id: "run-approval"
+    }
+  }, { id: "approval-responded", now: "2026-05-30T00:00:05.000Z" });
+
+  record(
+    "approval-responded",
+    event.type === "approval" &&
+      event.status === "completed" &&
+      event.title === "Approval responded" &&
+      event.approval?.decision === "once",
+    "approval.responded maps to a completed approval event with the chosen response."
+  );
+}
+
+function checkApprovalDenied() {
+  const event = activity.createActivityEventFromHermesRunEvent({
+    type: "run_event",
+    name: "approval.responded",
+    status: "deny",
+    payload: {
+      event: "approval.responded",
+      choice: "deny",
+      run_id: "run-denied"
+    }
+  }, { id: "approval-denied" });
+
+  record(
+    "approval-denied",
+    event.type === "approval" &&
+      event.status === "cancelled" &&
+      event.approval?.decision === "deny",
+    "denied approval responses stay visible as cancelled approval activity."
+  );
+}
+
+function checkApprovalWithoutId() {
+  const event = activity.createActivityEventFromHermesApprovalEvent({
+    type: "approval_event",
+    name: "approval.request",
+    status: "request",
+    payload: {
+      Authorization: "Bearer abc123",
+      message: "Approval needs Bearer abc123",
+      run_id: "run-no-id"
+    }
+  }, { id: "approval-no-id" });
+
+  const serialized = JSON.stringify(event);
+  record(
+    "approval-without-id",
+    event.type === "approval" &&
+      event.status === "waiting_for_approval" &&
+      event.approval?.approvalId === undefined &&
+      event.summary === "Approval needs Bearer [redacted]" &&
+      serialized.includes("[redacted]") &&
+      !serialized.includes("abc123"),
+    "approval events remain display-only and redacted even when Hermes omits an approval id."
   );
 }
 

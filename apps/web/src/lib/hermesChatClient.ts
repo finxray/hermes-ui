@@ -164,6 +164,7 @@ function isHermesChatStreamEvent(value: unknown): value is HermesChatStreamEvent
     type === "message_done" ||
     type === "tool_event" ||
     type === "run_event" ||
+    type === "approval_event" ||
     type === "error" ||
     type === "done"
   );

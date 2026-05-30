@@ -107,6 +107,7 @@ type HermesChatStreamEvent =
   | { type: "message_done"; ... }
   | { type: "tool_event"; ... }
   | { type: "run_event"; ... }
+  | { type: "approval_event"; ... }
   | { type: "error"; ... }
   | { type: "done" };
 ```
@@ -122,6 +123,8 @@ Proposed mapping:
 | `tool_event` status `failed` | `type: "tool"` or `error`, `status: "failed"`. |
 | `run_event` `run.started` | `type: "status"`, `status: "running"`. |
 | `run_event` `run.completed` | `type: "status"`, `status: "completed"`. |
+| `approval_event` `approval.request` | `type: "approval"`, `status: "waiting_for_approval"`. |
+| `approval_event` `approval.responded` | `type: "approval"`, `status: "completed"` or `cancelled` when denied. |
 | UI stream abort | `type: "status"`, `status: "cancelled"`, title `Stopped`. |
 | `error` | `type: "error"`, `status: "failed"`. |
 | `done` | Stream lifecycle marker, not usually rendered directly. |
@@ -137,6 +140,28 @@ Hermes sends, and generic/specific activity precedence so a running public
 activity row can replace the generic `Thinking...` row. Slice 13G added a
 display-only stopped/cancelled status activity for intentional client/BFF stream
 aborts on the current session-stream path.
+
+Slice 13H added `approval_event` normalization, an optional `approval` metadata
+object on `AgentActivityEvent`, and display-only approval activity rendering.
+Approval action controls remain deferred because the current production chat
+path is session-stream based while Hermes approval responses are run-scoped.
+
+Approval fields:
+
+```ts
+approval?: {
+  approvalId?: string;
+  action?: string;
+  choices?: string[];
+  decision?: string;
+  prompt?: string;
+  reason?: string;
+  respondedAt?: string;
+  riskLevel?: string;
+  actionAvailable: boolean;
+  unavailableReason?: string;
+}
+```
 
 ## Duration Semantics
 

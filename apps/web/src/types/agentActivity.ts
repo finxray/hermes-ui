@@ -48,6 +48,18 @@ export type AgentActivityEvent = {
     sessionKey?: string;
     scopeStatus?: string;
   };
+  approval?: {
+    approvalId?: string;
+    action?: string;
+    choices?: string[];
+    decision?: string;
+    prompt?: string;
+    reason?: string;
+    respondedAt?: string;
+    riskLevel?: string;
+    actionAvailable: boolean;
+    unavailableReason?: string;
+  };
   artifact?: {
     fileId?: string;
     path?: string;

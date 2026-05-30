@@ -78,16 +78,28 @@ function checkComponentSource() {
   );
   record(
     "metadata-rendering",
-    component.includes("projectKey") && component.includes("sessionKey") && component.includes("safeJson"),
-    "Component renders scope metadata and compact JSON details."
+    component.includes("projectKey") &&
+      component.includes("sessionKey") &&
+      component.includes("primary.approval?.approvalId") &&
+      component.includes("safeJson"),
+    "Component renders scope/approval metadata and compact JSON details."
+  );
+  record(
+    "approval-display-only",
+    component.includes("Approval action unavailable in current stream path") &&
+      component.includes("ShieldAlert") &&
+      !component.includes("onApprove") &&
+      !component.includes("onReject"),
+    "Approval activity renders as display-only until a BFF approval action route exists."
   );
   record(
     "status-styling",
       css.includes('data-status="running"') &&
       css.includes('data-status="failed"') &&
       css.includes('data-status="completed"') &&
-      css.includes('data-status="cancelled"'),
-    "CSS includes running, failed, completed, and cancelled status states."
+      css.includes('data-status="cancelled"') &&
+      css.includes('data-status="waiting_for_approval"'),
+    "CSS includes running, failed, completed, cancelled, and approval-waiting status states."
   );
   record(
     "no-dangerous-html",
@@ -125,6 +137,25 @@ async function checkHelperBehavior() {
       serialized.includes("[redacted]") &&
       !serialized.includes("abc123"),
     "Rendered activity inputs keep secret-like values redacted."
+  );
+
+  const approval = activity.createActivityEventFromHermesApprovalEvent({
+    type: "approval_event",
+    name: "approval.request",
+    status: "request",
+    payload: {
+      approval_id: "approval-1",
+      message: "Allow action?",
+      run_id: "run-approval"
+    }
+  }, { id: "render-approval" });
+
+  record(
+    "approval-helper",
+    approval.type === "approval" &&
+      approval.status === "waiting_for_approval" &&
+      approval.approval?.actionAvailable === false,
+    "Approval helper produces a waiting display-only activity event for rendering."
   );
 }
 

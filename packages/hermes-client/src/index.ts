@@ -405,6 +405,15 @@ export function normalizeHermesSseEvent(
     };
   }
 
+  if (eventName.startsWith("approval.")) {
+    return {
+      type: "approval_event",
+      name: eventName,
+      status: eventName.replace("approval.", ""),
+      payload: data
+    };
+  }
+
   if (eventName.startsWith("run.")) {
     return {
       type: "run_event",

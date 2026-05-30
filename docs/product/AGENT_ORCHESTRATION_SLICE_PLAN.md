@@ -103,13 +103,18 @@ Deliver:
 
 Goal: represent Hermes approval requests safely.
 
+Status: completed in Slice 13H. See
+`docs/product/APPROVALS_UX_13H.md`.
+
 Deliver:
 
-- BFF approval response route;
-- approval request row;
-- choices: once, session, always, deny;
-- waiting state and post-response state;
-- audit-friendly details.
+- discovered run-scoped Hermes approval surface;
+- display-only approval request/response activity rows;
+- choices documented: once, session, always, deny;
+- waiting state and post-response state mapping;
+- audit-friendly redacted details;
+- BFF approval response route deferred until chat uses a run-backed control
+  plane.
 
 ### 13I - Files/Artifacts Panel
 
@@ -172,11 +177,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13H - Approvals UX.
+Slice 13I - Files/Artifacts Panel.
 
 Reason:
 
-- Slice 13G added an honest session-stream stop behavior with client/BFF abort
-  and a cancelled activity marker.
-- The next advertised Hermes orchestration capability that remains deferred is
-  approval request/response handling through BFF-mediated routes.
+- Slice 13H safely represents approval events without adding unsupported
+  approval actions on the session-stream path.
+- The next listed orchestration surface is files/artifacts, which can be scoped
+  as inspectable output without changing Hermes streaming, Brain Memory
+  mutation, or approval control-plane behavior.

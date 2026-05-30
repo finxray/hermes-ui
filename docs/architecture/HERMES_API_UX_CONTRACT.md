@@ -453,6 +453,17 @@ UI contract:
 - Send approval responses only through a BFF route.
 - Do not implement approvals until run support and BFF approval routes exist.
 
+Slice 13H status:
+
+- The UI now preserves `approval.*` stream frames as normalized
+  `approval_event` objects and renders display-only approval activity rows.
+- Current production chat still uses `/api/sessions/{session_id}/chat/stream`.
+  The inspected session-stream handler does not register or forward approval
+  gateway notifications.
+- No approval action route or approve/deny controls were added because Hermes'
+  action endpoint is run-scoped and requires an active `/v1/runs` approval
+  session.
+
 ## 9. Stop And Cancel
 
 Verified Hermes endpoint:

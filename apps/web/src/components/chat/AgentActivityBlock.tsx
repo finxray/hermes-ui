@@ -6,6 +6,7 @@ import {
   Database,
   Hammer,
   Info,
+  ShieldAlert,
   Terminal
 } from "lucide-react";
 import { computeActivityDuration, computeRunElapsed, formatActivityDuration } from "@/lib/agentActivityEvents";
@@ -71,6 +72,7 @@ function ActivityDetails({ group }: { group: ActivityGroup }) {
     source: event.source,
     hermes: event.hermes,
     memory: event.memory,
+    approval: event.approval,
     artifact: event.artifact,
     metadata: event.metadata,
     details: event.details
@@ -101,6 +103,9 @@ function ActivityDetails({ group }: { group: ActivityGroup }) {
           {primary.memory?.operation ? <Meta label="operation" value={primary.memory.operation} /> : null}
           {primary.memory?.projectKey ? <Meta label="project" value={primary.memory.projectKey} /> : null}
           {primary.memory?.sessionKey ? <Meta label="session" value={primary.memory.sessionKey} /> : null}
+          {primary.approval?.approvalId ? <Meta label="approval" value={primary.approval.approvalId} /> : null}
+          {primary.approval?.decision ? <Meta label="decision" value={primary.approval.decision} /> : null}
+          {primary.approval?.riskLevel ? <Meta label="risk" value={primary.approval.riskLevel} /> : null}
           {primary.hermes?.runId ? <Meta label="run" value={primary.hermes.runId} /> : null}
         </dl>
         <pre className={styles.pre}>{safeJson(detailPayload)}</pre>
@@ -146,6 +151,9 @@ function groupKey(event: AgentActivityEvent) {
   if (event.type === "tool" || event.type === "command") {
     return `${event.type}:${event.hermes?.toolCallId ?? event.hermes?.toolName ?? event.title}`;
   }
+  if (event.type === "approval") {
+    return `approval:${event.approval?.approvalId ?? event.hermes?.runId ?? event.hermes?.eventType ?? event.title}`;
+  }
   if (event.type === "status") {
     if (event.hermes?.runId) {
       return `status:run:${event.hermes.runId}`;
@@ -163,7 +171,13 @@ function groupStatus(events: AgentActivityEvent[]): AgentActivityStatus {
   if (events.some((event) => event.status === "failed")) {
     return "failed";
   }
-  if (events.some((event) => event.status === "waiting_for_approval")) {
+  if (events.some((event) => event.status === "cancelled")) {
+    return "cancelled";
+  }
+  if (
+    events.some((event) => event.status === "waiting_for_approval") &&
+    !events.some((event) => event.status === "completed")
+  ) {
     return "waiting_for_approval";
   }
   if (events.some((event) => event.status === "running")) {
@@ -179,6 +193,7 @@ function groupSummary(events: AgentActivityEvent[], primary: AgentActivityEvent)
   const eventCount = events.length > 1 ? `${events.length} events` : sourceLabel(primary);
   const subtitleParts = [
     primary.summary,
+    primary.type === "approval" ? approvalAvailabilityLabel(primary) : null,
     primary.type === "memory" ? memoryScopeLabel(primary) : null,
     eventCount
   ].filter(Boolean);
@@ -188,6 +203,13 @@ function groupSummary(events: AgentActivityEvent[], primary: AgentActivityEvent)
     subtitle: subtitleParts.join(" - "),
     title: primary.title
   };
+}
+
+function approvalAvailabilityLabel(event: AgentActivityEvent) {
+  if (event.approval?.actionAvailable) {
+    return null;
+  }
+  return event.approval?.unavailableReason ?? "Approval action unavailable in current stream path";
 }
 
 function memoryScopeLabel(event: AgentActivityEvent) {
@@ -215,6 +237,9 @@ function statusLabel(status: AgentActivityStatus) {
 function ActivityIcon({ status, type }: { status: AgentActivityStatus; type: AgentActivityType }) {
   if (status === "failed") {
     return <AlertTriangle size={15} />;
+  }
+  if (type === "approval") {
+    return <ShieldAlert size={15} />;
   }
   if (status === "running" || status === "queued") {
     return <CircleDashed size={15} />;

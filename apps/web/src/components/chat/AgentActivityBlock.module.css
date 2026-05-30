@@ -104,6 +104,11 @@
   color: var(--warning);
 }
 
+.block[data-status="waiting_for_approval"] .icon,
+.block[data-type="approval"] .title {
+  color: var(--warning);
+}
+
 .block[data-status="cancelled"] .icon {
   color: var(--text-muted);
 }

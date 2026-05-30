@@ -198,6 +198,12 @@ export type HermesChatStreamEvent =
       payload: Record<string, unknown>;
     }
   | {
+      type: "approval_event";
+      name: string;
+      status: string;
+      payload: Record<string, unknown>;
+    }
+  | {
       type: "error";
       error: HermesChatError;
     }

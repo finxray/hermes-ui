@@ -198,6 +198,18 @@ browser smoke covers the behavior. Brain Memory logic, memory scope bridge
 behavior, stable keys, and memory mutation/admin boundaries remain unchanged.
 See `docs/product/STOP_CANCEL_STREAMING_13G.md`.
 
+## Checkpoint: Slice 13H approvals UX
+
+Slice 13H added safe, display-only Hermes approval activity UX on 2026-05-30.
+The BFF now preserves `approval.*` stream frames as normalized approval events,
+the frontend activity model carries approval metadata, and the transcript can
+render waiting/responded/denied approval rows with redacted details. No approval
+action route or approve/deny controls were added because the current production
+chat path is session-stream based while Hermes approval responses are scoped to
+active `/v1/runs` records. Browser-to-Hermes, Brain Memory mutation/admin, and
+direct storage boundaries remain unchanged. See
+`docs/product/APPROVALS_UX_13H.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

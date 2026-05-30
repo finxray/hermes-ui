@@ -33,6 +33,9 @@ export function createActivityEventFromHermesStreamEvent(
   if (event.type === "run_event") {
     return createActivityEventFromHermesRunEvent(event, options);
   }
+  if (event.type === "approval_event") {
+    return createActivityEventFromHermesApprovalEvent(event, options);
+  }
   if (event.type === "error") {
     return createActivityEventFromHermesError(event, options);
   }
@@ -116,8 +119,8 @@ export function createActivityEventFromHermesRunEvent(
   options: ActivityOptions = {}
 ): AgentActivityEvent {
   const payload = event.payload ?? {};
-  const status = normalizeActivityStatus(event.status || event.name);
   const eventType = asString(payload.event) || event.name;
+  const status = normalizeApprovalStatus(eventType, event.status) ?? normalizeActivityStatus(event.status || event.name);
   const occurredAt = getPayloadTime(payload) ?? options.now;
   const type = activityTypeForRunEvent(eventType, status);
 
@@ -138,6 +141,37 @@ export function createActivityEventFromHermesRunEvent(
       sessionId: asString(payload.session_id),
       toolName: asString(payload.tool_name)
     },
+    approval: type === "approval" ? getApprovalData(payload, status) : undefined,
+    metadata: getActivityMetadata(payload)
+  };
+}
+
+export function createActivityEventFromHermesApprovalEvent(
+  event: Extract<HermesChatStreamEvent, { type: "approval_event" }>,
+  options: ActivityOptions = {}
+): AgentActivityEvent {
+  const payload = event.payload ?? {};
+  const eventType = asString(payload.event) || event.name;
+  const status = normalizeApprovalStatus(eventType, event.status) ?? normalizeActivityStatus(event.status || event.name);
+  const occurredAt = getPayloadTime(payload) ?? options.now;
+
+  return {
+    id: makeActivityId("approval", eventType, payload, options),
+    type: "approval",
+    status,
+    title: titleFromEventType(eventType, "approval"),
+    summary: getApprovalSummary(payload) ?? getPayloadSummary(payload),
+    startedAt: status === "waiting_for_approval" || status === "running" ? occurredAt : undefined,
+    completedAt: status === "completed" || status === "failed" || status === "cancelled" ? occurredAt : undefined,
+    collapsedByDefault: false,
+    details: redactActivityDetails(payload),
+    source: "hermes",
+    hermes: {
+      eventType,
+      runId: asString(payload.run_id),
+      sessionId: asString(payload.session_id)
+    },
+    approval: getApprovalData(payload, status),
     metadata: getActivityMetadata(payload)
   };
 }
@@ -358,7 +392,14 @@ function activityTypeForRunEvent(eventType: string, status: AgentActivityStatus)
 
 function titleFromEventType(eventType: string, type: AgentActivityType): string {
   if (type === "approval") {
-    return normalizeName(eventType).includes("responded") ? "Approval responded" : "Approval required";
+    const normalized = normalizeName(eventType);
+    if (normalized.includes("responded")) {
+      return "Approval responded";
+    }
+    if (normalized.includes("deny") || normalized.includes("reject")) {
+      return "Approval denied";
+    }
+    return "Approval required";
   }
   if (type === "error") {
     return "Run failed";
@@ -408,18 +449,111 @@ function getPayloadSummary(payload: Record<string, unknown>) {
   return undefined;
 }
 
+function getApprovalSummary(payload: Record<string, unknown>) {
+  for (const key of ["prompt", "question", "action", "requested_action", "command", "preview", "summary", "message"]) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) {
+      return redactText(value.trim());
+    }
+  }
+  return undefined;
+}
+
 function getPayloadTime(payload: Record<string, unknown>) {
   return asString(payload.ts) || asString(payload.timestamp) || asString(payload.time) || undefined;
 }
 
 function getActivityMetadata(payload: Record<string, unknown>): Record<string, unknown> | undefined {
   const metadata: Record<string, unknown> = {};
-  for (const key of ["seq", "message_id", "layer", "memory_layer", "result_count", "exit_code"]) {
+  for (const key of ["seq", "message_id", "layer", "memory_layer", "result_count", "exit_code", "approval_id", "choice", "risk_level", "resolved"]) {
     if (payload[key] !== undefined) {
       metadata[key] = redactActivityDetails(payload[key]);
     }
   }
   return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+function getApprovalData(
+  payload: Record<string, unknown>,
+  status: AgentActivityStatus
+): AgentActivityEvent["approval"] {
+  return {
+    action: asString(payload.action) ||
+      asString(payload.requested_action) ||
+      asString(payload.command) ||
+      asString(payload.tool_name) ||
+      undefined,
+    actionAvailable: false,
+    approvalId: asString(payload.approval_id) || asString(payload.approvalId) || asString(payload.id) || undefined,
+    choices: getStringList(payload.choices),
+    decision: getApprovalDecision(payload, status),
+    prompt: asString(payload.prompt) || asString(payload.question) || undefined,
+    reason: asString(payload.reason) || undefined,
+    respondedAt: asString(payload.responded_at) || asString(payload.respondedAt) || undefined,
+    riskLevel: asString(payload.risk_level) || asString(payload.riskLevel) || asString(payload.risk) || undefined,
+    unavailableReason: "Approval action unavailable in current stream path"
+  };
+}
+
+function getApprovalDecision(payload: Record<string, unknown>, status: AgentActivityStatus) {
+  const explicit =
+    asString(payload.choice) ||
+    asString(payload.decision) ||
+    asString(payload.response) ||
+    asString(payload.status);
+  if (explicit) {
+    return explicit;
+  }
+  if (typeof payload.approved === "boolean") {
+    return payload.approved ? "approve" : "deny";
+  }
+  if (status === "cancelled") {
+    return "deny";
+  }
+  return undefined;
+}
+
+function getStringList(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : undefined;
+}
+
+function normalizeApprovalStatus(eventType: string, status: string): AgentActivityStatus | null {
+  const combined = normalizeName(`${eventType} ${status}`);
+  if (!combined.includes("approval")) {
+    return null;
+  }
+  if (
+    combined.includes("deny") ||
+    combined.includes("denied") ||
+    combined.includes("reject") ||
+    combined.includes("rejected")
+  ) {
+    return "cancelled";
+  }
+  if (
+    combined.includes("responded") ||
+    combined.includes("approved") ||
+    combined.includes("allow") ||
+    combined.includes("once") ||
+    combined.includes("session") ||
+    combined.includes("always")
+  ) {
+    return "completed";
+  }
+  if (
+    combined.includes("request") ||
+    combined.includes("required") ||
+    combined.includes("waiting") ||
+    combined.includes("pending")
+  ) {
+    return "waiting_for_approval";
+  }
+  if (combined.includes("fail") || combined.includes("error")) {
+    return "failed";
+  }
+  return "info";
 }
 
 function getCommandTitle(toolName: string) {

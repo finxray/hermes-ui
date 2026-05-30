@@ -66,6 +66,40 @@ export type ToolEvent = {
   time: string;
 };
 
+export type RunRecordStatus = "running" | "completed" | "stopped" | "failed" | "cancelled";
+
+export type RunRecordSourceChannel = "web-ui" | "telegram" | "cli" | "api" | "unknown";
+
+export type RunActivitySummary = {
+  toolCount: number;
+  memoryCount: number;
+  commandCount: number;
+  approvalCount: number;
+  errorCount: number;
+};
+
+export type RunRecord = {
+  id: string;
+  projectId: string;
+  sessionId: string;
+  hermesSessionId: string;
+  hermesRunId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
+  sourceChannel: RunRecordSourceChannel;
+  status: RunRecordStatus;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  stoppedByUser?: boolean;
+  modelLabel?: string;
+  providerLabel?: string;
+  summary?: string;
+  metadata?: Record<string, unknown>;
+  activityEventIds: string[];
+  activitySummary: RunActivitySummary;
+};
+
 export type StudioArtifactKind =
   | "architecture"
   | "code"
@@ -127,6 +161,7 @@ export type Session = {
   messages: ChatMessage[];
   memoryEvidence: MemoryEvidence[];
   toolEvents: ToolEvent[];
+  runRecords: RunRecord[];
   artifacts: Artifact[];
 };
 

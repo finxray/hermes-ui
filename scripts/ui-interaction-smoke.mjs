@@ -387,6 +387,18 @@ async function checkRightRailTabs() {
         "Files tab exposes local/mock artifact source state."
       );
     }
+    if (name === "context") {
+      await expectVisible(
+        "right-rail-run-history",
+        page.getByText("Run history", { exact: true }).first(),
+        "Context tab exposes local Web UI run history."
+      );
+      await expectVisible(
+        "right-rail-run-history-empty-state",
+        page.getByText("No runs in this session yet", { exact: true }).first(),
+        "Run history empty state is honest before a send."
+      );
+    }
     if (name === "memory") {
       await expectVisible(
         "right-rail-memory-activity",
@@ -487,6 +499,7 @@ async function runLiveStopSmoke({ message, sendButton }) {
   const sendAgain = page.getByRole("button", { name: "Send message", exact: true });
   const sendAgainEnabled = await sendAgain.isEnabled();
   check("composer-send-after-stop", sendAgainEnabled, "User can type another message and Send is enabled after stop.");
+  await checkRunHistoryStatus("stopped", "composer-run-history-stopped");
 }
 
 async function runLiveSendSmoke({ message, sendButton }) {
@@ -534,6 +547,23 @@ async function runLiveSendSmoke({ message, sendButton }) {
     streamStatus
       ? `/api/hermes/chat/stream returned HTTP ${streamStatus}.`
       : "No /api/hermes/chat/stream response was observed."
+  );
+  await checkRunHistoryStatus("completed", "composer-run-history-completed");
+}
+
+async function checkRunHistoryStatus(expectedStatus, name) {
+  const contextTab = page.getByRole("button", { name: "Show context panel", exact: true });
+  await contextTab.click({ timeout: timeoutMs });
+  const runHistory = page.locator('section[aria-labelledby="run-history-heading"]');
+  await expectVisible(
+    `${name}-section`,
+    runHistory.getByText("Run history", { exact: true }).first(),
+    "Run history section is visible after live composer action."
+  );
+  await expectVisible(
+    name,
+    runHistory.getByText(expectedStatus, { exact: true }).first(),
+    `Run history includes a ${expectedStatus} Web UI run.`
   );
 }
 

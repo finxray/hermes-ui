@@ -35,6 +35,7 @@ checkDerivedTimestampFormatting();
 checkActiveStateRepair();
 checkNormalizationFillsMemoryScopes();
 checkNormalizationFillsTitleMetadata();
+checkRunRecordPersistence();
 checkArchiveRepairsActiveSession();
 checkResetReturnsValidState();
 
@@ -250,6 +251,131 @@ function checkNormalizationFillsTitleMetadata() {
 
   const manualNormalized = workspaceReducer(base, { type: "hydrate", state: manualLegacy });
   assert.equal(manualNormalized.sessions[0].titleSource, "manual");
+}
+
+function checkRunRecordPersistence() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const stableSessionKey = session.memoryScope.stableSessionKey;
+  const hermesSessionId = session.hermesSessionId;
+  const stableProjectKey = state.projects.find((project) => project.id === session.projectId)
+    ?.memoryScope.stableProjectKey;
+  const startedAt = "2026-05-30T10:00:00.000Z";
+  const completedAt = "2026-05-30T10:00:03.500Z";
+
+  state = workspaceReducer(state, {
+    type: "appendRunRecord",
+    sessionId: session.id,
+    run: {
+      id: "run-check",
+      projectId: session.projectId,
+      sessionId: session.id,
+      hermesSessionId,
+      userMessageId: "msg-user-check",
+      assistantMessageId: "msg-assistant-check",
+      sourceChannel: "web-ui",
+      status: "running",
+      startedAt,
+      modelLabel: "Hermes default",
+      providerLabel: "Hermes server config",
+      summary: "Check local run persistence",
+      activityEventIds: [],
+      activitySummary: {
+        approvalCount: 0,
+        commandCount: 0,
+        errorCount: 0,
+        memoryCount: 0,
+        toolCount: 0
+      }
+    }
+  });
+
+  let updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.runRecords.length, 1);
+  assert.equal(updated?.runRecords[0].status, "running");
+  assert.equal(updated?.runRecords[0].sourceChannel, "web-ui");
+
+  state = workspaceReducer(state, {
+    type: "updateRunRecord",
+    sessionId: session.id,
+    runId: "run-check",
+    patch: {
+      activityEventIds: ["activity-tool", "activity-memory", "activity-command"],
+      activitySummary: {
+        approvalCount: 1,
+        commandCount: 1,
+        errorCount: 0,
+        memoryCount: 1,
+        toolCount: 1
+      },
+      completedAt,
+      durationMs: 3500,
+      hermesRunId: "hermes-run-check",
+      status: "completed"
+    }
+  });
+
+  updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.runRecords[0].status, "completed");
+  assert.equal(updated?.runRecords[0].durationMs, 3500);
+  assert.equal(updated?.runRecords[0].activitySummary.memoryCount, 1);
+  assert.equal(updated?.runRecords[0].hermesRunId, "hermes-run-check");
+  assert.equal(updated?.memoryScope.stableSessionKey, stableSessionKey);
+  assert.equal(updated?.hermesSessionId, hermesSessionId);
+  assert.equal(
+    state.projects.find((project) => project.id === session.projectId)?.memoryScope.stableProjectKey,
+    stableProjectKey
+  );
+
+  state = workspaceReducer(state, {
+    type: "updateRunRecord",
+    sessionId: session.id,
+    runId: "run-check",
+    patch: {
+      completedAt,
+      status: "stopped",
+      stoppedByUser: true
+    }
+  });
+  updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.runRecords[0].status, "stopped");
+  assert.equal(updated?.runRecords[0].stoppedByUser, true);
+
+  state = workspaceReducer(state, {
+    type: "updateRunRecord",
+    sessionId: session.id,
+    runId: "run-check",
+    patch: {
+      status: "failed",
+      summary: "Hermes stream failed."
+    }
+  });
+  updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.runRecords[0].status, "failed");
+  assert.equal(updated?.runRecords[0].summary, "Hermes stream failed.");
+
+  const legacy = structuredClone(base);
+  delete legacy.sessions[0].runRecords;
+  const normalizedLegacy = workspaceReducer(base, { type: "hydrate", state: legacy });
+  assert.deepEqual(normalizedLegacy.sessions[0].runRecords, []);
+
+  const malformed = structuredClone(base);
+  malformed.sessions[0].runRecords = [
+    {
+      id: "run-malformed",
+      startedAt: "bad date",
+      status: "surprising",
+      sourceChannel: "unsupported",
+      activitySummary: {
+        commandCount: 2
+      },
+      activityEventIds: ["activity-1"]
+    }
+  ];
+  const normalizedMalformed = workspaceReducer(base, { type: "hydrate", state: malformed });
+  assert.equal(normalizedMalformed.sessions[0].runRecords[0].status, "completed");
+  assert.equal(normalizedMalformed.sessions[0].runRecords[0].sourceChannel, "unknown");
+  assert.equal(normalizedMalformed.sessions[0].runRecords[0].activitySummary.commandCount, 2);
 }
 
 function checkArchiveRepairsActiveSession() {

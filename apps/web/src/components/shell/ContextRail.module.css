@@ -201,6 +201,37 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
+.runHistory {
+  display: grid;
+  gap: 18px;
+}
+
+.runRow {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 3px;
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.runRow:hover,
+.runRow:focus-visible,
+.selectedRunRow {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.runDetail {
+  display: grid;
+  gap: 16px;
+  padding-top: 2px;
+}
+
 .toolRow,
 .commandRow,
 .artifactRow {

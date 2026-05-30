@@ -179,22 +179,38 @@ Deliver:
 
 Goal: let users revisit what happened in a run/session.
 
+Status: completed in Slice 13M. See
+`docs/product/RUN_HISTORY_SESSION_REPLAY_13M.md`.
+
 Deliver:
 
-- persisted normalized activity events where appropriate;
-- replay model for session transcript plus activity;
-- run summary;
-- failure/retry history;
-- export shape.
+- local persisted `RunRecord` metadata for Web UI-created sends;
+- replay foundation for session transcript plus compact run status/activity;
+- run summary with source channel, timestamps, optional Hermes run id, and
+  activity counts;
+- completed/stopped/failed status history for local Web UI runs;
+- export shape documented as deferred until persisted activity events exist.
+
+### 13N - Persisted Activity Event Replay And Export Shape
+
+Goal: preserve enough redacted activity detail to replay recent runs after
+refresh and export a trustworthy local session bundle.
+
+Deliver:
+
+- bounded persisted activity-event cache;
+- redaction/truncation normalization before persistence;
+- transcript plus run plus activity export shape;
+- refresh/reload replay smoke;
+- no backend persistence or cross-channel discovery.
 
 ## Recommended Next Slice
 
-Slice 13M - Production-Grade Run History/Session Replay.
+Slice 13N - Persisted Activity Event Replay And Export Shape.
 
 Reason:
 
-- Slice 13L added first-class command detail rendering and recent command
-  summaries without adding browser command execution or backend changes.
-- The next orchestration gap is durable normalized run/session replay so users
-  can revisit transcript, activity, command, memory, approval, and artifact
-  history coherently.
+- Slice 13M added compact local run records and a right-rail inspector without
+  changing Hermes streaming or backend storage.
+- Full replay still cannot survive refresh because complete `AgentActivityEvent`
+  payloads remain live React state only.

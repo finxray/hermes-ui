@@ -117,8 +117,25 @@ Recent chats are also sorted by `updatedAt` descending and are labelled as
 - a user message is appended;
 - an assistant message is updated/completed;
 - a tool event is appended;
+- a local Web UI run record is appended or updated;
 - a session is renamed;
 - a session is archived.
+
+## Run History Extension
+
+Slice 13M adds `Session.runRecords[]` as an additive local session-history
+field. It stores compact Web UI-created run metadata for replay/inspection:
+message ids, Hermes session id, optional Hermes run id, source channel, status,
+timestamps, model/provider labels, linked live activity event ids, and activity
+counts.
+
+This extension preserves the Slice 13B identity rules:
+
+- display title changes do not change stable keys;
+- run record append/update does not change stable keys;
+- run record append/update does not change `hermesSessionId`;
+- legacy sessions missing `runRecords` normalize to `[]`;
+- localStorage key and version remain unchanged.
 
 ## Timestamp Formatting
 
@@ -201,6 +218,7 @@ opt-in through `npm run smoke:ui:send`.
 - active repair after archived/missing session;
 - localStorage normalization fills title metadata;
 - session memory scope still uses stable key.
+- local run record append/update and normalization preserve stable keys.
 
 ## Checks Run
 

@@ -159,6 +159,12 @@ events. It adds a derived `MemoryTimelineItem` model for the Brain Memory rail.
 Full activity events remain React state only and are not persisted or replayed
 after refresh.
 
+Slice 13M adds local `RunRecord` metadata on `Session.runRecords[]` for Web
+UI-created sends. Run records persist compact status, source channel, linked
+message ids, optional Hermes run id, activity event ids, and activity counts.
+They do not persist full `AgentActivityEvent` payloads yet and do not discover
+Hermes/Telegram/CLI/API runs created outside the Web UI.
+
 Approval fields:
 
 ```ts
@@ -320,7 +326,7 @@ Expanded by default:
 ## Non-Goals For This Slice
 
 - No BFF normalization change is made.
-- No persisted activity timeline is added.
+- No persisted full activity timeline is added.
 - No persisted activity-event array is added to workspace state.
 - No approvals, stop/cancel, file upload, or memory mutation is implemented.
 - No hidden/private chain-of-thought is displayed. Future public reasoning

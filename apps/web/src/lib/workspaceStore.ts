@@ -5,6 +5,8 @@ import type {
   ProjectMemoryScope,
   PersistedWorkspaceState,
   Project,
+  RunActivitySummary,
+  RunRecord,
   Session,
   SessionMemoryScope,
   ToolEvent,
@@ -25,6 +27,8 @@ type WorkspaceAction =
   | { type: "renameSession"; sessionId: string; title: string }
   | { type: "archiveSession"; sessionId: string }
   | { type: "appendMessage"; sessionId: string; message: ChatMessage }
+  | { type: "appendRunRecord"; sessionId: string; run: RunRecord }
+  | { type: "updateRunRecord"; sessionId: string; runId: string; patch: Partial<RunRecord> }
   | {
       type: "updateMessage";
       sessionId: string;
@@ -65,6 +69,10 @@ export function workspaceReducer(
       return archiveSession(state, action.sessionId);
     case "appendMessage":
       return appendMessage(state, action.sessionId, action.message);
+    case "appendRunRecord":
+      return appendRunRecord(state, action.sessionId, action.run);
+    case "updateRunRecord":
+      return updateRunRecord(state, action.sessionId, action.runId, action.patch);
     case "updateMessage":
       return updateMessage(state, action);
     case "appendToolEvent":
@@ -213,6 +221,7 @@ function createSession(state: WorkspaceState): WorkspaceState {
     messages: [],
     memoryEvidence: [],
     toolEvents: [],
+    runRecords: [],
     artifacts: []
   };
 
@@ -311,6 +320,78 @@ function appendMessage(
     ...state,
     sessions: state.sessions.map((item) =>
       item.id === sessionId ? appendMessageToSession(item, message, now) : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
+function appendRunRecord(
+  state: WorkspaceState,
+  sessionId: string,
+  run: RunRecord
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session) {
+    return state;
+  }
+
+  const project = state.projects.find((item) => item.id === session.projectId);
+  const now = new Date().toISOString();
+  const normalizedRun = normalizeRunRecord(run, session, project);
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            runRecords: [
+              normalizedRun,
+              ...(item.runRecords ?? []).filter((record) => record.id !== normalizedRun.id)
+            ].slice(0, 24),
+            updatedAt: now
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
+function updateRunRecord(
+  state: WorkspaceState,
+  sessionId: string,
+  runId: string,
+  patch: Partial<RunRecord>
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  const existingRun = session?.runRecords?.find((record) => record.id === runId);
+  if (!session || !existingRun) {
+    return state;
+  }
+
+  const project = state.projects.find((item) => item.id === session.projectId);
+  const now = new Date().toISOString();
+  const mergedRun = normalizeRunRecord(
+    {
+      ...existingRun,
+      ...patch,
+      activityEventIds: patch.activityEventIds ?? existingRun.activityEventIds,
+      activitySummary: patch.activitySummary ?? existingRun.activitySummary
+    },
+    session,
+    project
+  );
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            runRecords: (item.runRecords ?? []).map((record) =>
+              record.id === runId ? mergedRun : record
+            ),
+            updatedAt: now
+          }
+        : item
     )
   };
   return touchProject(next, session.projectId, now);
@@ -432,9 +513,48 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     messages: session.messages ?? [],
     memoryEvidence: session.memoryEvidence ?? [],
     toolEvents: session.toolEvents ?? [],
+    runRecords: (session.runRecords ?? [])
+      .map((run) => normalizeRunRecord(run, session, project))
+      .slice(0, 24),
     artifacts: (session.artifacts ?? []).map((artifact) =>
       normalizeArtifact(artifact, session, project)
     )
+  };
+}
+
+function normalizeRunRecord(
+  run: Partial<RunRecord>,
+  session: Session,
+  project?: Project
+): RunRecord {
+  const id = asString(run.id) || `run-${session.id}`;
+  const startedAt = normalizeTimestamp(run.startedAt) || normalizeTimestamp(session.updatedAt) || new Date().toISOString();
+  const completedAt = normalizeTimestamp(run.completedAt);
+  const durationMs =
+    typeof run.durationMs === "number" && Number.isFinite(run.durationMs)
+      ? Math.max(0, Math.round(run.durationMs))
+      : computeDurationMs(startedAt, completedAt);
+
+  return {
+    id,
+    projectId: asString(run.projectId) || project?.id || session.projectId,
+    sessionId: asString(run.sessionId) || session.id,
+    hermesSessionId: asString(run.hermesSessionId) || session.hermesSessionId || `hermes-${session.id}`,
+    hermesRunId: asString(run.hermesRunId) || undefined,
+    userMessageId: asString(run.userMessageId) || undefined,
+    assistantMessageId: asString(run.assistantMessageId) || undefined,
+    sourceChannel: normalizeRunSourceChannel(run.sourceChannel),
+    status: normalizeRunStatus(run.status),
+    startedAt,
+    completedAt,
+    durationMs,
+    stoppedByUser: run.stoppedByUser === true,
+    modelLabel: asString(run.modelLabel) || undefined,
+    providerLabel: asString(run.providerLabel) || undefined,
+    summary: asString(run.summary) || undefined,
+    metadata: normalizeRecord(run.metadata),
+    activityEventIds: normalizeStringList(run.activityEventIds).slice(-80),
+    activitySummary: normalizeActivitySummary(run.activitySummary)
   };
 }
 
@@ -616,6 +736,75 @@ function normalizeArtifactStatus(value: unknown): Artifact["status"] {
     return normalized;
   }
   return "unavailable";
+}
+
+function normalizeRunStatus(value: unknown): RunRecord["status"] {
+  const normalized = asString(value).trim().toLowerCase();
+  if (
+    normalized === "running" ||
+    normalized === "completed" ||
+    normalized === "stopped" ||
+    normalized === "failed" ||
+    normalized === "cancelled"
+  ) {
+    return normalized;
+  }
+  return "completed";
+}
+
+function normalizeRunSourceChannel(value: unknown): RunRecord["sourceChannel"] {
+  const normalized = asString(value).trim().toLowerCase().replace(/[\s_]+/g, "-");
+  if (
+    normalized === "web-ui" ||
+    normalized === "telegram" ||
+    normalized === "cli" ||
+    normalized === "api" ||
+    normalized === "unknown"
+  ) {
+    return normalized;
+  }
+  return "unknown";
+}
+
+function normalizeActivitySummary(value: unknown): RunActivitySummary {
+  const source =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<RunActivitySummary>)
+      : {};
+  return {
+    approvalCount: normalizeCount(source.approvalCount),
+    commandCount: normalizeCount(source.commandCount),
+    errorCount: normalizeCount(source.errorCount),
+    memoryCount: normalizeCount(source.memoryCount),
+    toolCount: normalizeCount(source.toolCount)
+  };
+}
+
+function normalizeCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function normalizeStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function normalizeRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function normalizeTimestamp(value: unknown): string | undefined {
+  const text = asString(value);
+  return text && Number.isFinite(Date.parse(text)) ? text : undefined;
+}
+
+function computeDurationMs(startedAt?: string, completedAt?: string) {
+  if (!startedAt || !completedAt) {
+    return undefined;
+  }
+  const durationMs = Date.parse(completedAt) - Date.parse(startedAt);
+  return Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : undefined;
 }
 
 function asString(value: unknown): string {

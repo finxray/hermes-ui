@@ -342,6 +342,7 @@ export const sessions: Session[] = [
     messages: roadmapMessages,
     memoryEvidence,
     toolEvents,
+    runRecords: [],
     artifacts
   },
   {
@@ -361,6 +362,7 @@ export const sessions: Session[] = [
     messages: gatewayMessages,
     memoryEvidence: memoryEvidence.slice(0, 2),
     toolEvents: toolEvents.slice(1),
+    runRecords: [],
     artifacts: makeArtifacts("project-brain-memory", "session-memory-contract", [
       "artifact-adr",
       "artifact-contract"
@@ -383,6 +385,7 @@ export const sessions: Session[] = [
     messages: evidenceMessages,
     memoryEvidence: memoryEvidence.slice(1),
     toolEvents: toolEvents.slice(2),
+    runRecords: [],
     artifacts: makeArtifacts("project-brain-memory", "session-evidence-ui", [
       "artifact-contract",
       "artifact-brief"
@@ -405,6 +408,7 @@ export const sessions: Session[] = [
     messages: runsMessages,
     memoryEvidence: memoryEvidence.slice(0, 1),
     toolEvents,
+    runRecords: [],
     artifacts: makeArtifacts("project-hermes-agent", "session-runs-api")
   },
   {
@@ -426,6 +430,7 @@ export const sessions: Session[] = [
     messages: approvalMessages,
     memoryEvidence: memoryEvidence.slice(0, 1),
     toolEvents: toolEvents.slice(1),
+    runRecords: [],
     artifacts: makeArtifacts("project-hermes-agent", "session-approval-flow", ["artifact-adr"])
   },
   {
@@ -447,6 +452,7 @@ export const sessions: Session[] = [
     messages: packageMessages,
     memoryEvidence: memoryEvidence.slice(2),
     toolEvents: toolEvents.slice(1),
+    runRecords: [],
     artifacts: makeArtifacts("project-packaging", "session-desktop-package", ["artifact-brief"])
   },
   {
@@ -468,6 +474,7 @@ export const sessions: Session[] = [
     messages: runsMessages,
     memoryEvidence: memoryEvidence.slice(0, 1),
     toolEvents,
+    runRecords: [],
     artifacts: makeArtifacts("project-packaging", "session-audit-hermes-integration", [
       "artifact-adr",
       "artifact-contract"
@@ -490,6 +497,7 @@ export const sessions: Session[] = [
     messages: gatewayMessages,
     memoryEvidence: memoryEvidence.slice(0, 2),
     toolEvents,
+    runRecords: [],
     artifacts: makeArtifacts("project-brain-memory", "session-integrate-brain-memory", [
       "artifact-adr",
       "artifact-contract"
@@ -512,6 +520,7 @@ export const sessions: Session[] = [
     messages: evidenceMessages,
     memoryEvidence: memoryEvidence.slice(1),
     toolEvents: toolEvents.slice(1),
+    runRecords: [],
     artifacts: makeArtifacts("project-brain-memory", "session-config-parse-error", [
       "artifact-contract",
       "artifact-brief"

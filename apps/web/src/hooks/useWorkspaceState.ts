@@ -9,7 +9,7 @@ import {
   workspaceReducer,
   type WorkspaceAction
 } from "@/lib/workspaceStore";
-import type { ChatMessage, ToolEvent } from "@/data/types";
+import type { ChatMessage, RunRecord, ToolEvent } from "@/data/types";
 
 export function useWorkspaceState() {
   const [state, dispatch] = useReducer(workspaceReducer, undefined, createMockWorkspaceState);
@@ -41,6 +41,8 @@ export function useWorkspaceState() {
     () => ({
       appendMessage: (sessionId: string, message: ChatMessage) =>
         dispatch({ type: "appendMessage", sessionId, message }),
+      appendRunRecord: (sessionId: string, run: RunRecord) =>
+        dispatch({ type: "appendRunRecord", sessionId, run }),
       appendToolEvent: (sessionId: string, event: ToolEvent) =>
         dispatch({ type: "appendToolEvent", sessionId, event }),
       archiveSession: (sessionId: string) => dispatch({ type: "archiveSession", sessionId }),
@@ -54,6 +56,8 @@ export function useWorkspaceState() {
       reset: () => dispatch({ type: "reset" }),
       switchProject: (projectId: string) => dispatch({ type: "switchProject", projectId }),
       switchSession: (sessionId: string) => dispatch({ type: "switchSession", sessionId }),
+      updateRunRecord: (sessionId: string, runId: string, patch: Partial<RunRecord>) =>
+        dispatch({ type: "updateRunRecord", sessionId, runId, patch }),
       updateMessage: (
         sessionId: string,
         messageId: string,

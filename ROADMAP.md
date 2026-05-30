@@ -262,6 +262,18 @@ direct browser-to-Hermes/Gateway/storage path, Hermes streaming change, Brain
 Memory logic change, Telegram integration, or provider integration was added.
 See `docs/product/COMMAND_EXECUTION_DETAILS_13L.md`.
 
+## Checkpoint: Slice 13M run history and session replay foundation
+
+Slice 13M added a local Web UI run-history foundation on 2026-05-31. Sessions
+now persist compact `RunRecord` metadata for Web UI-created sends, including
+status, source channel, message ids, Hermes session id, optional Hermes run id,
+timestamps, provider/model labels, linked live activity event ids, and activity
+counts. The Context rail shows recent runs with an inspectable detail summary,
+and workspace/UI smokes cover empty, completed, stopped, failed, and legacy
+normalization states. Full activity event persistence, backend run history,
+cross-channel discovery, retry/rerun controls, and export remain deferred. See
+`docs/product/RUN_HISTORY_SESSION_REPLAY_13M.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

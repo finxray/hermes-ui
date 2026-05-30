@@ -153,6 +153,12 @@ object on `AgentActivityEvent`, and display-only approval activity rendering.
 Approval action controls remain deferred because the current production chat
 path is session-stream based while Hermes approval responses are run-scoped.
 
+Slice 13K lifts the live in-memory `AgentActivityEvent[]` buffer to the shell
+so the chat transcript and right rail can share the current session's activity
+events. It adds a derived `MemoryTimelineItem` model for the Brain Memory rail.
+Full activity events remain React state only and are not persisted or replayed
+after refresh.
+
 Approval fields:
 
 ```ts
@@ -256,6 +262,8 @@ Render in right rail:
 - raw event payloads;
 - stdout/stderr;
 - memory evidence and scopes;
+- recent read-only memory activity timeline derived from normalized
+  `AgentActivityEvent` objects;
 - files/artifacts;
 - approval history;
 - retries/failures.

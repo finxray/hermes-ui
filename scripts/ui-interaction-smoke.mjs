@@ -387,6 +387,18 @@ async function checkRightRailTabs() {
         "Files tab exposes local/mock artifact source state."
       );
     }
+    if (name === "memory") {
+      await expectVisible(
+        "right-rail-memory-activity",
+        page.getByText("Memory activity", { exact: true }).first(),
+        "Memory tab exposes the session memory activity timeline."
+      );
+      await expectVisible(
+        "right-rail-memory-empty-state",
+        page.getByText("No memory activity in this session yet.", { exact: true }).first(),
+        "Memory timeline empty state is honest when no session memory events exist."
+      );
+    }
   }
 }
 

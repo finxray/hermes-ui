@@ -9,11 +9,13 @@ import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session } from "@/data/types";
+import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ContextRail.module.css";
 
 type ContextRailProps = {
   activeProject: Project;
   activeSession: Session | null;
+  activityEvents: AgentActivityEvent[];
   brainMemoryStatus: NormalizedBrainMemoryStatus | null;
   hermesStatus: NormalizedHermesStatus | null;
   isBrainMemoryStatusLoading: boolean;
@@ -27,6 +29,7 @@ type PanelTab = "context" | "memory" | "tools" | "files";
 export function ContextRail({
   activeProject,
   activeSession,
+  activityEvents,
   brainMemoryStatus,
   hermesStatus,
   isBrainMemoryStatusLoading,
@@ -78,6 +81,7 @@ export function ContextRail({
           <BrainMemoryConsole
             activeProject={activeProject}
             activeSession={activeSession}
+            activityEvents={activityEvents}
             isStatusLoading={isBrainMemoryStatusLoading}
             onRefreshStatus={refreshBrainMemoryStatus}
             status={brainMemoryStatus}

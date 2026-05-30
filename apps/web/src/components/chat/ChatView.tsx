@@ -22,26 +22,29 @@ type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ChatViewProps = {
   activeProject: Project;
   activeSession: Session | null;
+  activityEvents: AgentActivityEvent[];
   createSession: () => void;
   hermesStatus: NormalizedHermesStatus | null;
   isHermesStatusLoading: boolean;
   modelChoices: ModelChoice[];
+  onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
   workspaceActions: WorkspaceActions;
 };
 
 export function ChatView({
   activeProject,
   activeSession,
+  activityEvents,
   createSession,
   hermesStatus,
   isHermesStatusLoading,
   modelChoices,
+  onActivityEvent,
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStopRequested, setIsStopRequested] = useState(false);
   const [assistantHasContent, setAssistantHasContent] = useState(false);
-  const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const stopRequestedRef = useRef(false);
@@ -230,10 +233,7 @@ export function ChatView({
   }
 
   function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
-    setActivityEventsBySession((current) => ({
-      ...current,
-      [sessionId]: [...(current[sessionId] ?? []), event].slice(-80)
-    }));
+    onActivityEvent(sessionId, event);
   }
 
   function appendElapsedActivityEvent(sessionId: string, startedAt: string, completedAt: string) {
@@ -284,7 +284,7 @@ export function ChatView({
     appendElapsedActivityEvent(sessionId, startedAt, stoppedAt);
   }
 
-  const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
+  const activeActivityEvents = activeSession ? activityEvents : [];
   const latestActivityEvent = activeActivityEvents.at(-1);
   const hasRunningActivity = latestActivityEvent ? isActiveActivityEvent(latestActivityEvent) : false;
 

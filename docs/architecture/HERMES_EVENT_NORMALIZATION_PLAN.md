@@ -78,6 +78,11 @@ activity rows. It does not add approval action routes because the current
 production chat path uses `/api/sessions/{session_id}/chat/stream`, while
 Hermes approval responses are scoped to active `/v1/runs` records.
 
+Slice 13K keeps the BFF normalizer unchanged and adds a right-rail Brain
+Memory event timeline derived from the frontend `AgentActivityEvent` model.
+The timeline consumes normalized memory events only; it does not inspect raw
+token deltas, call Gateway directly, or persist full activity events.
+
 ## Target Normalization Boundary
 
 Future boundary:
@@ -210,6 +215,11 @@ Slice 13D frontend classification recognizes Brain Memory-like tool names such
 as `memory_store`, `memory_search`, and `memory_health_check` and maps them to
 memory activity labels. This is classification only; no memory mutation/admin UI
 or direct storage access is added.
+
+Slice 13K renders those classified memory activity events in the right rail
+Memory tab as a compact read-only timeline. Supported display labels are
+`store`, `search`, `retrieve`, `health_check`, `update`, `delete`, and
+`unknown`. Update/delete remain classification labels only.
 
 ## File And Artifact Mapping
 

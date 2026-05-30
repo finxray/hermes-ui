@@ -108,7 +108,10 @@ async function checkSourceSmokeTargets() {
     "apps/web/src/components/shell/TopBar.tsx",
     "apps/web/src/components/shell/Sidebar.tsx",
     "apps/web/src/components/shell/ContextRail.tsx",
+    "apps/web/src/components/memory/BrainMemoryConsole.tsx",
     "apps/web/src/components/chat/Composer.tsx",
+    "apps/web/src/lib/memoryTimeline.ts",
+    "docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md",
     "docs/product/PROVIDER_MODEL_SELECTOR_13J.md"
   ];
 
@@ -124,6 +127,8 @@ async function checkSourceSmokeTargets() {
   const topBar = readFile("apps/web/src/components/shell/TopBar.tsx");
   const sidebar = readFile("apps/web/src/components/shell/Sidebar.tsx");
   const contextRail = readFile("apps/web/src/components/shell/ContextRail.tsx");
+  const memoryConsole = readFile("apps/web/src/components/memory/BrainMemoryConsole.tsx");
+  const memoryTimeline = readFile("apps/web/src/lib/memoryTimeline.ts");
   const composer = readFile("apps/web/src/components/chat/Composer.tsx");
 
   checkSource("ui:left-rail-toggle-label", topBar.includes("Collapse left sidebar"), "Top bar exposes left rail toggle labels.");
@@ -164,6 +169,21 @@ async function checkSourceSmokeTargets() {
     "ui:files-artifacts-disabled-download",
     contextRail.includes("Local/mock only") && contextRail.includes("Download unavailable"),
     "Files tab clearly distinguishes local/mock artifacts from unavailable downloads."
+  );
+  checkSource(
+    "ui:memory-activity-timeline",
+    memoryConsole.includes("Memory activity") &&
+      memoryConsole.includes("No memory activity in this session yet.") &&
+      memoryTimeline.includes("createMemoryTimelineItems") &&
+      memoryTimeline.includes("operation === \"delete\""),
+    "Memory tab exposes a read-only Brain Memory event timeline and honest empty state."
+  );
+  checkSource(
+    "ui:memory-timeline-no-direct-calls",
+    !memoryTimeline.includes("fetch(") &&
+      !memoryTimeline.includes("localStorage") &&
+      !memoryConsole.includes("/api/brain-memory"),
+    "Memory timeline derives from activity events without direct Gateway/storage calls."
   );
   checkSource(
     "ui:composer-textarea-label",

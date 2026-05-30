@@ -150,6 +150,9 @@ Deliver:
 
 Goal: make memory activity transparent.
 
+Status: completed in Slice 13K. See
+`docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md`.
+
 Deliver:
 
 - memory retrieval/store event rows from Hermes Brain Memory tool events;
@@ -183,12 +186,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13K - Brain Memory Event Timeline.
+Slice 13L - Command Execution Details/stdout/stderr UI.
 
 Reason:
 
-- Slice 13J established an honest server-configured provider/model foundation
-  and kept runtime switching disabled until a verified Hermes/BFF control path
-  exists.
-- Brain Memory event visibility is the next orchestration surface that can be
-  improved without adding memory mutation/admin actions.
+- Slice 13K added a read-only Brain Memory event timeline in the right rail
+  without changing Hermes streaming or Brain Memory Gateway behavior.
+- Command/tool output is the next orchestration surface that needs compact
+  transcript rows and richer right-rail detail without unsafe execution or
+  storage shortcuts.

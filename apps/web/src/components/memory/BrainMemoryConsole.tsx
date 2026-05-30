@@ -1,12 +1,18 @@
 "use client";
 
-import { Database, Search } from "lucide-react";
+import { Activity, Database, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { BrainMemoryStatusPanel } from "@/components/memory/BrainMemoryStatusPanel";
 import { ContextField, MemoryDetailPanel, ScopeSummary } from "@/components/memory/MemoryDetailPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useBrainMemorySearch } from "@/hooks/useBrainMemorySearch";
 import { useMemoryInspection } from "@/hooks/useMemoryInspection";
+import {
+  createMemoryTimelineItems,
+  formatMemoryOperation,
+  formatMemoryScope,
+  summarizeMemoryTimeline
+} from "@/lib/memoryTimeline";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type {
   BrainMemorySearchContext,
@@ -14,12 +20,15 @@ import type {
   NormalizedMemoryResult
 } from "@hermes-ui/brain-memory-client";
 import type { MemoryEvidence, Project, Session } from "@/data/types";
+import type { AgentActivityEvent } from "@/types/agentActivity";
+import type { MemoryTimelineItem } from "@/lib/memoryTimeline";
 import type { FormEvent } from "react";
 import styles from "./BrainMemoryConsole.module.css";
 
 type BrainMemoryConsoleProps = {
   activeProject: Project;
   activeSession: Session | null;
+  activityEvents: AgentActivityEvent[];
   status: NormalizedBrainMemoryStatus | null;
   isStatusLoading: boolean;
   onRefreshStatus: () => void;
@@ -28,6 +37,7 @@ type BrainMemoryConsoleProps = {
 export function BrainMemoryConsole({
   activeProject,
   activeSession,
+  activityEvents,
   status,
   isStatusLoading,
   onRefreshStatus
@@ -53,6 +63,23 @@ export function BrainMemoryConsole({
   const gatewayResults = lastResponse?.mode === "real" ? lastResponse.results : [];
   const shouldUseMock = !lastResponse || lastResponse.mode !== "real";
   const scope = lastResponse?.mode === "real" ? lastResponse.scope : null;
+  const memoryTimelineItems = useMemo(
+    () =>
+      createMemoryTimelineItems(activityEvents, {
+        projectKey: activeProject.memoryScope.stableProjectKey,
+        sessionKey: activeSession?.memoryScope.stableSessionKey
+      }).slice(-12),
+    [
+      activeProject.memoryScope.stableProjectKey,
+      activeSession?.memoryScope.stableSessionKey,
+      activityEvents
+    ]
+  );
+  const timelineSummary = useMemo(
+    () => summarizeMemoryTimeline(memoryTimelineItems),
+    [memoryTimelineItems]
+  );
+  const canInspectTimelineMemory = status?.mode === "real" && status.reachable === true;
 
   useEffect(() => {
     setQuery(activeSession?.memoryEvidence[0]?.title ?? activeProject.name);
@@ -125,6 +152,20 @@ export function BrainMemoryConsole({
           </div>
         </div>
       </section>
+
+      <MemoryTimelineSection
+        canInspectMemory={canInspectTimelineMemory}
+        items={memoryTimelineItems}
+        onInspectMemory={(memoryId) => {
+          setMockDetail(null);
+          setSelectedMemoryId(memoryId);
+          void inspect({
+            context,
+            memoryId
+          });
+        }}
+        summary={timelineSummary}
+      />
 
       <section className={styles.section} aria-labelledby="memory-search-heading">
         <div className={styles.sectionLabel} id="memory-search-heading">
@@ -203,6 +244,89 @@ export function BrainMemoryConsole({
         />
       ) : null}
     </>
+  );
+}
+
+function MemoryTimelineSection({
+  canInspectMemory,
+  items,
+  onInspectMemory,
+  summary
+}: {
+  canInspectMemory: boolean;
+  items: MemoryTimelineItem[];
+  onInspectMemory: (memoryId: string) => void;
+  summary: ReturnType<typeof summarizeMemoryTimeline>;
+}) {
+  return (
+    <section className={styles.section} aria-labelledby="memory-activity-heading">
+      <div className={styles.sectionLabel} id="memory-activity-heading">
+        <span>Memory activity</span>
+        <Activity size={13} aria-hidden="true" />
+      </div>
+      <div className={styles.timelineStats} aria-label="Memory activity summary">
+        <ContextField label="Events" value={String(summary.total)} />
+        <ContextField label="Running" value={String(summary.running)} />
+        <ContextField label="Failed" value={String(summary.failed)} />
+      </div>
+      {items.length === 0 ? (
+        <EmptyState compact title="No memory activity" body="No memory activity in this session yet." />
+      ) : (
+        <ol className={styles.timelineList}>
+          {items.map((item) => (
+            <MemoryTimelineRow
+              canInspectMemory={canInspectMemory}
+              item={item}
+              key={item.id}
+              onInspectMemory={onInspectMemory}
+            />
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function MemoryTimelineRow({
+  canInspectMemory,
+  item,
+  onInspectMemory
+}: {
+  canInspectMemory: boolean;
+  item: MemoryTimelineItem;
+  onInspectMemory: (memoryId: string) => void;
+}) {
+  const hasInspectAction = canInspectMemory && Boolean(item.memoryId);
+  return (
+    <li className={styles.timelineItem} data-status={item.status}>
+      <div className={styles.timelineDot} aria-hidden="true" />
+      <div className={styles.timelineBody}>
+        <div className={styles.cardTitle}>
+          <span>{formatMemoryOperation(item.operation)}</span>
+          <span className={styles.pill}>{item.status}</span>
+        </div>
+        <div className={styles.cardBody}>{item.summary ?? item.title}</div>
+        <div className={styles.meta}>
+          {formatMemoryScope(item.projectKey, item.sessionKey)}
+          {item.durationMs !== undefined ? ` - ${formatTimelineDuration(item.durationMs)}` : ""}
+        </div>
+        {item.memoryId ? <div className={styles.meta}>memory {item.memoryId}</div> : null}
+        {item.scopeStatus ? <div className={styles.meta}>scope {item.scopeStatus}</div> : null}
+        <details className={styles.metadata}>
+          <summary>Redacted details</summary>
+          <pre>{safeJson(item.details)}</pre>
+        </details>
+        {hasInspectAction ? (
+          <button
+            className={styles.linkAction}
+            type="button"
+            onClick={() => item.memoryId && onInspectMemory(item.memoryId)}
+          >
+            Inspect detail
+          </button>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -348,4 +472,19 @@ function GatewayMemoryResults({
 
 function formatScore(score: number | undefined) {
   return typeof score === "number" ? score.toFixed(2) : "n/a";
+}
+
+function formatTimelineDuration(durationMs: number) {
+  if (durationMs > 0 && durationMs < 1000) {
+    return "<1s";
+  }
+  const seconds = Math.max(0, Math.round(durationMs / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function safeJson(value: unknown) {
+  const text = JSON.stringify(value ?? {}, null, 2) ?? "{}";
+  return text.length > 2_400 ? `${text.slice(0, 2_400)}\n... truncated` : text;
 }

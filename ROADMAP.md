@@ -1,6 +1,6 @@
 # Roadmap — Hermes UI + Brain Memory Studio
 
-Last updated: 2026-05-30
+Last updated: 2026-05-31
 Target local path: `C:\Users\Alexey\.cursor\projects\hermes-ui`
 
 ## 1. Goal
@@ -234,6 +234,20 @@ placeholder model unless Hermes capabilities report verified client selection.
 Fast-stream constraints for future Cerebras/Kimi-like providers are documented
 without adding provider calls or credentials. See
 `docs/product/PROVIDER_MODEL_SELECTOR_13J.md`.
+
+## Checkpoint: Slice 13K Brain Memory event timeline
+
+Slice 13K added the first read-only Brain Memory event timeline on 2026-05-31.
+The app now shares live normalized `AgentActivityEvent` state between the chat
+transcript and right rail, derives compact `MemoryTimelineItem` rows for
+store/search/retrieve/health_check/update/delete/unknown operations, and shows
+the timeline in the Memory tab with collapsed redacted details and honest empty
+state behavior. Gateway status/search/detail remain separate and
+Gateway-mediated; optional memory detail click-through only uses the existing
+read-only BFF inspect route when Gateway is real/reachable. No memory
+mutation/admin actions, direct Gateway/storage paths, provider calls, or Hermes
+streaming changes were added. See
+`docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md`.
 
 ## 5. Recommended technical direction
 

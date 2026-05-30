@@ -9,7 +9,10 @@ const componentPath = resolve(root, "apps/web/src/components/chat/AgentActivityB
 const composerPath = resolve(root, "apps/web/src/components/chat/Composer.tsx");
 const cssPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.module.css");
 const chatViewPath = resolve(root, "apps/web/src/components/chat/ChatView.tsx");
+const appShellPath = resolve(root, "apps/web/src/components/shell/AppShell.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
+const memoryTimelinePath = resolve(root, "apps/web/src/lib/memoryTimeline.ts");
+const memoryConsolePath = resolve(root, "apps/web/src/components/memory/BrainMemoryConsole.tsx");
 const checks = [];
 
 checkFilesExist();
@@ -34,6 +37,8 @@ function checkFilesExist() {
   record("component-exists", existsSync(componentPath), "AgentActivityBlock component file exists.");
   record("composer-exists", existsSync(composerPath), "Composer component file exists.");
   record("css-exists", existsSync(cssPath), "AgentActivityBlock CSS module exists.");
+  record("memory-timeline-helper-exists", existsSync(memoryTimelinePath), "Memory timeline helper file exists.");
+  record("memory-console-exists", existsSync(memoryConsolePath), "Brain Memory console component file exists.");
 }
 
 function checkComponentSource() {
@@ -41,8 +46,11 @@ function checkComponentSource() {
     return;
   }
   const component = readFileSync(componentPath, "utf8");
+  const appShell = readFileSync(appShellPath, "utf8");
   const chatView = readFileSync(chatViewPath, "utf8");
   const composer = readFileSync(composerPath, "utf8");
+  const memoryConsole = readFileSync(memoryConsolePath, "utf8");
+  const memoryTimeline = readFileSync(memoryTimelinePath, "utf8");
   const css = readFileSync(cssPath, "utf8");
 
   record(
@@ -100,6 +108,33 @@ function checkComponentSource() {
     "Component renders scope/approval metadata and compact JSON details."
   );
   record(
+    "memory-timeline-right-rail",
+    memoryConsole.includes("Memory activity") &&
+      memoryConsole.includes("No memory activity in this session yet.") &&
+      memoryConsole.includes("createMemoryTimelineItems") &&
+      memoryConsole.includes("Redacted details"),
+    "Brain Memory console renders an honest session memory activity timeline and empty state."
+  );
+  record(
+    "memory-timeline-derived-not-persisted",
+      appShell.includes("activityEvents={activeActivityEvents}") &&
+      appShell.includes("setActivityEventsBySession") &&
+      memoryConsole.includes("activityEvents: AgentActivityEvent[]") &&
+      memoryTimeline.includes("function createMemoryTimelineItems") &&
+      !memoryTimeline.includes("localStorage") &&
+      !memoryTimeline.includes("fetch("),
+    "Memory timeline is derived from normalized activity events without persistence or direct network calls."
+  );
+  record(
+    "memory-timeline-display-only",
+    memoryConsole.includes("canInspectMemory") &&
+      !memoryConsole.includes("deleteMemory") &&
+      !memoryConsole.includes("updateMemory") &&
+      !memoryConsole.includes("supersede") &&
+      !memoryConsole.includes("pinMemory"),
+    "Memory timeline remains display-only except optional read-only inspect detail."
+  );
+  record(
     "approval-display-only",
     component.includes("Approval action unavailable in current stream path") &&
       component.includes("ShieldAlert") &&
@@ -124,7 +159,8 @@ function checkComponentSource() {
 }
 
 async function checkHelperBehavior() {
-  const activity = await importHelperModule();
+  const activity = await importHelperModule(helperPath);
+  const memoryTimeline = await importHelperModule(memoryTimelinePath);
   record(
     "duration-format",
     activity.formatActivityDuration(500) === "<1s" &&
@@ -172,17 +208,85 @@ async function checkHelperBehavior() {
       approval.approval?.actionAvailable === false,
     "Approval helper produces a waiting display-only activity event for rendering."
   );
+
+  const memoryStore = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "memory_store",
+    status: "completed",
+    payload: {
+      Authorization: "Bearer abc123",
+      memory_id: "mem-13k",
+      preview: "Stored safely",
+      project_key: "project-a",
+      session_key: "session-a"
+    }
+  }, { id: "timeline-store" });
+  const memorySearch = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "memory_search",
+    status: "completed",
+    payload: {
+      result_count: 2
+    }
+  }, { id: "timeline-search" });
+  const memoryHealth = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "memory_health_check",
+    status: "completed",
+    payload: {}
+  }, { id: "timeline-health" });
+  const memoryUpdate = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "memory_update",
+    status: "completed",
+    payload: {}
+  }, { id: "timeline-update" });
+  const memoryDelete = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "memory_delete",
+    status: "completed",
+    payload: {}
+  }, { id: "timeline-delete" });
+
+  const timelineItems = memoryTimeline.createMemoryTimelineItems(
+    [memoryStore, memorySearch, memoryHealth, memoryUpdate, memoryDelete],
+    { projectKey: "fallback-project", sessionKey: "fallback-session" }
+  );
+  const serializedTimeline = JSON.stringify(timelineItems);
+  record(
+    "memory-timeline-helper",
+    timelineItems.length === 5 &&
+      timelineItems[0].operation === "store" &&
+      timelineItems[1].operation === "search" &&
+      timelineItems[2].operation === "health_check" &&
+      timelineItems[3].operation === "update" &&
+      timelineItems[4].operation === "delete",
+    "Memory timeline helper classifies store, search, health_check, update, and delete operations."
+  );
+  record(
+    "memory-timeline-redaction",
+    timelineItems[0].collapsedByDefault === true &&
+      serializedTimeline.includes("[redacted]") &&
+      !serializedTimeline.includes("abc123"),
+    "Memory timeline details stay collapsed and redacted."
+  );
+  record(
+    "memory-timeline-empty-safe",
+    memoryTimeline.createMemoryTimelineItems([]).length === 0 &&
+      memoryTimeline.summarizeMemoryTimeline([]).total === 0,
+    "Memory timeline helper is safe without live Brain Memory Gateway events."
+  );
 }
 
-async function importHelperModule() {
-  const source = readFileSync(helperPath, "utf8");
+async function importHelperModule(path) {
+  const source = readFileSync(path, "utf8");
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ES2022,
       target: ts.ScriptTarget.ES2022,
       verbatimModuleSyntax: false
     },
-    fileName: helperPath
+    fileName: path
   });
 
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled.outputText).toString("base64")}`;

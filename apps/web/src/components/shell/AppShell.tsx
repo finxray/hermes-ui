@@ -8,14 +8,24 @@ import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { useState } from "react";
+import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./AppShell.module.css";
 
 export function AppShell() {
   const { actions, activeProject, activeSession, isHydrated, state } = useWorkspaceState();
   const hermesStatus = useHermesStatus();
   const brainMemoryStatus = useBrainMemoryStatus();
+  const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
+
+  function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
+    setActivityEventsBySession((current) => ({
+      ...current,
+      [sessionId]: [...(current[sessionId] ?? []), event].slice(-80)
+    }));
+  }
 
   return (
     <main
@@ -62,15 +72,18 @@ export function AppShell() {
       <ChatView
         activeProject={activeProject}
         activeSession={activeSession}
+        activityEvents={activeActivityEvents}
         createSession={actions.createSession}
         hermesStatus={hermesStatus.status}
         isHermesStatusLoading={hermesStatus.isLoading}
         modelChoices={state.modelChoices}
+        onActivityEvent={appendActivityEvent}
         workspaceActions={actions}
       />
       <ContextRail
         activeProject={activeProject}
         activeSession={activeSession}
+        activityEvents={activeActivityEvents}
         brainMemoryStatus={brainMemoryStatus.status}
         hermesStatus={hermesStatus.status}
         isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}

@@ -108,7 +108,7 @@ right-rail detail.
 | Reasoning chunk | Show model/agent reasoning when exposed safely. | title, summary, text/deltas, privacy flag. | `tool.progress` reasoning payloads or future reasoning events. | Collapsed by default unless short and safe. | Planned | 13F |
 | Command execution block | Show shell or command tool execution. | command, cwd, status, stdout/stderr preview, exit code, duration. | Tool events from Hermes/MCP tools when payload identifies command execution. | Compact row, expandable stdout/stderr. | Future | 13L |
 | Tool execution row | Show tool lifecycle. | toolName, args preview, status, startedAt/completedAt, payload. | `tool.started`, `tool.completed`, `tool.failed`, run tool events. | Status icon and short summary; raw args hidden. | Partially implemented | 13E |
-| Memory event row | Show retrieval/store/update activity. | memory id, action, scope, result count, layer/source. | Hermes Brain Memory tool events and Brain Memory Gateway responses. | Visible scope and outcome; details expandable. | Planned | 13K |
+| Memory event row | Show retrieval/store/update activity. | memory id, action, scope, result count, layer/source. | Hermes Brain Memory tool events and Brain Memory Gateway responses. | Visible scope and outcome; details expandable. | Partially implemented | 13K |
 | File/artifact event row | Show file creation/update/read artifacts. | file id/path, kind, action, status, preview. | Tool events or future Hermes file/artifact API. | Files rail can show mapped artifact metadata; preview/download deferred. | Partially implemented | 13I |
 | Approval request | Block on user permission. | runId, approval id/session key, action, risk, choices. | `approval.request`. | Display-only waiting row on session stream; choices deferred until run-backed BFF route. | Partially implemented | 13H |
 | Retry/error row | Explain failures and retry state. | error kind, message, retryable, source, raw payload. | `error`, `run.failed`, tool failed events. | Red/amber row with details collapsed. | Partially implemented | 13E |
@@ -137,6 +137,7 @@ Required surfaces:
 - command history;
 - memory retrieval events;
 - memory store events;
+- recent Brain Memory event timeline;
 - files/artifacts;
 - approval requests;
 - environment/status;

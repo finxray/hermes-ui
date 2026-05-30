@@ -111,6 +111,7 @@ export type HermesClientConfig = {
   apiKey?: string | null;
   enabled?: boolean;
   memoryScopeBridgeEnabled?: boolean;
+  signal?: AbortSignal;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
 };

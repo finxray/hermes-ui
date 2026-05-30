@@ -115,7 +115,7 @@
 }
 
 .sendButton.ready,
-.stopButton:disabled {
+.stopButton {
   background: rgba(255, 255, 255, 0.96);
   color: #050505;
   box-shadow:
@@ -133,18 +133,13 @@
   transform: translateY(-1px);
 }
 
-.sendButton:disabled {
+.sendButton:disabled:not(.stopButton) {
   background: rgba(255, 255, 255, 0.16);
   color: #050505;
   box-shadow: none;
 }
 
 .stopButton:disabled {
-  background: rgba(255, 255, 255, 0.96);
-  color: #050505;
-  box-shadow:
-    0 8px 22px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   opacity: 1;
 }
 

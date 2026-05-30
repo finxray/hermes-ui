@@ -187,6 +187,17 @@ Brain Memory BFF logic, memory scope bridge behavior, stable keys, and
 mutation/admin boundaries remain unchanged. See
 `docs/product/THINKING_ELAPSED_UX_13F.md`.
 
+## Checkpoint: Slice 13G stop/cancel streaming
+
+Slice 13G enabled an honest stop control on 2026-05-30 for the current
+session-stream chat path. The UI now aborts the active browser-to-BFF stream,
+the BFF propagates the abort signal to the upstream Hermes session-stream fetch,
+and the transcript records a `Stopped` cancelled activity row without claiming
+server-side `/v1/runs/{run_id}/stop`. A new opt-in `npm run smoke:ui:stop`
+browser smoke covers the behavior. Brain Memory logic, memory scope bridge
+behavior, stable keys, and memory mutation/admin boundaries remain unchanged.
+See `docs/product/STOP_CANCEL_STREAMING_13G.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

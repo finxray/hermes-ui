@@ -122,6 +122,7 @@ Proposed mapping:
 | `tool_event` status `failed` | `type: "tool"` or `error`, `status: "failed"`. |
 | `run_event` `run.started` | `type: "status"`, `status: "running"`. |
 | `run_event` `run.completed` | `type: "status"`, `status: "completed"`. |
+| UI stream abort | `type: "status"`, `status: "cancelled"`, title `Stopped`. |
 | `error` | `type: "error"`, `status: "failed"`. |
 | `done` | Stream lifecycle marker, not usually rendered directly. |
 
@@ -133,7 +134,9 @@ projecting events into the existing compact `Session.toolEvents[]` state for
 right-rail compatibility. It does not persist full `AgentActivityEvent` objects
 yet. Slice 13F added safer duration helpers, UI-local elapsed markers for live
 Hermes sends, and generic/specific activity precedence so a running public
-activity row can replace the generic `Thinking...` row.
+activity row can replace the generic `Thinking...` row. Slice 13G added a
+display-only stopped/cancelled status activity for intentional client/BFF stream
+aborts on the current session-stream path.
 
 ## Duration Semantics
 

@@ -218,8 +218,8 @@ export function normalizeHermesUiCapabilities(
     },
     cancellation: {
       runStopEndpoint: runStop,
-      streamAbortSupportedByUi: false,
-      uiState: runStop ? "deferred" : "unavailable"
+      streamAbortSupportedByUi: canSend,
+      uiState: canSend ? "available" : runStop ? "deferred" : "unavailable"
     },
     files: {
       artifacts: "unknown",
@@ -246,7 +246,7 @@ export function normalizeHermesUiCapabilities(
       canShowFiles: false,
       canShowProviderSelector: false,
       canShowToolActivity: progressEvents,
-      stopControl: runStop ? "deferred" : "unavailable"
+      stopControl: canSend ? "available" : runStop ? "deferred" : "unavailable"
     }
   };
 }
@@ -279,6 +279,7 @@ export async function streamHermesSessionChat(
     apiKey: config.apiKey,
     base,
     fetchImpl,
+    signal: config.signal,
     timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
   });
 
@@ -295,6 +296,7 @@ export async function streamHermesSessionChat(
     base,
     fetchImpl,
     model: request.model,
+    signal: config.signal,
     sessionId: hermesSessionId,
     sessionTitle: request.context.session.title,
     timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
@@ -304,8 +306,7 @@ export async function streamHermesSessionChat(
     return sessionResult;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const abort = createLinkedAbortController(config.signal, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const headers = new Headers({
     Accept: "text/event-stream",
     "Content-Type": "application/json"
@@ -334,31 +335,33 @@ export async function streamHermesSessionChat(
       cache: "no-store",
       headers,
       method: "POST",
-      signal: controller.signal
+      signal: abort.signal
     });
   } catch (error) {
-    clearTimeout(timeout);
+    abort.cleanup();
     return {
       ok: false,
-      status: error instanceof Error && error.name === "AbortError" ? 504 : 502,
+      status: isAbortError(error) ? 499 : 502,
       error: normalizeChatFetchError(error)
     };
   }
-  clearTimeout(timeout);
+  abort.clearTimeout();
 
   if (!response.ok) {
+    abort.cleanup();
     const message = await safeHermesErrorMessage(response, "/api/sessions/{session_id}/chat/stream");
     return chatFailure(response.status, "http_error", message);
   }
 
   if (!response.body) {
+    abort.cleanup();
     return chatFailure(502, "bad_response", "Hermes did not return a streaming response body.");
   }
 
   return {
     ok: true,
     hermesSessionId,
-    stream: normalizeHermesSseStream(response.body)
+    stream: normalizeHermesSseStream(response.body, abort)
   };
 }
 
@@ -432,10 +435,10 @@ async function checkSessionStreamingCapability(args: {
   apiKey?: string | null;
   base: URL;
   fetchImpl: typeof fetch;
+  signal?: AbortSignal;
   timeoutMs: number;
 }): Promise<boolean | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), args.timeoutMs);
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
   const headers = new Headers({ Accept: "application/json" });
   applyHermesAuth(headers, args.apiKey);
 
@@ -443,7 +446,7 @@ async function checkSessionStreamingCapability(args: {
     const response = await args.fetchImpl(buildEndpointUrl(args.base, "/v1/capabilities"), {
       cache: "no-store",
       headers,
-      signal: controller.signal
+      signal: abort.signal
     });
     if (!response.ok) {
       return null;
@@ -459,7 +462,7 @@ async function checkSessionStreamingCapability(args: {
   } catch {
     return null;
   } finally {
-    clearTimeout(timeout);
+    abort.cleanup();
   }
 }
 
@@ -536,12 +539,12 @@ async function ensureHermesSession(args: {
   base: URL;
   fetchImpl: typeof fetch;
   model?: string | null;
+  signal?: AbortSignal;
   sessionId: string;
   sessionTitle: string;
   timeoutMs: number;
 }): Promise<HermesChatStreamResult> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), args.timeoutMs);
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
   const headers = new Headers({
     Accept: "application/json",
     "Content-Type": "application/json"
@@ -558,7 +561,7 @@ async function ensureHermesSession(args: {
       cache: "no-store",
       headers,
       method: "POST",
-      signal: controller.signal
+      signal: abort.signal
     });
 
     if (response.ok || response.status === 409) {
@@ -574,11 +577,11 @@ async function ensureHermesSession(args: {
   } catch (error) {
     return {
       ok: false,
-      status: error instanceof Error && error.name === "AbortError" ? 504 : 502,
+      status: isAbortError(error) ? 499 : 502,
       error: normalizeChatFetchError(error)
     };
   } finally {
-    clearTimeout(timeout);
+    abort.cleanup();
   }
 }
 
@@ -601,7 +604,10 @@ function sanitizeHeaderValue(value: string | null): string | null {
   return clean || null;
 }
 
-function normalizeHermesSseStream(upstream: ReadableStream<Uint8Array>) {
+function normalizeHermesSseStream(
+  upstream: ReadableStream<Uint8Array>,
+  abort: LinkedAbortController
+) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
@@ -632,18 +638,21 @@ function normalizeHermesSseStream(upstream: ReadableStream<Uint8Array>) {
         if (!doneSent) {
           writeUiSse(controller, encoder, { type: "done" });
         }
-      } catch {
-        writeUiSse(controller, encoder, {
-          type: "error",
-          error: {
-            kind: "network",
-            message: "Hermes stream ended unexpectedly."
+      } catch (error) {
+        if (!abort.signal.aborted && !isAbortError(error)) {
+          writeUiSse(controller, encoder, {
+            type: "error",
+            error: {
+              kind: "network",
+              message: "Hermes stream ended unexpectedly."
+            }
+          });
+          if (!doneSent) {
+            writeUiSse(controller, encoder, { type: "done" });
           }
-        });
-        if (!doneSent) {
-          writeUiSse(controller, encoder, { type: "done" });
         }
       } finally {
+        abort.cleanup();
         controller.close();
         reader.releaseLock();
       }
@@ -794,7 +803,7 @@ function firstError(results: HermesEndpointResult[]): HermesStatusError | null {
 }
 
 function normalizeFetchError(error: unknown): HermesStatusError {
-  if (error instanceof Error && error.name === "AbortError") {
+  if (isAbortError(error)) {
     return {
       kind: "timeout",
       message: "Timed out while checking Hermes status."
@@ -808,10 +817,10 @@ function normalizeFetchError(error: unknown): HermesStatusError {
 }
 
 function normalizeChatFetchError(error: unknown): HermesChatError {
-  if (error instanceof Error && error.name === "AbortError") {
+  if (isAbortError(error)) {
     return {
       kind: "timeout",
-      message: "Timed out while contacting Hermes chat."
+      message: "Hermes chat request was cancelled before a stream was opened."
     };
   }
 
@@ -819,6 +828,47 @@ function normalizeChatFetchError(error: unknown): HermesChatError {
     kind: "network",
     message: "Could not reach Hermes at the configured base URL."
   };
+}
+
+type LinkedAbortController = {
+  signal: AbortSignal;
+  clearTimeout: () => void;
+  cleanup: () => void;
+};
+
+function createLinkedAbortController(
+  externalSignal: AbortSignal | undefined,
+  timeoutMs: number
+): LinkedAbortController {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (externalSignal?.aborted) {
+    controller.abort();
+  } else {
+    externalSignal?.addEventListener("abort", onAbort, { once: true });
+  }
+
+  const clearLinkedTimeout = () => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+
+  return {
+    signal: controller.signal,
+    clearTimeout: clearLinkedTimeout,
+    cleanup: () => {
+      clearLinkedTimeout();
+      externalSignal?.removeEventListener("abort", onAbort);
+    }
+  };
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 async function safeHermesErrorMessage(response: Response, path: string): Promise<string> {

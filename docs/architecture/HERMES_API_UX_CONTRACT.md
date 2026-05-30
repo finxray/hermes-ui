@@ -470,18 +470,25 @@ Current Hermes behavior:
 
 Current Hermes UI status:
 
-- Composer shows an honest disabled "Stop response coming soon" placeholder
-  during generation.
+- Composer now shows an enabled `Stop generation` button during active
+  generation for the current session-stream path.
 - No real stop/cancel route exists in the Studio BFF.
-- No run id is currently owned by the browser for cancellation.
+- Session stream events include transient `run_id` payloads, but the current UI
+  does not own a durable `/v1/runs` run id that is safe to pass to
+  `/v1/runs/{run_id}/stop`.
+- Slice 13G implements client/BFF stream abort only. It appends a
+  `Stopped`/`cancelled` UI activity marker and does not claim server-side run
+  interruption.
 
 UI contract:
 
-- Do not show an enabled stop button until the UI has a Hermes `run_id` or
-  another verified cancellable operation id.
+- Do not claim server-side Hermes stop until the UI has a Hermes `/v1/runs`
+  `run_id` or another verified cancellable operation id.
 - Implement stop through the BFF, not direct browser-to-Hermes calls.
 - Distinguish client-side stream close from real Hermes interrupt.
 - Render final cancellation status from Hermes events/status, not optimism.
+- When using the MVP session-stream path, label stop behavior as stream abort
+  and record `serverSideRunStop: false` in the UI activity details.
 
 ## 10. Files And Artifacts
 

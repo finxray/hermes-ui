@@ -104,6 +104,10 @@
   color: var(--warning);
 }
 
+.block[data-status="cancelled"] .icon {
+  color: var(--text-muted);
+}
+
 .block[data-type="memory"] .title {
   color: #d9efe3;
 }

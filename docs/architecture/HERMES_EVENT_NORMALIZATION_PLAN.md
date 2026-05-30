@@ -65,6 +65,11 @@ event after the stream finishes or reports an error through the existing event
 channel. This does not change Hermes request semantics, Brain Memory behavior,
 or persisted workspace state.
 
+Slice 13G keeps the normalizer shape unchanged but adds an intentional
+client-abort path. When the user stops the current session stream, the UI
+records a `status` / `cancelled` activity titled `Stopped` with details marking
+`stopStrategy: "client_stream_abort"` and `serverSideRunStop: false`.
+
 ## Target Normalization Boundary
 
 Future boundary:
@@ -113,6 +118,7 @@ For `/v1/runs` and `/v1/runs/{run_id}/events`:
 | `event: "run.completed"` | Run summary, status `completed`. |
 | `event: "run.failed"` | Error row, status `failed`. |
 | `event: "run.cancelled"` | Cancellation row, status `cancelled`. |
+| UI client abort | Local status row, status `cancelled`, title `Stopped`. |
 | Tool callback events | Tool rows with running/completed/failed/progress. |
 
 Run event SSE currently sends JSON inside `data:` frames rather than named SSE

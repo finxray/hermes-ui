@@ -188,6 +188,35 @@ export function makeElapsedActivityEvent(args: {
   };
 }
 
+export function makeStoppedActivityEvent(args: {
+  id?: string;
+  stoppedAt: string;
+  startedAt?: string;
+  durationMs?: number;
+  source?: AgentActivitySource;
+  summary?: string;
+  details?: Record<string, unknown>;
+  hermes?: AgentActivityEvent["hermes"];
+}): AgentActivityEvent {
+  return {
+    id: args.id ?? `stopped-${args.stoppedAt}`,
+    type: "status",
+    status: "cancelled",
+    title: "Stopped",
+    summary: args.summary ?? "Generation stopped by user",
+    startedAt: args.startedAt,
+    completedAt: args.stoppedAt,
+    durationMs: args.durationMs,
+    collapsedByDefault: true,
+    details: redactActivityDetails({
+      stopStrategy: "client_stream_abort",
+      ...(args.details ?? {})
+    }),
+    source: args.source ?? "ui",
+    hermes: args.hermes
+  };
+}
+
 export function formatActivityDuration(durationMs: number) {
   return formatDuration(durationMs);
 }

@@ -89,6 +89,9 @@ Deliver:
 
 Goal: replace the placeholder stop button with verified Hermes interruption.
 
+Status: completed in Slice 13G. See
+`docs/product/STOP_CANCEL_STREAMING_13G.md`.
+
 Deliver:
 
 - run-backed BFF stop route or verified cancellable session-stream strategy;
@@ -169,11 +172,11 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13G - Real Stop/Cancel Stream Support.
+Slice 13H - Approvals UX.
 
 Reason:
 
-- Slice 13F added honest thinking/activity precedence and elapsed-time markers
-  without exposing private reasoning or changing stream mechanics.
-- The next orchestration gap is replacing the placeholder stop control with
-  verified Hermes interruption behavior.
+- Slice 13G added an honest session-stream stop behavior with client/BFF abort
+  and a cancelled activity marker.
+- The next advertised Hermes orchestration capability that remains deferred is
+  approval request/response handling through BFF-mediated routes.

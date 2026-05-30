@@ -119,7 +119,7 @@ verified behavior.
 | Runs | Hermes advertises runs/status/events, but the UI has not switched chat to a run-backed path. |
 | Tool activity | Tool event display remains tied to real normalized stream events. Skills/toolsets registry UI is deferred. |
 | Approvals | Hermes advertises approval events and response endpoint. UI remains `deferred` because no BFF approval route or approval row exists yet. |
-| Stop/cancel | Hermes advertises `/v1/runs/{run_id}/stop`. UI remains `deferred` because current chat uses session streaming and does not own a run id for real interruption. |
+| Stop/cancel | Hermes advertises `/v1/runs/{run_id}/stop`. Slice 13G enables client/BFF stream abort for the current session-stream path, but server-side run stop remains deferred until chat is run-backed. |
 | Provider/model selector | Model list is visible to status logic. Client selector remains `deferred` because runtime model-switch behavior is server-configured and not live-verified as a safe UI action. |
 | Files/artifacts | File uploads are not supported through the verified API server path. Artifacts remain local/mock metadata until a safe artifact source exists. |
 | Memory scope | `X-Hermes-Session-Key` is advertised. Instruction bridge is reported as active unless `HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE=false`. Metadata context propagation remains `unknown`. |
@@ -147,7 +147,8 @@ verified behavior.
 - No memory mutation/admin actions were added.
 - No auth/classification behavior was implemented.
 - No provider/model selector behavior was enabled.
-- No stop/cancel behavior was enabled.
+- Slice 13G later enabled client/BFF stream abort only. No server-side run stop
+  route was added in Slice 13C.
 - No production Hermes or Brain Memory service source was modified.
 
 ## Regression Expectations

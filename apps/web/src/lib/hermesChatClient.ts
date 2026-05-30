@@ -9,19 +9,29 @@ type StreamHermesChatHandlers = {
   signal?: AbortSignal;
 };
 
+type StreamHermesChatResult = "completed" | "aborted";
+
 export async function streamHermesChatFromBff(
   request: HermesChatRequest,
   handlers: StreamHermesChatHandlers
-) {
-  const response = await fetch("/api/hermes/chat/stream", {
-    body: JSON.stringify(request),
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    method: "POST",
-    signal: handlers.signal
-  });
+): Promise<StreamHermesChatResult> {
+  let response: Response;
+  try {
+    response = await fetch("/api/hermes/chat/stream", {
+      body: JSON.stringify(request),
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      method: "POST",
+      signal: handlers.signal
+    });
+  } catch (error) {
+    if (handlers.signal?.aborted || isAbortError(error)) {
+      return "aborted";
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const error = await readError(response);
@@ -30,7 +40,7 @@ export async function streamHermesChatFromBff(
       error
     });
     handlers.onEvent({ type: "done" });
-    return;
+    return "completed";
   }
 
   if (!response.body) {
@@ -42,16 +52,17 @@ export async function streamHermesChatFromBff(
       }
     });
     handlers.onEvent({ type: "done" });
-    return;
+    return "completed";
   }
 
-  await readUiEventStream(response.body, handlers.onEvent);
+  return readUiEventStream(response.body, handlers.onEvent, handlers.signal);
 }
 
 async function readUiEventStream(
   body: ReadableStream<Uint8Array>,
-  onEvent: (event: HermesChatStreamEvent) => void
-) {
+  onEvent: (event: HermesChatStreamEvent) => void,
+  signal?: AbortSignal
+): Promise<StreamHermesChatResult> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -80,7 +91,11 @@ async function readUiEventStream(
         onEvent(event);
       }
     }
+    return "completed";
   } catch {
+    if (signal?.aborted) {
+      return "aborted";
+    }
     onEvent({
       type: "error",
       error: {
@@ -88,6 +103,7 @@ async function readUiEventStream(
         message: "The local Hermes chat stream ended unexpectedly."
       }
     });
+    return "completed";
   } finally {
     reader.releaseLock();
   }
@@ -164,4 +180,8 @@ function isHermesChatErrorKind(value: unknown): value is HermesChatError["kind"]
     value === "bad_response" ||
     value === "unknown"
   );
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }

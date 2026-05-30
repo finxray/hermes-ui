@@ -58,10 +58,25 @@ Headed optional live send:
 npm run smoke:ui:send:headed
 ```
 
+Optional live stop:
+
+```text
+npm run smoke:ui:stop
+```
+
+Headed optional live stop:
+
+```text
+npm run smoke:ui:stop:headed
+```
+
 The default run does not click Send, so it does not require live Hermes. The
 live send run passes `--send-test --require-hermes`; it requires the Web UI BFF
 Hermes status route to report `mode=real` and `reachable=true` before it sends
-one real composer message.
+one real composer message. The live stop run passes
+`--send-test --stop-test --require-hermes`; it sends a longer live message,
+clicks `Stop generation`, verifies a stopped/cancelled activity row, and checks
+the composer can type another sendable message afterward.
 
 ## Interactions Covered
 
@@ -81,6 +96,10 @@ one real composer message.
 - Optional live-send mode clicks Send, renders a unique user smoke message,
   waits for a new assistant message, requires non-empty assistant content, and
   verifies `/api/hermes/chat/stream` returned HTTP 200.
+- Optional live-stop mode clicks Send, waits for the enabled `Stop generation`
+  button, clicks Stop, verifies the composer returns to Send state, verifies
+  `Stopped` / `Generation stopped by user` activity, and checks the stopped
+  assistant message is not marked as a red error.
 - Deferred top menu placeholders remain disabled and labelled coming soon.
 - Deferred composer controls remain disabled and honestly labelled.
 - Stop response placeholder is not exposed outside generation state.
@@ -100,6 +119,8 @@ one real composer message.
 - Default mode does not require live Brain Memory Gateway search/detail.
 - Live-send mode does not require Brain Memory Gateway.
 - Default mode does not exercise real stop/cancel streaming.
+- Live-stop mode validates client/BFF stream abort behavior, not server-side
+  `/v1/runs/{run_id}/stop`.
 - The harness does not stress-test high-token streaming throughput.
 - The harness does not validate mobile layouts.
 
@@ -143,7 +164,9 @@ When Hermes is intentionally live and reachable, add:
 
 ```text
 npm run smoke:ui:send
+npm run smoke:ui:stop
 ```
 
 Use the live send gate before changing composer send behavior, BFF stream route
-plumbing, or UI transcript rendering.
+plumbing, or UI transcript rendering. Use the live stop gate before changing
+composer stop behavior, abort propagation, or cancelled activity rendering.

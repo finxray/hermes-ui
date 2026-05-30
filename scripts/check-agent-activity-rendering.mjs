@@ -6,6 +6,7 @@ import ts from "typescript";
 
 const root = resolve(process.cwd());
 const componentPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.tsx");
+const composerPath = resolve(root, "apps/web/src/components/chat/Composer.tsx");
 const cssPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.module.css");
 const chatViewPath = resolve(root, "apps/web/src/components/chat/ChatView.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
@@ -31,6 +32,7 @@ console.log(`Agent activity rendering checks passed: ${checks.length}`);
 
 function checkFilesExist() {
   record("component-exists", existsSync(componentPath), "AgentActivityBlock component file exists.");
+  record("composer-exists", existsSync(composerPath), "Composer component file exists.");
   record("css-exists", existsSync(cssPath), "AgentActivityBlock CSS module exists.");
 }
 
@@ -39,6 +41,7 @@ function checkComponentSource() {
     return;
   }
   const component = readFileSync(componentPath, "utf8");
+  const composer = readFileSync(composerPath, "utf8");
   const css = readFileSync(cssPath, "utf8");
 
   record(
@@ -62,8 +65,16 @@ function checkComponentSource() {
     "specific-running-suppresses-generic-thinking",
     existsSync(chatViewPath) &&
       readFileSync(chatViewPath, "utf8").includes("!hasRunningActivity") &&
-      readFileSync(chatViewPath, "utf8").includes("makeElapsedActivityEvent"),
-    "Chat view lets specific running activity replace the generic Thinking row and appends elapsed markers."
+      readFileSync(chatViewPath, "utf8").includes("makeElapsedActivityEvent") &&
+      readFileSync(chatViewPath, "utf8").includes("makeStoppedActivityEvent"),
+    "Chat view lets specific running activity replace generic Thinking and appends elapsed/stopped markers."
+  );
+  record(
+    "stop-button-accessibility",
+    composer.includes("Stop generation") &&
+      composer.includes('type={isGenerating ? "button" : "submit"}') &&
+      composer.includes("onStop?.()"),
+    "Composer exposes an enabled stop-generation button during active streaming."
   );
   record(
     "metadata-rendering",
@@ -72,10 +83,11 @@ function checkComponentSource() {
   );
   record(
     "status-styling",
-    css.includes('data-status="running"') &&
+      css.includes('data-status="running"') &&
       css.includes('data-status="failed"') &&
-      css.includes('data-status="completed"'),
-    "CSS includes running, failed, and completed status states."
+      css.includes('data-status="completed"') &&
+      css.includes('data-status="cancelled"'),
+    "CSS includes running, failed, completed, and cancelled status states."
   );
   record(
     "no-dangerous-html",

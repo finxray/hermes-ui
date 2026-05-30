@@ -6,7 +6,8 @@ import { Composer } from "@/components/chat/Composer";
 import {
   computeRunElapsed,
   createActivityEventFromHermesStreamEvent,
-  makeElapsedActivityEvent
+  makeElapsedActivityEvent,
+  makeStoppedActivityEvent
 } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
@@ -38,9 +39,12 @@ export function ChatView({
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isStopRequested, setIsStopRequested] = useState(false);
   const [assistantHasContent, setAssistantHasContent] = useState(false);
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
+  const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
+  const stopRequestedRef = useRef(false);
   const selectedModel = modelChoices.find((choice) => choice.id === "hermes-default");
   const modelLabel = selectedModel
     ? `${selectedModel.label} · ${selectedModel.provider}`
@@ -67,6 +71,8 @@ export function ChatView({
     workspaceActions.appendMessage(session.id, assistantMessage);
     setAssistantHasContent(false);
     setIsGenerating(true);
+    setIsStopRequested(false);
+    stopRequestedRef.current = false;
 
     if (!canUseRealHermes(hermesStatus)) {
       const fallback = mockUnavailableResponse(hermesStatus, isHermesStatusLoading);
@@ -75,9 +81,12 @@ export function ChatView({
         "BFF boundary preserved"
       ]);
       setIsGenerating(false);
+      setIsStopRequested(false);
       return;
     }
 
+    const streamController = new AbortController();
+    activeStreamControllerRef.current = streamController;
     const runStartedAt = new Date().toISOString();
     let accumulated = "";
     let completedAssistant = false;
@@ -93,7 +102,7 @@ export function ChatView({
       });
     };
 
-    await streamHermesChatFromBff(
+    const streamResult = await streamHermesChatFromBff(
       {
         context: {
           project: {
@@ -169,13 +178,28 @@ export function ChatView({
               "Hermes stream error"
             ]);
           }
-        }
+        },
+        signal: streamController.signal
       }
     );
+
+    if (activeStreamControllerRef.current === streamController) {
+      activeStreamControllerRef.current = null;
+    }
 
     if (flushFrameRef.current !== null) {
       window.cancelAnimationFrame(flushFrameRef.current);
       flushFrameRef.current = null;
+    }
+
+    const completedAt = new Date().toISOString();
+    if (streamResult === "aborted" || stopRequestedRef.current) {
+      finalizeStoppedStream(session.id, assistantId, accumulated, runStartedAt, completedAt);
+      setAssistantHasContent(true);
+      setIsGenerating(false);
+      setIsStopRequested(false);
+      stopRequestedRef.current = false;
+      return;
     }
 
     if (!completedAssistant && !hadStreamError && accumulated) {
@@ -192,8 +216,19 @@ export function ChatView({
       );
     }
 
-    appendElapsedActivityEvent(session.id, runStartedAt, new Date().toISOString());
+    appendElapsedActivityEvent(session.id, runStartedAt, completedAt);
     setIsGenerating(false);
+    setIsStopRequested(false);
+    stopRequestedRef.current = false;
+  }
+
+  function handleStop() {
+    if (!isGenerating || isStopRequested) {
+      return;
+    }
+    stopRequestedRef.current = true;
+    setIsStopRequested(true);
+    activeStreamControllerRef.current?.abort();
   }
 
   function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
@@ -220,6 +255,37 @@ export function ChatView({
     );
   }
 
+  function finalizeStoppedStream(
+    sessionId: string,
+    assistantId: string,
+    content: string,
+    startedAt: string,
+    stoppedAt: string
+  ) {
+    const durationMs = computeRunElapsed(startedAt, stoppedAt);
+    const finalContent = content.trim()
+      ? content
+      : "Stopped before Hermes returned assistant text.";
+    workspaceActions.updateMessage(sessionId, assistantId, finalContent, "complete", [
+      "Stopped by user",
+      "Client-side stream abort"
+    ]);
+    appendActivityEvent(
+      sessionId,
+      makeStoppedActivityEvent({
+        details: {
+          serverSideRunStop: false
+        },
+        durationMs,
+        id: `stopped-${assistantSafeId(sessionId)}-${stoppedAt}`,
+        source: "ui",
+        startedAt,
+        stoppedAt
+      })
+    );
+    appendElapsedActivityEvent(sessionId, startedAt, stoppedAt);
+  }
+
   const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
   const latestActivityEvent = activeActivityEvents.at(-1);
   const hasRunningActivity = latestActivityEvent ? isActiveActivityEvent(latestActivityEvent) : false;
@@ -240,9 +306,11 @@ export function ChatView({
       <Composer
         disabled={!activeSession}
         isGenerating={isGenerating}
+        isStopRequested={isStopRequested}
         modelLabel={modelLabel}
         modelSelectorState={hermesStatus?.uiCapabilities.models.uiState}
         onSend={handleSend}
+        onStop={handleStop}
         stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
       />
     </section>

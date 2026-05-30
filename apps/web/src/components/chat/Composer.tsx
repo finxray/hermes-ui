@@ -7,18 +7,22 @@ import styles from "./Composer.module.css";
 type ComposerProps = {
   disabled?: boolean;
   isGenerating?: boolean;
+  isStopRequested?: boolean;
   modelLabel?: string;
   modelSelectorState?: HermesCapabilityState;
   onSend: (message: string) => void;
+  onStop?: () => void;
   stopControlState?: HermesCapabilityState;
 };
 
 export function Composer({
   disabled = false,
   isGenerating = false,
+  isStopRequested = false,
   modelLabel = "Hermes default",
   modelSelectorState = "deferred",
   onSend,
+  onStop,
   stopControlState = "deferred"
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
@@ -32,6 +36,13 @@ export function Composer({
     }
     setDraft("");
     onSend(message);
+  }
+
+  function stopGeneration() {
+    if (!isGenerating || isStopRequested) {
+      return;
+    }
+    onStop?.();
   }
 
   return (
@@ -94,9 +105,10 @@ export function Composer({
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                type="submit"
-                disabled={disabled || isGenerating || draft.trim().length === 0}
-                aria-label={isGenerating ? "Stop response coming soon" : "Send message"}
+                type={isGenerating ? "button" : "submit"}
+                disabled={isGenerating ? disabled || isStopRequested : disabled || draft.trim().length === 0}
+                aria-label={isGenerating ? "Stop generation" : "Send message"}
+                onClick={isGenerating ? stopGeneration : undefined}
                 title={isGenerating ? stopControlTitle(stopControlState) : undefined}
               >
                 {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
@@ -126,7 +138,10 @@ function modelSelectorTitle(state: HermesCapabilityState) {
 
 function stopControlTitle(state: HermesCapabilityState) {
   if (state === "unavailable") {
-    return "Hermes has not advertised a stop endpoint for this UI path.";
+    return "Stop closes the active local stream if one is running; Hermes has not advertised run stop for this UI path.";
   }
-  return "Hermes advertises run stop, but this session stream path has no run-scoped cancellation wired yet; real cancellation is deferred.";
+  if (state === "available") {
+    return "Stop generation by aborting the active browser-to-BFF stream. This is not a Hermes run-stop request.";
+  }
+  return "Stop generation by aborting the active browser-to-BFF stream. Server-side run stop remains deferred until chat uses Hermes runs.";
 }

@@ -175,9 +175,10 @@ async function checkSourceSmokeTargets() {
   );
   checkSource(
     "ui:composer-stop-placeholder",
-    composer.includes("Stop response coming soon") &&
-      composer.includes("real cancellation is deferred"),
-    "Composer stop state is explicitly documented as deferred."
+    composer.includes("Stop generation") &&
+      composer.includes("browser-to-BFF stream") &&
+      composer.includes("not a Hermes run-stop request"),
+    "Composer stop state is explicitly labelled as stream abort, not fake run stop."
   );
 }
 

@@ -13,7 +13,8 @@ const report = {
   mode: {
     headed: args.headed,
     requireHermes: args.requireHermes,
-    sendTest: args.sendTest
+    sendTest: args.sendTest,
+    stopTest: args.stopTest
   },
   summary: {
     passed: 0,
@@ -43,7 +44,7 @@ async function main() {
   }
 
   const hermesStatus = await checkHermesRequirement();
-  if (args.sendTest && !canUseLiveHermes(hermesStatus)) {
+  if ((args.sendTest || args.stopTest) && !canUseLiveHermes(hermesStatus)) {
     addResult(
       "hermes-send-precondition",
       "fail",
@@ -106,6 +107,7 @@ function parseArgs(values) {
     json: false,
     requireHermes: false,
     sendTest: false,
+    stopTest: false,
     unknown: []
   };
 
@@ -118,6 +120,9 @@ function parseArgs(values) {
     } else if (arg === "--require-hermes") {
       parsed.requireHermes = true;
     } else if (arg === "--send-test") {
+      parsed.sendTest = true;
+    } else if (arg === "--stop-test") {
+      parsed.stopTest = true;
       parsed.sendTest = true;
     } else if (arg === "--base-url") {
       parsed.baseUrl = values[index + 1] || "";
@@ -371,7 +376,9 @@ async function checkComposer() {
   const textarea = page.getByLabel("Message", { exact: true });
   const sendButton = page.getByRole("button", { name: "Send message", exact: true });
   const message = args.sendTest
-    ? `UI_SMOKE_SEND_${Date.now()} please reply with UI_SMOKE_SEND_OK.`
+    ? args.stopTest
+      ? `UI_SMOKE_STOP_${Date.now()} write a detailed answer in many short numbered lines.`
+      : `UI_SMOKE_SEND_${Date.now()} please reply with UI_SMOKE_SEND_OK.`
     : "hello smoke test";
 
   await textarea.fill(message, { timeout: timeoutMs });
@@ -385,11 +392,59 @@ async function checkComposer() {
   check("composer-send-enabled", enabled, "Typing into the composer enables Send message.");
 
   if (args.sendTest) {
-    await runLiveSendSmoke({ message, sendButton });
+    if (args.stopTest) {
+      await runLiveStopSmoke({ message, sendButton });
+    } else {
+      await runLiveSendSmoke({ message, sendButton });
+    }
   } else {
     await textarea.fill("", { timeout: timeoutMs });
     addResult("composer-send-click", "warn", "Optional send click skipped; pass --send-test to exercise Hermes.");
   }
+}
+
+async function runLiveStopSmoke({ message, sendButton }) {
+  const initialAssistantCount = await page.locator('article[data-role="assistant"]').count();
+
+  await sendButton.click({ timeout: timeoutMs });
+  addResult("composer-send-click", "pass", "Clicked Send for opt-in live stop smoke.");
+
+  await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("composer-user-message", "pass", "Unique user stop-smoke message rendered in the transcript.");
+
+  const stopButton = page.getByRole("button", { name: "Stop generation", exact: true });
+  await stopButton.waitFor({ state: "visible", timeout: timeoutMs });
+  const stopEnabled = await stopButton.isEnabled();
+  check("composer-stop-visible", stopEnabled, "Stop generation button is visible and enabled during streaming.");
+  await stopButton.click({ timeout: timeoutMs });
+  addResult("composer-stop-click", "pass", "Clicked Stop generation.");
+
+  await page.getByRole("button", { name: "Send message", exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("composer-stop-returned-send", "pass", "Composer returned to Send message state after stop.");
+
+  await page.getByText("Stopped", { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  await page.waitForFunction(
+    () => document.body.innerText.includes("Generation stopped by user"),
+    null,
+    { timeout: timeoutMs }
+  );
+  addResult("composer-stopped-activity", "pass", "Stopped/cancelled activity appeared after abort.");
+
+  const latestAssistantStatus = await page.evaluate(({ initialCount }) => {
+    const messages = Array.from(document.querySelectorAll('article[data-role="assistant"]'));
+    return messages[initialCount]?.getAttribute("data-status") || "";
+  }, { initialCount: initialAssistantCount });
+  check(
+    "composer-stop-not-red-error",
+    latestAssistantStatus !== "error",
+    `Stopped assistant message status is "${latestAssistantStatus || "unknown"}".`
+  );
+
+  const textarea = page.getByLabel("Message", { exact: true });
+  await textarea.fill(`UI_SMOKE_AFTER_STOP_${Date.now()} ready`, { timeout: timeoutMs });
+  const sendAgain = page.getByRole("button", { name: "Send message", exact: true });
+  const sendAgainEnabled = await sendAgain.isEnabled();
+  check("composer-send-after-stop", sendAgainEnabled, "User can type another message and Send is enabled after stop.");
 }
 
 async function runLiveSendSmoke({ message, sendButton }) {
@@ -515,8 +570,8 @@ async function checkDisabledPlaceholders() {
     );
   }
 
-  const stopButtons = await page.getByRole("button", { name: "Stop response coming soon", exact: true }).count();
-  check("composer-stop-placeholder", stopButtons === 0, "Stop placeholder is not exposed outside generation state.");
+  const stopButtons = await page.getByRole("button", { name: "Stop generation", exact: true }).count();
+  check("composer-stop-idle-hidden", stopButtons === 0, "Stop generation is not exposed outside generation state.");
 }
 
 async function checkNoHorizontalOverflow(name) {

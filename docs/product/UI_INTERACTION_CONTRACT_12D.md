@@ -79,14 +79,14 @@ Audited UI elements: 40
 | 37 | Composer | Attach context | Placeholder | Disabled; context attachment controls are deferred. |
 | 38 | Composer | Provider/model selector | Placeholder | Disabled; provider/model selector polish is deferred. |
 | 39 | Composer | Voice input | Placeholder | Disabled; voice input is deferred. |
-| 40 | Composer | Stop response | Placeholder | Disabled during generation; real stop/cancel streaming is deferred. |
+| 40 | Composer | Stop generation | Working | Enabled during generation in Slice 13G; aborts the active browser-to-BFF stream and records a cancelled UI activity marker. Server-side `/v1/runs/{run_id}/stop` remains deferred. |
 
 ## P0/P1 Findings
 
 - P0: none found.
 - P1: top menu items looked clickable but had no handlers. Fixed by disabling deferred items and labelling them as coming soon.
 - P1: composer utility controls looked actionable but had no handlers. Fixed by disabling attach/model/voice controls and labelling them as placeholders.
-- P1: the stop icon implied real cancellation during generation. Kept visible as an honest disabled placeholder and documented real cancellation as deferred.
+- P1: the stop icon implied real cancellation during generation. Slice 13G replaced the disabled placeholder with an honest client/BFF stream abort control and documents that server-side run stop is still deferred.
 
 ## Smoke Harness Updates
 
@@ -95,7 +95,7 @@ Audited UI elements: 40
 - current Workspace top menu label,
 - disabled coming-soon top menu placeholders,
 - disabled composer placeholder controls,
-- explicit deferred stop/cancel copy.
+- explicit stop/cancel copy that distinguishes stream abort from server-side run stop.
 
 Slice 12E adds `scripts/ui-interaction-smoke.mjs` and `npm run smoke:ui` for
 browser-level regression coverage of the MVP shell contract.

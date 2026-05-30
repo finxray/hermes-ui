@@ -30,6 +30,7 @@ checkRunEvent();
 checkErrorEvent();
 checkUnknownRunFallback();
 checkElapsedEvent();
+checkStoppedEvent();
 checkDurationFormatting();
 checkDurationHelpers();
 checkSecretRedaction();
@@ -198,6 +199,24 @@ function checkElapsedEvent() {
     "elapsed-event",
     event.type === "elapsed" && event.status === "info" && event.title === "Worked for 1m 3s",
     "elapsed helper formats duration and creates an informational event."
+  );
+}
+
+function checkStoppedEvent() {
+  const event = activity.makeStoppedActivityEvent({
+    startedAt: "2026-05-30T00:00:00.000Z",
+    stoppedAt: "2026-05-30T00:00:05.000Z",
+    durationMs: 5_000
+  });
+
+  record(
+    "stopped-event",
+    event.type === "status" &&
+      event.status === "cancelled" &&
+      event.title === "Stopped" &&
+      event.summary === "Generation stopped by user" &&
+      event.details?.stopStrategy === "client_stream_abort",
+    "stopped helper creates an honest cancelled client-abort activity event."
   );
 }
 

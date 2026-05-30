@@ -380,6 +380,13 @@ async function checkRightRailTabs() {
       page.getByText(marker, { exact: true }).first(),
       `${marker} content is visible.`
     );
+    if (name === "files") {
+      await expectVisible(
+        "right-rail-files-local-state",
+        page.getByText("Local/mock only", { exact: true }).first(),
+        "Files tab exposes local/mock artifact source state."
+      );
+    }
   }
 }
 

@@ -121,6 +121,9 @@ Deliver:
 Goal: turn the files rail into a real artifact surface when a safe source
 exists.
 
+Status: completed in Slice 13I. See
+`docs/product/FILES_ARTIFACTS_PANEL_13I.md`.
+
 Deliver:
 
 - artifact event contract;
@@ -177,12 +180,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13I - Files/Artifacts Panel.
+Slice 13J - Provider/Model Selector And Cerebras/Kimi Fast-Stream UX.
 
 Reason:
 
-- Slice 13H safely represents approval events without adding unsupported
-  approval actions on the session-stream path.
-- The next listed orchestration surface is files/artifacts, which can be scoped
-  as inspectable output without changing Hermes streaming, Brain Memory
-  mutation, or approval control-plane behavior.
+- Slice 13I established artifact metadata and disabled preview/download until
+  a verified artifact service exists.
+- Provider/model selection is the next visible deferred control, and it needs
+  live Hermes behavior verification before the UI should expose more than the
+  current placeholder.

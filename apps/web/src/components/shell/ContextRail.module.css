@@ -208,6 +208,18 @@
   align-items: start;
 }
 
+.artifactStatus {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.artifactContent {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
 .toolIcon {
   display: grid;
   width: 28px;
@@ -220,6 +232,22 @@
 
 .artifactIcon {
   color: var(--text-secondary);
+}
+
+.ghostAction {
+  justify-self: start;
+  min-height: 28px;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.ghostAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 @media (max-width: 1180px) {

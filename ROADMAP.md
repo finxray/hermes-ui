@@ -210,6 +210,17 @@ active `/v1/runs` records. Browser-to-Hermes, Brain Memory mutation/admin, and
 direct storage boundaries remain unchanged. See
 `docs/product/APPROVALS_UX_13H.md`.
 
+## Checkpoint: Slice 13I files/artifacts panel foundation
+
+Slice 13I added the first read-only Files/Artifacts panel foundation on
+2026-05-30. The UI now has a typed `StudioArtifact` model, normalizes legacy
+local artifact metadata, maps artifact-shaped activity payloads when present,
+and clearly labels the Files tab as local/mock only while Hermes lacks verified
+artifact upload, list, preview, or download endpoints. No BFF artifact route,
+direct storage access, browser-to-Hermes call, Brain Memory mutation/admin
+action, or Hermes streaming change was added. See
+`docs/product/FILES_ARTIFACTS_PANEL_13I.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

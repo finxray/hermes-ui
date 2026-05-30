@@ -515,7 +515,10 @@ execute server-side under the API server runtime.
 Current Hermes UI status:
 
 - Right rail has a files/artifacts tab.
-- Artifacts are local mock metadata.
+- Artifacts are local/mock metadata unless Hermes emits artifact-shaped event
+  data.
+- Slice 13I keeps preview/download disabled because no verified Hermes artifact
+  endpoint exists.
 
 UI contract:
 

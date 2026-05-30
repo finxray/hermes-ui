@@ -1,5 +1,6 @@
 import { workspaceMock } from "../data/mockWorkspace";
 import type {
+  Artifact,
   ChatMessage,
   ProjectMemoryScope,
   PersistedWorkspaceState,
@@ -431,7 +432,43 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     messages: session.messages ?? [],
     memoryEvidence: session.memoryEvidence ?? [],
     toolEvents: session.toolEvents ?? [],
-    artifacts: session.artifacts ?? []
+    artifacts: (session.artifacts ?? []).map((artifact) =>
+      normalizeArtifact(artifact, session, project)
+    )
+  };
+}
+
+function normalizeArtifact(
+  artifact: Partial<Artifact> & Record<string, unknown>,
+  session: Session,
+  project?: Project
+): Artifact {
+  const id = asString(artifact.id) || `artifact-${session.id}`;
+  const title =
+    asString(artifact.title) ||
+    asString(artifact.name) ||
+    asString(artifact.path) ||
+    "Untitled artifact";
+  const metadata = artifact.metadata && typeof artifact.metadata === "object" && !Array.isArray(artifact.metadata)
+    ? artifact.metadata as Record<string, unknown>
+    : undefined;
+
+  return {
+    id,
+    projectId: asString(artifact.projectId) || project?.id || session.projectId,
+    sessionId: asString(artifact.sessionId) || session.id,
+    title,
+    kind: normalizeArtifactKind(artifact.kind),
+    source: normalizeArtifactSource(artifact.source),
+    status: normalizeArtifactStatus(artifact.status),
+    path: asString(artifact.path) || undefined,
+    mimeType: asString(artifact.mimeType) || undefined,
+    sizeBytes: typeof artifact.sizeBytes === "number" ? artifact.sizeBytes : undefined,
+    createdAt: asString(artifact.createdAt) || undefined,
+    updatedAt: asString(artifact.updatedAt) || undefined,
+    summary: asString(artifact.summary) || undefined,
+    activityEventId: asString(artifact.activityEventId) || undefined,
+    metadata
   };
 }
 
@@ -534,6 +571,55 @@ function makeProjectStableKey(tenantId: string, projectId: string): string {
 
 function makeSessionStableKey(tenantId: string, projectId: string, sessionId: string): string {
   return `studio:${tenantId}:project:${projectId}:session:${sessionId}`;
+}
+
+function normalizeArtifactKind(value: unknown): Artifact["kind"] {
+  const normalized = asString(value).trim().toLowerCase().replace(/[\s_-]+/g, "-");
+  if (
+    normalized === "architecture" ||
+    normalized === "code" ||
+    normalized === "contract" ||
+    normalized === "data" ||
+    normalized === "design" ||
+    normalized === "document" ||
+    normalized === "image" ||
+    normalized === "log" ||
+    normalized === "report"
+  ) {
+    return normalized;
+  }
+  return "unknown";
+}
+
+function normalizeArtifactSource(value: unknown): Artifact["source"] {
+  const normalized = asString(value).trim().toLowerCase();
+  if (
+    normalized === "hermes" ||
+    normalized === "brain-memory" ||
+    normalized === "ui" ||
+    normalized === "local" ||
+    normalized === "mock"
+  ) {
+    return normalized;
+  }
+  return "mock";
+}
+
+function normalizeArtifactStatus(value: unknown): Artifact["status"] {
+  const normalized = asString(value).trim().toLowerCase();
+  if (
+    normalized === "available" ||
+    normalized === "pending" ||
+    normalized === "unavailable" ||
+    normalized === "error"
+  ) {
+    return normalized;
+  }
+  return "unavailable";
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 function makeUniqueTitle(baseTitle: string, existingTitles: string[]): string {

@@ -281,26 +281,50 @@ function FilesSection({
   hermesStatus: NormalizedHermesStatus | null;
 }) {
   const fileState = hermesStatus?.uiCapabilities.files.uiState ?? "unknown";
+  const artifactState = hermesStatus?.uiCapabilities.files.artifacts ?? "unknown";
+  const uploadSupported = hermesStatus?.uiCapabilities.files.uploadSupported === true;
+  const realArtifactsAvailable = artifactState === "available" && fileState === "available";
   return (
     <section className={styles.section} aria-labelledby="files-heading">
       <SectionLabel id="files-heading" icon={<FolderGit2 size={13} />} label="Files and artifacts" />
+      <div className={styles.artifactStatus}>
+        <ContextField label="Source" value={realArtifactsAvailable ? "Hermes artifact API" : "Local/mock only"} />
+        <ContextField label="Artifacts" value={artifactState} />
+        <ContextField label="Uploads" value={uploadSupported ? "Supported" : "Not supported"} />
+      </div>
       {artifacts.length === 0 ? (
         <EmptyState
           compact
-          title="No files attached"
-          body={`Artifacts are local mock metadata for now. Real file/artifact UI is ${fileState}.`}
+          title="No files or artifacts yet"
+          body={`Hermes file/artifact UI is ${fileState}. Local/mock metadata will appear here when present.`}
         />
       ) : (
         <ul className={styles.list}>
           {artifacts.map((artifact) => (
-            <li className={styles.artifactRow} key={artifact.id}>
+            <li className={styles.artifactRow} data-source={artifact.source} data-status={artifact.status} key={artifact.id}>
               <FileText className={styles.artifactIcon} size={18} aria-hidden="true" />
-              <span>
+              <span className={styles.artifactContent}>
                 <span className={styles.cardTitle}>
-                  <span>{artifact.name}</span>
+                  <span>{artifact.title}</span>
                   <span className={styles.pill}>{artifact.status}</span>
                 </span>
-                <span className={styles.meta}>{artifact.kind}</span>
+                <span className={styles.cardBody}>
+                  {artifact.summary ?? "Artifact metadata is visible, but preview/download is not available yet."}
+                </span>
+                <span className={styles.meta}>
+                  {artifact.kind} - {artifact.source}
+                  {artifact.updatedAt ? ` - ${formatArtifactDate(artifact.updatedAt)}` : ""}
+                  {artifact.sizeBytes ? ` - ${formatArtifactSize(artifact.sizeBytes)}` : ""}
+                </span>
+                {artifact.path ? <span className={styles.meta}>{artifact.path}</span> : null}
+                <button
+                  className={styles.ghostAction}
+                  type="button"
+                  disabled
+                  aria-label={`Download unavailable for ${artifact.title}`}
+                >
+                  Download unavailable
+                </button>
               </span>
             </li>
           ))}
@@ -308,6 +332,27 @@ function FilesSection({
       )}
     </section>
   );
+}
+
+function formatArtifactDate(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric"
+  }).format(timestamp);
+}
+
+function formatArtifactSize(value: number) {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${Math.round(value / 1024)} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function SectionLabel({ icon, id, label }: { icon?: ReactNode; id: string; label: string }) {

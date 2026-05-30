@@ -86,7 +86,7 @@ This product should feel familiar like ChatGPT/Codex, but it is not only a chat 
 | Export/import | Portability | Future | Should include project/session/memory-scope metadata. |
 | Pinned context | Memory UX | Partially implemented | Data fields exist; editing UX is deferred. |
 | Session summaries | Navigation and memory | Future | Should be explicit user-visible summaries, not hidden prompt state. |
-| Files/artifacts per project | Workspace UX | Future | Right rail exists; real file/artifact API is not present. |
+| Files/artifacts per project | Workspace UX | Partially implemented | Right rail lists local/mock artifact metadata; real file/artifact API is not present. |
 | Memory-aware session switching | Differentiator | Partially implemented | Scope is displayed and sent; richer retrieval timeline is deferred. |
 | Model/provider selector | Power-user control | Planned next | Placeholder only; actual Hermes model behavior needs live verification. |
 | Keyboard shortcuts | Daily-use polish | Future | Must not obscure accessibility. |
@@ -109,7 +109,7 @@ right-rail detail.
 | Command execution block | Show shell or command tool execution. | command, cwd, status, stdout/stderr preview, exit code, duration. | Tool events from Hermes/MCP tools when payload identifies command execution. | Compact row, expandable stdout/stderr. | Future | 13L |
 | Tool execution row | Show tool lifecycle. | toolName, args preview, status, startedAt/completedAt, payload. | `tool.started`, `tool.completed`, `tool.failed`, run tool events. | Status icon and short summary; raw args hidden. | Partially implemented | 13E |
 | Memory event row | Show retrieval/store/update activity. | memory id, action, scope, result count, layer/source. | Hermes Brain Memory tool events and Brain Memory Gateway responses. | Visible scope and outcome; details expandable. | Planned | 13K |
-| File/artifact event row | Show file creation/update/read artifacts. | file id/path, kind, action, status, preview. | Tool events or future Hermes file/artifact API. | Opens right-rail artifact detail. | Future | 13I |
+| File/artifact event row | Show file creation/update/read artifacts. | file id/path, kind, action, status, preview. | Tool events or future Hermes file/artifact API. | Files rail can show mapped artifact metadata; preview/download deferred. | Partially implemented | 13I |
 | Approval request | Block on user permission. | runId, approval id/session key, action, risk, choices. | `approval.request`. | Display-only waiting row on session stream; choices deferred until run-backed BFF route. | Partially implemented | 13H |
 | Retry/error row | Explain failures and retry state. | error kind, message, retryable, source, raw payload. | `error`, `run.failed`, tool failed events. | Red/amber row with details collapsed. | Partially implemented | 13E |
 | Elapsed time separator | Explain long-running work duration. | startedAt, completedAt, durationMs. | UI derived from run/tool events. | Text separator such as `Worked for 2m 13s`. | Future | 13F |

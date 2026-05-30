@@ -276,26 +276,53 @@ export const toolEvents: ToolEvent[] = [
   }
 ];
 
-export const artifacts: Artifact[] = [
+const artifactTemplates: Array<
+  Omit<Artifact, "id" | "projectId" | "sessionId"> & { id: string }
+> = [
   {
     id: "artifact-adr",
-    name: "ADR-0001 stack and integration",
-    kind: "Architecture",
-    status: "source note"
+    title: "ADR-0001 stack and integration",
+    kind: "architecture",
+    source: "mock",
+    status: "unavailable",
+    summary: "Local mock metadata only. No Hermes file download endpoint is available."
   },
   {
     id: "artifact-contract",
-    name: "Brain Memory UI endpoint proposal",
-    kind: "Contract",
-    status: "draft"
+    title: "Brain Memory UI endpoint proposal",
+    kind: "contract",
+    source: "mock",
+    status: "unavailable",
+    summary: "Local mock metadata for the read-only Gateway UI contract."
   },
   {
     id: "artifact-brief",
-    name: "OpenAI dark UI brief",
-    kind: "Design",
-    status: "active"
+    title: "OpenAI dark UI brief",
+    kind: "design",
+    source: "mock",
+    status: "unavailable",
+    summary: "Local design brief marker; artifact preview/download is deferred."
   }
 ];
+
+function makeArtifacts(
+  projectId: string,
+  sessionId: string,
+  templateIds: string[] = artifactTemplates.map((artifact) => artifact.id)
+): Artifact[] {
+  return templateIds
+    .map((id) => artifactTemplates.find((artifact) => artifact.id === id))
+    .filter((artifact): artifact is (typeof artifactTemplates)[number] => Boolean(artifact))
+    .map((artifact) => ({
+      ...artifact,
+      id: `${artifact.id}-${sessionId}`,
+      projectId,
+      sessionId,
+      updatedAt
+    }));
+}
+
+export const artifacts: Artifact[] = makeArtifacts("project-brain-memory", "session-roadmap");
 
 export const sessions: Session[] = [
   {
@@ -334,7 +361,10 @@ export const sessions: Session[] = [
     messages: gatewayMessages,
     memoryEvidence: memoryEvidence.slice(0, 2),
     toolEvents: toolEvents.slice(1),
-    artifacts: artifacts.slice(0, 2)
+    artifacts: makeArtifacts("project-brain-memory", "session-memory-contract", [
+      "artifact-adr",
+      "artifact-contract"
+    ])
   },
   {
     id: "session-evidence-ui",
@@ -353,7 +383,10 @@ export const sessions: Session[] = [
     messages: evidenceMessages,
     memoryEvidence: memoryEvidence.slice(1),
     toolEvents: toolEvents.slice(2),
-    artifacts: artifacts.slice(1)
+    artifacts: makeArtifacts("project-brain-memory", "session-evidence-ui", [
+      "artifact-contract",
+      "artifact-brief"
+    ])
   },
   {
     id: "session-runs-api",
@@ -372,7 +405,7 @@ export const sessions: Session[] = [
     messages: runsMessages,
     memoryEvidence: memoryEvidence.slice(0, 1),
     toolEvents,
-    artifacts
+    artifacts: makeArtifacts("project-hermes-agent", "session-runs-api")
   },
   {
     id: "session-approval-flow",
@@ -393,7 +426,7 @@ export const sessions: Session[] = [
     messages: approvalMessages,
     memoryEvidence: memoryEvidence.slice(0, 1),
     toolEvents: toolEvents.slice(1),
-    artifacts: artifacts.slice(0, 1)
+    artifacts: makeArtifacts("project-hermes-agent", "session-approval-flow", ["artifact-adr"])
   },
   {
     id: "session-desktop-package",
@@ -414,7 +447,7 @@ export const sessions: Session[] = [
     messages: packageMessages,
     memoryEvidence: memoryEvidence.slice(2),
     toolEvents: toolEvents.slice(1),
-    artifacts: artifacts.slice(2)
+    artifacts: makeArtifacts("project-packaging", "session-desktop-package", ["artifact-brief"])
   },
   {
     id: "session-audit-hermes-integration",
@@ -435,7 +468,10 @@ export const sessions: Session[] = [
     messages: runsMessages,
     memoryEvidence: memoryEvidence.slice(0, 1),
     toolEvents,
-    artifacts: artifacts.slice(0, 2)
+    artifacts: makeArtifacts("project-packaging", "session-audit-hermes-integration", [
+      "artifact-adr",
+      "artifact-contract"
+    ])
   },
   {
     id: "session-integrate-brain-memory",
@@ -454,7 +490,10 @@ export const sessions: Session[] = [
     messages: gatewayMessages,
     memoryEvidence: memoryEvidence.slice(0, 2),
     toolEvents,
-    artifacts: artifacts.slice(0, 2)
+    artifacts: makeArtifacts("project-brain-memory", "session-integrate-brain-memory", [
+      "artifact-adr",
+      "artifact-contract"
+    ])
   },
   {
     id: "session-config-parse-error",
@@ -473,7 +512,10 @@ export const sessions: Session[] = [
     messages: evidenceMessages,
     memoryEvidence: memoryEvidence.slice(1),
     toolEvents: toolEvents.slice(1),
-    artifacts: artifacts.slice(1)
+    artifacts: makeArtifacts("project-brain-memory", "session-config-parse-error", [
+      "artifact-contract",
+      "artifact-brief"
+    ])
   }
 ];
 

@@ -157,6 +157,11 @@ async function checkSourceSmokeTargets() {
     );
   }
   checkSource(
+    "ui:files-artifacts-disabled-download",
+    contextRail.includes("Local/mock only") && contextRail.includes("Download unavailable"),
+    "Files tab clearly distinguishes local/mock artifacts from unavailable downloads."
+  );
+  checkSource(
     "ui:composer-textarea-label",
     composer.includes('aria-label="Message"'),
     "Composer textarea has an accessible label."

@@ -26,6 +26,7 @@ checkMemoryStoreCompleted();
 checkMemorySearch();
 checkGenericTool();
 checkCommandTool();
+checkArtifactPayload();
 checkRunEvent();
 checkApprovalRequested();
 checkApprovalResponded();
@@ -137,6 +138,35 @@ function checkCommandTool() {
     "command-tool",
     event.type === "command" && event.status === "completed" && event.source === "mcp",
     "command-like tool payload maps to a command activity event."
+  );
+}
+
+function checkArtifactPayload() {
+  const event = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "write_file",
+    status: "completed",
+    payload: {
+      artifact: {
+        artifact_id: "artifact-1",
+        action: "generated",
+        mime_type: "text/markdown",
+        path: "docs/report.md",
+        size_bytes: 2048,
+        title: "Report"
+      },
+      run_id: "run-artifact"
+    }
+  }, { id: "artifact-payload" });
+
+  record(
+    "artifact-payload",
+    event.artifact?.artifactId === "artifact-1" &&
+      event.artifact?.path === "docs/report.md" &&
+      event.artifact?.mimeType === "text/markdown" &&
+      event.artifact?.sizeBytes === 2048 &&
+      event.artifact?.status === "completed",
+    "artifact-shaped tool payloads are preserved for Files rail mapping."
   );
 }
 

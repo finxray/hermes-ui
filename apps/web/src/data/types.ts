@@ -66,12 +66,50 @@ export type ToolEvent = {
   time: string;
 };
 
-export type Artifact = {
+export type StudioArtifactKind =
+  | "architecture"
+  | "code"
+  | "contract"
+  | "data"
+  | "design"
+  | "document"
+  | "image"
+  | "log"
+  | "report"
+  | "unknown";
+
+export type StudioArtifactSource =
+  | "hermes"
+  | "brain-memory"
+  | "ui"
+  | "local"
+  | "mock";
+
+export type StudioArtifactStatus =
+  | "available"
+  | "pending"
+  | "unavailable"
+  | "error";
+
+export type StudioArtifact = {
   id: string;
-  name: string;
-  kind: string;
-  status: string;
+  projectId: string;
+  sessionId?: string;
+  title: string;
+  kind: StudioArtifactKind;
+  source: StudioArtifactSource;
+  status: StudioArtifactStatus;
+  path?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  summary?: string;
+  activityEventId?: string;
+  metadata?: Record<string, unknown>;
 };
+
+export type Artifact = StudioArtifact;
 
 export type Session = {
   id: string;

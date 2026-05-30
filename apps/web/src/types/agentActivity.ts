@@ -61,9 +61,16 @@ export type AgentActivityEvent = {
     unavailableReason?: string;
   };
   artifact?: {
+    artifactId?: string;
     fileId?: string;
+    title?: string;
     path?: string;
     kind?: string;
+    action?: string;
+    source?: AgentActivitySource;
+    status?: AgentActivityStatus;
+    mimeType?: string;
+    sizeBytes?: number;
   };
   metadata?: Record<string, unknown>;
 };

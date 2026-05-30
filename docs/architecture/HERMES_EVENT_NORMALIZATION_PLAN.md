@@ -220,6 +220,11 @@ server chat/responses. Future artifact events should come from:
 - a future safe BFF artifact store;
 - future Hermes-native file/artifact support if added.
 
+Slice 13I added a frontend-only `StudioArtifact` model, richer optional
+`AgentActivityEvent.artifact` metadata, and a read-only Files rail foundation.
+The panel shows local/mock artifact metadata and explicitly disables
+preview/download while Hermes artifact endpoints remain unavailable.
+
 Target artifact fields:
 
 - file id;

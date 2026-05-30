@@ -81,6 +81,7 @@ export function createActivityEventFromHermesToolEvent(
   const occurredAt = getPayloadTime(payload) ?? options.now;
   const title = activityTitleForTool(event.name, classification.type, memoryOperation);
   const details = redactActivityDetails(payload);
+  const artifact = getArtifactData(payload, status);
 
   return {
     id: makeActivityId(classification.type, event.name, payload, options),
@@ -110,6 +111,7 @@ export function createActivityEventFromHermesToolEvent(
             sessionKey: asString(payload.session_key) || asString(payload.sessionKey)
           }
         : undefined,
+    artifact,
     metadata: getActivityMetadata(payload)
   };
 }
@@ -123,6 +125,7 @@ export function createActivityEventFromHermesRunEvent(
   const status = normalizeApprovalStatus(eventType, event.status) ?? normalizeActivityStatus(event.status || event.name);
   const occurredAt = getPayloadTime(payload) ?? options.now;
   const type = activityTypeForRunEvent(eventType, status);
+  const artifact = getArtifactData(payload, status);
 
   return {
     id: makeActivityId(type, eventType, payload, options),
@@ -142,6 +145,7 @@ export function createActivityEventFromHermesRunEvent(
       toolName: asString(payload.tool_name)
     },
     approval: type === "approval" ? getApprovalData(payload, status) : undefined,
+    artifact,
     metadata: getActivityMetadata(payload)
   };
 }
@@ -495,6 +499,42 @@ function getApprovalData(
   };
 }
 
+function getArtifactData(
+  payload: Record<string, unknown>,
+  status: AgentActivityStatus
+): AgentActivityEvent["artifact"] | undefined {
+  const nested = objectRecord(payload.artifact) ?? objectRecord(payload.file);
+  const source = nested ?? payload;
+  const artifactId = asString(source.artifact_id) || asString(source.artifactId);
+  const fileId = asString(source.file_id) || asString(source.fileId) || asString(source.id);
+  const path =
+    asString(source.path) ||
+    asString(source.file_path) ||
+    asString(source.filePath) ||
+    asString(source.filename);
+  const title = asString(source.title) || asString(source.name);
+  const kind = asString(source.kind) || asString(source.type);
+  const mimeType = asString(source.mime_type) || asString(source.mimeType);
+  const action = asString(source.action) || asString(source.operation);
+  const sizeBytes = asNumber(source.size_bytes) ?? asNumber(source.sizeBytes);
+
+  if (!artifactId && !fileId && !path && !title) {
+    return undefined;
+  }
+
+  return {
+    action: action || undefined,
+    artifactId: artifactId || undefined,
+    fileId: fileId || undefined,
+    kind: kind || undefined,
+    mimeType: mimeType || undefined,
+    path: path || undefined,
+    sizeBytes,
+    status,
+    title: title || undefined
+  };
+}
+
 function getApprovalDecision(payload: Record<string, unknown>, status: AgentActivityStatus) {
   const explicit =
     asString(payload.choice) ||
@@ -517,6 +557,16 @@ function getStringList(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : undefined;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function normalizeApprovalStatus(eventType: string, status: string): AgentActivityStatus | null {

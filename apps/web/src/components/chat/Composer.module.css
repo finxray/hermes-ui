@@ -22,8 +22,8 @@
   border: 0;
   border-radius: 26px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), rgba(255, 255, 255, 0.008)),
-    rgba(26, 27, 31, 0.98);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    rgba(29, 30, 34, 0.98);
   box-shadow:
     0 20px 64px rgba(0, 0, 0, 0.44),
     inset 0 1px 0 rgba(255, 255, 255, 0.035);
@@ -109,14 +109,14 @@
 .sendButton {
   width: calc(var(--control-height) * 0.92);
   height: calc(var(--control-height) * 0.92);
-  background: rgba(255, 255, 255, 0.13);
-  color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.16);
+  color: #050505;
   box-shadow: none;
 }
 
 .sendButton.ready,
 .stopButton:disabled {
-  background: rgba(245, 246, 248, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   color: #050505;
   box-shadow:
     0 8px 22px rgba(0, 0, 0, 0.28),
@@ -134,13 +134,13 @@
 }
 
 .sendButton:disabled {
-  background: rgba(255, 255, 255, 0.13);
-  color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.16);
+  color: #050505;
   box-shadow: none;
 }
 
 .stopButton:disabled {
-  background: rgba(245, 246, 248, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   color: #050505;
   box-shadow:
     0 8px 22px rgba(0, 0, 0, 0.28),

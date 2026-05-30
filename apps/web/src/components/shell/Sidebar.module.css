@@ -13,7 +13,7 @@
   flex-direction: column;
   direction: rtl;
   overflow: hidden auto;
-  padding: 18px var(--sidebar-rail-padding-x) 20px;
+  padding: 23px var(--sidebar-rail-padding-x) 20px;
   background: transparent;
   border: 0;
   transition:

@@ -1,32 +1,33 @@
+"use client";
+
 import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
 import styles from "./TopBar.module.css";
 
 type TopBarProps = {
-  leftToggleId: string;
   leftCollapsed: boolean;
-  rightToggleId: string;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
   rightCollapsed: boolean;
 };
 
 export function TopBar({
-  leftToggleId,
   leftCollapsed,
-  rightToggleId,
+  onToggleLeft,
+  onToggleRight,
   rightCollapsed
 }: TopBarProps) {
   return (
     <header className={styles.topbar} aria-label="Brain Memory Studio workspace menu">
       <div className={styles.left}>
-        <label
+        <button
           className={styles.iconButton}
           aria-label={leftCollapsed ? "Open left sidebar" : "Collapse left sidebar"}
           aria-pressed={!leftCollapsed}
-          htmlFor={leftToggleId}
-          role="button"
-          tabIndex={0}
+          onClick={onToggleLeft}
+          type="button"
         >
           <PanelToggleIcon side="left" />
-        </label>
+        </button>
         <nav className={styles.menu} aria-label="Workspace sections">
           {["Workspace", "Memory", "Projects", "Tools", "Help"].map((item) => (
             <button
@@ -40,16 +41,15 @@ export function TopBar({
         </nav>
       </div>
       <div className={styles.right}>
-        <label
+        <button
           className={styles.iconButton}
           aria-label={rightCollapsed ? "Open right context panel" : "Collapse right context panel"}
           aria-pressed={!rightCollapsed}
-          htmlFor={rightToggleId}
-          role="button"
-          tabIndex={0}
+          onClick={onToggleRight}
+          type="button"
         >
           <PanelToggleIcon side="right" />
-        </label>
+        </button>
       </div>
     </header>
   );

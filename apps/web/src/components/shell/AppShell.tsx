@@ -42,9 +42,9 @@ export function AppShell() {
         type="checkbox"
       />
       <TopBar
-        leftToggleId="studio-left-rail-toggle"
         leftCollapsed={leftCollapsed}
-        rightToggleId="studio-right-rail-toggle"
+        onToggleLeft={() => setLeftCollapsed((collapsed) => !collapsed)}
+        onToggleRight={() => setRightCollapsed((collapsed) => !collapsed)}
         rightCollapsed={rightCollapsed}
       />
       <Sidebar

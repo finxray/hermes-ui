@@ -42,10 +42,45 @@ for (const token of [
   "data-left-collapsed",
   "data-right-collapsed",
   "studio-left-rail-toggle",
-  "studio-right-rail-toggle"
+  "studio-right-rail-toggle",
+  "const [leftCollapsed, setLeftCollapsed]",
+  "const [rightCollapsed, setRightCollapsed]",
+  "setLeftCollapsed(event.currentTarget.checked)",
+  "setRightCollapsed(event.currentTarget.checked)"
 ]) {
   if (!appShell.includes(token)) {
     failures.push(`AppShell is missing ${token}`);
+  }
+}
+
+const topBar = readFileSync(join(root, "apps/web/src/components/shell/TopBar.tsx"), "utf8");
+for (const token of [
+  "leftToggleId",
+  "rightToggleId",
+  "htmlFor={leftToggleId}",
+  "htmlFor={rightToggleId}",
+  "aria-pressed={!leftCollapsed}",
+  "aria-pressed={!rightCollapsed}",
+  "title={leftCollapsed ?",
+  "title={rightCollapsed ?"
+]) {
+  if (!topBar.includes(token)) {
+    failures.push(`TopBar panel toggle contract is missing ${token}`);
+  }
+}
+
+const appShellCss = readFileSync(join(root, "apps/web/src/components/shell/AppShell.module.css"), "utf8");
+for (const token of [
+  '.shell[data-left-collapsed="true"]',
+  '.shell[data-right-collapsed="true"]',
+  ".shell:has(.leftToggle:checked)",
+  ".shell:has(.rightToggle:checked)",
+  "transition: grid-template-columns 500ms",
+  ':global([data-shell-rail="left"])',
+  ':global([data-shell-rail="right"])'
+]) {
+  if (!appShellCss.includes(token)) {
+    failures.push(`AppShell CSS panel toggle contract is missing ${token}`);
   }
 }
 

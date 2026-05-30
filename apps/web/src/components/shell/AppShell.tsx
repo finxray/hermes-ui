@@ -25,8 +25,8 @@ export function AppShell() {
     >
       <input
         aria-hidden="true"
-        checked={leftCollapsed}
         className={`${styles.toggleInput} ${styles.leftToggle}`}
+        defaultChecked={false}
         id="studio-left-rail-toggle"
         onChange={(event) => setLeftCollapsed(event.currentTarget.checked)}
         tabIndex={-1}
@@ -34,17 +34,17 @@ export function AppShell() {
       />
       <input
         aria-hidden="true"
-        checked={rightCollapsed}
         className={`${styles.toggleInput} ${styles.rightToggle}`}
+        defaultChecked={false}
         id="studio-right-rail-toggle"
         onChange={(event) => setRightCollapsed(event.currentTarget.checked)}
         tabIndex={-1}
         type="checkbox"
       />
       <TopBar
+        leftToggleId="studio-left-rail-toggle"
         leftCollapsed={leftCollapsed}
-        onToggleLeft={() => setLeftCollapsed((collapsed) => !collapsed)}
-        onToggleRight={() => setRightCollapsed((collapsed) => !collapsed)}
+        rightToggleId="studio-right-rail-toggle"
         rightCollapsed={rightCollapsed}
       />
       <Sidebar

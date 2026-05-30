@@ -2,6 +2,23 @@
 
 This is a future plan, not an implemented production CLI.
 
+## Current Slice 14K Checkpoint
+
+Slice 14K adds a packaging readiness manifest and safe release gate:
+
+```powershell
+npm run check:packaging
+npm run release:check
+```
+
+These commands are source/build/audit checks. They do not start services, do not
+install Hermes, do not install Brain Memory, do not manage Docker/systemd, and
+do not implement export/import.
+
+The current `studio:launch` and `studio:web` commands are foundations for local
+diagnostics and Web UI-only startup. They are not the final one-command GitHub
+distribution.
+
 ## Goal
 
 A user should eventually be able to clone or download a package, choose a mode,
@@ -67,7 +84,9 @@ Slice 09A starts with portable Node scripts:
 - production installer;
 - npm package publishing;
 - Docker orchestration;
+- final one-command GitHub distribution;
 - automatic Brain Memory installation;
 - service manager integration;
 - automatic Hermes or Brain Memory start/stop;
+- export/import;
 - memory mutation/admin actions.

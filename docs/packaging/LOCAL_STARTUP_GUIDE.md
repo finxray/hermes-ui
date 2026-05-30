@@ -39,7 +39,7 @@ npm run studio:doctor
 6. Start the Web UI:
 
 ```powershell
-npm run dev
+npm run studio:web
 ```
 
 7. Open the app:
@@ -55,7 +55,7 @@ Use this when you only want the UI shell and local mock/unconfigured states.
 ```powershell
 npm install
 npm run studio:env -- --mode web-ui-only
-npm run dev
+npm run studio:web
 npm run studio:open
 ```
 

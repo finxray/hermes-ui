@@ -86,7 +86,25 @@ troubleshooting, browser scaling notes, and secrets guidance, see
 For the launcher details, flags, safety boundaries, and relationship to the
 future one-command CLI, see `docs/packaging/STUDIO_LAUNCHER_14A.md` and
 `docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`. For stale-server
-recovery, see `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`.
+recovery, see `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`. For the
+optional Web UI-only start wrapper, see `docs/packaging/STUDIO_WEB_DEV_14J.md`.
+
+## Packaging Readiness
+
+The current packaging posture is MVP/demo-ready for local Web UI use after the
+release gate passes, but it is not a production installer or final one-command
+GitHub distribution yet. See `docs/packaging/PACKAGING_READINESS_14K.md`.
+
+Safe release gate:
+
+```powershell
+npm run check:packaging
+npm run release:check
+```
+
+Browser and live-service smokes remain separate because they require a healthy
+selected Web UI base URL and, for live gates, already-running Hermes or Brain
+Memory services.
 
 1. Install dependencies:
 

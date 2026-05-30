@@ -263,6 +263,8 @@ Do not add direct browser-to-Gateway calls or direct storage access.
 | `npm run check:workspace-state` | Project/session reducer and local state contract. |
 | `npm run check:brain-memory-client` | Brain Memory client response shape contract. |
 | `npm run check:studio-launch` | Studio launcher help, JSON shape, base URL, redaction, recovery, and safety contract. |
+| `npm run check:packaging` | Packaging readiness source/docs/script contract. |
+| `npm run release:check` | Safe non-browser release gate: packaging, launcher contract, state/client/activity/rendering/UI checks, typecheck, build, and audit. |
 | `npm run check:ui-structure` | UI component structure and accessibility markers. |
 | `npm run typecheck` | TypeScript validation. |
 | `npm run build` | Production Next.js build. |
@@ -283,6 +285,17 @@ node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory
 npm run smoke:ui
 npm run smoke:ui:send
 ```
+
+Packaging readiness gate:
+
+```powershell
+npm run check:packaging
+npm run release:check
+```
+
+`release:check` intentionally excludes browser smokes and live-service gates.
+Run those separately after `studio:launch -- --check --base-url <healthy-url>`
+passes for the selected Web UI server.
 
 ## Browser Troubleshooting
 

@@ -421,6 +421,19 @@ wrapper does not kill existing processes, delete `.next`, modify env files,
 manage Hermes/Brain Memory/Docker/systemd, change backend/Hermes/Brain Memory
 logic, or implement export/import. See `docs/packaging/STUDIO_WEB_DEV_14J.md`.
 
+## Checkpoint: Slice 14K packaging readiness release gate
+
+Slice 14K added a packaging readiness manifest and safe release gate on
+2026-05-31. `docs/packaging/PACKAGING_READINESS_14K.md` now defines what is
+ready, partially ready, not ready, deferred, release-gated, and not claimable
+yet across Web UI standalone, Web UI + Hermes, attach-later Brain Memory,
+future bundle mode, Brain Memory standalone, and future one-command packaging.
+`npm run check:packaging` verifies the packaging docs/scripts contract, and
+`npm run release:check` runs only safe source/build/audit checks without
+requiring browser smokes or live services. No production installer, final
+one-command distribution, service automation, backend/Hermes/Brain Memory
+logic change, or export/import was added.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

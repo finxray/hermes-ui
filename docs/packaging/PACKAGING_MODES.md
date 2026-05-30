@@ -4,6 +4,20 @@ Hermes UI / Brain Memory Studio must stay modular. Users should not be forced
 to install Brain Memory to use Hermes UI, and Brain Memory should remain useful
 without the Web UI.
 
+## Current Status
+
+Slice 14K records the current packaging readiness baseline in
+`docs/packaging/PACKAGING_READINESS_14K.md`.
+
+- Web UI standalone is safe for MVP/demo use after the release gate passes and
+  a healthy selected Web UI server is verified.
+- Web UI + Hermes is safe for MVP/demo use when Hermes is already running and
+  reachable through the BFF.
+- Brain Memory attach-later remains optional and manual.
+- Recommended bundle mode is a future target and not implemented as an
+  installer or service orchestrator yet.
+- The final one-command package remains deferred.
+
 ## Web UI Standalone
 
 Use this when a user wants the Studio Web UI for Hermes but does not want Brain
@@ -61,7 +75,8 @@ Disables:
 Use this when a user wants Web UI + Brain Memory together.
 
 This is the future recommended path for users who want persistent
-project/session memory, but Slice 09A does not implement the installer.
+project/session memory, but it is not implemented as a production installer or
+service orchestrator yet.
 
 Requires:
 

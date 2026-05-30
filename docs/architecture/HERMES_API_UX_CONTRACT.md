@@ -547,6 +547,9 @@ Verified current source nuance:
 - `_create_agent()` resolves the actual runtime model from gateway config/env.
 - Source inspection did not find `X-Hermes-Model` being read in
   `api_server.py` at reviewed HEAD.
+- Slice 13J confirmed the current Studio BFF status reports one advertised
+  model, `hermes-agent`, and no verified client-selectable model control for
+  the session-stream path.
 
 UI contract:
 
@@ -558,6 +561,8 @@ UI contract:
   `/v1/capabilities` before allowing changes.
 - Future provider/model UX should explain whether it changes runtime behavior
   or only tags the request.
+- The Studio chat request should not send a placeholder model id unless the
+  normalized Hermes capability state reports verified client selection.
 
 ## 12. Memory And Session Context
 

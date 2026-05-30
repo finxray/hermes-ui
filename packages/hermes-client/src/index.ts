@@ -8,6 +8,7 @@ import type {
   HermesClientConfig,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesModelDescriptor,
   HermesStatusError,
   HermesUiCapabilities,
   NormalizedHermesStatus
@@ -37,6 +38,9 @@ export type {
   HermesClientConfig,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesFastStreamProfile,
+  HermesModelDescriptor,
+  HermesModelSelectionStatus,
   HermesStatusError,
   HermesUiCapabilities,
   NormalizedHermesStatus
@@ -162,6 +166,14 @@ export function normalizeHermesUiCapabilities(
     asString(status.capabilities?.model) ||
     firstModelId(status.models) ||
     null;
+  const availableModels = modelDescriptors(status.models);
+  const modelsListAvailable = Boolean(status.models) || hasEndpoint(endpoints, "models");
+  const modelState = normalizeModelUiState({
+    availableModels,
+    listAvailable: modelsListAvailable,
+    serverAdvertisedModel,
+    statusMode: status.mode
+  });
   const sessionChat = flag(features, "session_chat") || hasEndpoint(endpoints, "session_chat");
   const sessionStreaming =
     flag(features, "session_chat_streaming") || hasEndpoint(endpoints, "session_chat_stream");
@@ -227,8 +239,15 @@ export function normalizeHermesUiCapabilities(
       uploadSupported: false
     },
     models: {
+      availableModels,
       clientSelectable: false,
-      listAvailable: Boolean(status.models) || hasEndpoint(endpoints, "models"),
+      currentModelLabel: modelState.currentModelLabel,
+      currentProviderLabel: modelState.currentProviderLabel,
+      fastStreamProfile: modelState.fastStreamProfile,
+      listAvailable: modelsListAvailable,
+      reason: modelState.reason,
+      selectedModelId: modelState.selectedModelId,
+      selectionStatus: modelState.selectionStatus,
       serverAdvertisedModel,
       serverConfiguredOnly: true,
       uiState: "deferred"
@@ -509,6 +528,97 @@ function firstModelId(models: Record<string, unknown> | null): string {
   }
   const first = data.find((item) => item && typeof item === "object" && !Array.isArray(item));
   return first ? asString((first as Record<string, unknown>).id) : "";
+}
+
+function modelDescriptors(models: Record<string, unknown> | null): HermesModelDescriptor[] {
+  const data = models?.data;
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  const descriptors: HermesModelDescriptor[] = [];
+  for (const item of data) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const id = asString(record.id);
+    if (!id) {
+      continue;
+    }
+    descriptors.push({
+      id,
+      label: id,
+      provider: asString(record.owned_by) || null
+    });
+  }
+  return descriptors;
+}
+
+function normalizeModelUiState(args: {
+  availableModels: HermesModelDescriptor[];
+  listAvailable: boolean;
+  serverAdvertisedModel: string | null;
+  statusMode: string;
+}): {
+  currentModelLabel: string;
+  currentProviderLabel: string;
+  fastStreamProfile: "unknown";
+  reason: string;
+  selectedModelId: string | null;
+  selectionStatus: HermesUiCapabilities["models"]["selectionStatus"];
+} {
+  const selectedModelId = args.serverAdvertisedModel ?? args.availableModels[0]?.id ?? null;
+  const currentModelLabel = selectedModelId ?? "Hermes server model";
+  const currentProviderLabel = "Hermes server config";
+  const selectionStatus = modelSelectionStatus(args);
+
+  return {
+    currentModelLabel,
+    currentProviderLabel,
+    fastStreamProfile: "unknown",
+    reason: modelSelectionReason(selectionStatus, args),
+    selectedModelId,
+    selectionStatus
+  };
+}
+
+function modelSelectionStatus(args: {
+  availableModels: HermesModelDescriptor[];
+  listAvailable: boolean;
+  serverAdvertisedModel: string | null;
+  statusMode: string;
+}): HermesUiCapabilities["models"]["selectionStatus"] {
+  if (args.statusMode === "unconfigured" || args.statusMode === "mock" || args.statusMode === "error") {
+    return args.listAvailable ? "deferred" : "unavailable";
+  }
+  if (args.serverAdvertisedModel || args.availableModels.length > 0) {
+    return "server-configured";
+  }
+  return args.listAvailable ? "unknown" : "unavailable";
+}
+
+function modelSelectionReason(
+  status: ReturnType<typeof modelSelectionStatus>,
+  args: {
+    availableModels: HermesModelDescriptor[];
+    listAvailable: boolean;
+    serverAdvertisedModel: string | null;
+  }
+) {
+  if (status === "server-configured") {
+    return "Hermes advertises a model/profile, but current runtime switching is server-configured and not verified for the session stream API.";
+  }
+  if (status === "unavailable") {
+    return "Hermes has not exposed a model list or verified client-selectable model control for this UI process.";
+  }
+  if (status === "unknown") {
+    return "Hermes model status is partially available, but client-selectable runtime switching is not verified.";
+  }
+  if (args.availableModels.length > 0 || args.serverAdvertisedModel) {
+    return "Model data is visible, but selection remains deferred until runtime switching is verified through the BFF.";
+  }
+  return "Provider/model selection is deferred until Hermes exposes a verified client-selectable control path.";
 }
 
 function parseBaseUrl(value: string): URL | null {

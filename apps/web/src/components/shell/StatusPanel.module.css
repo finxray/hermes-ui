@@ -45,6 +45,34 @@
   gap: 10px;
 }
 
+.fieldGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fieldLabel {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.fieldValue {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  line-height: 1.35;
+}
+
 .metric {
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.07);

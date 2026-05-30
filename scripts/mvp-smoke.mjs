@@ -52,6 +52,9 @@ async function main() {
       body.uiCapabilities &&
       typeof body.uiCapabilities === "object" &&
       body.uiCapabilities.chat &&
+      body.uiCapabilities.models &&
+      body.uiCapabilities.models.clientSelectable === false &&
+      body.uiCapabilities.models.selectionStatus &&
       body.uiCapabilities.ui
   });
   const brainMemoryStatus = await checkJsonGet("/api/brain-memory/status", {
@@ -105,7 +108,8 @@ async function checkSourceSmokeTargets() {
     "apps/web/src/components/shell/TopBar.tsx",
     "apps/web/src/components/shell/Sidebar.tsx",
     "apps/web/src/components/shell/ContextRail.tsx",
-    "apps/web/src/components/chat/Composer.tsx"
+    "apps/web/src/components/chat/Composer.tsx",
+    "docs/product/PROVIDER_MODEL_SELECTOR_13J.md"
   ];
 
   for (const file of files) {
@@ -174,9 +178,21 @@ async function checkSourceSmokeTargets() {
   checkSource(
     "ui:composer-placeholders-disabled",
     composer.includes("Attach context coming soon") &&
-      composer.includes("Selected model placeholder") &&
+      composer.includes("Provider and model selector disabled") &&
       composer.includes("Voice input coming soon"),
     "Deferred composer controls are disabled and labelled as placeholders."
+  );
+  checkSource(
+    "ui:model-selector-server-configured",
+    composer.includes("runtime model switching is disabled") &&
+      composer.includes("Runtime model switching is not verified"),
+    "Provider/model selector stays disabled unless Hermes runtime switching is verified."
+  );
+  checkSource(
+    "ui:stream-batching-copy",
+    composer.includes("Streaming batches deltas with an animation-frame flush") &&
+      composer.includes("not one React update per token"),
+    "Composer documents the fast-stream batching assumption."
   );
   checkSource(
     "ui:composer-stop-placeholder",

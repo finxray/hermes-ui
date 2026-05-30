@@ -577,7 +577,7 @@ async function checkDisabledPlaceholders() {
 
   const composerControls = [
     ["attach-context", "Attach context coming soon"],
-    ["model-selector", "Selected model placeholder"],
+    ["model-selector", "Provider and model selector disabled"],
     ["voice-input", "Voice input coming soon"]
   ];
   for (const [name, label] of composerControls) {
@@ -590,6 +590,11 @@ async function checkDisabledPlaceholders() {
 
   const stopButtons = await page.getByRole("button", { name: "Stop generation", exact: true }).count();
   check("composer-stop-idle-hidden", stopButtons === 0, "Stop generation is not exposed outside generation state.");
+  await expectVisible(
+    "composer-model-server-configured",
+    page.getByText("Server-configured", { exact: false }).first(),
+    "Composer shows server-configured provider/model state."
+  );
 }
 
 async function checkNoHorizontalOverflow(name) {

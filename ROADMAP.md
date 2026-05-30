@@ -221,6 +221,20 @@ direct storage access, browser-to-Hermes call, Brain Memory mutation/admin
 action, or Hermes streaming change was added. See
 `docs/product/FILES_ARTIFACTS_PANEL_13I.md`.
 
+## Checkpoint: Slice 13J provider/model selector foundation
+
+Slice 13J added an honest provider/model selector foundation on 2026-05-31.
+Hermes currently advertises `hermes-agent` through `/v1/models`, but the Studio
+keeps runtime switching disabled because the reviewed API server resolves the
+actual model from server-side Gateway config and does not verify
+`X-Hermes-Model` for the session-stream path. The composer and Hermes status
+panel now distinguish server-configured model state from future
+client-selectable model state, and the chat request no longer sends a fake
+placeholder model unless Hermes capabilities report verified client selection.
+Fast-stream constraints for future Cerebras/Kimi-like providers are documented
+without adding provider calls or credentials. See
+`docs/product/PROVIDER_MODEL_SELECTOR_13J.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

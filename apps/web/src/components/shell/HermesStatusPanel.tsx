@@ -39,6 +39,14 @@ export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatus
           {status?.baseUrl ? `Base URL: ${status.baseUrl}` : "Set HERMES_API_BASE_URL to enable real checks."}
         </div>
         {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
+        {status?.uiCapabilities.models ? (
+          <div className={styles.fieldGrid} aria-label="Hermes model state">
+            <ModelField label="Model" value={status.uiCapabilities.models.currentModelLabel} />
+            <ModelField label="Provider" value={status.uiCapabilities.models.currentProviderLabel} />
+            <ModelField label="Selection" value={status.uiCapabilities.models.selectionStatus} />
+            <ModelField label="Fast stream" value={status.uiCapabilities.models.fastStreamProfile} />
+          </div>
+        ) : null}
         {capabilityRows.length > 0 ? (
           <div className={styles.capabilities} aria-label="Hermes capabilities">
             {capabilityRows.map((row) => (
@@ -53,6 +61,15 @@ export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatus
         <div className={styles.meta}>Last checked: {checkedAt}</div>
       </div>
     </section>
+  );
+}
+
+function ModelField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <span className={styles.fieldValue}>{value}</span>
+    </div>
   );
 }
 
@@ -110,6 +127,14 @@ function getCapabilityRows(status: NormalizedHermesStatus | null) {
     {
       label: "tools",
       value: ui.tools.uiState
+    },
+    {
+      label: "model",
+      value: ui.models.currentModelLabel
+    },
+    {
+      label: "model mode",
+      value: ui.models.selectionStatus
     },
     {
       label: "model selector",

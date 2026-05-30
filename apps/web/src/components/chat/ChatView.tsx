@@ -11,7 +11,7 @@ import {
 } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
-import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { HermesUiCapabilities, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { ChatMessage, ModelChoice, Project, Session, ToolEvent } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import type { AgentActivityEvent } from "@/types/agentActivity";
@@ -45,10 +45,8 @@ export function ChatView({
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const stopRequestedRef = useRef(false);
-  const selectedModel = modelChoices.find((choice) => choice.id === "hermes-default");
-  const modelLabel = selectedModel
-    ? `${selectedModel.label} · ${selectedModel.provider}`
-    : "Hermes default";
+  const providerModelState = getProviderModelState(hermesStatus, modelChoices);
+  const modelLabel = modelLabelForState(providerModelState);
 
   async function handleSend(content: string) {
     if (!activeSession || isGenerating) {
@@ -131,8 +129,8 @@ export function ChatView({
           }
         },
         message: content,
-        model: selectedModel?.id ?? null,
-        provider: selectedModel?.provider ?? null,
+        model: providerModelState.clientSelectable ? providerModelState.selectedModelId : null,
+        provider: null,
         recentMessages: session.messages.slice(-12).map((message) => ({
           role: message.role,
           content: message.content
@@ -308,13 +306,45 @@ export function ChatView({
         isGenerating={isGenerating}
         isStopRequested={isStopRequested}
         modelLabel={modelLabel}
-        modelSelectorState={hermesStatus?.uiCapabilities.models.uiState}
+        modelState={providerModelState}
         onSend={handleSend}
         onStop={handleStop}
         stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
       />
     </section>
   );
+}
+
+function getProviderModelState(
+  status: NormalizedHermesStatus | null,
+  modelChoices: ModelChoice[]
+): HermesUiCapabilities["models"] {
+  if (status?.uiCapabilities.models) {
+    return status.uiCapabilities.models;
+  }
+
+  const fallback = modelChoices.find((choice) => choice.id === "hermes-default");
+  return {
+    availableModels: [],
+    clientSelectable: false,
+    currentModelLabel: fallback?.label ?? "Hermes server model",
+    currentProviderLabel: "Hermes server config",
+    fastStreamProfile: "unknown",
+    listAvailable: false,
+    reason: "Hermes model status has not loaded; runtime selection remains disabled.",
+    selectedModelId: null,
+    selectionStatus: "unknown",
+    serverAdvertisedModel: null,
+    serverConfiguredOnly: true,
+    uiState: "deferred"
+  };
+}
+
+function modelLabelForState(state: HermesUiCapabilities["models"]) {
+  if (state.selectionStatus === "server-configured") {
+    return `${state.currentModelLabel} - Server-configured`;
+  }
+  return `${state.currentModelLabel} - ${state.selectionStatus}`;
 }
 
 function assistantSafeId(value: string) {

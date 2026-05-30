@@ -120,7 +120,7 @@ verified behavior.
 | Tool activity | Tool event display remains tied to real normalized stream events. Skills/toolsets registry UI is deferred. |
 | Approvals | Hermes advertises approval events and response endpoint. UI remains `deferred` because no BFF approval route or approval row exists yet. |
 | Stop/cancel | Hermes advertises `/v1/runs/{run_id}/stop`. Slice 13G enables client/BFF stream abort for the current session-stream path, but server-side run stop remains deferred until chat is run-backed. |
-| Provider/model selector | Model list is visible to status logic. Client selector remains `deferred` because runtime model-switch behavior is server-configured and not live-verified as a safe UI action. |
+| Provider/model selector | Model list is visible to status logic. Slice 13J adds a richer server-configured UI state, but client selector remains disabled because runtime model-switch behavior is not live-verified as a safe UI action. |
 | Files/artifacts | File uploads are not supported through the verified API server path. Artifacts remain local/mock metadata until a safe artifact source exists. |
 | Memory scope | `X-Hermes-Session-Key` is advertised. Instruction bridge is reported as active unless `HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE=false`. Metadata context propagation remains `unknown`. |
 | Memory mutation/admin | Not added. `memory_write_api=false` remains a hard boundary for this UI. |
@@ -131,6 +131,8 @@ verified behavior.
   slicing raw feature flags directly.
 - `Composer` keeps provider/model and stop controls disabled, but their titles
   now reflect capability state.
+- Slice 13J extends model state with current model/provider labels,
+  available model metadata, selection status, reason, and fast-stream profile.
 - `ContextRail` keeps tool and file empty states honest about whether the UI is
   available, deferred, or unknown.
 - `scripts/mvp-smoke.mjs` now verifies that `/api/hermes/status` includes

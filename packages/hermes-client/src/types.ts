@@ -14,6 +14,21 @@ export type HermesStatusError = {
 
 export type HermesCapabilityState = "available" | "unavailable" | "unknown" | "deferred";
 
+export type HermesModelSelectionStatus =
+  | "server-configured"
+  | "client-selectable"
+  | "deferred"
+  | "unavailable"
+  | "unknown";
+
+export type HermesFastStreamProfile = "normal" | "high-throughput" | "unknown";
+
+export type HermesModelDescriptor = {
+  id: string;
+  label: string;
+  provider?: string | null;
+};
+
 export type HermesUiCapabilities = {
   status: {
     configured: boolean;
@@ -61,6 +76,13 @@ export type HermesUiCapabilities = {
     serverAdvertisedModel: string | null;
     serverConfiguredOnly: boolean;
     clientSelectable: boolean;
+    availableModels: HermesModelDescriptor[];
+    currentModelLabel: string;
+    currentProviderLabel: string;
+    selectedModelId: string | null;
+    selectionStatus: HermesModelSelectionStatus;
+    reason: string;
+    fastStreamProfile: HermesFastStreamProfile;
     uiState: HermesCapabilityState;
   };
   memory: {

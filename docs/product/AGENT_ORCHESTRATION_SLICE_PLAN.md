@@ -135,6 +135,9 @@ Deliver:
 
 Goal: expose provider/model behavior honestly and keep fast streams smooth.
 
+Status: completed in Slice 13J. See
+`docs/product/PROVIDER_MODEL_SELECTOR_13J.md`.
+
 Deliver:
 
 - live verification of Hermes model/provider behavior;
@@ -180,12 +183,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13J - Provider/Model Selector And Cerebras/Kimi Fast-Stream UX.
+Slice 13K - Brain Memory Event Timeline.
 
 Reason:
 
-- Slice 13I established artifact metadata and disabled preview/download until
-  a verified artifact service exists.
-- Provider/model selection is the next visible deferred control, and it needs
-  live Hermes behavior verification before the UI should expose more than the
-  current placeholder.
+- Slice 13J established an honest server-configured provider/model foundation
+  and kept runtime switching disabled until a verified Hermes/BFF control path
+  exists.
+- Brain Memory event visibility is the next orchestration surface that can be
+  improved without adding memory mutation/admin actions.

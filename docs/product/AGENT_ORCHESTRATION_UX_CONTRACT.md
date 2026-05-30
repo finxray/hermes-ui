@@ -88,7 +88,7 @@ This product should feel familiar like ChatGPT/Codex, but it is not only a chat 
 | Session summaries | Navigation and memory | Future | Should be explicit user-visible summaries, not hidden prompt state. |
 | Files/artifacts per project | Workspace UX | Partially implemented | Right rail lists local/mock artifact metadata; real file/artifact API is not present. |
 | Memory-aware session switching | Differentiator | Partially implemented | Scope is displayed and sent; richer retrieval timeline is deferred. |
-| Model/provider selector | Power-user control | Planned next | Placeholder only; actual Hermes model behavior needs live verification. |
+| Model/provider selector | Power-user control | Partially implemented | Disabled server-configured foundation exists; actual Hermes runtime switching needs live verification. |
 | Keyboard shortcuts | Daily-use polish | Future | Must not obscure accessibility. |
 | Multi-session history | Workspace UX | Partially implemented | Sidebar history exists locally. |
 

@@ -1,7 +1,7 @@
 import { ArrowUp, Mic, Plus, Square } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { HermesCapabilityState } from "@hermes-ui/hermes-client";
+import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
 import styles from "./Composer.module.css";
 
 type ComposerProps = {
@@ -9,7 +9,7 @@ type ComposerProps = {
   isGenerating?: boolean;
   isStopRequested?: boolean;
   modelLabel?: string;
-  modelSelectorState?: HermesCapabilityState;
+  modelState?: HermesUiCapabilities["models"];
   onSend: (message: string) => void;
   onStop?: () => void;
   stopControlState?: HermesCapabilityState;
@@ -20,7 +20,7 @@ export function Composer({
   isGenerating = false,
   isStopRequested = false,
   modelLabel = "Hermes default",
-  modelSelectorState = "deferred",
+  modelState,
   onSend,
   onStop,
   stopControlState = "deferred"
@@ -80,8 +80,8 @@ export function Composer({
               <button
                 className={styles.modelButton}
                 type="button"
-                aria-label="Selected model placeholder"
-                title={modelSelectorTitle(modelSelectorState)}
+                aria-label="Provider and model selector disabled"
+                title={modelSelectorTitle(modelState)}
                 disabled
               >
                 {modelLabel}
@@ -126,14 +126,14 @@ export function Composer({
   );
 }
 
-function modelSelectorTitle(state: HermesCapabilityState) {
-  if (state === "available") {
-    return "Model list is available, but switching remains disabled until runtime behavior is verified.";
+function modelSelectorTitle(state?: HermesUiCapabilities["models"]) {
+  if (!state) {
+    return "Hermes model status is loading; runtime model switching is disabled.";
   }
-  if (state === "unavailable") {
-    return "Hermes has not advertised a usable model list for client-side switching.";
+  if (state.clientSelectable) {
+    return "Runtime model switching is available through the verified Hermes BFF path.";
   }
-  return "Hermes model selection is server-configured for now; provider switching is deferred.";
+  return state.reason || "Runtime model switching is not verified for the current Hermes session API.";
 }
 
 function stopControlTitle(state: HermesCapabilityState) {

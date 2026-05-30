@@ -41,6 +41,7 @@ function checkComponentSource() {
     return;
   }
   const component = readFileSync(componentPath, "utf8");
+  const chatView = readFileSync(chatViewPath, "utf8");
   const composer = readFileSync(composerPath, "utf8");
   const css = readFileSync(cssPath, "utf8");
 
@@ -64,10 +65,24 @@ function checkComponentSource() {
   record(
     "specific-running-suppresses-generic-thinking",
     existsSync(chatViewPath) &&
-      readFileSync(chatViewPath, "utf8").includes("!hasRunningActivity") &&
-      readFileSync(chatViewPath, "utf8").includes("makeElapsedActivityEvent") &&
-      readFileSync(chatViewPath, "utf8").includes("makeStoppedActivityEvent"),
+      chatView.includes("!hasRunningActivity") &&
+      chatView.includes("makeElapsedActivityEvent") &&
+      chatView.includes("makeStoppedActivityEvent"),
     "Chat view lets specific running activity replace generic Thinking and appends elapsed/stopped markers."
+  );
+  record(
+    "stream-delta-batching",
+    chatView.includes("accumulated += event.delta") &&
+      chatView.includes("window.requestAnimationFrame") &&
+      composer.includes("not one React update per token"),
+    "Chat view buffers deltas and flushes assistant text on animation frames."
+  );
+  record(
+    "model-selection-not-faked",
+    chatView.includes("providerModelState.clientSelectable ? providerModelState.selectedModelId : null") &&
+      composer.includes("Provider and model selector disabled") &&
+      composer.includes("Runtime model switching is not verified"),
+    "Provider/model control stays disabled and does not send a placeholder model id."
   );
   record(
     "stop-button-accessibility",

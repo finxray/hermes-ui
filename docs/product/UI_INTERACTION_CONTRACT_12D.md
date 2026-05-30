@@ -77,7 +77,7 @@ Audited UI elements: 40
 | 35 | Top menu | Tools section | Placeholder | Disabled and labelled as coming soon. |
 | 36 | Top menu | Help section | Placeholder | Disabled and labelled as coming soon. |
 | 37 | Composer | Attach context | Placeholder | Disabled; context attachment controls are deferred. |
-| 38 | Composer | Provider/model selector | Placeholder | Disabled; provider/model selector polish is deferred. |
+| 38 | Composer | Provider/model selector | Placeholder | Disabled; shows server-configured Hermes model state until runtime switching is verified through the BFF. |
 | 39 | Composer | Voice input | Placeholder | Disabled; voice input is deferred. |
 | 40 | Composer | Stop generation | Working | Enabled during generation in Slice 13G; aborts the active browser-to-BFF stream and records a cancelled UI activity marker. Server-side `/v1/runs/{run_id}/stop` remains deferred. |
 
@@ -122,7 +122,7 @@ Observed:
 - Durable evidence/supersession storage.
 - Memory mutation/admin actions.
 - Real stop/cancel streaming.
-- Provider/model selector polish.
+- Provider/model runtime switching.
 - Further UI polish.
 - Optional browser send smoke with `--send-test` before making live Hermes a
   default browser interaction gate.

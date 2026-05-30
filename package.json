@@ -22,6 +22,7 @@
     "check:ui-structure": "node scripts/check-ui-structure.mjs",
     "check:workspace-state": "node --no-warnings scripts/check-workspace-state.mjs",
     "smoke:mvp": "node scripts/mvp-smoke.mjs",
+    "smoke:markdown": "node scripts/markdown-fixture-smoke.mjs",
     "smoke:mvp:live": "node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory",
     "smoke:ui": "node scripts/ui-interaction-smoke.mjs",
     "smoke:ui:headed": "node scripts/ui-interaction-smoke.mjs --headed",

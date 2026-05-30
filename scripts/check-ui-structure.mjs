@@ -13,6 +13,9 @@ const requiredFiles = [
   "apps/web/src/components/chat/MessageMarkdown.tsx",
   "apps/web/src/components/chat/MessageMarkdown.module.css",
   "apps/web/src/components/chat/MessageBubble.module.css",
+  "apps/web/src/data/markdownFixture.ts",
+  "apps/web/src/app/design/markdown-fixture/page.tsx",
+  "apps/web/src/app/design/markdown-fixture/page.module.css",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 

@@ -136,12 +136,23 @@ It verifies:
 
 ## Remaining Improvements
 
+- deterministic visual fixture for markdown examples;
 - richer language coverage;
 - optional line numbers;
 - code block word-wrap toggle;
-- deterministic visual fixture for markdown examples;
 - virtualized long transcript rendering before very large sessions;
 - semantic copy/share/export actions after the export/import contract is ready.
+
+## Slice 14E Follow-Up
+
+Slice 14E added the deterministic fixture route and browser smoke for this
+renderer:
+
+```powershell
+npm run smoke:markdown
+```
+
+See `docs/design/MARKDOWN_FIXTURE_SMOKE_14E.md`.
 
 ## Next Recommended Slice
 

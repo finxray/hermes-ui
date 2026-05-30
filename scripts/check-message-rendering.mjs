@@ -7,8 +7,11 @@ const failures = [];
 const files = {
   markdown: "apps/web/src/components/chat/MessageMarkdown.tsx",
   markdownCss: "apps/web/src/components/chat/MessageMarkdown.module.css",
+  fixture: "apps/web/src/data/markdownFixture.ts",
+  fixtureRoute: "apps/web/src/app/design/markdown-fixture/page.tsx",
   bubble: "apps/web/src/components/chat/MessageBubble.tsx",
   bubbleCss: "apps/web/src/components/chat/MessageBubble.module.css",
+  markdownSmoke: "scripts/markdown-fixture-smoke.mjs",
   packageJson: "apps/web/package.json"
 };
 
@@ -20,8 +23,11 @@ for (const [name, path] of Object.entries(files)) {
 
 const markdown = read(files.markdown);
 const markdownCss = read(files.markdownCss);
+const fixture = read(files.fixture);
+const fixtureRoute = read(files.fixtureRoute);
 const bubble = read(files.bubble);
 const bubbleCss = read(files.bubbleCss);
+const markdownSmoke = read(files.markdownSmoke);
 const packageJson = JSON.parse(read(files.packageJson) || "{}");
 
 expect(markdown.includes("ReactMarkdown"), "MessageMarkdown uses ReactMarkdown.");
@@ -46,6 +52,24 @@ expect(bubble.includes(".split(\"\\n\")"), "User messages keep simple newline-pr
 expect(bubbleCss.includes(".messageCopyButton"), "Message copy action has scoped styling.");
 expect(Boolean(packageJson.dependencies?.["react-markdown"]), "react-markdown dependency is declared.");
 expect(Boolean(packageJson.dependencies?.["remark-gfm"]), "remark-gfm dependency is declared.");
+expect(fixture.includes("# Markdown Fixture Response"), "Fixture includes heading markdown.");
+expect(fixture.includes("**bold emphasis**") && fixture.includes("_italic nuance_"), "Fixture includes bold and italic markdown.");
+expect(fixture.includes("- Keep Hermes as the runtime.") && fixture.includes("1. Parse markdown safely."), "Fixture includes unordered and ordered lists.");
+expect(fixture.includes("- [x]") && fixture.includes("- [ ]"), "Fixture includes checked and unchecked task list items.");
+expect(fixture.includes("> Brain Memory inspection"), "Fixture includes blockquote markdown.");
+expect(fixture.includes("| Surface | Status | Notes |"), "Fixture includes GFM table markdown.");
+expect(fixture.includes("\\`inline code\\`"), "Fixture includes inline code markdown.");
+expect(fixture.includes("\\`\\`\\`typescript") && fixture.includes("\\`\\`\\`bash"), "Fixture includes TypeScript and bash fenced code blocks.");
+expect(fixture.includes("[Hermes UI link](https://example.com/hermes-ui)"), "Fixture includes a safe link.");
+expect(fixture.includes("RAW_HTML_SHOULD_NOT_RENDER"), "Fixture includes raw HTML sentinel.");
+expect(fixture.includes("partialMarkdownFixture") && fixture.includes("\\`\\`\\`typescript"), "Fixture includes partial markdown/code fence content.");
+expect(fixtureRoute.includes("/design/markdown-fixture") || fixtureRoute.includes("MarkdownFixturePage"), "Markdown fixture route exists.");
+expect(fixtureRoute.includes("aria-label=\"Markdown fixture\""), "Markdown fixture route exposes a fixture region label.");
+expect(fixtureRoute.includes("<MessageBubble") && fixtureRoute.includes("<MessageMarkdown"), "Fixture route renders complete and partial markdown examples.");
+expect(markdownSmoke.includes("/design/markdown-fixture"), "Markdown browser smoke targets the fixture route.");
+expect(markdownSmoke.includes("Copy code") && markdownSmoke.includes("Copy message"), "Markdown browser smoke checks copy buttons.");
+expect(markdownSmoke.includes("raw-html-fixture") && markdownSmoke.includes("RAW_HTML_SHOULD_NOT_RENDER"), "Markdown browser smoke checks raw HTML safety.");
+expect(markdownSmoke.includes("target") && markdownSmoke.includes("noreferrer"), "Markdown browser smoke checks safe link attributes.");
 
 if (failures.length > 0) {
   console.error("Message rendering checks failed:");

@@ -347,6 +347,19 @@ No Hermes streaming, Brain Memory BFF, memory scope, backend, storage,
 mutation/admin, or export/import behavior changed. See
 `docs/design/RICH_RESPONSE_RENDERER_14D.md`.
 
+## Checkpoint: Slice 14E markdown fixture smoke
+
+Slice 14E added deterministic rich-response fixture coverage on 2026-05-31.
+`/design/markdown-fixture` renders a complete assistant markdown fixture plus a
+partial streaming fixture without calling Hermes, Brain Memory, localStorage,
+or external services. `npm run smoke:markdown` verifies headings, paragraphs,
+lists, task lists, blockquotes, tables, inline code, fenced code blocks, safe
+links, copy buttons, raw HTML safety, partial markdown handling, dark code
+styling, and horizontal overflow. Source checks now assert the fixture and smoke
+contracts. No backend, Hermes, Brain Memory, memory mutation/admin, direct
+service, storage, or export/import behavior changed. See
+`docs/design/MARKDOWN_FIXTURE_SMOKE_14E.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

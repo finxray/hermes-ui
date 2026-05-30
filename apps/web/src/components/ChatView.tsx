@@ -175,10 +175,6 @@ export function ChatView({
         <div className="topbar-left">
           <div className="topbar-title">
             <h1>{activeSession?.title ?? "No chat selected"}</h1>
-            <p>
-              {activeProject.name} /{" "}
-              {activeSession?.summary ?? "Create a new local mock chat to start this project."}
-            </p>
           </div>
         </div>
       </header>

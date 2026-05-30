@@ -1,3 +1,4 @@
+import { normalizeHermesUiCapabilities } from "@hermes-ui/hermes-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 
 export async function fetchHermesStatus(): Promise<NormalizedHermesStatus> {
@@ -7,7 +8,7 @@ export async function fetchHermesStatus(): Promise<NormalizedHermesStatus> {
     });
 
     if (!response.ok) {
-      return {
+      return withUiCapabilities({
         mode: "error",
         configured: false,
         reachable: false,
@@ -20,12 +21,12 @@ export async function fetchHermesStatus(): Promise<NormalizedHermesStatus> {
           message: `Hermes status route returned HTTP ${response.status}.`
         },
         checkedAt: new Date().toISOString()
-      };
+      });
     }
 
     return (await response.json()) as NormalizedHermesStatus;
   } catch {
-    return {
+    return withUiCapabilities({
       mode: "error",
       configured: false,
       reachable: false,
@@ -38,6 +39,15 @@ export async function fetchHermesStatus(): Promise<NormalizedHermesStatus> {
         message: "Could not reach the local Hermes status route."
       },
       checkedAt: new Date().toISOString()
-    };
+    });
   }
+}
+
+function withUiCapabilities(
+  status: Omit<NormalizedHermesStatus, "uiCapabilities">
+): NormalizedHermesStatus {
+  return {
+    ...status,
+    uiCapabilities: normalizeHermesUiCapabilities(status)
+  };
 }

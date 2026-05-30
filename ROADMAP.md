@@ -141,6 +141,16 @@ smokes cover the new session-history contract. Stable keys, Hermes session ids,
 Brain Memory scope, Hermes streaming, and BFF boundaries remain unchanged. See
 `docs/product/SESSION_HISTORY_CONTRACT_13B.md`.
 
+## Checkpoint: Slice 13C Hermes capability mapping
+
+Slice 13C added a typed `uiCapabilities` interpretation layer to Hermes status
+on 2026-05-30. The UI now distinguishes Hermes-advertised capabilities from
+features that remain deferred in the Web UI, including runs, stop/cancel,
+approvals, tools, files/artifacts, provider/model selection, and memory scope
+headers. Hermes streaming, Brain Memory BFF logic, memory scope bridge behavior,
+stable keys, and admin/mutation boundaries remain unchanged. See
+`docs/architecture/HERMES_CAPABILITY_MAPPING_13C.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

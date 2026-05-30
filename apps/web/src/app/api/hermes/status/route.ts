@@ -7,7 +7,8 @@ export async function GET() {
   const status = await getHermesStatus({
     apiKey: process.env.HERMES_API_KEY,
     baseUrl: process.env.HERMES_API_BASE_URL,
-    enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false"
+    enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
+    memoryScopeBridgeEnabled: process.env.HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE !== "false"
   });
 
   return NextResponse.json(status, {

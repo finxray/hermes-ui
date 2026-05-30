@@ -45,7 +45,14 @@ async function main() {
   await checkOptionalDesignRoute();
   const hermesStatus = await checkJsonGet("/api/hermes/status", {
     required: true,
-    validate: (body) => body && typeof body === "object" && typeof body.mode === "string"
+    validate: (body) =>
+      body &&
+      typeof body === "object" &&
+      typeof body.mode === "string" &&
+      body.uiCapabilities &&
+      typeof body.uiCapabilities === "object" &&
+      body.uiCapabilities.chat &&
+      body.uiCapabilities.ui
   });
   const brainMemoryStatus = await checkJsonGet("/api/brain-memory/status", {
     required: true,

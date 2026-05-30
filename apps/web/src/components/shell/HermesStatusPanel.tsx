@@ -9,7 +9,7 @@ type HermesStatusPanelProps = {
 };
 
 export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatusPanelProps) {
-  const capabilityFlags = getCapabilityFlags(status);
+  const capabilityRows = getCapabilityRows(status);
   const checkedAt = status?.checkedAt ? new Date(status.checkedAt).toLocaleTimeString() : "Never";
 
   return (
@@ -39,11 +39,11 @@ export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatus
           {status?.baseUrl ? `Base URL: ${status.baseUrl}` : "Set HERMES_API_BASE_URL to enable real checks."}
         </div>
         {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
-        {capabilityFlags.length > 0 ? (
+        {capabilityRows.length > 0 ? (
           <div className={styles.capabilities} aria-label="Hermes capabilities">
-            {capabilityFlags.slice(0, 8).map((flag) => (
-              <span className={styles.pill} key={flag}>
-                {flag}
+            {capabilityRows.map((row) => (
+              <span className={styles.pill} key={row.label}>
+                {row.label}: {row.value}
               </span>
             ))}
           </div>
@@ -84,13 +84,44 @@ function statusLabel(status: NormalizedHermesStatus | null, isLoading: boolean) 
   return "Hermes unreachable";
 }
 
-function getCapabilityFlags(status: NormalizedHermesStatus | null) {
-  const features = status?.capabilities?.features;
-  if (!features || typeof features !== "object" || Array.isArray(features)) {
+function getCapabilityRows(status: NormalizedHermesStatus | null) {
+  const ui = status?.uiCapabilities;
+  if (!ui) {
     return [];
   }
 
-  return Object.entries(features)
-    .filter(([, value]) => value === true)
-    .map(([key]) => key.replaceAll("_", " "));
+  return [
+    {
+      label: "session stream",
+      value: ui.chat.sessionStreaming ? "available" : "unavailable"
+    },
+    {
+      label: "runs",
+      value: ui.runs.submission && ui.runs.eventsSse ? "available" : "unavailable"
+    },
+    {
+      label: "stop",
+      value: ui.cancellation.uiState
+    },
+    {
+      label: "approvals",
+      value: ui.approvals.uiState
+    },
+    {
+      label: "tools",
+      value: ui.tools.uiState
+    },
+    {
+      label: "model selector",
+      value: ui.models.uiState
+    },
+    {
+      label: "memory bridge",
+      value: ui.memory.instructionBridgeActive ? "active" : "inactive"
+    },
+    {
+      label: "files",
+      value: ui.files.uiState
+    }
+  ];
 }

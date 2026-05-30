@@ -31,6 +31,9 @@ Deliver:
 Goal: make UI controls derive from Hermes capabilities instead of hardcoded
 assumptions.
 
+Status: completed in Slice 13C. See
+`docs/architecture/HERMES_CAPABILITY_MAPPING_13C.md`.
+
 Deliver:
 
 - typed capability interpretation layer;
@@ -157,12 +160,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13C - Hermes API capabilities-driven UI mapping.
+Slice 13D - AgentActivityEvent frontend type/model.
 
 Reason:
 
-- Slice 13B made local session title/history behavior explicit and covered.
-- The next orchestration risk is making UI controls and placeholders derive
-  from Hermes capabilities rather than hardcoded assumptions.
-- This prepares later run/activity, stop/cancel, approvals, and provider/model
-  slices without changing Hermes streaming logic prematurely.
+- Slice 13C made Hermes capability interpretation typed and visible to the UI.
+- The next orchestration risk is defining stable frontend activity events before
+  adding richer tool, memory, run, approval, command, and artifact rendering.
+- This keeps later UI work contract-driven without changing Hermes streaming
+  logic prematurely.

@@ -12,6 +12,74 @@ export type HermesStatusError = {
   message: string;
 };
 
+export type HermesCapabilityState = "available" | "unavailable" | "unknown" | "deferred";
+
+export type HermesUiCapabilities = {
+  status: {
+    configured: boolean;
+    reachable: boolean;
+    mode: HermesStatusMode;
+  };
+  chat: {
+    canSend: boolean;
+    sessionChat: boolean;
+    sessionStreaming: boolean;
+    chatCompletions: boolean;
+    chatCompletionsStreaming: boolean;
+    responses: boolean;
+    responsesStreaming: boolean;
+  };
+  runs: {
+    submission: boolean;
+    status: boolean;
+    eventsSse: boolean;
+    reconnect: HermesCapabilityState;
+  };
+  tools: {
+    registry: boolean;
+    skills: boolean;
+    toolsets: boolean;
+    progressEvents: boolean;
+    uiState: HermesCapabilityState;
+  };
+  approvals: {
+    hermesAvailable: boolean;
+    uiState: HermesCapabilityState;
+  };
+  cancellation: {
+    runStopEndpoint: boolean;
+    streamAbortSupportedByUi: boolean;
+    uiState: HermesCapabilityState;
+  };
+  files: {
+    uploadSupported: boolean;
+    artifacts: HermesCapabilityState;
+    uiState: HermesCapabilityState;
+  };
+  models: {
+    listAvailable: boolean;
+    serverAdvertisedModel: string | null;
+    serverConfiguredOnly: boolean;
+    clientSelectable: boolean;
+    uiState: HermesCapabilityState;
+  };
+  memory: {
+    sessionContinuityHeader: string | null;
+    sessionKeyHeader: string | null;
+    metadataContextPropagation: HermesCapabilityState;
+    instructionBridgeActive: boolean;
+    memoryWriteApi: boolean;
+  };
+  ui: {
+    canSendChat: boolean;
+    canShowToolActivity: boolean;
+    canShowApprovals: boolean;
+    canShowFiles: boolean;
+    canShowProviderSelector: boolean;
+    stopControl: HermesCapabilityState;
+  };
+};
+
 export type HermesChatError = {
   kind:
     | "disabled"
@@ -33,6 +101,7 @@ export type NormalizedHermesStatus = {
   capabilities: Record<string, unknown> | null;
   health: Record<string, unknown> | null;
   models: Record<string, unknown> | null;
+  uiCapabilities: HermesUiCapabilities;
   error: HermesStatusError | null;
   checkedAt: string;
 };
@@ -41,6 +110,7 @@ export type HermesClientConfig = {
   baseUrl?: string | null;
   apiKey?: string | null;
   enabled?: boolean;
+  memoryScopeBridgeEnabled?: boolean;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
 };

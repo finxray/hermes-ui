@@ -181,14 +181,16 @@ export function ChatView({
         disabled={!activeSession}
         isGenerating={isGenerating}
         modelLabel={modelLabel}
+        modelSelectorState={hermesStatus?.uiCapabilities.models.uiState}
         onSend={handleSend}
+        stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
       />
     </section>
   );
 }
 
 function canUseRealHermes(status: NormalizedHermesStatus | null) {
-  return status?.mode === "real" && status.reachable;
+  return status?.mode === "real" && status.reachable && status.uiCapabilities.chat.canSend;
 }
 
 function createMessage(

@@ -1,20 +1,25 @@
 import { ArrowUp, Mic, Plus, Square } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import type { HermesCapabilityState } from "@hermes-ui/hermes-client";
 import styles from "./Composer.module.css";
 
 type ComposerProps = {
   disabled?: boolean;
   isGenerating?: boolean;
   modelLabel?: string;
+  modelSelectorState?: HermesCapabilityState;
   onSend: (message: string) => void;
+  stopControlState?: HermesCapabilityState;
 };
 
 export function Composer({
   disabled = false,
   isGenerating = false,
   modelLabel = "Hermes default",
-  onSend
+  modelSelectorState = "deferred",
+  onSend,
+  stopControlState = "deferred"
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
@@ -65,7 +70,7 @@ export function Composer({
                 className={styles.modelButton}
                 type="button"
                 aria-label="Selected model placeholder"
-                title="Provider and model switching is coming soon."
+                title={modelSelectorTitle(modelSelectorState)}
                 disabled
               >
                 {modelLabel}
@@ -92,11 +97,7 @@ export function Composer({
                 type="submit"
                 disabled={disabled || isGenerating || draft.trim().length === 0}
                 aria-label={isGenerating ? "Stop response coming soon" : "Send message"}
-                title={
-                  isGenerating
-                    ? "Stop response is not wired yet; real cancellation is deferred."
-                    : undefined
-                }
+                title={isGenerating ? stopControlTitle(stopControlState) : undefined}
               >
                 {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
               </button>
@@ -111,4 +112,21 @@ export function Composer({
       </form>
     </div>
   );
+}
+
+function modelSelectorTitle(state: HermesCapabilityState) {
+  if (state === "available") {
+    return "Model list is available, but switching remains disabled until runtime behavior is verified.";
+  }
+  if (state === "unavailable") {
+    return "Hermes has not advertised a usable model list for client-side switching.";
+  }
+  return "Hermes model selection is server-configured for now; provider switching is deferred.";
+}
+
+function stopControlTitle(state: HermesCapabilityState) {
+  if (state === "unavailable") {
+    return "Hermes has not advertised a stop endpoint for this UI path.";
+  }
+  return "Hermes advertises run stop, but this session stream path has no run-scoped cancellation wired yet; real cancellation is deferred.";
 }

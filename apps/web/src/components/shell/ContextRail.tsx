@@ -84,8 +84,10 @@ export function ContextRail({
           />
         ) : null}
 
-        {activeTab === "tools" ? <ToolActivitySection toolEvents={toolEvents} /> : null}
-        {activeTab === "files" ? <FilesSection artifacts={artifacts} /> : null}
+        {activeTab === "tools" ? (
+          <ToolActivitySection hermesStatus={hermesStatus} toolEvents={toolEvents} />
+        ) : null}
+        {activeTab === "files" ? <FilesSection artifacts={artifacts} hermesStatus={hermesStatus} /> : null}
       </div>
     </aside>
   );
@@ -231,7 +233,14 @@ function RetrievedMemorySection({ memoryEvidence }: { memoryEvidence: Session["m
   );
 }
 
-function ToolActivitySection({ toolEvents }: { toolEvents: Session["toolEvents"] }) {
+function ToolActivitySection({
+  hermesStatus,
+  toolEvents
+}: {
+  hermesStatus: NormalizedHermesStatus | null;
+  toolEvents: Session["toolEvents"];
+}) {
+  const toolState = hermesStatus?.uiCapabilities.tools.uiState ?? "unknown";
   return (
     <section className={styles.section} aria-labelledby="tool-activity-heading">
       <SectionLabel id="tool-activity-heading" icon={<Activity size={13} />} label="Tool activity" />
@@ -239,7 +248,7 @@ function ToolActivitySection({ toolEvents }: { toolEvents: Session["toolEvents"]
         <EmptyState
           compact
           title="No tool activity"
-          body="Hermes stream tool events will appear here when a connected agent emits them."
+          body={`Hermes stream tool events will appear here when emitted. Tool event UI is ${toolState}.`}
         />
       ) : (
         <ul className={styles.list}>
@@ -264,12 +273,23 @@ function ToolActivitySection({ toolEvents }: { toolEvents: Session["toolEvents"]
   );
 }
 
-function FilesSection({ artifacts }: { artifacts: Session["artifacts"] }) {
+function FilesSection({
+  artifacts,
+  hermesStatus
+}: {
+  artifacts: Session["artifacts"];
+  hermesStatus: NormalizedHermesStatus | null;
+}) {
+  const fileState = hermesStatus?.uiCapabilities.files.uiState ?? "unknown";
   return (
     <section className={styles.section} aria-labelledby="files-heading">
       <SectionLabel id="files-heading" icon={<FolderGit2 size={13} />} label="Files and artifacts" />
       {artifacts.length === 0 ? (
-        <EmptyState compact title="No files attached" body="Artifacts are local mock metadata for now." />
+        <EmptyState
+          compact
+          title="No files attached"
+          body={`Artifacts are local mock metadata for now. Real file/artifact UI is ${fileState}.`}
+        />
       ) : (
         <ul className={styles.list}>
           {artifacts.map((artifact) => (

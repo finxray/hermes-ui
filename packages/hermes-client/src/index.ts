@@ -1,4 +1,5 @@
 import type {
+  HermesCapabilityState,
   HermesChatError,
   HermesChatContext,
   HermesChatRequest,
@@ -8,6 +9,7 @@ import type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesStatusError,
+  HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
 
@@ -25,6 +27,7 @@ const ENDPOINTS: Array<{
 ];
 
 export type {
+  HermesCapabilityState,
   HermesChatError,
   HermesChatContext,
   HermesChatHistoryMessage,
@@ -35,6 +38,7 @@ export type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesStatusError,
+  HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
 
@@ -44,7 +48,7 @@ export async function getHermesStatus(
   const checkedAt = new Date().toISOString();
 
   if (config.enabled === false) {
-    return {
+    return withUiCapabilities({
       mode: "mock",
       configured: false,
       reachable: false,
@@ -57,11 +61,11 @@ export async function getHermesStatus(
         message: "Real Hermes status is disabled for this UI process."
       },
       checkedAt
-    };
+    }, config);
   }
 
   if (!config.baseUrl?.trim()) {
-    return {
+    return withUiCapabilities({
       mode: "unconfigured",
       configured: false,
       reachable: false,
@@ -74,12 +78,12 @@ export async function getHermesStatus(
         message: "Set HERMES_API_BASE_URL to enable real Hermes status checks."
       },
       checkedAt
-    };
+    }, config);
   }
 
   const base = parseBaseUrl(config.baseUrl);
   if (!base) {
-    return {
+    return withUiCapabilities({
       mode: "error",
       configured: true,
       reachable: false,
@@ -92,7 +96,7 @@ export async function getHermesStatus(
         message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL."
       },
       checkedAt
-    };
+    }, config);
   }
 
   const fetchImpl = config.fetchImpl ?? fetch;
@@ -119,7 +123,7 @@ export async function getHermesStatus(
   const reachable = results.some((result) => result.ok);
 
   if (!reachable) {
-    return {
+    return withUiCapabilities({
       mode: "error",
       configured: true,
       reachable: false,
@@ -132,10 +136,10 @@ export async function getHermesStatus(
         message: "Hermes did not return a successful health or capability response."
       },
       checkedAt
-    };
+    }, config);
   }
 
-  return {
+  return withUiCapabilities({
     mode: "real",
     configured: true,
     reachable: true,
@@ -145,6 +149,105 @@ export async function getHermesStatus(
     models,
     error: null,
     checkedAt
+  }, config);
+}
+
+export function normalizeHermesUiCapabilities(
+  status: Omit<NormalizedHermesStatus, "uiCapabilities">,
+  options: { memoryScopeBridgeEnabled?: boolean } = {}
+): HermesUiCapabilities {
+  const features = objectRecord(status.capabilities?.features);
+  const endpoints = objectRecord(status.capabilities?.endpoints);
+  const serverAdvertisedModel =
+    asString(status.capabilities?.model) ||
+    firstModelId(status.models) ||
+    null;
+  const sessionChat = flag(features, "session_chat") || hasEndpoint(endpoints, "session_chat");
+  const sessionStreaming =
+    flag(features, "session_chat_streaming") || hasEndpoint(endpoints, "session_chat_stream");
+  const chatCompletions =
+    flag(features, "chat_completions") || hasEndpoint(endpoints, "chat_completions");
+  const chatCompletionsStreaming = flag(features, "chat_completions_streaming");
+  const responses = flag(features, "responses_api") || hasEndpoint(endpoints, "responses");
+  const responsesStreaming = flag(features, "responses_streaming");
+  const runSubmission = flag(features, "run_submission") || hasEndpoint(endpoints, "runs");
+  const runStatus = flag(features, "run_status") || hasEndpoint(endpoints, "run_status");
+  const runEvents = flag(features, "run_events_sse") || hasEndpoint(endpoints, "run_events");
+  const runStop = flag(features, "run_stop") || hasEndpoint(endpoints, "run_stop");
+  const approvalEvents = flag(features, "approval_events");
+  const approvalResponse =
+    flag(features, "run_approval_response") || hasEndpoint(endpoints, "run_approval");
+  const skills = flag(features, "skills_api") || hasEndpoint(endpoints, "skills");
+  const toolsets = hasEndpoint(endpoints, "toolsets");
+  const progressEvents = flag(features, "tool_progress_events");
+  const sessionContinuityHeader = asString(features?.session_continuity_header) || null;
+  const sessionKeyHeader = asString(features?.session_key_header) || null;
+  const canSend = status.mode === "real" && status.reachable && sessionStreaming;
+
+  return {
+    status: {
+      configured: status.configured,
+      mode: status.mode,
+      reachable: status.reachable
+    },
+    chat: {
+      canSend,
+      chatCompletions,
+      chatCompletionsStreaming,
+      responses,
+      responsesStreaming,
+      sessionChat,
+      sessionStreaming
+    },
+    runs: {
+      eventsSse: runEvents,
+      reconnect: runEvents && runStatus ? "available" : runEvents ? "unknown" : "unavailable",
+      status: runStatus,
+      submission: runSubmission
+    },
+    tools: {
+      progressEvents,
+      registry: skills || toolsets,
+      skills,
+      toolsets,
+      uiState: progressEvents ? "available" : skills || toolsets ? "deferred" : "unavailable"
+    },
+    approvals: {
+      hermesAvailable: approvalEvents && approvalResponse,
+      uiState: approvalEvents && approvalResponse ? "deferred" : "unavailable"
+    },
+    cancellation: {
+      runStopEndpoint: runStop,
+      streamAbortSupportedByUi: false,
+      uiState: runStop ? "deferred" : "unavailable"
+    },
+    files: {
+      artifacts: "unknown",
+      uiState: "deferred",
+      uploadSupported: false
+    },
+    models: {
+      clientSelectable: false,
+      listAvailable: Boolean(status.models) || hasEndpoint(endpoints, "models"),
+      serverAdvertisedModel,
+      serverConfiguredOnly: true,
+      uiState: "deferred"
+    },
+    memory: {
+      instructionBridgeActive: options.memoryScopeBridgeEnabled !== false,
+      memoryWriteApi: flag(features, "memory_write_api"),
+      metadataContextPropagation: "unknown",
+      sessionContinuityHeader,
+      sessionKeyHeader
+    },
+    ui: {
+      canSendChat: canSend,
+      canShowApprovals: false,
+      canShowFiles: false,
+      canShowProviderSelector: false,
+      canShowToolActivity: progressEvents,
+      stopControl: runStop ? "deferred" : "unavailable"
+    }
   };
 }
 
@@ -358,6 +461,42 @@ async function checkSessionStreamingCapability(args: {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function withUiCapabilities(
+  status: Omit<NormalizedHermesStatus, "uiCapabilities">,
+  config: Pick<HermesClientConfig, "memoryScopeBridgeEnabled">
+): NormalizedHermesStatus {
+  return {
+    ...status,
+    uiCapabilities: normalizeHermesUiCapabilities(status, {
+      memoryScopeBridgeEnabled: config.memoryScopeBridgeEnabled
+    })
+  };
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function flag(value: Record<string, unknown> | null, key: string): boolean {
+  return value?.[key] === true;
+}
+
+function hasEndpoint(endpoints: Record<string, unknown> | null, key: string): boolean {
+  const endpoint = endpoints?.[key];
+  return Boolean(endpoint && typeof endpoint === "object" && !Array.isArray(endpoint));
+}
+
+function firstModelId(models: Record<string, unknown> | null): string {
+  const data = models?.data;
+  if (!Array.isArray(data)) {
+    return "";
+  }
+  const first = data.find((item) => item && typeof item === "object" && !Array.isArray(item));
+  return first ? asString((first as Record<string, unknown>).id) : "";
 }
 
 function parseBaseUrl(value: string): URL | null {

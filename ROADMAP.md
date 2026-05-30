@@ -79,6 +79,14 @@ separates working behavior, mock/local behavior, placeholders, broken controls,
 and hidden/removed controls so future slices can change behavior intentionally.
 The contract is documented in `docs/product/UI_INTERACTION_CONTRACT_12D.md`.
 
+## Checkpoint: Slice 12E browser interaction smoke
+
+Slice 12E added a lightweight Playwright browser smoke on 2026-05-30. The
+`npm run smoke:ui` command verifies root load, sidebar rows, rail toggles,
+settings popover, right rail tabs, composer typing, disabled placeholders, and
+horizontal overflow. Details are documented in
+`docs/checkpoints/UI_INTERACTION_SMOKE_12E.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

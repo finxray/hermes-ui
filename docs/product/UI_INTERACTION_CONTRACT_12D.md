@@ -97,6 +97,9 @@ Audited UI elements: 40
 - disabled composer placeholder controls,
 - explicit deferred stop/cancel copy.
 
+Slice 12E adds `scripts/ui-interaction-smoke.mjs` and `npm run smoke:ui` for
+browser-level regression coverage of the MVP shell contract.
+
 ## Browser Smoke Notes
 
 Browser smoke target: `http://127.0.0.1:3000/`
@@ -121,8 +124,11 @@ Observed:
 - Real stop/cancel streaming.
 - Provider/model selector polish.
 - Further UI polish.
-- Browser-level interaction regression harness beyond source and route smoke.
+- Optional browser send smoke with `--send-test` before making live Hermes a
+  default browser interaction gate.
 
 ## Next Recommended Slice
 
-Slice 12E: add a browser-level interaction regression harness for the MVP shell, covering sidebar selection, chat send, right rail tabs, settings popover, and disabled placeholder assertions without changing product behavior.
+Slice 12F: add a launch/runbook update that documents server modes, `smoke:mvp`,
+`smoke:ui`, live-service expectations, and troubleshooting for stale dev-server
+hydration.

@@ -1,7 +1,6 @@
 "use client";
 
 import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
-import type { KeyboardEvent } from "react";
 import styles from "./TopBar.module.css";
 
 type TopBarProps = {
@@ -17,28 +16,23 @@ export function TopBar({
   rightToggleId,
   rightCollapsed
 }: TopBarProps) {
-  const activateToggleOnKeyDown = (event: KeyboardEvent<HTMLLabelElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      document.getElementById(event.currentTarget.htmlFor)?.click();
-    }
+  const activateToggle = (toggleId: string) => {
+    document.getElementById(toggleId)?.click();
   };
 
   return (
     <header className={styles.topbar} aria-label="Brain Memory Studio workspace menu">
       <div className={styles.left}>
-        <label
+        <button
           className={styles.iconButton}
           aria-label={leftCollapsed ? "Open left sidebar" : "Collapse left sidebar"}
           aria-pressed={!leftCollapsed}
-          htmlFor={leftToggleId}
-          onKeyDown={activateToggleOnKeyDown}
-          role="button"
-          tabIndex={0}
+          onClick={() => activateToggle(leftToggleId)}
           title={leftCollapsed ? "Open left sidebar" : "Collapse left sidebar"}
+          type="button"
         >
           <PanelToggleIcon side="left" />
-        </label>
+        </button>
         <nav className={styles.menu} aria-label="Workspace sections">
           <button
             aria-current="page"
@@ -64,18 +58,16 @@ export function TopBar({
         </nav>
       </div>
       <div className={styles.right}>
-        <label
+        <button
           className={styles.iconButton}
           aria-label={rightCollapsed ? "Open right context panel" : "Collapse right context panel"}
           aria-pressed={!rightCollapsed}
-          htmlFor={rightToggleId}
-          onKeyDown={activateToggleOnKeyDown}
-          role="button"
-          tabIndex={0}
+          onClick={() => activateToggle(rightToggleId)}
           title={rightCollapsed ? "Open right context panel" : "Collapse right context panel"}
+          type="button"
         >
           <PanelToggleIcon side="right" />
-        </label>
+        </button>
       </div>
     </header>
   );

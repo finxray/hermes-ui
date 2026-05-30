@@ -20,6 +20,7 @@ Root package scripts:
 ```text
 npm run smoke:mvp
 npm run smoke:mvp:live
+npm run smoke:ui
 ```
 
 ## What It Checks
@@ -150,29 +151,26 @@ Exit code:
 - `0`: no failures.
 - nonzero: one or more failures.
 
-## Manual Browser Checklist
+## Browser Interaction Harness
 
-Browser automation is intentionally not added in this slice because no
-lightweight browser automation dependency is currently present.
+Slice 12E adds a browser-level interaction harness:
 
-Manual smoke checklist:
+```text
+npm run smoke:ui
+```
 
-- Open `http://127.0.0.1:3000/`.
-- Confirm the app loads as Brain Memory Studio.
-- Confirm the old green UI is gone.
-- Confirm project/session sidebar is visible.
-- Confirm composer textarea is visible.
-- Confirm typing into the composer enables the send button.
-- Confirm the right rail is visible.
-- Confirm `Context`, `Memory`, `Tools`, and `Files` panel tabs switch panels.
-- Confirm the settings control opens the settings/connection popover.
-- Confirm there is no horizontal page overflow at desktop width.
+It covers the former manual checklist with a real browser: root load, old green
+UI absence, sidebar presence, rail toggles, settings popover, right rail tabs,
+composer typing/enabled send state, disabled placeholders, and horizontal
+overflow. Details are documented in
+`docs/checkpoints/UI_INTERACTION_SMOKE_12E.md`.
 
 ## Known Limitations
 
-- The harness does not replace a real browser smoke test.
-- Composer send behavior is checked through source/accessibility targets and the
-  live BFF stream route, not through a browser-driven click.
+- `smoke:mvp` remains a route/source/BFF smoke. Browser interaction regressions
+  are covered by `smoke:ui`.
+- Default `smoke:ui` verifies composer typing and enabled send state, but does
+  not click Send unless `--send-test` is provided.
 - Real Brain Memory search/detail is only verified when the UI process is
   configured for a live Gateway.
 - Fast-token throughput is not stress-tested here.

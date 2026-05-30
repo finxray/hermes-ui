@@ -57,8 +57,8 @@ const topBar = readFileSync(join(root, "apps/web/src/components/shell/TopBar.tsx
 for (const token of [
   "leftToggleId",
   "rightToggleId",
-  "htmlFor={leftToggleId}",
-  "htmlFor={rightToggleId}",
+  "activateToggle(leftToggleId)",
+  "activateToggle(rightToggleId)",
   "aria-pressed={!leftCollapsed}",
   "aria-pressed={!rightCollapsed}",
   "title={leftCollapsed ?",

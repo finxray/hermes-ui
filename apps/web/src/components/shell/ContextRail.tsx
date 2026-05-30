@@ -7,9 +7,10 @@ import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
+import { createRunReplaySummary } from "@/lib/persistedActivityReplay";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import type { Project, Session } from "@/data/types";
+import type { PersistedActivityEvent, Project, Session } from "@/data/types";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ContextRail.module.css";
 
@@ -285,6 +286,7 @@ function RunHistorySection({ runRecords }: { runRecords: Session["runRecords"] }
 }
 
 function RunDetail({ run }: { run: Session["runRecords"][number] }) {
+  const replaySummary = createRunReplaySummary(run);
   return (
     <div className={styles.runDetail} aria-label="Selected run detail">
       <div className={styles.fieldGrid}>
@@ -307,11 +309,61 @@ function RunDetail({ run }: { run: Session["runRecords"][number] }) {
         <Metric label="approvals" value={run.activitySummary.approvalCount} />
       </div>
       <div className={styles.meta}>
-        {run.activitySummary.errorCount} errors - {run.activityEventIds.length} linked activity events
+        {run.activitySummary.errorCount} errors - {run.activityEventIds.length} linked activity events - {replaySummary.eventCount} persisted replay events
         {run.stoppedByUser ? " - stopped by user" : ""}
       </div>
+      <PersistedReplayList events={run.activityReplay} />
     </div>
   );
+}
+
+function PersistedReplayList({ events }: { events: PersistedActivityEvent[] }) {
+  return (
+    <section className={styles.replaySection} aria-label="Persisted activity replay">
+      <div className={styles.sectionLabel}>
+        <span>Persisted replay</span>
+      </div>
+      {events.length === 0 ? (
+        <EmptyState
+          compact
+          title="No persisted activity replay for this run"
+          body="This run has transcript and run metadata only."
+        />
+      ) : (
+        <ul className={styles.replayList}>
+          {events.slice(-8).map((event) => (
+            <li className={styles.replayRow} data-status={event.status} key={event.id}>
+              <span className={styles.cardTitle}>
+                <span>{event.title}</span>
+                <span className={styles.pill}>{event.status}</span>
+              </span>
+              <span className={styles.cardBody}>
+                {event.command?.commandPreview ??
+                  event.summary ??
+                  event.detailsPreview ??
+                  replayFallback(event)}
+              </span>
+              <span className={styles.meta}>
+                {event.type} - {event.sourceChannel}
+                {event.durationMs !== undefined ? ` - ${formatActivityDuration(event.durationMs)}` : ""}
+                {event.command?.exitCode !== undefined ? ` - exit ${event.command.exitCode}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function replayFallback(event: PersistedActivityEvent) {
+  if (event.memory?.operation) {
+    return `Memory ${event.memory.operation} activity`;
+  }
+  if (event.approval?.requestedAction) {
+    return event.approval.requestedAction;
+  }
+  return "Persisted activity metadata";
 }
 
 function ToolActivitySection({

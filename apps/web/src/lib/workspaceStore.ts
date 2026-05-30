@@ -2,6 +2,7 @@ import { workspaceMock } from "../data/mockWorkspace";
 import type {
   Artifact,
   ChatMessage,
+  PersistedActivityEvent,
   ProjectMemoryScope,
   PersistedWorkspaceState,
   Project,
@@ -16,6 +17,9 @@ import type {
 export const WORKSPACE_STORAGE_KEY = "hermes-ui.workspace.v1";
 export const WORKSPACE_STORAGE_VERSION = 1;
 export const DEFAULT_TENANT_ID = "tenant-local";
+
+const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|credential|password|secret|token/i;
+const BEARER_VALUE_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 
 type WorkspaceAction =
   | { type: "hydrate"; state: WorkspaceState }
@@ -554,7 +558,8 @@ function normalizeRunRecord(
     summary: asString(run.summary) || undefined,
     metadata: normalizeRecord(run.metadata),
     activityEventIds: normalizeStringList(run.activityEventIds).slice(-80),
-    activitySummary: normalizeActivitySummary(run.activitySummary)
+    activitySummary: normalizeActivitySummary(run.activitySummary),
+    activityReplay: normalizePersistedActivityEvents(run.activityReplay, id)
   };
 }
 
@@ -780,8 +785,187 @@ function normalizeActivitySummary(value: unknown): RunActivitySummary {
   };
 }
 
+function normalizePersistedActivityEvents(
+  value: unknown,
+  runId: string
+): PersistedActivityEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((event) => normalizePersistedActivityEvent(event, runId))
+    .filter((event): event is PersistedActivityEvent => Boolean(event))
+    .slice(-40);
+}
+
+function normalizePersistedActivityEvent(
+  value: unknown,
+  runId: string
+): PersistedActivityEvent | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const source = value as Partial<PersistedActivityEvent>;
+  const id = asString(source.id);
+  const title = truncateText(asString(source.title), 160);
+  if (!id || !title) {
+    return null;
+  }
+
+  return {
+    id,
+    runId: asString(source.runId) || runId,
+    type: normalizePersistedActivityType(source.type),
+    status: normalizePersistedActivityStatus(source.status),
+    title,
+    summary: truncateText(asString(source.summary), 900) || undefined,
+    startedAt: normalizeTimestamp(source.startedAt),
+    completedAt: normalizeTimestamp(source.completedAt),
+    durationMs: normalizeOptionalCount(source.durationMs),
+    collapsedByDefault: source.collapsedByDefault !== false,
+    source: normalizePersistedActivitySource(source.source),
+    sourceChannel: normalizeRunSourceChannel(source.sourceChannel),
+    hermes: normalizeHermesReplay(source.hermes),
+    memory: normalizeMemoryReplay(source.memory),
+    command: normalizeCommandReplay(source.command),
+    approval: normalizeApprovalReplay(source.approval),
+    artifact: normalizeArtifactReplay(source.artifact),
+    detailsPreview: truncateText(asString(source.detailsPreview), 1400) || undefined,
+    metadata: normalizePersistedMetadata(source.metadata)
+  };
+}
+
 function normalizeCount(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function normalizeOptionalCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : undefined;
+}
+
+function normalizePersistedActivityType(value: unknown): PersistedActivityEvent["type"] {
+  const normalized = asString(value).trim().toLowerCase();
+  if (
+    normalized === "reasoning" ||
+    normalized === "command" ||
+    normalized === "tool" ||
+    normalized === "memory" ||
+    normalized === "file" ||
+    normalized === "approval" ||
+    normalized === "error" ||
+    normalized === "elapsed" ||
+    normalized === "status" ||
+    normalized === "stream"
+  ) {
+    return normalized;
+  }
+  return "status";
+}
+
+function normalizePersistedActivityStatus(value: unknown): PersistedActivityEvent["status"] {
+  const normalized = asString(value).trim().toLowerCase();
+  if (
+    normalized === "queued" ||
+    normalized === "running" ||
+    normalized === "completed" ||
+    normalized === "failed" ||
+    normalized === "cancelled" ||
+    normalized === "waiting_for_approval" ||
+    normalized === "info"
+  ) {
+    return normalized;
+  }
+  return "info";
+}
+
+function normalizePersistedActivitySource(value: unknown): PersistedActivityEvent["source"] {
+  const normalized = asString(value).trim().toLowerCase();
+  if (
+    normalized === "hermes" ||
+    normalized === "brain-memory" ||
+    normalized === "ui" ||
+    normalized === "mcp" ||
+    normalized === "unknown"
+  ) {
+    return normalized;
+  }
+  return "unknown";
+}
+
+function normalizeHermesReplay(value: unknown): PersistedActivityEvent["hermes"] {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  return compactRecord({
+    eventType: asString(source.eventType),
+    runId: asString(source.runId),
+    sessionId: asString(source.sessionId),
+    toolCallId: asString(source.toolCallId),
+    toolName: asString(source.toolName)
+  });
+}
+
+function normalizeMemoryReplay(value: unknown): PersistedActivityEvent["memory"] {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  return compactRecord({
+    memoryId: asString(source.memoryId),
+    operation: asString(source.operation),
+    projectKey: asString(source.projectKey),
+    scopeStatus: asString(source.scopeStatus),
+    sessionKey: asString(source.sessionKey)
+  });
+}
+
+function normalizeCommandReplay(value: unknown): PersistedActivityEvent["command"] {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  return compactRecord({
+    commandPreview: truncateText(asString(source.commandPreview), 900),
+    cwd: truncateText(asString(source.cwd), 512),
+    exitCode: typeof source.exitCode === "number" && Number.isFinite(source.exitCode) ? source.exitCode : undefined,
+    outputPreview: truncateText(asString(source.outputPreview), 900),
+    sourceChannel: asString(source.sourceChannel) ? normalizeRunSourceChannel(source.sourceChannel) : undefined,
+    stderrPreview: truncateText(asString(source.stderrPreview), 900),
+    stdoutPreview: truncateText(asString(source.stdoutPreview), 900),
+    truncated: source.truncated === true ? true : undefined
+  });
+}
+
+function normalizeApprovalReplay(value: unknown): PersistedActivityEvent["approval"] {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  return compactRecord({
+    approvalId: asString(source.approvalId),
+    decision: asString(source.decision),
+    requestedAction: asString(source.requestedAction),
+    riskLevel: asString(source.riskLevel)
+  });
+}
+
+function normalizeArtifactReplay(value: unknown): PersistedActivityEvent["artifact"] {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  return compactRecord({
+    fileId: asString(source.fileId),
+    kind: asString(source.kind),
+    path: truncateText(asString(source.path), 512)
+  });
+}
+
+function compactRecord<T extends Record<string, unknown>>(value: T): T | undefined {
+  const entries = Object.entries(value).filter(([, child]) => child !== undefined && child !== "");
+  return entries.length > 0 ? Object.fromEntries(entries) as T : undefined;
 }
 
 function normalizeStringList(value: unknown): string[] {
@@ -794,9 +978,54 @@ function normalizeRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
+function normalizePersistedMetadata(value: unknown): Record<string, unknown> | undefined {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  const entries = Object.entries(source)
+    .slice(0, 16)
+    .map(([key, child]) => [
+      key,
+      SECRET_KEY_PATTERN.test(key) ? "[redacted]" : normalizePersistedMetadataValue(child)
+    ] as const)
+    .filter(([, child]) => child !== undefined);
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function normalizePersistedMetadataValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return truncateText(value, 900);
+  }
+  if (typeof value === "number" || typeof value === "boolean" || value === null) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 12).map((item) => normalizePersistedMetadataValue(item));
+  }
+  if (value && typeof value === "object") {
+    return truncateText(JSON.stringify(value), 900);
+  }
+  return undefined;
+}
+
 function normalizeTimestamp(value: unknown): string | undefined {
   const text = asString(value);
   return text && Number.isFinite(Date.parse(text)) ? text : undefined;
+}
+
+function truncateText(value: string, maxLength: number): string {
+  const clean = redactText(value).trim();
+  if (!clean) {
+    return "";
+  }
+  return clean.length > maxLength
+    ? `${clean.slice(0, Math.max(0, maxLength - 14))}\n... truncated`
+    : clean;
+}
+
+function redactText(value: string) {
+  return value.replace(BEARER_VALUE_PATTERN, "Bearer [redacted]");
 }
 
 function computeDurationMs(startedAt?: string, completedAt?: string) {

@@ -280,6 +280,7 @@ function checkRunRecordPersistence() {
       providerLabel: "Hermes server config",
       summary: "Check local run persistence",
       activityEventIds: [],
+      activityReplay: [],
       activitySummary: {
         approvalCount: 0,
         commandCount: 0,
@@ -301,6 +302,31 @@ function checkRunRecordPersistence() {
     runId: "run-check",
     patch: {
       activityEventIds: ["activity-tool", "activity-memory", "activity-command"],
+      activityReplay: [
+        {
+          id: "activity-command",
+          runId: "run-check",
+          type: "command",
+          status: "completed",
+          title: "Command completed",
+          summary: "Authorization: Bearer abc123",
+          collapsedByDefault: true,
+          source: "mcp",
+          sourceChannel: "web-ui",
+          command: {
+            commandPreview: "npm test",
+            cwd: "C:/repo",
+            exitCode: 0,
+            stdoutPreview: `${"ok\n".repeat(300)}Authorization: Bearer abc123`,
+            sourceChannel: "web-ui"
+          },
+          detailsPreview: "token=Bearer abc123",
+          metadata: {
+            api_key: "secret",
+            source_channel: "web-ui"
+          }
+        }
+      ],
       activitySummary: {
         approvalCount: 1,
         commandCount: 1,
@@ -319,6 +345,10 @@ function checkRunRecordPersistence() {
   assert.equal(updated?.runRecords[0].status, "completed");
   assert.equal(updated?.runRecords[0].durationMs, 3500);
   assert.equal(updated?.runRecords[0].activitySummary.memoryCount, 1);
+  assert.equal(updated?.runRecords[0].activityReplay.length, 1);
+  assert.equal(updated?.runRecords[0].activityReplay[0].sourceChannel, "web-ui");
+  assert.equal(updated?.runRecords[0].activityReplay[0].metadata?.api_key, "[redacted]");
+  assert(!JSON.stringify(updated?.runRecords[0].activityReplay).includes("abc123"));
   assert.equal(updated?.runRecords[0].hermesRunId, "hermes-run-check");
   assert.equal(updated?.memoryScope.stableSessionKey, stableSessionKey);
   assert.equal(updated?.hermesSessionId, hermesSessionId);
@@ -369,13 +399,30 @@ function checkRunRecordPersistence() {
       activitySummary: {
         commandCount: 2
       },
-      activityEventIds: ["activity-1"]
+      activityEventIds: ["activity-1"],
+      activityReplay: [
+        {
+          id: "activity-1",
+          runId: "run-malformed",
+          type: "bad",
+          status: "bad",
+          title: "Replay with Authorization: Bearer abc123",
+          collapsedByDefault: true,
+          source: "bad",
+          sourceChannel: "telegram",
+          detailsPreview: "Authorization: Bearer abc123"
+        }
+      ]
     }
   ];
   const normalizedMalformed = workspaceReducer(base, { type: "hydrate", state: malformed });
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].status, "completed");
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].sourceChannel, "unknown");
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activitySummary.commandCount, 2);
+  assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].type, "status");
+  assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].status, "info");
+  assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].sourceChannel, "telegram");
+  assert(!JSON.stringify(normalizedMalformed.sessions[0].runRecords[0].activityReplay).includes("abc123"));
 }
 
 function checkArchiveRepairsActiveSession() {

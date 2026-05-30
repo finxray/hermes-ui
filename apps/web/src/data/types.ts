@@ -78,6 +78,75 @@ export type RunActivitySummary = {
   errorCount: number;
 };
 
+export type PersistedActivityEvent = {
+  id: string;
+  runId: string;
+  type:
+    | "reasoning"
+    | "command"
+    | "tool"
+    | "memory"
+    | "file"
+    | "approval"
+    | "error"
+    | "elapsed"
+    | "status"
+    | "stream";
+  status:
+    | "queued"
+    | "running"
+    | "completed"
+    | "failed"
+    | "cancelled"
+    | "waiting_for_approval"
+    | "info";
+  title: string;
+  summary?: string;
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  collapsedByDefault: boolean;
+  source: "hermes" | "brain-memory" | "ui" | "mcp" | "unknown";
+  sourceChannel: RunRecordSourceChannel;
+  hermes?: {
+    sessionId?: string;
+    runId?: string;
+    eventType?: string;
+    toolName?: string;
+    toolCallId?: string;
+  };
+  memory?: {
+    memoryId?: string;
+    operation?: string;
+    projectKey?: string;
+    sessionKey?: string;
+    scopeStatus?: string;
+  };
+  command?: {
+    commandPreview?: string;
+    cwd?: string;
+    exitCode?: number;
+    stdoutPreview?: string;
+    stderrPreview?: string;
+    outputPreview?: string;
+    truncated?: boolean;
+    sourceChannel?: RunRecordSourceChannel;
+  };
+  approval?: {
+    approvalId?: string;
+    decision?: string;
+    requestedAction?: string;
+    riskLevel?: string;
+  };
+  artifact?: {
+    fileId?: string;
+    path?: string;
+    kind?: string;
+  };
+  detailsPreview?: string;
+  metadata?: Record<string, unknown>;
+};
+
 export type RunRecord = {
   id: string;
   projectId: string;
@@ -98,6 +167,7 @@ export type RunRecord = {
   metadata?: Record<string, unknown>;
   activityEventIds: string[];
   activitySummary: RunActivitySummary;
+  activityReplay: PersistedActivityEvent[];
 };
 
 export type StudioArtifactKind =

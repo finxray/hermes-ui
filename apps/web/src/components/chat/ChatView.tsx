@@ -10,11 +10,16 @@ import {
   makeStoppedActivityEvent
 } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
+import {
+  createPersistedActivityEvent,
+  limitPersistedActivityEvents
+} from "@/lib/persistedActivityReplay";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesUiCapabilities, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type {
   ChatMessage,
   ModelChoice,
+  PersistedActivityEvent,
   Project,
   RunActivitySummary,
   RunRecord,
@@ -79,6 +84,7 @@ export function ChatView({
     const runRecordId = `run-${crypto.randomUUID()}`;
     const runStartedAt = new Date().toISOString();
     let runActivityIds: string[] = [];
+    let runActivityReplay: PersistedActivityEvent[] = [];
     let runSummary = makeEmptyRunActivitySummary();
     let hermesRunId: string | undefined;
 
@@ -89,10 +95,15 @@ export function ChatView({
     const recordRunActivity: ActivityRecorder = (sessionId, activityEvent) => {
       appendActivityEvent(sessionId, activityEvent);
       runActivityIds = [...new Set([...runActivityIds, activityEvent.id])].slice(-80);
+      runActivityReplay = limitPersistedActivityEvents([
+        ...runActivityReplay,
+        createPersistedActivityEvent(activityEvent, runRecordId)
+      ]);
       runSummary = addActivityToRunSummary(runSummary, activityEvent);
       hermesRunId = activityEvent.hermes?.runId || hermesRunId;
       updateRunRecord({
         activityEventIds: runActivityIds,
+        activityReplay: runActivityReplay,
         activitySummary: runSummary,
         hermesRunId
       });
@@ -114,6 +125,7 @@ export function ChatView({
       providerLabel: providerModelState.currentProviderLabel,
       summary: summarizeRunPrompt(content),
       activityEventIds: [],
+      activityReplay: [],
       activitySummary: runSummary
     });
     setAssistantHasContent(false);
@@ -131,6 +143,7 @@ export function ChatView({
       updateRunRecord({
         completedAt,
         durationMs: computeRunElapsed(runStartedAt, completedAt),
+        activityReplay: runActivityReplay,
         status: "failed",
         summary: "Hermes unavailable; no real agent call was made."
       });
@@ -260,6 +273,7 @@ export function ChatView({
       updateRunRecord({
         completedAt,
         durationMs: computeRunElapsed(runStartedAt, completedAt),
+        activityReplay: runActivityReplay,
         status: "stopped",
         stoppedByUser: true,
         summary: accumulated.trim()
@@ -291,6 +305,7 @@ export function ChatView({
     updateRunRecord({
       completedAt,
       durationMs: computeRunElapsed(runStartedAt, completedAt),
+      activityReplay: runActivityReplay,
       status: hadStreamError ? "failed" : "completed",
       summary: hadStreamError
         ? "Hermes stream failed."

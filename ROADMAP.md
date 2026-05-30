@@ -274,6 +274,18 @@ normalization states. Full activity event persistence, backend run history,
 cross-channel discovery, retry/rerun controls, and export remain deferred. See
 `docs/product/RUN_HISTORY_SESSION_REPLAY_13M.md`.
 
+## Checkpoint: Slice 13N persisted activity replay
+
+Slice 13N added bounded, redacted `PersistedActivityEvent` snapshots to
+`RunRecord.activityReplay[]` on 2026-05-31. Web UI-created runs now keep compact
+display metadata for activity replay after refresh, including source/channel,
+status, timing, Hermes ids, Brain Memory scope labels, command previews,
+approval metadata, artifact hints, and redacted details previews. The Context
+rail shows persisted replay for selected runs. Full raw payloads, full
+stdout/stderr/output, secrets, binaries, command rerun handles, backend
+persistence, cross-channel discovery, and Telegram integration remain excluded.
+See `docs/product/PERSISTED_ACTIVITY_REPLAY_13N.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

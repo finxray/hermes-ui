@@ -11,6 +11,7 @@ const cssPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.m
 const chatViewPath = resolve(root, "apps/web/src/components/chat/ChatView.tsx");
 const appShellPath = resolve(root, "apps/web/src/components/shell/AppShell.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
+const replayHelperPath = resolve(root, "apps/web/src/lib/persistedActivityReplay.ts");
 const memoryTimelinePath = resolve(root, "apps/web/src/lib/memoryTimeline.ts");
 const memoryConsolePath = resolve(root, "apps/web/src/components/memory/BrainMemoryConsole.tsx");
 const checks = [];
@@ -38,6 +39,7 @@ function checkFilesExist() {
   record("composer-exists", existsSync(composerPath), "Composer component file exists.");
   record("css-exists", existsSync(cssPath), "AgentActivityBlock CSS module exists.");
   record("memory-timeline-helper-exists", existsSync(memoryTimelinePath), "Memory timeline helper file exists.");
+  record("persisted-replay-helper-exists", existsSync(replayHelperPath), "Persisted activity replay helper file exists.");
   record("memory-console-exists", existsSync(memoryConsolePath), "Brain Memory console component file exists.");
 }
 
@@ -51,6 +53,7 @@ function checkComponentSource() {
   const composer = readFileSync(composerPath, "utf8");
   const memoryConsole = readFileSync(memoryConsolePath, "utf8");
   const memoryTimeline = readFileSync(memoryTimelinePath, "utf8");
+  const persistedReplay = readFileSync(replayHelperPath, "utf8");
   const css = readFileSync(cssPath, "utf8");
 
   record(
@@ -124,6 +127,23 @@ function checkComponentSource() {
     "Tools rail exposes a compact Recent commands section with an honest empty state."
   );
   record(
+    "run-history-persisted-replay",
+    contextRailHasPersistedReplay() &&
+      persistedReplay.includes("createPersistedActivityEvent") &&
+      persistedReplay.includes("MAX_PERSISTED_ACTIVITY_EVENTS_PER_RUN") &&
+      persistedReplay.includes("restoreActivityEventFromPersisted") &&
+      persistedReplay.includes("createSessionExportPreview"),
+    "Run history exposes persisted replay and helper supports compact replay/export shapes."
+  );
+  record(
+    "persisted-replay-no-rerun",
+    !persistedReplay.includes("fetch(") &&
+      !persistedReplay.includes("exec(") &&
+      !persistedReplay.includes("localStorage") &&
+      !persistedReplay.includes("dangerouslySetInnerHTML"),
+    "Persisted replay helper is local shape logic only, with no network, storage, execution, or unsafe HTML."
+  );
+  record(
     "memory-timeline-right-rail",
     memoryConsole.includes("Memory activity") &&
       memoryConsole.includes("No memory activity in this session yet.") &&
@@ -176,6 +196,7 @@ function checkComponentSource() {
 
 async function checkHelperBehavior() {
   const activity = await importHelperModule(helperPath);
+  const replay = await importHelperModule(replayHelperPath);
   const memoryTimeline = await importHelperModule(memoryTimelinePath);
   record(
     "duration-format",
@@ -267,6 +288,19 @@ async function checkHelperBehavior() {
       failedCommand.command?.stderrPreview === "Authorization: Bearer [redacted]" &&
       !JSON.stringify(failedCommand).includes("abc123"),
     "Failed command metadata is status-correct and redacted before rendering."
+  );
+
+  const persisted = replay.createPersistedActivityEvent(failedCommand, "run-render");
+  const restored = replay.restoreActivityEventFromPersisted(persisted);
+  const bounded = replay.limitPersistedActivityEvents(
+    Array.from({ length: 45 }, (_, index) => ({ ...persisted, id: `persisted-${index}` }))
+  );
+  record(
+    "persisted-replay-helper",
+    persisted.command?.stderrPreview === "Authorization: Bearer [redacted]" &&
+      restored.details?.replay === true &&
+      bounded.length === 40,
+    "Persisted replay helper redacts, restores display-only events, and bounds snapshots."
   );
 
   const memoryStore = activity.createActivityEventFromHermesToolEvent({
@@ -368,6 +402,22 @@ function contextRailHasRecentCommands() {
     contextRail.includes("No command activity in this session yet.") &&
     contextRail.includes("extractCommandDetails") &&
     contextRail.includes("CommandActivityRow") &&
+    !contextRail.includes("exec(")
+  );
+}
+
+function contextRailHasPersistedReplay() {
+  const contextRailPath = resolve(root, "apps/web/src/components/shell/ContextRail.tsx");
+  if (!existsSync(contextRailPath)) {
+    return false;
+  }
+  const contextRail = readFileSync(contextRailPath, "utf8");
+  return (
+    contextRail.includes("Persisted replay") &&
+    contextRail.includes("No persisted activity replay for this run") &&
+    contextRail.includes("createRunReplaySummary") &&
+    contextRail.includes("PersistedReplayList") &&
+    !contextRail.includes("fetch(") &&
     !contextRail.includes("exec(")
   );
 }

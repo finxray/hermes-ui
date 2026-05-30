@@ -165,6 +165,13 @@ message ids, optional Hermes run id, activity event ids, and activity counts.
 They do not persist full `AgentActivityEvent` payloads yet and do not discover
 Hermes/Telegram/CLI/API runs created outside the Web UI.
 
+Slice 13N adds bounded `PersistedActivityEvent` snapshots on
+`RunRecord.activityReplay[]`. These are compact, redacted display records for
+local replay/export shape, not full raw activity payloads. They preserve source
+channel, ids, command/memory/approval/artifact display metadata, details
+previews, and activity timing while excluding secrets, binary data, raw stdout
+streams, and command rerun behavior.
+
 Approval fields:
 
 ```ts
@@ -327,7 +334,7 @@ Expanded by default:
 
 - No BFF normalization change is made.
 - No persisted full activity timeline is added.
-- No persisted activity-event array is added to workspace state.
+- No persisted raw `AgentActivityEvent` array is added to workspace state.
 - No approvals, stop/cancel, file upload, or memory mutation is implemented.
 - No hidden/private chain-of-thought is displayed. Future public reasoning
   summaries require a separate capability-gated slice.

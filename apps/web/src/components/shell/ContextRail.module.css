@@ -232,6 +232,31 @@
   padding-top: 2px;
 }
 
+.replaySection {
+  display: grid;
+  gap: 10px;
+}
+
+.replayList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.replayRow {
+  display: grid;
+  gap: 4px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.replayRow[data-status="failed"] .pill,
+.replayRow[data-status="cancelled"] .pill {
+  color: var(--danger);
+}
+
 .toolRow,
 .commandRow,
 .artifactRow {

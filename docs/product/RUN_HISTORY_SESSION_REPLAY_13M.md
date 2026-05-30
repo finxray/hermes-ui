@@ -70,6 +70,7 @@ type RunRecord = {
     approvalCount: number;
     errorCount: number;
   };
+  activityReplay: PersistedActivityEvent[]; // added in Slice 13N
 };
 ```
 
@@ -206,3 +207,11 @@ Reason: Slice 13M stores compact run metadata and links to live activity event
 ids, but full replay still cannot survive refresh. The next safe step is a
 bounded, redacted, local `AgentActivityEvent` persistence/export contract that
 does not change Hermes streaming or backend storage.
+
+## Slice 13N Update
+
+Slice 13N adds `RunRecord.activityReplay[]`, a bounded redacted
+`PersistedActivityEvent` snapshot list for Web UI-created runs. This preserves
+enough compact activity metadata to inspect a selected run after refresh while
+still excluding full raw payloads, full stdout/stderr/output, secrets, binary
+data, command execution handles, rerun behavior, and backend persistence.

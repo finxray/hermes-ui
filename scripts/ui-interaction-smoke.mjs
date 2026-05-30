@@ -565,6 +565,18 @@ async function checkRunHistoryStatus(expectedStatus, name) {
     runHistory.getByText(expectedStatus, { exact: true }).first(),
     `Run history includes a ${expectedStatus} Web UI run.`
   );
+  await expectVisible(
+    `${name}-persisted-replay`,
+    runHistory.getByText("Persisted replay", { exact: true }).first(),
+    "Selected run exposes persisted replay activity."
+  );
+  if (expectedStatus === "stopped") {
+    await expectVisible(
+      `${name}-persisted-stopped-event`,
+      runHistory.getByText("Stopped", { exact: true }).first(),
+      "Stopped run replay includes the persisted stopped activity."
+    );
+  }
 }
 
 async function waitForAssistantResponse(initialAssistantCount) {

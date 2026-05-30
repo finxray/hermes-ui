@@ -6,6 +6,7 @@ import ts from "typescript";
 
 const root = resolve(process.cwd());
 const sourcePath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
+const replayPath = resolve(root, "apps/web/src/lib/persistedActivityReplay.ts");
 const source = readFileSync(sourcePath, "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
@@ -18,6 +19,7 @@ const compiled = ts.transpileModule(source, {
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled.outputText).toString("base64")}`;
 const activity = await import(moduleUrl);
+const replay = await importHelperModule(replayPath);
 
 const checks = [];
 
@@ -40,6 +42,10 @@ checkErrorEvent();
 checkUnknownRunFallback();
 checkElapsedEvent();
 checkStoppedEvent();
+checkPersistedReplayRedaction();
+checkPersistedReplayBounding();
+checkPersistedReplayRestoreAndSummary();
+checkSessionExportPreviewShape();
 checkDurationFormatting();
 checkDurationHelpers();
 checkSecretRedaction();
@@ -449,6 +455,134 @@ function checkStoppedEvent() {
   );
 }
 
+function checkPersistedReplayRedaction() {
+  const event = activity.createActivityEventFromHermesToolEvent({
+    type: "tool_event",
+    name: "shell",
+    status: "completed",
+    payload: {
+      api_key: "super-secret",
+      channel: "web-ui",
+      command: "echo token",
+      cwd: "C:/repo",
+      stdout: `${"line\n".repeat(400)}Authorization: Bearer abc123`,
+      stderr: "token=Bearer abc123"
+    }
+  }, { id: "persist-command" });
+  const persisted = replay.createPersistedActivityEvent(event, "run-persist");
+  const serialized = JSON.stringify(persisted);
+
+  record(
+    "persisted-replay-redaction",
+    persisted.runId === "run-persist" &&
+      persisted.sourceChannel === "web-ui" &&
+      persisted.command?.stdoutPreview?.includes("... truncated") &&
+      persisted.command?.stderrPreview === "token=Bearer [redacted]" &&
+      serialized.includes("[redacted]") &&
+      !serialized.includes("abc123") &&
+      !serialized.includes("super-secret"),
+    "persisted replay snapshots redact secrets and truncate command previews."
+  );
+}
+
+function checkPersistedReplayBounding() {
+  const events = Array.from({ length: 55 }, (_, index) => ({
+    id: `event-${index}`,
+    runId: "run-bounded",
+    type: "status",
+    status: "info",
+    title: `Event ${index}`,
+    collapsedByDefault: true,
+    source: "ui",
+    sourceChannel: "web-ui"
+  }));
+  const bounded = replay.limitPersistedActivityEvents(events, 40);
+
+  record(
+    "persisted-replay-bounded",
+    bounded.length === 40 &&
+      bounded[0].id === "event-15" &&
+      replay.MAX_PERSISTED_ACTIVITY_EVENTS_PER_RUN === 40,
+    "persisted replay keeps only the latest bounded activity snapshots per run."
+  );
+}
+
+function checkPersistedReplayRestoreAndSummary() {
+  const stopped = activity.makeStoppedActivityEvent({
+    startedAt: "2026-05-30T00:00:00.000Z",
+    stoppedAt: "2026-05-30T00:00:04.000Z",
+    durationMs: 4000
+  });
+  const persisted = replay.createPersistedActivityEvent(stopped, "run-stopped");
+  const restored = replay.restoreActivityEventFromPersisted(persisted);
+  const summary = replay.createRunReplaySummary(
+    {
+      id: "run-stopped",
+      projectId: "project",
+      sessionId: "session",
+      hermesSessionId: "hermes-session",
+      sourceChannel: "web-ui",
+      status: "stopped",
+      startedAt: "2026-05-30T00:00:00.000Z",
+      stoppedByUser: true,
+      activityEventIds: [persisted.id],
+      activityReplay: [persisted],
+      activitySummary: {
+        approvalCount: 0,
+        commandCount: 0,
+        errorCount: 0,
+        memoryCount: 0,
+        toolCount: 0
+      }
+    },
+    [persisted]
+  );
+
+  record(
+    "persisted-replay-restore-summary",
+    persisted.status === "cancelled" &&
+      restored.status === "cancelled" &&
+      restored.details?.replay === true &&
+      summary.eventCount === 1 &&
+      summary.stopped === true,
+    "persisted replay restores display-only activity and summarizes stopped runs."
+  );
+}
+
+function checkSessionExportPreviewShape() {
+  const session = {
+    id: "session-export",
+    projectId: "project-export",
+    hermesSessionId: "hermes-session-export",
+    title: "Export shape",
+    summary: "Export shape summary",
+    createdAt: "2026-05-30T00:00:00.000Z",
+    updatedAt: "2026-05-30T00:00:10.000Z",
+    memoryScope: {
+      tenantId: "tenant-local",
+      projectId: "project-export",
+      sessionId: "session-export",
+      stableSessionKey: "studio:tenant-local:project:project-export:session:session-export",
+      includeProjectContext: true,
+      includeSessionContext: true
+    },
+    messages: [],
+    memoryEvidence: [],
+    toolEvents: [],
+    runRecords: [],
+    artifacts: []
+  };
+  const exportPreview = replay.createSessionExportPreview(session);
+
+  record(
+    "session-export-preview-shape",
+    exportPreview.exportVersion === 1 &&
+      exportPreview.session.id === "session-export" &&
+      exportPreview.excluded.includes("api keys and credentials"),
+    "session export preview shape excludes secrets and raw output classes."
+  );
+}
+
 function checkDurationFormatting() {
   record(
     "duration-formatting",
@@ -508,4 +642,18 @@ function checkSecretRedaction() {
 
 function record(name, ok, message) {
   checks.push({ message, name, ok });
+}
+
+async function importHelperModule(path) {
+  const helperSource = readFileSync(path, "utf8");
+  const helperCompiled = ts.transpileModule(helperSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+      verbatimModuleSyntax: false
+    },
+    fileName: path
+  });
+  const helperUrl = `data:text/javascript;base64,${Buffer.from(helperCompiled.outputText).toString("base64")}`;
+  return import(helperUrl);
 }

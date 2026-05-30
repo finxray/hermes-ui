@@ -196,6 +196,9 @@ Deliver:
 Goal: preserve enough redacted activity detail to replay recent runs after
 refresh and export a trustworthy local session bundle.
 
+Status: completed in Slice 13N. See
+`docs/product/PERSISTED_ACTIVITY_REPLAY_13N.md`.
+
 Deliver:
 
 - bounded persisted activity-event cache;
@@ -204,13 +207,25 @@ Deliver:
 - refresh/reload replay smoke;
 - no backend persistence or cross-channel discovery.
 
+### 13O - Reload Replay Smoke And Local Export Preview Surface
+
+Goal: make persisted replay survivability and export shape visible without
+adding backend persistence.
+
+Deliver:
+
+- browser smoke that sends a run, reloads, and verifies persisted replay;
+- local export preview helper/view if still low-risk;
+- no command rerun or agent re-execution behavior;
+- no direct service/storage calls.
+
 ## Recommended Next Slice
 
-Slice 13N - Persisted Activity Event Replay And Export Shape.
+Slice 13O - Reload Replay Smoke And Local Export Preview Surface.
 
 Reason:
 
-- Slice 13M added compact local run records and a right-rail inspector without
-  changing Hermes streaming or backend storage.
-- Full replay still cannot survive refresh because complete `AgentActivityEvent`
-  payloads remain live React state only.
+- Slice 13N added bounded redacted replay snapshots and an export-ready helper
+  shape without changing Hermes streaming or backend storage.
+- The next gap is proving replay survives hydration in a browser smoke and
+  deciding whether to expose a local-only export preview surface.

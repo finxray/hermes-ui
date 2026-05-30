@@ -434,6 +434,17 @@ requiring browser smokes or live services. No production installer, final
 one-command distribution, service automation, backend/Hermes/Brain Memory
 logic change, or export/import was added.
 
+## Checkpoint: Slice 14L release notes and manual RC checklist
+
+Slice 14L added release-candidate documentation on 2026-05-31:
+`docs/release/RELEASE_NOTES_TEMPLATE.md`, `docs/release/MVP_RC_NOTES.md`,
+`docs/release/MANUAL_RC_CHECKLIST.md`, and
+`docs/release/RELEASE_DECISION_RECORD.md`. The checkpoint records the current
+MVP RC posture, manual browser/live-service gates, release decision template,
+and deferred/not-claimable items. No production installer, final one-command
+distribution, service automation, backend/Hermes/Brain Memory logic, UI
+behavior, memory mutation/admin action, or export/import was added.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

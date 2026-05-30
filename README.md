@@ -106,6 +106,10 @@ Browser and live-service smokes remain separate because they require a healthy
 selected Web UI base URL and, for live gates, already-running Hermes or Brain
 Memory services.
 
+For release preparation, see `docs/release/MANUAL_RC_CHECKLIST.md` and
+`docs/release/RELEASE_NOTES_TEMPLATE.md`. Current MVP candidate notes live in
+`docs/release/MVP_RC_NOTES.md`.
+
 1. Install dependencies:
 
 ```powershell

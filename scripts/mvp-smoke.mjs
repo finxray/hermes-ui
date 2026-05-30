@@ -52,10 +52,10 @@ async function main() {
     validate: (body) => body && typeof body === "object" && typeof body.mode === "string"
   });
 
-  await checkBrainMemorySearch();
-  await checkBrainMemoryInspect();
+  const brainMemorySearch = await checkBrainMemorySearch(brainMemoryStatus.body);
+  await checkBrainMemoryInspect(brainMemoryStatus.body, brainMemorySearch.body);
   await checkHermesLiveSmoke(hermesStatus.body);
-  checkBrainMemoryMode(brainMemoryStatus.body);
+  checkBrainMemoryMode(brainMemoryStatus.body, brainMemorySearch.body);
 
   finalize();
 }
@@ -207,7 +207,7 @@ async function checkJsonGet(path, options) {
   return result;
 }
 
-async function checkBrainMemorySearch() {
+async function checkBrainMemorySearch(status) {
   const result = await fetchJson(`${baseUrl}/api/brain-memory/search`, {
     body: JSON.stringify({
       context: smokeContext(),
@@ -224,18 +224,47 @@ async function checkBrainMemorySearch() {
   }
 
   const mode = result.body?.mode;
-  if (mode === "real" || mode === "mock" || mode === "unconfigured" || mode === "error") {
-    addResult("POST /api/brain-memory/search", "pass", `Search route returned normalized ${mode} response.`);
+  const resultCount = Array.isArray(result.body?.results) ? result.body.results.length : 0;
+  if (args.requireBrainMemory && mode !== "real") {
+    addResult(
+      "POST /api/brain-memory/search",
+      "fail",
+      `Brain Memory is required but search returned normalized ${mode || "unknown"} response${authHint(result.body)}.`
+    );
+  } else if (status?.mode === "real" && result.body?.error?.kind === "unauthorized") {
+    addResult(
+      "POST /api/brain-memory/search",
+      args.requireBrainMemory ? "fail" : "warn",
+      "Search reached the BFF but Gateway rejected the optional UI bearer."
+    );
+  } else if (status?.mode === "real" && result.body?.error?.kind === "forbidden") {
+    addResult(
+      "POST /api/brain-memory/search",
+      args.requireBrainMemory ? "fail" : "warn",
+      "Search reached the BFF but the tenant-bound memory key was not authorized for this scope."
+    );
+  } else if (mode === "real" || mode === "mock" || mode === "unconfigured" || mode === "error") {
+    addResult(
+      "POST /api/brain-memory/search",
+      "pass",
+      `Search route returned normalized ${mode} response with ${resultCount} result(s).`
+    );
   } else {
     addResult("POST /api/brain-memory/search", "fail", "Search route response did not include a normalized mode.");
   }
+
+  return result;
 }
 
-async function checkBrainMemoryInspect() {
+async function checkBrainMemoryInspect(status, searchBody) {
+  const resultId = Array.isArray(searchBody?.results) ? searchBody.results[0]?.id : null;
+  const memoryId = typeof resultId === "string" && resultId.trim()
+    ? resultId.trim()
+    : "mvp-smoke-nonexistent-memory";
   const result = await fetchJson(`${baseUrl}/api/brain-memory/memory/inspect`, {
     body: JSON.stringify({
       context: smokeContext(),
-      memoryId: "mvp-smoke-nonexistent-memory"
+      memoryId
     }),
     headers: { "Content-Type": "application/json" },
     method: "POST"
@@ -247,11 +276,36 @@ async function checkBrainMemoryInspect() {
   }
 
   const mode = result.body?.mode;
-  if (mode === "real" || mode === "mock" || mode === "unconfigured" || mode === "error") {
-    addResult("POST /api/brain-memory/memory/inspect", "pass", `Inspect route returned normalized ${mode} response.`);
+  const detailStatus = result.body?.detail ? "detail" : result.body?.error?.kind || "no-detail";
+  if (args.requireBrainMemory && mode !== "real") {
+    addResult(
+      "POST /api/brain-memory/memory/inspect",
+      "fail",
+      `Brain Memory is required but inspect returned normalized ${mode || "unknown"} response${authHint(result.body)}.`
+    );
+  } else if (status?.mode === "real" && result.body?.error?.kind === "unauthorized") {
+    addResult(
+      "POST /api/brain-memory/memory/inspect",
+      args.requireBrainMemory ? "fail" : "warn",
+      "Inspect reached the BFF but Gateway rejected the optional UI bearer."
+    );
+  } else if (status?.mode === "real" && result.body?.error?.kind === "forbidden") {
+    addResult(
+      "POST /api/brain-memory/memory/inspect",
+      args.requireBrainMemory ? "fail" : "warn",
+      "Inspect reached the BFF but the tenant-bound memory key was not authorized for this scope."
+    );
+  } else if (mode === "real" || mode === "mock" || mode === "unconfigured" || mode === "error") {
+    addResult(
+      "POST /api/brain-memory/memory/inspect",
+      "pass",
+      `Inspect route returned normalized ${mode} response (${detailStatus}).`
+    );
   } else {
     addResult("POST /api/brain-memory/memory/inspect", "fail", "Inspect route response did not include a normalized mode.");
   }
+
+  return result;
 }
 
 async function checkHermesLiveSmoke(status) {
@@ -301,10 +355,17 @@ async function checkHermesLiveSmoke(status) {
   }
 }
 
-function checkBrainMemoryMode(status) {
+function checkBrainMemoryMode(status, searchBody) {
   const live = status?.mode === "real" && status?.reachable === true;
+  const searchReady = searchBody?.mode === "real";
   if (live) {
-    addResult("Brain Memory live mode", "pass", "Brain Memory BFF reports real/reachable Gateway.");
+    addResult(
+      "Brain Memory live mode",
+      args.requireBrainMemory && !searchReady ? "fail" : "pass",
+      searchReady
+        ? "Brain Memory BFF reports real/reachable Gateway and search is live."
+        : `Brain Memory BFF reports real/reachable Gateway, but search is not live${authHint(searchBody)}.`
+    );
     return;
   }
 
@@ -363,18 +424,18 @@ function smokeContext() {
   return {
     project: {
       contextPolicy: "balanced",
-      id: "project-mvp-smoke",
+      id: "brain-memory",
       retrievalProfile: "balanced",
-      stableKey: "studio:tenant-local:project:project-mvp-smoke",
-      tenantId: "tenant-local",
-      title: "MVP Smoke"
+      stableKey: "brain-memory",
+      tenantId: "local-dev",
+      title: "Brain Memory"
     },
     session: {
-      id: "session-mvp-smoke",
+      id: "slice-12c-live-recheck",
       includeProjectContext: true,
       includeSessionContext: true,
-      stableKey: "studio:tenant-local:project:project-mvp-smoke:session:session-mvp-smoke",
-      title: "MVP smoke"
+      stableKey: "slice-12c-live-recheck",
+      title: "Slice 12C live re-check"
     },
     ui: {
       source: "hermes-ui",
@@ -464,6 +525,20 @@ function describeFetchResult(result) {
     return `HTTP ${result.status}`;
   }
   return result.error || "unknown error";
+}
+
+function authHint(body) {
+  const kind = body?.error?.kind;
+  if (kind === "unauthorized") {
+    return " (UI bearer missing or invalid)";
+  }
+  if (kind === "forbidden") {
+    return " (tenant-bound memory key missing or unauthorized)";
+  }
+  if (kind === "http_error") {
+    return " (Gateway returned a scoped HTTP error)";
+  }
+  return "";
 }
 
 function trimSlash(value) {

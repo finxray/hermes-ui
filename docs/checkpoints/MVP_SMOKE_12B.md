@@ -98,7 +98,12 @@ node scripts/mvp-smoke.mjs --require-brain-memory
 Behavior:
 
 - `/api/brain-memory/status` must report real/reachable.
-- search and inspect routes must return normalized responses.
+- search must return a live `mode: "real"` response.
+- inspect uses the first search result id when search returns a result; if search
+  is live but empty, inspect uses a harmless nonexistent id to verify safe
+  Gateway normalization.
+- 401 and 403 responses are reported as auth/tenant failures without printing
+  secrets.
 - Mock/unconfigured Brain Memory becomes a failure instead of a warning.
 
 No browser-to-Gateway calls are made; the script only calls the Web UI BFF.

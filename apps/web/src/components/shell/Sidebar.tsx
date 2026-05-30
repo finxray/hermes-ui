@@ -2,22 +2,19 @@
 
 import {
   Brain,
-  Edit3,
-  FileText,
   Folder,
   FolderPlus,
   MessageSquare,
   MessageSquarePlus,
   RefreshCw,
   RotateCcw,
-  Trash2
+  Settings
 } from "lucide-react";
-import { useState } from "react";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { useEffect, useRef } from "react";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session, WorkspaceState } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
-import { SidebarIconButton, SidebarRow, SidebarStatusDot } from "./SidebarRow";
+import { SidebarRow, SidebarStatusDot } from "./SidebarRow";
 import styles from "./Sidebar.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
@@ -25,7 +22,6 @@ type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type SidebarProps = {
   projects: Project[];
   allSessions: Session[];
-  sessions: Session[];
   activeProject: Project;
   activeSession: Session | null;
   actions: WorkspaceActions;
@@ -40,7 +36,6 @@ export function Sidebar({
   actions,
   allSessions,
   projects,
-  sessions,
   activeProject,
   activeSession,
   connectionStatus,
@@ -49,45 +44,37 @@ export function Sidebar({
   isHydrated,
   refreshHermesStatus
 }: SidebarProps) {
-  const [editing, setEditing] = useState<
-    | { kind: "project"; id: string; value: string }
-    | { kind: "session"; id: string; value: string }
-    | null
-  >(null);
+  const settingsRef = useRef<HTMLDivElement | null>(null);
+  const settingsToggleRef = useRef<HTMLInputElement | null>(null);
 
-  function startRenameProject(project: Project) {
-    setEditing({ kind: "project", id: project.id, value: project.name });
-  }
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (settingsToggleRef.current) {
+          settingsToggleRef.current.checked = false;
+        }
+      }
+    }
 
-  function startRenameSession(session: Session) {
-    setEditing({ kind: "session", id: session.id, value: session.title });
-  }
+    function closeOnOutside(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Node && !settingsRef.current?.contains(target)) {
+        if (settingsToggleRef.current) {
+          settingsToggleRef.current.checked = false;
+        }
+      }
+    }
 
-  function commitRename() {
-    if (!editing) {
-      return;
-    }
-    const value = editing.value.trim();
-    if (!value) {
-      return;
-    }
-    if (editing.kind === "project") {
-      actions.renameProject(editing.id, value);
-    } else {
-      actions.renameSession(editing.id, value);
-    }
-    setEditing(null);
-  }
-
-  function archiveSession(session: Session) {
-    const confirmed = window.confirm(`Archive "${session.title}"?`);
-    if (confirmed) {
-      actions.archiveSession(session.id);
-    }
-  }
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("mousedown", closeOnOutside);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("mousedown", closeOnOutside);
+    };
+  }, []);
 
   return (
-    <aside className={styles.sidebar} data-shell-rail="left" aria-label="Projects and sessions">
+    <aside className={styles.sidebar} data-shell-rail="left" aria-label="Projects and chats">
       <div className={styles.brand}>
         <div className={styles.brandIcon} aria-hidden="true">
           <Brain size={17} />
@@ -110,168 +97,132 @@ export function Sidebar({
         </div>
         <ul className={styles.list}>
           {projects.map((project) => {
-            const isEditing = editing?.kind === "project" && editing.id === project.id;
-            const sessionCount = allSessions.filter(
-              (session) => session.projectId === project.id && !session.archivedAt
-            ).length;
+            const projectSessions = getProjectSessions(allSessions, project.id);
+            const isActiveProject = project.id === activeProject.id;
             return (
-              <li key={project.id}>
+              <li className={styles.projectGroup} key={project.id}>
                 <SidebarRow
-                  active={project.id === activeProject.id}
-                  actions={
-                    <SidebarIconButton
-                      label={`Rename project ${project.name}`}
-                      onClick={() => startRenameProject(project)}
-                    >
-                      <Edit3 size={13} />
-                    </SidebarIconButton>
-                  }
+                  active={isActiveProject && !activeSession}
                   icon={<Folder size={15} />}
-                  label={
-                    isEditing ? (
-                      <RenameInput
-                        ariaLabel={`Rename project ${project.name}`}
-                        onCancel={() => setEditing(null)}
-                        onCommit={commitRename}
-                        setValue={(value) => setEditing({ ...editing, value })}
-                        value={editing.value}
-                      />
-                    ) : (
-                      project.name
-                    )
-                  }
-                  meta={sessionCount}
-                  onClick={isEditing ? undefined : () => actions.switchProject(project.id)}
-                  secondary={isEditing ? project.description : undefined}
+                  label={project.name}
+                  meta={projectSessions.length > 0 ? projectSessions.length : undefined}
+                  muted={!isActiveProject}
+                  onClick={() => actions.switchProject(project.id)}
                 />
+                {projectSessions.length === 0 ? (
+                  <SidebarRow depth={1} disabled label="No chats" muted />
+                ) : (
+                  <ul className={styles.childList}>
+                    {projectSessions.map((session) => {
+                      return (
+                        <li key={session.id}>
+                          <SidebarRow
+                            active={session.id === activeSession?.id}
+                            depth={1}
+                            label={session.title}
+                            onClick={() => actions.switchSession(session.id)}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </li>
             );
           })}
         </ul>
       </section>
 
-      <section className={styles.section} aria-labelledby="sessions-heading">
-        <div className={styles.sectionLabel} id="sessions-heading">
-          <span>Sessions</span>
+      <section className={styles.section} aria-labelledby="chats-heading">
+        <div className={styles.sectionLabel} id="chats-heading">
+          <span>Chats</span>
         </div>
-        {sessions.length === 0 ? (
-          <EmptyState
-            title="No chats yet"
-            body="Create a local mock chat for this project. It will stay in browser localStorage."
-            actionLabel="New chat"
-            onAction={actions.createSession}
-          />
-        ) : (
-          <ul className={styles.list}>
-            {sessions.map((session) => {
-              const isEditing = editing?.kind === "session" && editing.id === session.id;
-              return (
-                <li key={session.id}>
-                  <SidebarRow
-                    active={session.id === activeSession?.id}
-                    actions={
-                      <>
-                        <SidebarIconButton
-                          label={`Rename session ${session.title}`}
-                          onClick={() => startRenameSession(session)}
-                        >
-                          <Edit3 size={13} />
-                        </SidebarIconButton>
-                        <SidebarIconButton
-                          label={`Archive session ${session.title}`}
-                          onClick={() => archiveSession(session)}
-                        >
-                          <Trash2 size={13} />
-                        </SidebarIconButton>
-                      </>
-                    }
-                    icon={<MessageSquare size={15} />}
-                    label={
-                      isEditing ? (
-                        <RenameInput
-                          ariaLabel={`Rename session ${session.title}`}
-                          onCancel={() => setEditing(null)}
-                          onCommit={commitRename}
-                          setValue={(value) => setEditing({ ...editing, value })}
-                          value={editing.value}
-                        />
-                      ) : (
-                        session.title
-                      )
-                    }
-                    onClick={isEditing ? undefined : () => actions.switchSession(session.id)}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ul className={styles.list}>
+          {getRecentChats(allSessions).map((session) => (
+            <li key={`chat-${session.id}`}>
+              <SidebarRow
+                active={session.id === activeSession?.id}
+                icon={<MessageSquare size={15} />}
+                label={session.title}
+                onClick={() => actions.switchSession(session.id)}
+              />
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <div className={styles.footer}>
-        <div className={styles.sectionLabel}>
-          <span>Mock connections</span>
-          <FileText size={13} aria-hidden="true" />
+      <div className={styles.footer} ref={settingsRef}>
+        <input
+          ref={settingsToggleRef}
+          className={styles.settingsToggle}
+          id="studio-settings-toggle"
+          type="checkbox"
+          aria-hidden="true"
+        />
+        <div className={styles.settingsPopover} role="dialog" aria-label="Settings and connection status">
+          <div className={styles.accountBlock}>
+            <div className={styles.accountAvatar} aria-hidden="true">
+              <Brain size={16} />
+            </div>
+            <div>
+              <div className={styles.accountTitle}>Brain Memory Studio</div>
+              <div className={styles.accountMeta}>Local profile</div>
+            </div>
+          </div>
+          <div className={styles.popoverRows}>
+            <SidebarRow icon={<Settings size={14} />} label="Settings" muted />
+          </div>
+          <div className={styles.popoverSection}>
+            <div className={styles.popoverLabel}>Mock connections</div>
+            <div className={styles.popoverRows}>
+              <SidebarRow
+                icon={<SidebarStatusDot tone={hermesStatusTone(hermesStatus, isHermesStatusLoading)} />}
+                label={`Hermes: ${formatHermesStatus(hermesStatus, isHermesStatusLoading)}`}
+                muted
+              />
+              <SidebarRow
+                icon={<SidebarStatusDot tone="mock" />}
+                label={`Brain Memory: ${connectionStatus.brainMemory}`}
+                muted
+              />
+              <SidebarRow
+                icon={<SidebarStatusDot tone="quiet" />}
+                label={isHydrated ? "LocalStorage: active" : "LocalStorage: loading"}
+                muted
+              />
+            </div>
+          </div>
+          <div className={styles.popoverRows}>
+            <SidebarRow icon={<RotateCcw size={14} />} label="Reset mock data" onClick={actions.reset} />
+            <SidebarRow
+              icon={<RefreshCw size={14} />}
+              label="Refresh Hermes"
+              onClick={refreshHermesStatus}
+            />
+          </div>
         </div>
-        <div className={styles.statusStack}>
-          <SidebarRow
-            icon={<SidebarStatusDot tone={hermesStatusTone(hermesStatus, isHermesStatusLoading)} />}
-            label={`Hermes: ${formatHermesStatus(hermesStatus, isHermesStatusLoading)}`}
-            muted
-          />
-          <SidebarRow
-            icon={<SidebarStatusDot tone="mock" />}
-            label={`Brain Memory: ${connectionStatus.brainMemory}`}
-            muted
-          />
-          <SidebarRow
-            icon={<SidebarStatusDot tone="quiet" />}
-            label={isHydrated ? "LocalStorage: active" : "LocalStorage: loading"}
-            muted
-          />
-          <SidebarRow icon={<RotateCcw size={14} />} label="Reset mock data" onClick={actions.reset} />
-          <SidebarRow
-            icon={<RefreshCw size={14} />}
-            label="Refresh Hermes"
-            onClick={refreshHermesStatus}
-          />
-        </div>
+        <label className={styles.settingsButton} htmlFor="studio-settings-toggle">
+          <span className={styles.settingsIcon} aria-hidden="true">
+            <Settings size={15} />
+          </span>
+          <span className={styles.settingsLabel}>Settings</span>
+        </label>
       </div>
     </aside>
   );
 }
 
-function RenameInput({
-  ariaLabel,
-  onCancel,
-  onCommit,
-  setValue,
-  value
-}: {
-  ariaLabel: string;
-  onCancel: () => void;
-  onCommit: () => void;
-  setValue: (value: string) => void;
-  value: string;
-}) {
-  return (
-    <input
-      autoFocus
-      aria-label={ariaLabel}
-      className={styles.renameInput}
-      value={value}
-      onBlur={onCommit}
-      onChange={(event) => setValue(event.currentTarget.value)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          onCommit();
-        }
-        if (event.key === "Escape") {
-          onCancel();
-        }
-      }}
-    />
-  );
+function getProjectSessions(sessions: Session[], projectId: string) {
+  return sessions
+    .filter((session) => session.projectId === projectId && !session.archivedAt)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function getRecentChats(sessions: Session[]) {
+  return sessions
+    .filter((session) => !session.archivedAt)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 2);
 }
 
 function formatHermesStatus(status: NormalizedHermesStatus | null, isLoading: boolean) {

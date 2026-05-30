@@ -17,6 +17,7 @@ export function Composer({
   onSend
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
+  const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,7 +64,13 @@ export function Composer({
                 <Mic size={16} />
               </button>
               <button
-                className={`${styles.sendButton} ${isGenerating ? styles.stopButton : ""}`}
+                className={[
+                  styles.sendButton,
+                  canSend ? styles.ready : "",
+                  isGenerating ? styles.stopButton : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 type="submit"
                 disabled={disabled || isGenerating || draft.trim().length === 0}
                 aria-label={isGenerating ? "Stop response placeholder" : "Send message"}

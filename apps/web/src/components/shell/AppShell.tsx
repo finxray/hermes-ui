@@ -11,8 +11,7 @@ import { useState } from "react";
 import styles from "./AppShell.module.css";
 
 export function AppShell() {
-  const { actions, activeProject, activeProjectSessions, activeSession, isHydrated, state } =
-    useWorkspaceState();
+  const { actions, activeProject, activeSession, isHydrated, state } = useWorkspaceState();
   const hermesStatus = useHermesStatus();
   const brainMemoryStatus = useBrainMemoryStatus();
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -59,7 +58,6 @@ export function AppShell() {
         isHydrated={isHydrated}
         projects={state.projects}
         refreshHermesStatus={hermesStatus.refresh}
-        sessions={activeProjectSessions}
       />
       <ChatView
         activeProject={activeProject}

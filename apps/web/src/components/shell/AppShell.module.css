@@ -90,7 +90,6 @@
 }
 
 .shell:has(.leftToggle:checked) :global([data-shell-rail="left"]) {
-  width: 0;
   padding-right: 0;
   padding-left: 0;
   opacity: 0;
@@ -99,9 +98,6 @@
 }
 
 .shell:has(.rightToggle:checked) :global([data-shell-rail="right"]) {
-  width: 0;
-  padding-right: 0;
-  padding-left: 0;
   opacity: 0;
   pointer-events: none;
   transform: translateX(100%);

@@ -64,7 +64,7 @@
 .section {
   display: grid;
   gap: 9px;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .sectionLabel {
@@ -86,11 +86,153 @@
   list-style: none;
 }
 
-.footer {
+.projectGroup {
   display: grid;
-  gap: 9px;
+  gap: 1px;
+}
+
+.childList {
+  display: grid;
+  gap: 1px;
+  margin: 1px 0 5px;
+  padding: 0;
+  list-style: none;
+}
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  gap: 2px;
   margin-top: auto;
   padding-top: 18px;
+  padding-bottom: 2px;
+  background:
+    linear-gradient(180deg, transparent, rgba(13, 12, 15, 0.92) 32%, rgba(13, 12, 15, 0.98)),
+    transparent;
+  z-index: 4;
+}
+
+.settingsPopover {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--row-height) + 10px);
+  left: 0;
+  z-index: 10;
+  display: none;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background: rgba(24, 25, 29, 0.98);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.settingsToggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settingsToggle:checked + .settingsPopover {
+  display: grid;
+}
+
+.settingsButton {
+  display: grid;
+  grid-template-columns: var(--icon-sm) minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-height: var(--row-height);
+  padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  border-radius: 15px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.settingsButton:hover,
+.settingsButton:focus-visible,
+.settingsToggle:checked ~ .settingsButton {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.052);
+  color: var(--text-primary);
+}
+
+.settingsIcon {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.settingsLabel {
+  overflow: hidden;
+  font-size: var(--font-small);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountBlock {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+}
+
+.accountAvatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(142, 230, 198, 0.11);
+  color: var(--accent);
+}
+
+.accountTitle,
+.accountMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountTitle {
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.accountMeta,
+.popoverLabel {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+}
+
+.popoverRows {
+  display: grid;
+  gap: 1px;
+}
+
+.popoverSection {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.popoverLabel {
+  padding: 0 12px;
+  font-weight: 650;
 }
 
 .renameInput {

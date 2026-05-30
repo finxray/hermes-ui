@@ -1,9 +1,4 @@
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen
-} from "lucide-react";
+import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
 import styles from "./TopBar.module.css";
 
 type TopBarProps = {
@@ -30,7 +25,7 @@ export function TopBar({
           role="button"
           tabIndex={0}
         >
-          {leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          <PanelToggleIcon side="left" />
         </label>
         <nav className={styles.menu} aria-label="Workspace sections">
           {["Workspace", "Memory", "Projects", "Tools", "Help"].map((item) => (
@@ -53,7 +48,7 @@ export function TopBar({
           role="button"
           tabIndex={0}
         >
-          {rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
+          <PanelToggleIcon side="right" />
         </label>
       </div>
     </header>

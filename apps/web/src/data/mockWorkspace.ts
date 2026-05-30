@@ -53,7 +53,7 @@ function sessionScope(
 export const projects: Project[] = [
   {
     id: "project-brain-memory",
-    name: "Brain Memory",
+    name: "brain-memory",
     description: "Gateway-scoped persistent memory and UI console",
     icon: "BM",
     memoryScopeKey: "studio:tenant-local:project:project-brain-memory",
@@ -69,7 +69,7 @@ export const projects: Project[] = [
   },
   {
     id: "project-hermes-agent",
-    name: "Hermes Agent",
+    name: "hermes-ui",
     description: "API server, runs, approvals, and tool events",
     icon: "HA",
     memoryScopeKey: "studio:tenant-local:project:project-hermes-agent",
@@ -85,7 +85,7 @@ export const projects: Project[] = [
   },
   {
     id: "project-packaging",
-    name: "Packaging",
+    name: "projects",
     description: "Local desktop, Docker, and release workflow",
     icon: "PK",
     memoryScopeKey: "studio:tenant-local:project:project-packaging",
@@ -97,6 +97,21 @@ export const projects: Project[] = [
     ),
     createdAt,
     updatedAt: "2026-05-25T12:00:00.000Z"
+  },
+  {
+    id: "project-integrations",
+    name: "integrations  brain-memory",
+    description: "External service wiring and optional Brain Memory attach mode",
+    icon: "IN",
+    memoryScopeKey: "studio:tenant-local:project:project-integrations",
+    memoryScope: projectScope(
+      "project-integrations",
+      "Integration context should stay provider-neutral and keep optional services decoupled.",
+      "balanced",
+      "minimal"
+    ),
+    createdAt,
+    updatedAt: "2026-05-24T12:00:00.000Z"
   }
 ];
 
@@ -287,7 +302,7 @@ export const sessions: Session[] = [
     id: "session-roadmap",
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-roadmap",
-    title: "Hermes UI roadmap",
+    title: "Add memory detail and evidence",
     summary: "Slice planning for the Studio shell and future integration path",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -305,7 +320,7 @@ export const sessions: Session[] = [
     id: "session-memory-contract",
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-memory-contract",
-    title: "Gateway memory contract",
+    title: "Add read-only UI API",
     summary: "Read-only search, evidence, supersession, and audit endpoints",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -323,7 +338,7 @@ export const sessions: Session[] = [
     id: "session-evidence-ui",
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-evidence-ui",
-    title: "Evidence cards and audit trail",
+    title: "Check crash status",
     summary: "Memory console display rules and trust markers",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -341,7 +356,7 @@ export const sessions: Session[] = [
     id: "session-runs-api",
     projectId: "project-hermes-agent",
     hermesSessionId: "hermes-session-runs-api",
-    title: "Runs API event model",
+    title: "Polish Codex-style UI",
     summary: "Mapping run lifecycle events into a future tool panel",
     memoryScope: sessionScope(
       "project-hermes-agent",
@@ -359,7 +374,7 @@ export const sessions: Session[] = [
     id: "session-approval-flow",
     projectId: "project-hermes-agent",
     hermesSessionId: "hermes-session-approval-flow",
-    title: "Approval and stop UX",
+    title: "Initialize Hermes UI repo",
     summary: "Mocking approval controls without wiring real Hermes calls",
     memoryScope: sessionScope(
       "project-hermes-agent",
@@ -379,7 +394,7 @@ export const sessions: Session[] = [
     id: "session-desktop-package",
     projectId: "project-packaging",
     hermesSessionId: "hermes-session-desktop-package",
-    title: "Downloadable local package",
+    title: "Remove OpenClaw files",
     summary: "Install, run, and health-check expectations",
     memoryScope: sessionScope(
       "project-packaging",
@@ -394,6 +409,62 @@ export const sessions: Session[] = [
     memoryEvidence: memoryEvidence.slice(2),
     toolEvents: toolEvents.slice(1),
     artifacts: artifacts.slice(2)
+  },
+  {
+    id: "session-audit-hermes-integration",
+    projectId: "project-packaging",
+    hermesSessionId: "hermes-session-audit-hermes-integration",
+    title: "Audit Hermes integration",
+    summary: "Review Hermes API status, streaming, and BFF boundaries",
+    memoryScope: sessionScope(
+      "project-packaging",
+      "session-audit-hermes-integration",
+      "Audit context should focus on Hermes BFF behavior and endpoint compatibility.",
+      true,
+      false
+    ),
+    createdAt,
+    updatedAt: "2026-05-24T15:00:00.000Z",
+    messages: runsMessages,
+    memoryEvidence: memoryEvidence.slice(0, 1),
+    toolEvents,
+    artifacts: artifacts.slice(0, 2)
+  },
+  {
+    id: "session-integrate-brain-memory",
+    projectId: "project-brain-memory",
+    hermesSessionId: "hermes-session-integrate-brain-memory",
+    title: "Integrate Brain Memory with Hermes",
+    summary: "Scope bridge and MCP write propagation",
+    memoryScope: sessionScope(
+      "project-brain-memory",
+      "session-integrate-brain-memory",
+      "Brain Memory integration work should preserve UI -> Hermes -> MCP -> Gateway flow."
+    ),
+    createdAt,
+    updatedAt: "2026-05-26T09:00:00.000Z",
+    messages: gatewayMessages,
+    memoryEvidence: memoryEvidence.slice(0, 2),
+    toolEvents,
+    artifacts: artifacts.slice(0, 2)
+  },
+  {
+    id: "session-config-parse-error",
+    projectId: "project-brain-memory",
+    hermesSessionId: "hermes-session-config-parse-error",
+    title: "Fix config parse error",
+    summary: "Local runtime config parsing and diagnostics",
+    memoryScope: sessionScope(
+      "project-brain-memory",
+      "session-config-parse-error",
+      "Config repair context should stay scoped to local diagnostics and startup checks."
+    ),
+    createdAt,
+    updatedAt: "2026-05-25T09:00:00.000Z",
+    messages: evidenceMessages,
+    memoryEvidence: memoryEvidence.slice(1),
+    toolEvents: toolEvents.slice(1),
+    artifacts: artifacts.slice(1)
   }
 ];
 

@@ -4,6 +4,7 @@ import styles from "./SidebarRow.module.css";
 type SidebarRowProps = {
   actions?: ReactNode;
   active?: boolean;
+  depth?: 0 | 1;
   disabled?: boolean;
   icon?: ReactNode;
   label: ReactNode;
@@ -17,6 +18,7 @@ type SidebarRowProps = {
 export function SidebarRow({
   actions,
   active = false,
+  depth = 0,
   disabled = false,
   icon,
   label,
@@ -54,6 +56,7 @@ export function SidebarRow({
       <button
         aria-current={active ? "page" : undefined}
         className={className}
+        data-depth={depth}
         disabled={disabled}
         onClick={onClick}
         title={title}
@@ -65,7 +68,7 @@ export function SidebarRow({
   }
 
   return (
-    <div className={className} title={title}>
+    <div className={className} data-depth={depth} title={title}>
       {content}
     </div>
   );

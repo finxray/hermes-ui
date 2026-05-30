@@ -1,6 +1,7 @@
 .rail {
   grid-area: right;
   display: grid;
+  width: var(--rail-width-right);
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -10,14 +11,10 @@
   border-left: 1px solid rgba(255, 255, 255, 0.065);
   transition:
     opacity 500ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 500ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    padding 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 :global([data-right-collapsed="true"]) .rail {
-  width: 0;
-  padding-right: 0;
-  padding-left: 0;
   opacity: 0;
   pointer-events: none;
   transform: translateX(100%);

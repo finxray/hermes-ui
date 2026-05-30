@@ -29,7 +29,11 @@
   display: block;
   min-width: 0;
   min-height: auto;
-  margin: clamp(19px, calc(14px + 0.36vw), 30px) clamp(18px, 4vw, 58px) 0;
+  margin:
+    clamp(19px, calc(14px + 0.36vw), 30px)
+    clamp(18px, 4vw, 58px)
+    0
+    clamp(19px, calc(14px + 0.36vw), 30px);
   background: transparent;
 }
 

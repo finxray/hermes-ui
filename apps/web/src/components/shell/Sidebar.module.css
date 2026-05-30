@@ -13,7 +13,7 @@
   flex-direction: column;
   direction: rtl;
   overflow: hidden auto;
-  padding: 26px var(--sidebar-rail-padding-x) 20px;
+  padding: 18px var(--sidebar-rail-padding-x) 20px;
   background: transparent;
   border: 0;
   transition:
@@ -49,7 +49,7 @@
   width: var(--sidebar-icon-column);
   height: var(--sidebar-icon-column);
   place-items: center;
-  color: var(--accent);
+  color: #0a84ff;
 }
 
 .brandTitle {
@@ -119,9 +119,7 @@
   margin-top: auto;
   padding-top: 18px;
   padding-bottom: 2px;
-  background:
-    linear-gradient(180deg, transparent, rgba(10, 10, 12, 0.72) 44%, rgba(10, 10, 12, 0.94)),
-    transparent;
+  background: transparent;
   z-index: 4;
 }
 
@@ -207,8 +205,8 @@
   height: 34px;
   place-items: center;
   border-radius: 999px;
-  background: rgba(142, 230, 198, 0.11);
-  color: var(--accent);
+  background: rgba(10, 132, 255, 0.1);
+  color: #0a84ff;
 }
 
 .accountTitle,

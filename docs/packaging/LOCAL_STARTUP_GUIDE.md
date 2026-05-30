@@ -3,6 +3,10 @@
 This guide covers modular local startup paths. None of these paths install
 Brain Memory automatically or start external services for you.
 
+For the current MVP demo runbook, smoke-test matrix, stale dev-server recovery,
+browser scaling notes, and secrets checklist, see
+`docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
+
 ## A. Web UI Standalone With Hermes
 
 Use this when Hermes API server is running and Brain Memory is not required.

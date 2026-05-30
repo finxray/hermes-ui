@@ -87,6 +87,13 @@ settings popover, right rail tabs, composer typing, disabled placeholders, and
 horizontal overflow. Details are documented in
 `docs/checkpoints/UI_INTERACTION_SMOKE_12E.md`.
 
+## Checkpoint: Slice 12F local launch runbook
+
+Slice 12F added the MVP local launch runbook on 2026-05-30. The runbook covers
+Web UI startup, Hermes live checks, optional Brain Memory Gateway checks, smoke
+commands, stale dev-server recovery, browser scaling, Playwright install, and
+secrets safety. See `docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

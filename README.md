@@ -32,6 +32,26 @@ both only from the server-side BFF.
 
 ## Local Development
 
+Quick MVP path:
+
+```powershell
+npm install
+npm run studio:env -- --mode web-ui-with-hermes
+npm run dev
+npm run studio:doctor
+npm run smoke:mvp
+npm run smoke:ui
+npm run studio:open
+```
+
+The app opens at `http://127.0.0.1:3000`. The expected Hermes API URL is
+`http://127.0.0.1:8642`; Brain Memory Gateway is optional and usually expected
+at `http://127.0.0.1:8080` when live.
+
+For the full local launch flow, service modes, smoke matrix, stale-server
+troubleshooting, browser scaling notes, and secrets guidance, see
+`docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
+
 1. Install dependencies:
 
 ```powershell
@@ -70,6 +90,7 @@ npm run dev
 
 ```powershell
 npm run smoke:mvp
+npm run smoke:ui
 ```
 
 Use `npm run smoke:mvp:live` only when both Hermes and Brain Memory Gateway are

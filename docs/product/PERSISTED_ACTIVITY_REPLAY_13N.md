@@ -159,8 +159,10 @@ Behavior:
 
 ## Export Shape
 
-The helper `createSessionExportPreview(session)` defines a future local export
-shape without exposing a UI button yet:
+The helper `createSessionExportPreview(session)` defines a local export preview
+shape. Slice 13O exposes this shape as a collapsed, local-only Context rail
+preview without adding copy/download, filesystem writes, backend export, cloud
+backup, or import:
 
 ```ts
 type SessionExportPreview = {
@@ -233,12 +235,13 @@ Full check results are recorded in the final Slice 13N response.
   authoritative event ledger.
 - Full activity event payloads are intentionally not stored.
 - Existing pre-13N runs show run metadata but no persisted replay.
-- Export is a helper/shape only; no UI export button is added.
+- Export remains a local preview shape only; no copy/download/import behavior is
+  added.
 
 ## Next Recommended Slice
 
-Slice 13O - Reload Replay Smoke And Local Export Preview Surface.
+Slice 13P - Local Export Download And Import Validation Contract.
 
-Reason: Slice 13N defines and stores bounded replay snapshots, but the UI does
-not yet have an explicit local export surface or a browser smoke that reloads
-after a live run and verifies replay survives hydration.
+Reason: Slice 13O added reload replay smoke coverage and a collapsed local
+export preview surface. The next useful step is defining a safe local
+download/import validation contract before durable backup or cloud sync.

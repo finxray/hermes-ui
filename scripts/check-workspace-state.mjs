@@ -17,12 +17,16 @@ registerHooks({
 const workspaceStore = await import(
   pathToFileURL("apps/web/src/lib/workspaceStore.ts").toString()
 );
+const replayHelpers = await import(
+  pathToFileURL("apps/web/src/lib/persistedActivityReplay.ts").toString()
+);
 const {
   createMockWorkspaceState,
   formatSessionUpdatedAt,
   getVisibleSessions,
   workspaceReducer
 } = workspaceStore;
+const { createSessionExportPreview } = replayHelpers;
 
 const base = createMockWorkspaceState();
 
@@ -36,6 +40,7 @@ checkActiveStateRepair();
 checkNormalizationFillsMemoryScopes();
 checkNormalizationFillsTitleMetadata();
 checkRunRecordPersistence();
+checkSessionExportPreview();
 checkArchiveRepairsActiveSession();
 checkResetReturnsValidState();
 
@@ -423,6 +428,92 @@ function checkRunRecordPersistence() {
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].status, "info");
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].sourceChannel, "telegram");
   assert(!JSON.stringify(normalizedMalformed.sessions[0].runRecords[0].activityReplay).includes("abc123"));
+}
+
+function checkSessionExportPreview() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const startedAt = "2026-05-30T11:00:00.000Z";
+  const completedAt = "2026-05-30T11:00:02.000Z";
+
+  state = workspaceReducer(state, {
+    type: "appendMessage",
+    sessionId: session.id,
+    message: {
+      id: "msg-export-secret",
+      role: "user",
+      author: "Alexey",
+      createdAt: "11:00",
+      content: "Please redact Authorization: Bearer abc123 and token=abc123 in export preview.",
+      status: "complete"
+    }
+  });
+
+  state = workspaceReducer(state, {
+    type: "appendRunRecord",
+    sessionId: session.id,
+    run: {
+      id: "run-export-preview",
+      projectId: session.projectId,
+      sessionId: session.id,
+      hermesSessionId: session.hermesSessionId,
+      userMessageId: "msg-export-secret",
+      assistantMessageId: "msg-export-assistant",
+      sourceChannel: "web-ui",
+      status: "completed",
+      startedAt,
+      completedAt,
+      durationMs: 2000,
+      summary: "Export preview run",
+      activityEventIds: ["activity-export-command"],
+      activityReplay: [
+        {
+          id: "activity-export-command",
+          runId: "run-export-preview",
+          type: "command",
+          status: "completed",
+          title: "Command completed",
+          summary: "Authorization: Bearer abc123",
+          startedAt,
+          completedAt,
+          durationMs: 2000,
+          collapsedByDefault: true,
+          source: "mcp",
+          sourceChannel: "web-ui",
+          command: {
+            commandPreview: "npm test --token=abc123",
+            stdoutPreview: "ok",
+            stderrPreview: "password=abc123",
+            sourceChannel: "web-ui"
+          },
+          detailsPreview: "api_key=abc123",
+          metadata: {
+            api_key: "abc123",
+            safe: "value"
+          }
+        }
+      ],
+      activitySummary: {
+        approvalCount: 0,
+        commandCount: 1,
+        errorCount: 0,
+        memoryCount: 0,
+        toolCount: 0
+      }
+    }
+  });
+
+  const updated = state.sessions.find((item) => item.id === session.id);
+  assert(updated, "export preview check should have an updated session");
+  const preview = createSessionExportPreview(updated);
+  const serialized = JSON.stringify(preview);
+  assert.equal(preview.exportVersion, 1);
+  assert.equal(preview.messages.length, 1);
+  assert.equal(preview.runs.length, 1);
+  assert.equal(preview.runs[0].activityReplay.length, 1);
+  assert(preview.excluded.includes("api keys and credentials"));
+  assert(serialized.includes("[redacted]"));
+  assert(!serialized.includes("abc123"));
 }
 
 function checkArchiveRepairsActiveSession() {

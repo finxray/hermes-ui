@@ -474,10 +474,10 @@ function checkPersistedReplayRedaction() {
 
   record(
     "persisted-replay-redaction",
-    persisted.runId === "run-persist" &&
+      persisted.runId === "run-persist" &&
       persisted.sourceChannel === "web-ui" &&
       persisted.command?.stdoutPreview?.includes("... truncated") &&
-      persisted.command?.stderrPreview === "token=Bearer [redacted]" &&
+      persisted.command?.stderrPreview?.includes("[redacted]") &&
       serialized.includes("[redacted]") &&
       !serialized.includes("abc123") &&
       !serialized.includes("super-secret"),

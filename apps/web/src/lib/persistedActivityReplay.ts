@@ -8,6 +8,8 @@ export const MAX_PERSISTED_METADATA_KEYS = 16;
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|credential|password|secret|token/i;
 const BEARER_VALUE_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const SECRET_ASSIGNMENT_PATTERN =
+  /\b(api[_-]?key|authorization|credential|password|secret|token)\s*[:=]\s*["']?[^"'\s,;]+/gi;
 
 export type SessionExportPreview = {
   exportVersion: 1;
@@ -201,10 +203,13 @@ export function createRunReplaySummary(
   };
 }
 
-export function createSessionExportPreview(session: Session): SessionExportPreview {
-  return {
+export function createSessionExportPreview(
+  session: Session,
+  exportedAt = new Date().toISOString()
+): SessionExportPreview {
+  const preview: SessionExportPreview = {
     exportVersion: 1,
-    exportedAt: new Date().toISOString(),
+    exportedAt,
     session: {
       createdAt: session.createdAt,
       hermesSessionId: session.hermesSessionId,
@@ -228,6 +233,8 @@ export function createSessionExportPreview(session: Session): SessionExportPrevi
       "direct service URLs with secrets"
     ]
   };
+
+  return redactValue(preview) as SessionExportPreview;
 }
 
 function compactMetadata(value: unknown): Record<string, unknown> | undefined {
@@ -341,5 +348,7 @@ function redactValue(value: unknown, depth = 0): unknown {
 }
 
 function redactText(value: string) {
-  return value.replace(BEARER_VALUE_PATTERN, "Bearer [redacted]");
+  return value
+    .replace(BEARER_VALUE_PATTERN, "Bearer [redacted]")
+    .replace(SECRET_ASSIGNMENT_PATTERN, "$1=[redacted]");
 }

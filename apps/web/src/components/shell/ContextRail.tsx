@@ -7,7 +7,7 @@ import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
-import { createRunReplaySummary } from "@/lib/persistedActivityReplay";
+import { createRunReplaySummary, createSessionExportPreview } from "@/lib/persistedActivityReplay";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { PersistedActivityEvent, Project, Session } from "@/data/types";
@@ -76,6 +76,7 @@ export function ContextRail({
             />
             <ActiveContextSection activeProject={activeProject} activeSession={activeSession} />
             <RunHistorySection runRecords={runRecords} />
+            <ExportPreviewSection activeSession={activeSession} />
             <ContextContractSection activeProject={activeProject} activeSession={activeSession} />
             <RetrievedMemorySection memoryEvidence={memoryEvidence} />
           </>
@@ -352,6 +353,62 @@ function PersistedReplayList({ events }: { events: PersistedActivityEvent[] }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function ExportPreviewSection({ activeSession }: { activeSession: Session | null }) {
+  if (!activeSession) {
+    return (
+      <section className={styles.section} aria-labelledby="export-preview-heading">
+        <SectionLabel id="export-preview-heading" icon={<FileText size={13} />} label="Export preview" />
+        <EmptyState compact title="No active session" body="Local export preview waits for an active session." />
+      </section>
+    );
+  }
+
+  const preview = createSessionExportPreview(activeSession, activeSession.updatedAt);
+  const runCount = preview.runs.length;
+  const replayEventCount = preview.runs.reduce(
+    (total, run) => total + run.activityReplay.length,
+    0
+  );
+  const previewJson = JSON.stringify(preview, null, 2);
+
+  return (
+    <section className={styles.section} aria-labelledby="export-preview-heading">
+      <SectionLabel id="export-preview-heading" icon={<FileText size={13} />} label="Export preview" />
+      <div className={styles.card}>
+        <div>
+          <div className={styles.cardTitle}>
+            <span>Local preview only</span>
+            <span className={styles.pill}>no backend export</span>
+          </div>
+          <div className={styles.cardBody}>
+            Session transcript, run records, memory scope, and persisted activity replay are previewed from local
+            browser state. Raw payloads and credential-like values are excluded or redacted.
+          </div>
+        </div>
+        <div className={styles.metrics}>
+          <Metric label="messages" value={preview.messages.length} />
+          <Metric label="runs" value={runCount} />
+          <Metric label="replay events" value={replayEventCount} />
+          <Metric label="excluded fields" value={preview.excluded.length} />
+        </div>
+        <div className={styles.fieldGrid}>
+          <ContextField label="Session title" value={preview.session.title} />
+          <ContextField label="Updated" value={formatRunDate(preview.session.updatedAt)} />
+        </div>
+        <ul className={styles.excludedList} aria-label="Excluded export fields">
+          {preview.excluded.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <details className={styles.exportDetails}>
+          <summary>Preview JSON</summary>
+          <pre className={styles.exportJson}>{previewJson}</pre>
+        </details>
+      </div>
     </section>
   );
 }

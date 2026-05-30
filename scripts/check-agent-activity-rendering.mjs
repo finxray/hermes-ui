@@ -136,6 +136,11 @@ function checkComponentSource() {
     "Run history exposes persisted replay and helper supports compact replay/export shapes."
   );
   record(
+    "export-preview-display-only",
+    contextRailHasExportPreview(),
+    "Context rail exposes a collapsed local export preview without download, filesystem, or network behavior."
+  );
+  record(
     "persisted-replay-no-rerun",
     !persistedReplay.includes("fetch(") &&
       !persistedReplay.includes("exec(") &&
@@ -297,7 +302,8 @@ async function checkHelperBehavior() {
   );
   record(
     "persisted-replay-helper",
-    persisted.command?.stderrPreview === "Authorization: Bearer [redacted]" &&
+    persisted.command?.stderrPreview?.includes("[redacted]") &&
+      !JSON.stringify(persisted).includes("abc123") &&
       restored.details?.replay === true &&
       bounded.length === 40,
     "Persisted replay helper redacts, restores display-only events, and bounds snapshots."
@@ -417,6 +423,25 @@ function contextRailHasPersistedReplay() {
     contextRail.includes("No persisted activity replay for this run") &&
     contextRail.includes("createRunReplaySummary") &&
     contextRail.includes("PersistedReplayList") &&
+    !contextRail.includes("fetch(") &&
+    !contextRail.includes("exec(")
+  );
+}
+
+function contextRailHasExportPreview() {
+  const contextRailPath = resolve(root, "apps/web/src/components/shell/ContextRail.tsx");
+  if (!existsSync(contextRailPath)) {
+    return false;
+  }
+  const contextRail = readFileSync(contextRailPath, "utf8");
+  return (
+    contextRail.includes("ExportPreviewSection") &&
+    contextRail.includes("createSessionExportPreview") &&
+    contextRail.includes("Local preview only") &&
+    contextRail.includes("<details") &&
+    !contextRail.includes("navigator.clipboard") &&
+    !contextRail.includes("URL.createObjectURL") &&
+    !contextRail.includes("download=") &&
     !contextRail.includes("fetch(") &&
     !contextRail.includes("exec(")
   );

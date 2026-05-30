@@ -13,6 +13,7 @@ const report = {
   mode: {
     headed: args.headed,
     requireHermes: args.requireHermes,
+    replayTest: args.replayTest,
     sendTest: args.sendTest,
     stopTest: args.stopTest
   },
@@ -45,7 +46,7 @@ async function main() {
   }
 
   const hermesStatus = await checkHermesRequirement();
-  if ((args.sendTest || args.stopTest) && !canUseLiveHermes(hermesStatus)) {
+  if ((args.sendTest || args.stopTest || args.replayTest) && !canUseLiveHermes(hermesStatus)) {
     addResult(
       "hermes-send-precondition",
       "fail",
@@ -111,6 +112,7 @@ function parseArgs(values) {
     headed: false,
     json: false,
     requireHermes: false,
+    replayTest: false,
     sendTest: false,
     stopTest: false,
     unknown: []
@@ -125,6 +127,10 @@ function parseArgs(values) {
     } else if (arg === "--require-hermes") {
       parsed.requireHermes = true;
     } else if (arg === "--send-test") {
+      parsed.sendTest = true;
+    } else if (arg === "--replay-test") {
+      parsed.replayTest = true;
+      parsed.requireHermes = true;
       parsed.sendTest = true;
     } else if (arg === "--stop-test") {
       parsed.stopTest = true;
@@ -398,6 +404,16 @@ async function checkRightRailTabs() {
         page.getByText("No runs in this session yet", { exact: true }).first(),
         "Run history empty state is honest before a send."
       );
+      await expectVisible(
+        "right-rail-export-preview",
+        page.getByText("Export preview", { exact: true }).first(),
+        "Context tab exposes the local export preview surface."
+      );
+      await expectHidden(
+        "right-rail-export-json-collapsed",
+        page.locator("pre").filter({ hasText: '"exportVersion"' }).first(),
+        "Export preview JSON stays collapsed by default."
+      );
     }
     if (name === "memory") {
       await expectVisible(
@@ -432,7 +448,9 @@ async function checkComposer() {
   const message = args.sendTest
     ? args.stopTest
       ? `UI_SMOKE_STOP_${Date.now()} write a detailed answer in many short numbered lines.`
-      : `UI_SMOKE_SEND_${Date.now()} please reply with UI_SMOKE_SEND_OK.`
+      : args.replayTest
+        ? `UI_SMOKE_REPLAY_${Date.now()} please reply with UI_SMOKE_SEND_OK.`
+        : `UI_SMOKE_SEND_${Date.now()} please reply with UI_SMOKE_SEND_OK.`
     : "hello smoke test";
 
   await textarea.fill(message, { timeout: timeoutMs });
@@ -448,6 +466,8 @@ async function checkComposer() {
   if (args.sendTest) {
     if (args.stopTest) {
       await runLiveStopSmoke({ message, sendButton });
+    } else if (args.replayTest) {
+      await runLiveReplaySmoke({ message, sendButton });
     } else {
       await runLiveSendSmoke({ message, sendButton });
     }
@@ -551,6 +571,63 @@ async function runLiveSendSmoke({ message, sendButton }) {
   await checkRunHistoryStatus("completed", "composer-run-history-completed");
 }
 
+async function runLiveReplaySmoke({ message, sendButton }) {
+  const initialAssistantCount = await page.locator('article[data-role="assistant"]').count();
+
+  await sendButton.click({ timeout: timeoutMs });
+  addResult("composer-send-click", "pass", "Clicked Send for opt-in reload replay smoke.");
+
+  await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("composer-user-message", "pass", "Unique replay-smoke message rendered in the transcript.");
+
+  await page.waitForFunction(
+    ({ initialCount }) => document.querySelectorAll('article[data-role="assistant"]').length > initialCount,
+    { initialCount: initialAssistantCount },
+    { timeout: liveSendTimeoutMs }
+  );
+  addResult("composer-assistant-created", "pass", "A new assistant message was created for replay smoke.");
+
+  const assistantResult = await waitForAssistantResponse(initialAssistantCount);
+  if (!assistantResult.ok) {
+    addResult("composer-assistant-response", "fail", assistantResult.message);
+    return;
+  }
+  addResult(
+    "composer-assistant-response",
+    "pass",
+    `Observed replay-smoke assistant response: ${assistantResult.preview}`
+  );
+
+  await checkRunHistoryStatus("completed", "composer-run-history-replay-before-reload");
+  await checkNoHorizontalOverflow("replay-before-reload-overflow");
+
+  await page.reload({ waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await page.waitForLoadState("load", { timeout: timeoutMs });
+  addResult("replay-page-reload", "pass", "Reloaded the app in the same isolated browser context.");
+
+  await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("replay-selected-session-retained", "pass", "Selected session still shows the unique user message after reload.");
+
+  const runHistory = await checkRunHistoryStatus("completed", "composer-run-history-replay-after-reload");
+  await expectHidden(
+    "replay-not-empty-after-reload",
+    runHistory.getByText("No persisted activity replay for this run", { exact: true }).first(),
+    "Persisted replay is not empty after reload."
+  );
+  await expectVisible(
+    "replay-export-preview-after-reload",
+    page.getByText("Local preview only", { exact: true }).first(),
+    "Local export preview remains available after reload."
+  );
+  await expectVisible(
+    "replay-export-counts-after-reload",
+    page.getByText("replay events", { exact: true }).first(),
+    "Export preview includes replay event count after reload."
+  );
+  await checkNoVisibleSecrets("replay-visible-secrets");
+  await checkNoHorizontalOverflow("replay-after-reload-overflow");
+}
+
 async function checkRunHistoryStatus(expectedStatus, name) {
   const contextTab = page.getByRole("button", { name: "Show context panel", exact: true });
   await contextTab.click({ timeout: timeoutMs });
@@ -577,6 +654,7 @@ async function checkRunHistoryStatus(expectedStatus, name) {
       "Stopped run replay includes the persisted stopped activity."
     );
   }
+  return runHistory;
 }
 
 async function waitForAssistantResponse(initialAssistantCount) {
@@ -672,6 +750,15 @@ async function checkNoHorizontalOverflow(name) {
     name,
     sizes.scrollWidth <= sizes.clientWidth + 1,
     `Document width ${sizes.scrollWidth}px fits viewport ${sizes.clientWidth}px.`
+  );
+}
+
+async function checkNoVisibleSecrets(name) {
+  const bodyText = await page.locator("body").innerText({ timeout: timeoutMs }).catch(() => "");
+  check(
+    name,
+    !/(Bearer\s+[A-Za-z0-9._~+/=-]+|api[_-]?key\s*[:=]\s*[^,\s]+|token\s*[:=]\s*[^,\s]+|password\s*[:=]\s*[^,\s]+)/i.test(bodyText),
+    "No credential-like values are visible in replay/export smoke output."
   );
 }
 

@@ -257,6 +257,44 @@
   color: var(--danger);
 }
 
+.excludedList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.4;
+}
+
+.exportDetails {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+}
+
+.exportDetails summary {
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.exportJson {
+  max-height: 260px;
+  margin: 12px 0 0;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .toolRow,
 .commandRow,
 .artifactRow {

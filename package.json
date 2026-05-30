@@ -26,6 +26,8 @@
     "smoke:ui:send:headed": "node scripts/ui-interaction-smoke.mjs --send-test --require-hermes --headed",
     "smoke:ui:stop": "node scripts/ui-interaction-smoke.mjs --send-test --stop-test --require-hermes",
     "smoke:ui:stop:headed": "node scripts/ui-interaction-smoke.mjs --send-test --stop-test --require-hermes --headed",
+    "smoke:ui:replay": "node scripts/ui-interaction-smoke.mjs --replay-test --require-hermes",
+    "smoke:ui:replay:headed": "node scripts/ui-interaction-smoke.mjs --replay-test --require-hermes --headed",
     "typecheck": "npm run typecheck -w @hermes-ui/web"
   },
   "overrides": {

@@ -286,6 +286,19 @@ stdout/stderr/output, secrets, binaries, command rerun handles, backend
 persistence, cross-channel discovery, and Telegram integration remain excluded.
 See `docs/product/PERSISTED_ACTIVITY_REPLAY_13N.md`.
 
+## Checkpoint: Slice 13O reload replay and export preview
+
+Slice 13O added an opt-in `npm run smoke:ui:replay` browser smoke on
+2026-05-31 that requires live Hermes, sends through the existing composer/BFF
+path, reloads the page, and verifies selected-session replay survives
+hydration. The Context rail now exposes a collapsed local-only export preview
+for the active session, including transcript, run records, memory scope, and
+bounded persisted replay counts while excluding or redacting raw payloads,
+full output, credentials, binaries, and secret service URLs. No copy/download,
+backend export, import, command rerun, direct browser-to-service call, storage
+access, or memory mutation/admin action was added. See
+`docs/product/RELOAD_REPLAY_EXPORT_PREVIEW_13O.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

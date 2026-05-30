@@ -212,6 +212,9 @@ Deliver:
 Goal: make persisted replay survivability and export shape visible without
 adding backend persistence.
 
+Status: completed in Slice 13O. See
+`docs/product/RELOAD_REPLAY_EXPORT_PREVIEW_13O.md`.
+
 Deliver:
 
 - browser smoke that sends a run, reloads, and verifies persisted replay;
@@ -219,13 +222,27 @@ Deliver:
 - no command rerun or agent re-execution behavior;
 - no direct service/storage calls.
 
+### 13P - Local Export Download And Import Validation Contract
+
+Goal: define a safe local file export/import contract before adding durable
+backup, cloud sync, or backend persistence.
+
+Deliver:
+
+- validate the JSON export shape with clear versioning;
+- add a safe local download/copy path only if redaction and size limits remain
+  enforced;
+- define import validation without merging imported data automatically;
+- keep all behavior local, explicit, and display-only until the contract is
+  proven.
+
 ## Recommended Next Slice
 
-Slice 13O - Reload Replay Smoke And Local Export Preview Surface.
+Slice 13P - Local Export Download And Import Validation Contract.
 
 Reason:
 
-- Slice 13N added bounded redacted replay snapshots and an export-ready helper
-  shape without changing Hermes streaming or backend storage.
-- The next gap is proving replay survives hydration in a browser smoke and
-  deciding whether to expose a local-only export preview surface.
+- Slice 13O made the local export shape visible and proved persisted replay
+  survives reload in an opt-in browser smoke.
+- The next gap is a validated local export/download/import contract that stays
+  explicit, redacted, versioned, and independent of backend persistence.

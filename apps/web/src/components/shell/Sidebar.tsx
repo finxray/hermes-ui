@@ -201,7 +201,12 @@ export function Sidebar({
             />
           </div>
         </div>
-        <label className={styles.settingsButton} htmlFor="studio-settings-toggle">
+        <label
+          className={styles.settingsButton}
+          htmlFor="studio-settings-toggle"
+          aria-label="Open settings and connection status"
+          title="Open settings and connection status"
+        >
           <span className={styles.settingsIcon} aria-hidden="true">
             <Settings size={15} />
           </span>

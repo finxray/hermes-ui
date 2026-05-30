@@ -101,7 +101,13 @@ function TabButton({
   onClick: () => void;
 }) {
   return (
-    <button className={`${styles.tab} ${active ? styles.activeTab : ""}`} type="button" onClick={onClick}>
+    <button
+      className={`${styles.tab} ${active ? styles.activeTab : ""}`}
+      type="button"
+      aria-label={`Show ${children.toLowerCase()} panel`}
+      aria-pressed={active}
+      onClick={onClick}
+    >
       {children}
     </button>
   );

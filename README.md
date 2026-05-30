@@ -66,7 +66,16 @@ npm run studio:doctor
 npm run dev
 ```
 
-6. Open the app:
+6. Run the MVP smoke harness:
+
+```powershell
+npm run smoke:mvp
+```
+
+Use `npm run smoke:mvp:live` only when both Hermes and Brain Memory Gateway are
+configured and expected to be reachable.
+
+7. Open the app:
 
 ```powershell
 npm run studio:open

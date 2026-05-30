@@ -16,6 +16,8 @@
     "check:brain-memory-client": "node scripts/check-brain-memory-client-shapes.mjs",
     "check:ui-structure": "node scripts/check-ui-structure.mjs",
     "check:workspace-state": "node --no-warnings scripts/check-workspace-state.mjs",
+    "smoke:mvp": "node scripts/mvp-smoke.mjs",
+    "smoke:mvp:live": "node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory",
     "typecheck": "npm run typecheck -w @hermes-ui/web"
   },
   "overrides": {

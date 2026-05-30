@@ -88,6 +88,10 @@ the composer can type another sendable message afterward.
 - Project row accepts a safe click.
 - Child session row becomes active.
 - Recent chat row becomes active.
+- Next.js static chunks load successfully so the server-rendered shell is
+  hydrated before interaction assertions run.
+- New chat quick action creates an active child row with a non-empty label and
+  preserves the default `New chat` title before the first user message.
 - Left rail collapses and expands.
 - Right rail collapses and expands.
 - Settings popover opens and closes with Escape.
@@ -143,6 +147,10 @@ profile and avoids polluting the in-app browser session.
 
 - A generic browser `404` resource console line is ignored as harmless local
   static/favicon noise.
+- Failed `/_next/static/` chunks are treated as a hard failure because the page
+  may appear server-rendered while React click handlers are not hydrated. If
+  this occurs after `npm run build`, restart the running `next start` process so
+  it serves the current `.next` assets.
 - Dev-server HMR websocket noise is ignored because it is not a product runtime
   interaction failure.
 - The project row check verifies a safe click. Session/chat row checks verify

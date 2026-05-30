@@ -25,6 +25,7 @@ const report = {
 
 const browserIssues = [];
 const networkIssues = [];
+const staticAssetIssues = [];
 const streamResponses = [];
 let browser;
 let context;
@@ -69,23 +70,27 @@ async function main() {
     page.on("response", (response) => {
       const url = response.url();
       const status = response.status();
+      if (status >= 400 && url.includes("/_next/static/")) {
+        staticAssetIssues.push(`HTTP ${status}: ${safeDisplayUrl(url)}`);
+      } else if (status >= 400 && !isIgnoredNetworkResponse(url, status)) {
+        networkIssues.push(`HTTP ${status}: ${safeDisplayUrl(url)}`);
+      }
       if (url.includes("/api/hermes/chat/stream")) {
         streamResponses.push(status);
-      }
-      if (status >= 400 && !isIgnoredNetworkResponse(url, status)) {
-        networkIssues.push(`HTTP ${status}: ${safeDisplayUrl(url)}`);
       }
     });
 
     await loadRoot();
-    await checkSidebar();
-    await checkRailToggles();
-    await checkSettingsPopover();
-    await checkRightRailTabs();
-    await checkComposer();
-    await checkDisabledPlaceholders();
-    await checkNoHorizontalOverflow("final-layout-overflow");
-    checkBrowserIssues();
+    if (checkStaticAssetIssues()) {
+      await checkSidebar();
+      await checkRailToggles();
+      await checkSettingsPopover();
+      await checkRightRailTabs();
+      await checkComposer();
+      await checkDisabledPlaceholders();
+      await checkNoHorizontalOverflow("final-layout-overflow");
+      checkBrowserIssues();
+    }
   } catch (error) {
     addResult("browser-run", "fail", safeErrorMessage(error));
   } finally {
@@ -271,7 +276,7 @@ async function checkSidebar() {
 async function checkNewChatQuickAction() {
   const chatAction = page.getByRole("button", { name: "Chat", exact: true });
   await chatAction.click({ timeout: timeoutMs });
-  const label = await page.waitForFunction(
+  const active = await page.waitForFunction(
     () => {
       const rows = Array.from(
         document.querySelectorAll(
@@ -281,15 +286,21 @@ async function checkNewChatQuickAction() {
       const active = rows.find((row) => row.getAttribute("aria-current") === "page");
       const rawText = active instanceof HTMLElement ? active.innerText : active?.textContent;
       const text = rawText?.replace(/\s+/g, " ").trim() || "";
-      return /^New chat(?: \d+)?\b/.test(text) ? text : null;
+      return text ? { label: text, matchesDefaultTitle: /^New chat(?: \d+)?\b/.test(text) } : null;
     },
     null,
     { timeout: timeoutMs }
-  ).then((value) => value.jsonValue()).catch(() => "");
+  ).then((value) => value.jsonValue()).catch(() => null);
+  const label = typeof active?.label === "string" ? active.label : "";
   check(
     "sidebar-new-chat",
-    /^New chat(?: \d+)?\b/.test(label),
+    label.length > 0,
     `New chat quick action created active child row "${label}".`
+  );
+  check(
+    "sidebar-new-chat-default-title",
+    active?.matchesDefaultTitle === true,
+    `New chat active row keeps default title before first message: "${label}".`
   );
   await checkNoHorizontalOverflow("sidebar-new-chat-overflow");
 }
@@ -593,6 +604,21 @@ function checkBrowserIssues() {
     return;
   }
   addResult("browser-console-errors", "fail", issues.slice(0, 5).join(" | "));
+}
+
+function checkStaticAssetIssues() {
+  if (staticAssetIssues.length === 0) {
+    addResult("static-assets-loaded", "pass", "Next.js static chunks loaded without HTTP errors.");
+    return true;
+  }
+  addResult(
+    "static-assets-loaded",
+    "fail",
+    `Next.js static chunks failed to load; app may be server-rendered but not hydrated. ${staticAssetIssues
+      .slice(0, 3)
+      .join(" | ")}`
+  );
+  return false;
 }
 
 function isIgnoredConsoleError(message) {

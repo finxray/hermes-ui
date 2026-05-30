@@ -25,6 +25,7 @@ the deferred production one-command CLI.
 | `npm run studio:doctor` | Checks repo shape, env, Hermes status, Brain Memory status, and BFF reachability without printing secrets. |
 | `npm run studio:launch` | Safe launcher/checklist for env, Web UI, Hermes, Brain Memory mock/live state, stale static chunks, optional smoke, and browser open. |
 | `npm run studio:launch -- --help` | Prints launcher usage, examples, flags, and safety boundaries without running diagnostics. |
+| `npm run studio:launch -- --check --print-recovery-plan` | Prints the healthy-server recovery plan without executing it. |
 | `npm run studio:launch:smoke` | Runs launcher checks plus route/BFF and browser smokes. |
 | `npm run check:studio-launch` | Verifies the launcher help, base URL, JSON, redaction, recovery, and safety contract. |
 | `npm run dev` | Starts the Next.js Web UI on port 3000. |
@@ -122,6 +123,7 @@ npm run studio:launch -- --help
 npm run studio:launch -- --check --verbose
 npm run studio:launch -- --check --base-url http://127.0.0.1:3000
 npm run studio:launch -- --check --recovery
+npm run studio:launch -- --check --print-recovery-plan
 npm run studio:launch -- --check --require-hermes
 npm run studio:launch -- --smoke
 npm run studio:launch -- --ui-smoke
@@ -137,7 +139,9 @@ processes, delete `.next`, print API keys, or implement export/import. See
 `docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`. Guided recovery is
 documented in `docs/packaging/STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md`.
 Launcher help and contract checks are documented in
-`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.
+`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`. Manual recovery from
+stale/broken servers to one healthy selected server is documented in
+`docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`.
 
 ## Web UI Standalone / Mock Mode
 
@@ -308,10 +312,25 @@ recovery commands:
 
 ```powershell
 npm run studio:launch -- --check --recovery
+npm run studio:launch -- --check --print-recovery-plan
+```
+
+If no healthy Studio server is found, follow
+`docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`: identify listener ownership,
+stop stale servers manually after verifying ownership, start a fresh server,
+then verify a selected base URL before running browser smokes.
+
+If port `3000` is stale, start a fresh server on an unused explicit port such
+as `3002`:
+
+```powershell
+npm run dev -- --port 3002
+npm run studio:launch -- --check --base-url http://127.0.0.1:3002
 ```
 
 If port `3000` is healthy and another port is stale, pin follow-up checks and
-smokes to `3000`:
+smokes to `3000`. If the healthy server is on another port, replace the URL
+with that healthy selected base URL:
 
 ```powershell
 npm run studio:launch -- --check --base-url http://127.0.0.1:3000
@@ -330,7 +349,9 @@ npm run smoke:markdown:long -- --base-url http://127.0.0.1:3000
 Browser smokes check a bounded sample of `/_next/static/**` chunks before deep
 interaction. If the selected server has stale chunks, the smoke fails early and
 prints the selected base URL plus manual recovery guidance. Markdown smokes test
-the selected base URL directly; they do not silently switch to another port.
+the selected base URL directly; they do not silently switch to another port. Do
+not run browser smokes without `--base-url` while the default `3000` server is
+stale.
 
 If you need to inspect ownership manually on Windows:
 
@@ -340,20 +361,16 @@ Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $ports -cont
 Get-Process -Id <OwningProcess>
 ```
 
-If the process is an old local `node` or `next` server you own, stop it:
-
-```powershell
-Stop-Process -Id <OwningProcess>
-```
-
-Then restart:
+If the process is an old local `node` or `next` server you own, stop it
+manually from the terminal that owns it, or use your OS process manager after
+verifying the PID. Then restart:
 
 ```powershell
 npm run dev
 ```
 
-If stale assets persist, stop the server, remove only the web app build cache,
-then restart:
+If stale assets persist, stop the server, confirm the repo path, remove only the
+web app build cache as a last manual/destructive step, then restart:
 
 ```powershell
 Remove-Item -Recurse -Force apps\web\.next

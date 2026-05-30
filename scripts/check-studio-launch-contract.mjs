@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -10,10 +10,14 @@ const root = resolve(process.cwd());
 const launcherPath = join(root, "scripts", "studio-launch.mjs");
 const smokeBaseUrlPath = join(root, "scripts", "smoke-base-url.mjs");
 const packagePath = join(root, "package.json");
+const healthyServerRunbookPath = join(root, "docs", "runbooks", "HEALTHY_STUDIO_SERVER_RECOVERY.md");
 
 const launcher = readFileSync(launcherPath, "utf8");
 const smokeBaseUrl = readFileSync(smokeBaseUrlPath, "utf8");
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+const healthyServerRunbook = existsSync(healthyServerRunbookPath)
+  ? readFileSync(healthyServerRunbookPath, "utf8")
+  : "";
 
 const results = [];
 
@@ -64,7 +68,8 @@ function checkHelpSource() {
     "--json",
     "--verbose",
     "--dev-command",
-    "--recovery"
+    "--recovery",
+    "--print-recovery-plan"
   ];
 
   passIf("help-parser", launcher.includes("args.help") && launcher.includes("printHelp()"), "Launcher parses --help and calls printHelp.");
@@ -128,9 +133,16 @@ function checkSecretRedactionContract() {
 function checkRecoveryContract() {
   passIf("recovery-print-only-text", launcher.includes("The launcher does not execute recovery commands."), "Recovery output states commands are print-only.");
   passIf("recovery-data-only", launcher.includes("function buildRecoveryCommands()"), "Recovery commands are built as report data.");
+  passIf("recovery-runbook-exists", existsSync(healthyServerRunbookPath), "Healthy Studio server recovery runbook exists.");
+  passIf("recovery-runbook-referenced", launcher.includes("HEALTHY_STUDIO_SERVER_RECOVERY.md"), "Launcher references the healthy-server recovery runbook.");
+  passIf("recovery-no-healthy-message", launcher.includes("No healthy Studio server found"), "Launcher has no-healthy-server recovery wording.");
+  passIf("recovery-print-plan-alias", launcher.includes("--print-recovery-plan") && launcher.includes("parsed.printRecoveryPlan = true"), "--print-recovery-plan aliases print-only recovery.");
+  passIf("recovery-base-url-smoke-guidance", launcher.includes("Run browser smokes only after the selected base URL is healthy") && healthyServerRunbook.includes("Do not run smokes without `--base-url` while `3000` is stale."), "Launcher/runbook require healthy selected base URL before smokes.");
   passIf("recovery-destructive-marked", /command:\s*"Remove-Item -Recurse -Force apps\\\\web\\\\\.next"[\s\S]*?destructive:\s*true/.test(launcher), "Windows cache cleanup is marked destructive.");
   passIf("recovery-rm-marked", /command:\s*"rm -rf apps\/web\/\.next"[\s\S]*?destructive:\s*true/.test(launcher), "POSIX cache cleanup is marked destructive.");
   passIf("recovery-note", launcher.includes("Print-only. Do not run until the server is stopped and the path is confirmed."), "Destructive recovery commands carry guarded notes.");
+  passIf("recovery-runbook-manual-stop", healthyServerRunbook.includes("The launcher does not stop processes automatically."), "Runbook keeps process stopping manual.");
+  passIf("recovery-runbook-no-start-script", healthyServerRunbook.includes("There is currently no committed root or web `start` script"), "Runbook does not document unsupported npm start flow.");
 }
 
 function checkSafetyContract() {

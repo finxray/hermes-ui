@@ -147,3 +147,20 @@ Reason: Slice 14H protects the launcher contract. The next useful increment is
 to stabilize local browser smoke execution around a known healthy selected
 server and document the manual stale-server recovery path, without adding
 automatic process killing, `.next` deletion, or service management.
+
+## Slice 14I Follow-Up
+
+Slice 14I extended the contract check to cover the healthy-server recovery
+runbook and launcher recovery wording. `npm run check:studio-launch` now also
+verifies:
+
+- `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md` exists;
+- launcher help includes `--print-recovery-plan`;
+- no-healthy-server recovery wording is present;
+- the recovery runbook is referenced by launcher output;
+- base-url smoke guidance requires a healthy selected server;
+- `.next` cleanup remains manual/destructive guidance only;
+- no destructive recovery or service commands are executed.
+
+Detailed behavior is documented in
+`docs/packaging/STUDIO_LAUNCHER_14I_HEALTHY_SERVER_RECOVERY.md`.

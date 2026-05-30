@@ -395,6 +395,20 @@ delete `.next`, modify env files, change backend/Hermes/Brain Memory logic, or
 implement export/import. See
 `docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.
 
+## Checkpoint: Slice 14I healthy Studio server recovery
+
+Slice 14I added a manual healthy-server recovery workflow on 2026-05-31 for
+the case where all detected Studio servers are stale/broken. The launcher now
+prints explicit no-healthy-server guidance, supports the print-only
+`--print-recovery-plan` alias, points to
+`docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`, and tells users to verify a
+fresh selected base URL before browser smokes. `npm run check:studio-launch`
+now covers the recovery runbook and no-healthy-server contract. No process
+kill, `.next` deletion, service start/stop, env mutation, backend logic change,
+Hermes/Brain Memory change, direct browser-to-service path, or export/import
+was added. See
+`docs/packaging/STUDIO_LAUNCHER_14I_HEALTHY_SERVER_RECOVERY.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

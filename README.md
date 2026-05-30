@@ -69,6 +69,11 @@ npm run smoke:ui -- --base-url http://127.0.0.1:3000
 
 Browser smokes fail early on stale Next static chunks and print manual recovery
 guidance instead of continuing into misleading click failures.
+If no healthy Studio server is detected, follow
+`docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`, start a fresh server on an
+unused port such as `npm run dev -- --port 3002`, verify it with
+`npm run studio:launch -- --check --base-url http://127.0.0.1:3002`, then run
+smokes with the same `--base-url`.
 
 The app opens at `http://127.0.0.1:3000`. The expected Hermes API URL is
 `http://127.0.0.1:8642`; Brain Memory Gateway is optional and usually expected
@@ -80,7 +85,8 @@ troubleshooting, browser scaling notes, and secrets guidance, see
 
 For the launcher details, flags, safety boundaries, and relationship to the
 future one-command CLI, see `docs/packaging/STUDIO_LAUNCHER_14A.md` and
-`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`.
+`docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`. For stale-server
+recovery, see `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`.
 
 1. Install dependencies:
 

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Brain Memory Studio",
-  description: "Static Hermes UI shell with mocked project, session, and memory data."
+  description: "Local Hermes UI and Brain Memory Studio with project-scoped chat and read-only memory inspection."
 };
 
 export default function RootLayout({

@@ -1,4 +1,5 @@
 import { Link2 } from "lucide-react";
+import { memo, useMemo } from "react";
 import type { ChatMessage } from "@/data/types";
 import { CopyTextButton, MessageMarkdown } from "./MessageMarkdown";
 import styles from "./MessageBubble.module.css";
@@ -7,9 +8,13 @@ type MessageBubbleProps = {
   message: ChatMessage;
 };
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isAssistant = message.role === "assistant";
   const isStreaming = message.status === "streaming";
+  const userParagraphs = useMemo(
+    () => message.content.split("\n"),
+    [message.content]
+  );
 
   return (
     <article
@@ -30,9 +35,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             isAssistant ? (
               <MessageMarkdown content={message.content} isStreaming={isStreaming} />
             ) : (
-              message.content
-                .split("\n")
-                .map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)
+              userParagraphs.map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)
             )
           ) : (
             <p className={styles.streamPlaceholder}>Waiting for Hermes...</p>
@@ -56,4 +59,4 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
     </article>
   );
-}
+});

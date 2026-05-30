@@ -154,11 +154,24 @@ npm run smoke:markdown
 
 See `docs/design/MARKDOWN_FIXTURE_SMOKE_14E.md`.
 
+## Slice 14F Follow-Up
+
+Slice 14F added a renderer performance budget, long markdown fixture route, and
+long fixture smoke:
+
+```powershell
+npm run smoke:markdown:long
+```
+
+It also memoized unchanged message rows/code blocks, bounded long code block
+height, hardened long link/table overflow behavior, and preserved the existing
+streaming highlight skip path. See
+`docs/design/MESSAGE_RENDERER_PERFORMANCE_BUDGET_14F.md`.
+
 ## Next Recommended Slice
 
-Slice 14E - Deterministic Markdown Fixture And Visual Regression Smoke.
+Slice 14G - Stale Server Recovery UX And Smoke Base URL Hygiene.
 
-Reason: Slice 14D adds the renderer and source-level checks. The next useful
-step is a deterministic local fixture or test-only transcript state that lets
-browser smoke verify headings, tables, links, code copy, and overflow without
-depending on a live model response.
+Reason: the renderer is now covered by deterministic short and long fixture
+smokes. The next useful increment is to reduce confusion from stale local
+servers and make smoke base URL selection clearer.

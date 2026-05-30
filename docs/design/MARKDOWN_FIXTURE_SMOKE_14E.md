@@ -140,10 +140,25 @@ interactive HTML.
 - The fixture is not exposed in production navigation.
 - It does not test model-generated markdown.
 
+## Slice 14F Follow-Up
+
+Slice 14F added a separate long fixture route and smoke:
+
+```text
+/design/markdown-long-fixture
+```
+
+```powershell
+npm run smoke:markdown:long
+```
+
+The long fixture covers repeated assistant messages, long lists, long code,
+wide tables, long links, copy stability, bounded code scrolling, and the same
+raw HTML safety model.
+
 ## Next Recommended Slice
 
-Slice 14F - Message Renderer Polish And Long Transcript Performance Budget.
+Slice 14G - Stale Server Recovery UX And Smoke Base URL Hygiene.
 
-Reason: Slice 14E protects the renderer contract. The next useful increment is
-to tune small rendering polish and establish transcript size/performance
-budgets before adding heavier visual regression or virtualization.
+Reason: Slice 14F adds the long fixture and performance budget. The next useful
+increment is to tighten local stale-server recovery and smoke base URL hygiene.

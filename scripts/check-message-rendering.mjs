@@ -9,10 +9,14 @@ const files = {
   markdownCss: "apps/web/src/components/chat/MessageMarkdown.module.css",
   fixture: "apps/web/src/data/markdownFixture.ts",
   fixtureRoute: "apps/web/src/app/design/markdown-fixture/page.tsx",
+  longFixture: "apps/web/src/data/longMarkdownFixture.ts",
+  longFixtureRoute: "apps/web/src/app/design/markdown-long-fixture/page.tsx",
   bubble: "apps/web/src/components/chat/MessageBubble.tsx",
   bubbleCss: "apps/web/src/components/chat/MessageBubble.module.css",
   markdownSmoke: "scripts/markdown-fixture-smoke.mjs",
-  packageJson: "apps/web/package.json"
+  longMarkdownSmoke: "scripts/markdown-long-fixture-smoke.mjs",
+  packageJson: "apps/web/package.json",
+  rootPackageJson: "package.json"
 };
 
 for (const [name, path] of Object.entries(files)) {
@@ -25,10 +29,14 @@ const markdown = read(files.markdown);
 const markdownCss = read(files.markdownCss);
 const fixture = read(files.fixture);
 const fixtureRoute = read(files.fixtureRoute);
+const longFixture = read(files.longFixture);
+const longFixtureRoute = read(files.longFixtureRoute);
 const bubble = read(files.bubble);
 const bubbleCss = read(files.bubbleCss);
 const markdownSmoke = read(files.markdownSmoke);
+const longMarkdownSmoke = read(files.longMarkdownSmoke);
 const packageJson = JSON.parse(read(files.packageJson) || "{}");
+const rootPackageJson = JSON.parse(read(files.rootPackageJson) || "{}");
 
 expect(markdown.includes("ReactMarkdown"), "MessageMarkdown uses ReactMarkdown.");
 expect(markdown.includes("remarkGfm"), "MessageMarkdown enables remark-gfm.");
@@ -40,12 +48,18 @@ expect(markdown.includes("safeHref"), "Links pass through a safe href helper.");
 expect(markdown.includes("CopyTextButton"), "Shared copy button exists.");
 expect(markdown.includes("navigator.clipboard") && markdown.includes("execCommand(\"copy\")"), "Copy handler has Clipboard API and fallback paths.");
 expect(markdown.includes("CodeBlock"), "Fenced code blocks use a dedicated CodeBlock component.");
+expect(markdown.includes("memo(function MessageMarkdown") && markdown.includes("memo(function CodeBlock"), "Markdown renderer and code blocks are memoized.");
+expect(markdown.includes("useMemo") && markdown.includes("highlightedLines"), "Completed code block highlighting is memoized by code/language.");
 expect(markdown.includes("highlightLine") && markdown.includes("tokenizeLine"), "Code blocks use lightweight React token highlighting.");
 expect(markdown.includes("isStreaming || !language"), "Streaming code blocks avoid eager highlighting.");
 expect(markdown.includes("tableScroller"), "GFM tables are wrapped for horizontal scrolling.");
 expect(markdownCss.includes(".codeBlock") && markdownCss.includes(".copyButton"), "Code block and copy button styles exist.");
 expect(markdownCss.includes("overflow-x: auto"), "Long code/table content can scroll horizontally.");
+expect(markdownCss.includes("overflow-y: auto") && markdownCss.includes("max-height: min(56vh, 520px)"), "Long code blocks have bounded vertical scrolling.");
+expect(markdownCss.includes("overflow-wrap: anywhere"), "Long links and inline content can wrap inside message bounds.");
+expect(markdownCss.includes("min-width: 118px"), "Copy button feedback has a stable minimum width.");
 expect(markdownCss.includes(".tokenKeyword") && markdownCss.includes(".tokenString"), "Syntax token styles exist.");
+expect(bubble.includes("memo(function MessageBubble"), "MessageBubble is memoized for unchanged transcript rows.");
 expect(bubble.includes("<MessageMarkdown") && bubble.includes('message.role === "assistant"'), "Assistant messages render through MessageMarkdown.");
 expect(bubble.includes("CopyTextButton") && bubble.includes("Copy message"), "Assistant message-level copy action is present.");
 expect(bubble.includes(".split(\"\\n\")"), "User messages keep simple newline-preserving rendering.");
@@ -70,6 +84,21 @@ expect(markdownSmoke.includes("/design/markdown-fixture"), "Markdown browser smo
 expect(markdownSmoke.includes("Copy code") && markdownSmoke.includes("Copy message"), "Markdown browser smoke checks copy buttons.");
 expect(markdownSmoke.includes("raw-html-fixture") && markdownSmoke.includes("RAW_HTML_SHOULD_NOT_RENDER"), "Markdown browser smoke checks raw HTML safety.");
 expect(markdownSmoke.includes("target") && markdownSmoke.includes("noreferrer"), "Markdown browser smoke checks safe link attributes.");
+expect(longFixture.includes("# Long Markdown Fixture Response"), "Long fixture includes a heading.");
+expect(longFixture.includes("Array.from({ length: 18") && longFixture.includes("Array.from({ length: 12"), "Long fixture includes long unordered and ordered lists.");
+expect(longFixture.includes("Future Fast Provider Concern"), "Long fixture includes a wide table.");
+expect(longFixture.includes("veryLongProviderTraceLine"), "Long fixture includes a long code line.");
+expect(longFixture.includes("\\`\\`\\`typescript") && longFixture.includes("\\`\\`\\`bash") && longFixture.includes("\\`\\`\\`json"), "Long fixture includes multiple fenced code blocks.");
+expect(longFixture.includes("LONG_RAW_HTML_SHOULD_NOT_RENDER"), "Long fixture includes raw HTML sentinel.");
+expect(longFixture.includes("longPartialMarkdownFixture") && longFixture.includes("partialLongFixture"), "Long fixture includes partial streaming markdown.");
+expect(longFixtureRoute.includes("MarkdownLongFixturePage"), "Long markdown fixture route exists.");
+expect(longFixtureRoute.includes("aria-label=\"Long markdown fixture\""), "Long markdown fixture route exposes a fixture region label.");
+expect(longFixtureRoute.includes("<MessageBubble") && longFixtureRoute.includes("<MessageMarkdown"), "Long fixture route renders complete and partial markdown examples.");
+expect(longMarkdownSmoke.includes("/design/markdown-long-fixture"), "Long markdown browser smoke targets the long fixture route.");
+expect(longMarkdownSmoke.includes("maxHeight") && longMarkdownSmoke.includes("overflowY"), "Long markdown browser smoke checks bounded code scrolling.");
+expect(longMarkdownSmoke.includes("fixture-table-scroller"), "Long markdown browser smoke checks table overflow wrapper.");
+expect(longMarkdownSmoke.includes("long-raw-html-fixture") && longMarkdownSmoke.includes("LONG_RAW_HTML_SHOULD_NOT_RENDER"), "Long markdown browser smoke checks raw HTML safety.");
+expect(rootPackageJson.scripts?.["smoke:markdown:long"] === "node scripts/markdown-long-fixture-smoke.mjs", "Root package exposes smoke:markdown:long.");
 
 if (failures.length > 0) {
   console.error("Message rendering checks failed:");

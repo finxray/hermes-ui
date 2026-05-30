@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, ExternalLink } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -12,7 +12,10 @@ type MessageMarkdownProps = {
   isStreaming?: boolean;
 };
 
-export function MessageMarkdown({ content, isStreaming = false }: MessageMarkdownProps) {
+export const MessageMarkdown = memo(function MessageMarkdown({
+  content,
+  isStreaming = false
+}: MessageMarkdownProps) {
   const components = useMemo<Components>(
     () => ({
       a({ children, href }) {
@@ -56,7 +59,7 @@ export function MessageMarkdown({ content, isStreaming = false }: MessageMarkdow
       </ReactMarkdown>
     </div>
   );
-}
+});
 
 export function CopyTextButton({
   className,
@@ -91,7 +94,7 @@ export function CopyTextButton({
   );
 }
 
-function CodeBlock({
+const CodeBlock = memo(function CodeBlock({
   code,
   isStreaming,
   language
@@ -100,7 +103,22 @@ function CodeBlock({
   isStreaming: boolean;
   language: string;
 }) {
-  const lines = code.split("\n");
+  const highlightedLines = useMemo(
+    () => {
+      if (isStreaming || !language) {
+        return null;
+      }
+      const lines = code.split("\n");
+      return lines.map((line, index) => (
+        <span className={styles.codeLine} key={`${index}-${line}`}>
+          {highlightLine(line, language)}
+          {index < lines.length - 1 ? "\n" : null}
+        </span>
+      ));
+    },
+    [code, isStreaming, language]
+  );
+
   return (
     <figure className={styles.codeBlock}>
       <figcaption className={styles.codeHeader}>
@@ -108,20 +126,11 @@ function CodeBlock({
         <CopyTextButton className={styles.copyButton} label="Copy code" text={code} />
       </figcaption>
       <pre>
-        <code>
-          {isStreaming || !language
-            ? code
-            : lines.map((line, index) => (
-                <span className={styles.codeLine} key={`${index}-${line}`}>
-                  {highlightLine(line, language)}
-                  {index < lines.length - 1 ? "\n" : null}
-                </span>
-              ))}
-        </code>
+        <code>{highlightedLines ?? code}</code>
       </pre>
     </figure>
   );
-}
+});
 
 async function copyText(text: string) {
   try {

@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   Terminal
 } from "lucide-react";
+import { memo, useMemo } from "react";
 import {
   computeActivityDuration,
   computeRunElapsed,
@@ -31,13 +32,16 @@ type ActivityGroup = {
   primary: AgentActivityEvent;
 };
 
-export function AgentActivityBlock({
+export const AgentActivityBlock = memo(function AgentActivityBlock({
   events,
   legacyEvents = [],
   showThinking = false
 }: AgentActivityBlockProps) {
-  const displayEvents = events.length > 0 ? events : legacyEvents.map(toActivityEventFromToolEvent);
-  const groups = groupActivityEvents(displayEvents);
+  const displayEvents = useMemo(
+    () => events.length > 0 ? events : legacyEvents.map(toActivityEventFromToolEvent),
+    [events, legacyEvents]
+  );
+  const groups = useMemo(() => groupActivityEvents(displayEvents), [displayEvents]);
 
   if (!showThinking && groups.length === 0) {
     return null;
@@ -51,7 +55,7 @@ export function AgentActivityBlock({
       ))}
     </section>
   );
-}
+});
 
 function ThinkingRow() {
   return (

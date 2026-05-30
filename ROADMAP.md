@@ -360,6 +360,17 @@ contracts. No backend, Hermes, Brain Memory, memory mutation/admin, direct
 service, storage, or export/import behavior changed. See
 `docs/design/MARKDOWN_FIXTURE_SMOKE_14E.md`.
 
+## Checkpoint: Slice 14F message renderer performance budget
+
+Slice 14F hardened the rich assistant renderer on 2026-05-31 for longer
+transcripts and high-throughput streams. It added
+`docs/design/MESSAGE_RENDERER_PERFORMANCE_BUDGET_14F.md`,
+`/design/markdown-long-fixture`, and `npm run smoke:markdown:long`; memoized
+unchanged markdown/message/activity rendering paths; bounded long code blocks
+with internal scroll; protected wide tables, long links, copy feedback, and raw
+HTML safety. No backend, Hermes, Brain Memory, memory mutation/admin, direct
+service, storage, auth, provider, or export/import behavior changed.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

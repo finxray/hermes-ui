@@ -64,6 +64,14 @@ Browser UI -> Web UI Backend/BFF -> Brain Memory Gateway UI API -> controlled re
 
 The Web UI must never bypass the Brain Memory Gateway to mutate memory.
 
+## Checkpoint: Slice 12A MVP baseline
+
+Slice 12A captured an MVP launch-readiness baseline on 2026-05-30. The current
+production shell, Hermes live status/streaming path, project/session state,
+Brain Memory BFF mock/unconfigured behavior, route matrix, and regression check
+matrix are documented in
+`docs/checkpoints/MVP_CHECKPOINT_12A.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

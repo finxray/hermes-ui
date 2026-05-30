@@ -1,4 +1,4 @@
-import { Mic, Plus, SendHorizontal, SlidersHorizontal } from "lucide-react";
+import { ArrowUp, Mic, Plus } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
@@ -56,9 +56,6 @@ export function Composer({
               <button className="composer-model-button" type="button" aria-label="Selected model">
                 {modelLabel}
               </button>
-              <button className="composer-tool-button" type="button" aria-label="Composer options">
-                <SlidersHorizontal size={16} />
-              </button>
             </div>
             <div className="composer-controls-right">
               <button className="composer-tool-button" type="button" aria-label="Voice input">
@@ -70,7 +67,7 @@ export function Composer({
                 disabled={disabled || isGenerating || draft.trim().length === 0}
                 aria-label="Send message"
               >
-                <SendHorizontal size={17} />
+                <ArrowUp size={17} />
               </button>
             </div>
           </div>

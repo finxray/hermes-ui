@@ -105,6 +105,11 @@ The launcher is a non-destructive local checklist. By default it:
 - probes common Brain Memory Gateway URLs `8080` and `8765` as warnings unless
   live Brain Memory is required;
 - prints Windows/WSL/Linux process-hint commands for listener ownership;
+- prints non-destructive guided recovery commands when stale or conflicting
+  Studio servers are detected;
+- accepts `--base-url` to make one Web UI URL the primary check and smoke
+  target while still scanning nearby ports for confusion;
+- accepts `--no-port-scan` when a narrow single-target check is needed;
 - reminds the operator to use the production root `/` and 100% browser zoom;
 - prints next commands.
 
@@ -112,6 +117,8 @@ Useful variants:
 
 ```powershell
 npm run studio:launch -- --check --verbose
+npm run studio:launch -- --check --base-url http://127.0.0.1:3000
+npm run studio:launch -- --check --recovery
 npm run studio:launch -- --check --require-hermes
 npm run studio:launch -- --smoke
 npm run studio:launch -- --ui-smoke
@@ -124,7 +131,8 @@ The launcher does not start long-running services, install Hermes, install
 Brain Memory, start Docker, stop Docker, modify `~/.hermes`, kill stale Next
 processes, delete `.next`, print API keys, or implement export/import. See
 `docs/packaging/STUDIO_LAUNCHER_14A.md` and
-`docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`.
+`docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`. Guided recovery is
+documented in `docs/packaging/STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md`.
 
 ## Web UI Standalone / Mock Mode
 
@@ -289,6 +297,21 @@ The launcher scans ports `3000` through `3007`, classifies reachable servers as
 `likely-studio`, `stale-or-broken-studio`, `possible-studio-bff`,
 `unrelated-server`, or `unreachable`, and prints exact failing static assets.
 
+If the launcher finds stale or conflicting servers, ask it for print-only
+recovery commands:
+
+```powershell
+npm run studio:launch -- --check --recovery
+```
+
+If port `3000` is healthy and another port is stale, pin follow-up checks and
+smokes to `3000`:
+
+```powershell
+npm run studio:launch -- --check --base-url http://127.0.0.1:3000
+npm run studio:launch -- --check --smoke --ui-smoke --base-url http://127.0.0.1:3000
+```
+
 If you need to inspect ownership manually on Windows:
 
 ```powershell
@@ -319,6 +342,9 @@ npm run dev
 
 Do not run broad recursive delete commands outside the repo or without checking
 the path first.
+
+The launcher may print cache removal commands as guarded manual recovery
+options. It never executes them.
 
 If the browser shows a good app in one place and an old or broken app in
 another, confirm both browsers are using the same host/port and the production

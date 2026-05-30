@@ -166,3 +166,18 @@ Reason: Slice 14B can identify stale or conflicting local servers. The next
 increment should make recovery easier with non-destructive, copyable commands
 and explicit `STUDIO_WEB_UI_URL` server selection guidance, while still avoiding
 automatic service management.
+
+## Slice 14C Follow-Up
+
+Slice 14C completed the guided recovery pass. The launcher now supports
+explicit `--base-url`, optional `--no-port-scan`, and `--recovery` print-only
+guidance. It also emits structured JSON fields for `selectedBaseUrl`,
+`healthyStudioPorts`, `brokenStudioPorts`, `recommendedActions`,
+`recoveryCommands`, and `staticChunkFailures`.
+
+Detailed behavior is documented in
+`docs/packaging/STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md`.
+
+The safety boundary remains unchanged: recovery commands are printed only. The
+launcher still does not kill processes, remove `.next`, modify env files, start
+services, stop services, change backend logic, or implement export/import.

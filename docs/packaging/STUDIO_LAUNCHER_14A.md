@@ -73,7 +73,10 @@ The launcher gives one daily entry point for:
 
 ```text
 --check
+--base-url <url>
+--no-port-scan
 --open
+--recovery
 --smoke
 --ui-smoke
 --require-hermes
@@ -87,6 +90,8 @@ Examples:
 
 ```powershell
 npm run studio:launch -- --check
+npm run studio:launch -- --check --base-url http://127.0.0.1:3000
+npm run studio:launch -- --check --recovery
 npm run studio:launch -- --check --verbose
 npm run studio:launch -- --check --require-hermes
 npm run studio:launch -- --smoke

@@ -322,6 +322,19 @@ non-destructive: no service install/start/stop, stale-server kill, `.next`
 delete, backend logic change, or export/import was added. See
 `docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`.
 
+## Checkpoint: Slice 14C launcher guided recovery
+
+Slice 14C added print-only guided recovery and explicit server selection on
+2026-05-31. `npm run studio:launch` now supports `--base-url`,
+`--no-port-scan`, and `--recovery`, passes the selected base URL through to the
+existing MVP/UI smoke scripts, recommends canonical healthy Studio targets,
+prints stale-server/static-chunk recovery commands without executing them, and
+expands JSON diagnostics with selected URL, healthy/broken ports, static chunk
+failures, recommended actions, recovery commands, and warning/failure summaries.
+No process kill, `.next` deletion, service management, env mutation, backend
+logic change, or export/import was added. See
+`docs/packaging/STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

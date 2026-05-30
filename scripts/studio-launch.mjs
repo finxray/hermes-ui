@@ -12,19 +12,23 @@ const timeoutMs = 3500;
 const portProbeTimeoutMs = 1200;
 const webUiPorts = [3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007];
 const commonBrainMemoryUrls = ["http://127.0.0.1:8080", "http://127.0.0.1:8765"];
-const webUiUrl = trimSlash(process.env.STUDIO_WEB_UI_URL || "http://127.0.0.1:3000");
+const webUiUrl = trimSlash(args.baseUrl || process.env.STUDIO_WEB_UI_URL || "http://127.0.0.1:3000");
 const envPath = join(root, "apps", "web", ".env.local");
 const env = readEnvFile(envPath);
 
 const report = {
   cwd: root,
+  selectedBaseUrl: webUiUrl,
   webUiUrl,
   mode: "unknown",
   flags: {
+    baseUrl: args.baseUrl,
     check: args.check,
     devCommand: args.devCommand,
     json: args.json,
+    noPortScan: args.noPortScan,
     open: args.open,
+    recovery: args.recovery,
     requireBrainMemory: args.requireBrainMemory,
     requireHermes: args.requireHermes,
     smoke: args.smoke,
@@ -46,15 +50,23 @@ const report = {
     brainMemoryDirect: null
   },
   diagnostics: {
+    brokenStudioPorts: [],
     ports: [],
     processHints: null,
+    healthyStudioPorts: [],
     browserGuidance: [],
-    brainMemoryUrls: []
+    brainMemoryUrls: [],
+    recommendedActions: [],
+    recoveryCommands: [],
+    staticChunkFailures: [],
+    selectedBaseUrl: webUiUrl
   },
   summary: {
+    failures: [],
     passed: 0,
     warned: 0,
-    failed: 0
+    failed: 0,
+    warnings: []
   },
   suggestions: []
 };
@@ -65,16 +77,23 @@ async function main() {
   for (const arg of args.unknown) {
     addCheck("cli-args", "fail", `Unknown argument: ${arg}`);
   }
+  if (args.baseUrl && !isHttpUrl(args.baseUrl)) {
+    addCheck("cli-args", "fail", `--base-url must be an http(s) URL. Received: ${args.baseUrl}`);
+  }
 
   checkRepo();
   await checkToolchain();
   report.mode = inferMode(report.env);
-  report.diagnostics.ports = await checkWebUiPorts();
+  report.diagnostics.ports = args.noPortScan ? [] : await checkWebUiPorts();
+  updatePortSummaries();
   addPortDiagnosticsCheck(report.diagnostics.ports);
   report.diagnostics.processHints = await getProcessHints();
   report.diagnostics.browserGuidance = getBrowserGuidance();
   report.diagnostics.brainMemoryUrls = await checkBrainMemoryCommonUrls();
   addBrainMemoryUrlDiagnosticsCheck(report.diagnostics.brainMemoryUrls);
+  report.diagnostics.staticChunkFailures = collectStaticChunkFailures(report.diagnostics.ports);
+  report.diagnostics.recoveryCommands = buildRecoveryCommands();
+  report.diagnostics.recommendedActions = buildRecommendedActions();
   const webUiResult = await checkWebUi();
   const staticAssetsResult = await checkStaticAssets(webUiResult);
   const hermesBffResult = await checkHermesBff(webUiResult);
@@ -97,18 +116,18 @@ async function main() {
   if (args.smoke) {
     await runSmokeCommand(
       "smoke:mvp",
-      `npm run smoke:mvp${requireFlagsForSmoke().length ? ` -- ${requireFlagsForSmoke().join(" ")}` : ""}`,
+      `npm run smoke:mvp -- --base-url ${webUiUrl}${requireFlagsForSmoke().length ? ` ${requireFlagsForSmoke().join(" ")}` : ""}`,
       process.execPath,
-      [join(root, "scripts", "mvp-smoke.mjs"), ...requireFlagsForSmoke()]
+      [join(root, "scripts", "mvp-smoke.mjs"), "--base-url", webUiUrl, ...requireFlagsForSmoke()]
     );
   }
 
   if (args.uiSmoke) {
     await runSmokeCommand(
       "smoke:ui",
-      "npm run smoke:ui",
+      `npm run smoke:ui -- --base-url ${webUiUrl}`,
       process.execPath,
-      [join(root, "scripts", "ui-interaction-smoke.mjs")]
+      [join(root, "scripts", "ui-interaction-smoke.mjs"), "--base-url", webUiUrl]
     );
   }
 
@@ -132,10 +151,13 @@ async function main() {
 
 function parseArgs(values) {
   const parsed = {
+    baseUrl: "",
     check: false,
     devCommand: false,
     json: false,
+    noPortScan: false,
     open: false,
+    recovery: false,
     requireBrainMemory: false,
     requireHermes: false,
     smoke: false,
@@ -144,15 +166,25 @@ function parseArgs(values) {
     verbose: false
   };
 
-  for (const value of values) {
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
     if (value === "--check") {
       parsed.check = true;
+    } else if (value === "--base-url") {
+      parsed.baseUrl = values[index + 1] || "";
+      index += 1;
+    } else if (value.startsWith("--base-url=")) {
+      parsed.baseUrl = value.slice("--base-url=".length);
     } else if (value === "--dev-command") {
       parsed.devCommand = true;
     } else if (value === "--json") {
       parsed.json = true;
+    } else if (value === "--no-port-scan") {
+      parsed.noPortScan = true;
     } else if (value === "--open") {
       parsed.open = true;
+    } else if (value === "--recovery") {
+      parsed.recovery = true;
     } else if (value === "--require-brain-memory") {
       parsed.requireBrainMemory = true;
     } else if (value === "--require-hermes") {
@@ -399,7 +431,40 @@ function summarizeFetch(result) {
   };
 }
 
+function updatePortSummaries() {
+  report.diagnostics.healthyStudioPorts = report.diagnostics.ports
+    .filter((item) => item.classification === "likely-studio")
+    .map((item) => ({
+      baseUrl: item.baseUrl,
+      port: item.port,
+      selected: item.baseUrl === webUiUrl
+    }));
+  report.diagnostics.brokenStudioPorts = report.diagnostics.ports
+    .filter((item) => item.classification === "stale-or-broken-studio")
+    .map((item) => ({
+      baseUrl: item.baseUrl,
+      port: item.port,
+      selected: item.baseUrl === webUiUrl,
+      staticChunkFailures: (item.staticAssets?.failures || []).map((failure) => ({
+        path: failure.path,
+        status: failure.status || 0,
+        error: failure.error
+      }))
+    }));
+}
+
 function addPortDiagnosticsCheck(ports) {
+  if (args.noPortScan) {
+    addCheck(
+      "port-diagnostics",
+      "warn",
+      "Port diagnostics skipped because --no-port-scan was provided.",
+      "",
+      "warn"
+    );
+    return;
+  }
+
   const likely = ports.filter((item) => item.classification === "likely-studio");
   const broken = ports.filter((item) => item.classification === "stale-or-broken-studio");
   const occupied = ports.filter((item) => item.classification !== "unreachable");
@@ -410,7 +475,7 @@ function addPortDiagnosticsCheck(ports) {
       "port-diagnostics",
       false,
       "",
-      `Detected stale/broken Studio server(s): ${broken.map((item) => item.baseUrl).join(", ")}.`,
+      `Detected stale/broken Studio server(s): ${broken.map((item) => `${item.baseUrl} (${item.staticAssets?.failures?.length || 0} static failure(s))`).join(", ")}.`,
       "warn"
     );
     return;
@@ -421,7 +486,7 @@ function addPortDiagnosticsCheck(ports) {
       "port-diagnostics",
       false,
       "",
-      `Multiple likely Studio servers detected: ${likely.map((item) => item.baseUrl).join(", ")}.`,
+      `Multiple likely Studio servers detected: ${likely.map((item) => item.baseUrl).join(", ")}. Prefer healthy port 3000 when present, or pass --base-url explicitly.`,
       "warn"
     );
     return;
@@ -753,13 +818,195 @@ function isWsl() {
 }
 
 function getBrowserGuidance() {
+  const canonical = recommendCanonicalBaseUrl();
   return [
-    "Open the app at http://127.0.0.1:3000/ unless STUDIO_WEB_UI_URL points elsewhere.",
+    `Selected base URL for this run: ${webUiUrl}.`,
+    `Preferred healthy Studio URL: ${canonical || "none detected yet"}.`,
+    "Open the app at http://127.0.0.1:3000/ unless --base-url or STUDIO_WEB_UI_URL points elsewhere.",
     "Keep Chrome/Edge zoom at 100%; press Ctrl+0 before judging layout.",
     "/design/codex-shell is a reference/prototype route, not the production root.",
     "If the browser shows an old UI, run npm run studio:launch -- --check and inspect port diagnostics.",
     "If Codex/browser and your manual browser disagree, confirm they are using the same host and port."
   ];
+}
+
+function collectStaticChunkFailures(ports) {
+  return ports.flatMap((item) => (item.staticAssets?.failures || []).map((failure) => ({
+    baseUrl: item.baseUrl,
+    port: item.port,
+    path: failure.path,
+    status: failure.status || 0,
+    error: failure.error
+  })));
+}
+
+function buildRecommendedActions() {
+  const actions = [];
+  const healthy = report.diagnostics.healthyStudioPorts;
+  const broken = report.diagnostics.brokenStudioPorts;
+  const selectedPort = report.diagnostics.ports.find((item) => item.baseUrl === webUiUrl);
+  const canonical = recommendCanonicalBaseUrl();
+
+  if (broken.length > 0) {
+    actions.push({
+      kind: "stale-server",
+      message: `Review stale/broken Studio server(s): ${broken.map((item) => item.baseUrl).join(", ")}. Restart the terminal running that server after confirming ownership.`
+    });
+  }
+
+  if (healthy.length > 1) {
+    actions.push({
+      kind: "multiple-studio-servers",
+      message: `Multiple healthy Studio-like servers are reachable: ${healthy.map((item) => item.baseUrl).join(", ")}. Prefer ${canonical} or pass --base-url explicitly.`
+    });
+  }
+
+  if (canonical && canonical !== webUiUrl) {
+    actions.push({
+      command: `npm run studio:launch -- --check --base-url ${canonical}`,
+      kind: "base-url-selection",
+      message: `Selected base URL is ${webUiUrl}; recommended healthy Studio URL is ${canonical}.`
+    });
+  }
+
+  if (!selectedPort && !args.noPortScan) {
+    actions.push({
+      command: `npm run studio:launch -- --check --base-url ${webUiUrl}`,
+      kind: "selected-base-url",
+      message: `Selected base URL ${webUiUrl} is outside the scanned localhost port range or was not classified. Checks still use it as the primary target.`
+    });
+  }
+
+  if (!args.noPortScan && healthy.length === 0 && broken.length === 0) {
+    actions.push({
+      command: "npm run dev",
+      kind: "no-studio-server",
+      message: "No Studio server was found on ports 3000-3007. Start the Web UI, then re-run the launcher."
+    });
+    actions.push({
+      command: "npm run studio:launch -- --check",
+      kind: "recheck",
+      message: "Re-run the launcher after starting the Web UI."
+    });
+  }
+
+  if (report.diagnostics.staticChunkFailures.length > 0) {
+    actions.push({
+      kind: "static-chunk-failure",
+      message: "Static chunk failures usually mean a stale Next server, old static asset references, or the wrong process serving the app."
+    });
+  }
+
+  return actions;
+}
+
+function buildRecoveryCommands() {
+  const commands = [];
+  const brokenPorts = report.diagnostics.brokenStudioPorts.map((item) => item.port);
+  const portsForCommands = brokenPorts.length > 0 ? brokenPorts : webUiPorts;
+
+  if (report.diagnostics.brokenStudioPorts.length > 0 || report.diagnostics.healthyStudioPorts.length > 1) {
+    commands.push({
+      command: makePowerShellPortCommand(portsForCommands),
+      destructive: false,
+      label: "Windows: identify listener ownership",
+      platform: "windows"
+    });
+    commands.push({
+      command: portsForCommands.map((port) => `ss -ltnp | grep ':${port}'`).join(" ; "),
+      destructive: false,
+      label: "WSL/Linux: identify listener ownership",
+      platform: "linux-wsl"
+    });
+  }
+
+  if (report.diagnostics.brokenStudioPorts.length > 0) {
+    commands.push({
+      command: "npm run dev",
+      destructive: false,
+      label: "Restart the Web UI after stopping the stale terminal",
+      platform: "all"
+    });
+    commands.push({
+      command: "npm run studio:launch -- --check",
+      destructive: false,
+      label: "Re-run launcher diagnostics",
+      platform: "all"
+    });
+    commands.push({
+      command: "Remove-Item -Recurse -Force apps\\web\\.next",
+      destructive: true,
+      label: "Windows: remove Next cache only after stopping the server and confirming this repo path",
+      platform: "windows"
+    });
+    commands.push({
+      command: "rm -rf apps/web/.next",
+      destructive: true,
+      label: "WSL/Linux/macOS: remove Next cache only after stopping the server and confirming this repo path",
+      platform: "linux-wsl-macos"
+    });
+  }
+
+  if (!args.noPortScan && report.diagnostics.healthyStudioPorts.length === 0 && report.diagnostics.brokenStudioPorts.length === 0) {
+    commands.push({
+      command: "npm run dev",
+      destructive: false,
+      label: "Start Web UI dev server",
+      platform: "all"
+    });
+    commands.push({
+      command: "npm run studio:launch -- --check",
+      destructive: false,
+      label: "Re-run launcher checks after server start",
+      platform: "all"
+    });
+  }
+
+  const canonical = recommendCanonicalBaseUrl();
+  if (canonical) {
+    commands.push({
+      command: `npm run studio:launch -- --check --base-url ${canonical}`,
+      destructive: false,
+      label: "Run launcher against the recommended Studio URL",
+      platform: "all"
+    });
+    commands.push({
+      command: `npm run studio:launch -- --check --smoke --ui-smoke --base-url ${canonical}`,
+      destructive: false,
+      label: "Run launcher and smokes against the recommended Studio URL",
+      platform: "all"
+    });
+  }
+
+  return dedupeCommands(commands).map((item) => ({
+    ...item,
+    note: item.destructive
+      ? "Print-only. Do not run until the server is stopped and the path is confirmed."
+      : "Print-only. The launcher does not execute this command."
+  }));
+}
+
+function makePowerShellPortCommand(ports) {
+  const portsText = ports.join(",");
+  return `powershell.exe -NoProfile -Command "$ports = @(${portsText}); Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort -and $_.State -eq 'Listen' } | Select-Object LocalAddress,LocalPort,State,OwningProcess"`;
+}
+
+function dedupeCommands(commands) {
+  const seen = new Set();
+  return commands.filter((item) => {
+    const key = `${item.label}|${item.command}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function recommendCanonicalBaseUrl() {
+  const healthy = report.diagnostics.ports.filter((item) => item.classification === "likely-studio");
+  const port3000 = healthy.find((item) => item.port === 3000);
+  return (port3000 || healthy[0])?.baseUrl || "";
 }
 
 function summarizeWebUi(result) {
@@ -909,20 +1156,24 @@ function makeSuggestions() {
   const suggestions = [];
   const likelyStudio = report.diagnostics.ports.filter((item) => item.classification === "likely-studio");
   const brokenStudio = report.diagnostics.ports.filter((item) => item.classification === "stale-or-broken-studio");
+  const canonical = recommendCanonicalBaseUrl();
   if (!existsSync(envPath)) {
     suggestions.push("Create env with npm run studio:env -- --mode web-ui-with-hermes or web-ui-only.");
   }
   if (!report.services.webUi?.ok) {
-    suggestions.push("Start the Web UI in a separate terminal: npm run dev.");
+    suggestions.push("Start the Web UI in a separate terminal: npm run dev, then run npm run studio:launch -- --check.");
   }
   if (likelyStudio.length > 1) {
-    suggestions.push(`Multiple likely Studio servers are running: ${likelyStudio.map((item) => item.baseUrl).join(", ")}. Close stale terminals manually or choose one URL explicitly with STUDIO_WEB_UI_URL.`);
+    suggestions.push(`Multiple likely Studio servers are running: ${likelyStudio.map((item) => item.baseUrl).join(", ")}. Prefer ${canonical || "port 3000 when healthy"} or choose one explicitly with --base-url.`);
   }
   if (brokenStudio.length > 0) {
-    suggestions.push(`Stale/broken Studio server detected: ${brokenStudio.map((item) => item.baseUrl).join(", ")}. Restart the known Next server manually.`);
+    suggestions.push(`Stale/broken Studio server detected: ${brokenStudio.map((item) => item.baseUrl).join(", ")}. Run npm run studio:launch -- --check --recovery for copyable recovery commands.`);
   }
   if (report.services.staticAssets?.status === "warn") {
     suggestions.push("Static chunk issues usually mean a stale Next server. Restart npm run dev or next start; only then consider removing apps/web/.next.");
+  }
+  if (canonical && canonical !== webUiUrl) {
+    suggestions.push(`Use the recommended healthy Studio URL explicitly: npm run studio:launch -- --check --base-url ${canonical}.`);
   }
   if (args.requireHermes && !(report.services.hermesBff?.body?.mode === "real" && report.services.hermesBff?.body?.reachable === true)) {
     suggestions.push("Hermes was required. Start Hermes API, verify HERMES_API_BASE_URL, and restart the Web UI after env changes.");
@@ -934,10 +1185,10 @@ function makeSuggestions() {
     suggestions.push("Brain Memory was required. Start Gateway, verify BRAIN_MEMORY_GATEWAY_URL and keys, and restart the Web UI.");
   }
   if (!args.smoke) {
-    suggestions.push("Run npm run studio:launch -- --smoke for the route/BFF smoke.");
+    suggestions.push(`Run npm run studio:launch -- --smoke --base-url ${webUiUrl} for the route/BFF smoke.`);
   }
   if (!args.uiSmoke) {
-    suggestions.push("Run npm run studio:launch -- --ui-smoke for the browser interaction smoke.");
+    suggestions.push(`Run npm run studio:launch -- --ui-smoke --base-url ${webUiUrl} for the browser interaction smoke.`);
   }
   if (!args.open) {
     suggestions.push("Open the app with npm run studio:launch -- --open.");
@@ -951,12 +1202,20 @@ function makeSuggestions() {
 
 function summarizeReport() {
   return {
+    failures: [
+      ...report.checks.filter((check) => check.status === "fail").map((check) => ({ message: check.message, name: check.name })),
+      ...report.commands.filter((command) => command.status === "fail").map((command) => ({ command: command.command, name: command.name }))
+    ],
     passed: report.checks.filter((check) => check.status === "pass").length +
       report.commands.filter((command) => command.status === "pass").length,
     warned: report.checks.filter((check) => check.status === "warn").length +
       report.commands.filter((command) => command.status === "warn").length,
     failed: report.checks.filter((check) => check.status === "fail").length +
-      report.commands.filter((command) => command.status === "fail").length
+      report.commands.filter((command) => command.status === "fail").length,
+    warnings: [
+      ...report.checks.filter((check) => check.status === "warn").map((check) => ({ message: check.message, name: check.name })),
+      ...report.commands.filter((command) => command.status === "warn").map((command) => ({ command: command.command, name: command.name }))
+    ]
   };
 }
 
@@ -1072,7 +1331,8 @@ function printReport() {
   console.log("============================");
   console.log(`cwd: ${report.cwd}`);
   console.log(`mode: ${report.mode}`);
-  console.log(`web UI: ${report.webUiUrl}`);
+  console.log(`selected base URL: ${report.selectedBaseUrl}`);
+  console.log(`port scan: ${args.noPortScan ? "disabled" : `${webUiPorts[0]}-${webUiPorts.at(-1)}`}`);
   console.log("");
 
   console.log("Environment");
@@ -1094,6 +1354,7 @@ function printReport() {
   printBrainMemoryUrlDiagnostics();
   printProcessHints();
   printBrowserGuidance();
+  printRecoveryGuidance();
 
   if (report.commands.length > 0) {
     console.log("");
@@ -1119,6 +1380,10 @@ function printPortDiagnostics() {
   const occupied = report.diagnostics.ports.filter((item) => item.classification !== "unreachable");
   console.log("");
   console.log("Port diagnostics");
+  if (args.noPortScan) {
+    console.log("- Skipped because --no-port-scan was provided.");
+    return;
+  }
   if (occupied.length === 0) {
     console.log(`- No reachable servers on ports ${webUiPorts[0]}-${webUiPorts.at(-1)}.`);
     return;
@@ -1183,6 +1448,32 @@ function printBrowserGuidance() {
   }
 }
 
+function printRecoveryGuidance() {
+  if (report.diagnostics.recommendedActions.length === 0 && report.diagnostics.recoveryCommands.length === 0) {
+    return;
+  }
+
+  console.log("");
+  console.log(args.recovery ? "Recovery commands (print-only)" : "Guided recovery");
+  if (report.diagnostics.staticChunkFailures.length > 0) {
+    console.log("- Likely cause: stale Next server after a build, old static chunks, or the wrong process serving Studio.");
+    for (const failure of report.diagnostics.staticChunkFailures.slice(0, 8)) {
+      console.log(`- Static chunk failure on ${failure.baseUrl}: ${failure.path} -> ${failure.status || failure.error || "unknown"}`);
+    }
+  }
+  for (const action of report.diagnostics.recommendedActions) {
+    console.log(`- ${action.message}${action.command ? ` Command: ${action.command}` : ""}`);
+  }
+  for (const command of report.diagnostics.recoveryCommands) {
+    const marker = command.destructive ? "manual/destructive" : "manual";
+    console.log(`- ${command.label} [${marker}]: ${command.command}`);
+    if (command.destructive) {
+      console.log(`  ${command.note}`);
+    }
+  }
+  console.log("- The launcher does not execute recovery commands.");
+}
+
 function makeBrainMemoryUiAuthHeader() {
   const cleanValue = (env.BRAIN_MEMORY_UI_API_KEY || env.BRAIN_MEMORY_API_KEY || "").trim();
   return cleanValue ? { Authorization: `Bearer ${cleanValue}` } : undefined;
@@ -1208,6 +1499,15 @@ function safeUrl(value) {
 
 function trimSlash(value) {
   return value.replace(/\/$/, "");
+}
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function lastLines(value, maxLines = 16) {

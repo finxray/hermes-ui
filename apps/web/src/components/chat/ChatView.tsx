@@ -3,7 +3,11 @@ import { useRef, useState } from "react";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { Composer } from "@/components/chat/Composer";
-import { createActivityEventFromHermesStreamEvent } from "@/lib/agentActivityEvents";
+import {
+  computeRunElapsed,
+  createActivityEventFromHermesStreamEvent,
+  makeElapsedActivityEvent
+} from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
@@ -74,6 +78,7 @@ export function ChatView({
       return;
     }
 
+    const runStartedAt = new Date().toISOString();
     let accumulated = "";
     let completedAssistant = false;
     let hadStreamError = false;
@@ -143,7 +148,9 @@ export function ChatView({
               activeProject.memoryScope.stableProjectKey
             ]);
           } else if (event.type === "tool_event" || event.type === "run_event") {
-            const activityEvent = createActivityEventFromHermesStreamEvent(event);
+            const activityEvent = createActivityEventFromHermesStreamEvent(event, {
+              now: new Date().toISOString()
+            });
             if (activityEvent) {
               appendActivityEvent(session.id, activityEvent);
               workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
@@ -152,7 +159,9 @@ export function ChatView({
             hadStreamError = true;
             accumulated = event.error.message;
             setAssistantHasContent(true);
-            const activityEvent = createActivityEventFromHermesStreamEvent(event);
+            const activityEvent = createActivityEventFromHermesStreamEvent(event, {
+              now: new Date().toISOString()
+            });
             if (activityEvent) {
               appendActivityEvent(session.id, activityEvent);
             }
@@ -183,6 +192,7 @@ export function ChatView({
       );
     }
 
+    appendElapsedActivityEvent(session.id, runStartedAt, new Date().toISOString());
     setIsGenerating(false);
   }
 
@@ -193,7 +203,26 @@ export function ChatView({
     }));
   }
 
+  function appendElapsedActivityEvent(sessionId: string, startedAt: string, completedAt: string) {
+    const durationMs = computeRunElapsed(startedAt, completedAt);
+    if (typeof durationMs !== "number") {
+      return;
+    }
+    appendActivityEvent(
+      sessionId,
+      makeElapsedActivityEvent({
+        completedAt,
+        durationMs,
+        id: `elapsed-${assistantSafeId(sessionId)}-${completedAt}`,
+        source: "ui",
+        startedAt
+      })
+    );
+  }
+
   const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
+  const latestActivityEvent = activeActivityEvents.at(-1);
+  const hasRunningActivity = latestActivityEvent ? isActiveActivityEvent(latestActivityEvent) : false;
 
   return (
     <section className={styles.workspace} aria-label="Chat workspace">
@@ -204,7 +233,7 @@ export function ChatView({
         activityEvents={activeActivityEvents}
         bannerIcon={<AlertTriangle size={15} />}
         createSession={createSession}
-        isThinking={isGenerating && !assistantHasContent}
+        isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
         routeIcon={<SendHorizontal size={14} />}
         scopeIcon={<BookOpenText size={14} />}
       />
@@ -217,6 +246,18 @@ export function ChatView({
         stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
       />
     </section>
+  );
+}
+
+function assistantSafeId(value: string) {
+  return value.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+function isActiveActivityEvent(event: AgentActivityEvent) {
+  return (
+    event.status === "queued" ||
+    event.status === "running" ||
+    event.status === "waiting_for_approval"
   );
 }
 

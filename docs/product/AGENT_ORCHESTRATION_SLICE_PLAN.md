@@ -75,6 +75,9 @@ Deliver:
 
 Goal: make long-running work feel alive without fake decoration.
 
+Status: completed in Slice 13F. See
+`docs/product/THINKING_ELAPSED_UX_13F.md`.
+
 Deliver:
 
 - thinking row from real `message.started` or reasoning/progress events;
@@ -166,12 +169,11 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13F - Thinking/Reasoning Shimmer And Elapsed-Time Separators.
+Slice 13G - Real Stop/Cancel Stream Support.
 
 Reason:
 
-- Slice 13E added the first collapsed activity block renderer.
-- The next orchestration risk is improving progress and elapsed-time behavior
-  from real `message.started`, `tool.progress`, and timestamped event data.
-- This keeps the UI honest without exposing private reasoning or changing
-  streaming mechanics.
+- Slice 13F added honest thinking/activity precedence and elapsed-time markers
+  without exposing private reasoning or changing stream mechanics.
+- The next orchestration gap is replacing the placeholder stop control with
+  verified Hermes interruption behavior.

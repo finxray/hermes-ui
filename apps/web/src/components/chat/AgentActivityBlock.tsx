@@ -8,7 +8,7 @@ import {
   Info,
   Terminal
 } from "lucide-react";
-import { formatActivityDuration } from "@/lib/agentActivityEvents";
+import { computeActivityDuration, computeRunElapsed, formatActivityDuration } from "@/lib/agentActivityEvents";
 import type { ToolEvent } from "@/data/types";
 import type { AgentActivityEvent, AgentActivityStatus, AgentActivityType } from "@/types/agentActivity";
 import styles from "./AgentActivityBlock.module.css";
@@ -147,6 +147,9 @@ function groupKey(event: AgentActivityEvent) {
     return `${event.type}:${event.hermes?.toolCallId ?? event.hermes?.toolName ?? event.title}`;
   }
   if (event.type === "status") {
+    if (event.hermes?.runId) {
+      return `status:run:${event.hermes.runId}`;
+    }
     return `status:${event.hermes?.eventType ?? event.title}`;
   }
   return `${event.type}:${event.id}`;
@@ -172,7 +175,7 @@ function groupStatus(events: AgentActivityEvent[]): AgentActivityStatus {
 function groupSummary(events: AgentActivityEvent[], primary: AgentActivityEvent) {
   const first = events[0];
   const last = events.at(-1) ?? first;
-  const durationMs = primary.durationMs ?? deriveDuration(first.startedAt, last.completedAt);
+  const durationMs = computeActivityDuration(primary) ?? computeRunElapsed(first.startedAt, last.completedAt);
   const eventCount = events.length > 1 ? `${events.length} events` : sourceLabel(primary);
   const subtitleParts = [
     primary.summary,
@@ -185,18 +188,6 @@ function groupSummary(events: AgentActivityEvent[], primary: AgentActivityEvent)
     subtitle: subtitleParts.join(" - "),
     title: primary.title
   };
-}
-
-function deriveDuration(startedAt?: string, completedAt?: string) {
-  if (!startedAt || !completedAt) {
-    return undefined;
-  }
-  const started = Date.parse(startedAt);
-  const completed = Date.parse(completedAt);
-  if (!Number.isFinite(started) || !Number.isFinite(completed) || completed < started) {
-    return undefined;
-  }
-  return completed - started;
 }
 
 function memoryScopeLabel(event: AgentActivityEvent) {

@@ -8,9 +8,11 @@ This document defines the stable frontend event model for Hermes-native agent
 activity. Slice 13D added the first runtime type and mapping helpers; see
 `docs/product/AGENT_ACTIVITY_EVENT_MODEL_13D.md`.
 
-The model should let the UI render chat text, reasoning, tools, commands,
-memory, files, approvals, errors, elapsed time, and status updates without
-binding React components directly to raw Hermes event payloads.
+The model should let the UI render chat text, public reasoning/progress
+signals, tools, commands, memory, files, approvals, errors, elapsed time, and
+status updates without binding React components directly to raw Hermes event
+payloads. It must not expose hidden/private chain-of-thought or invent
+reasoning text.
 
 ## Runtime Type
 
@@ -129,7 +131,30 @@ currently exposed UI-facing events. Slice 13E added `AgentActivityBlock` to
 render live `AgentActivityEvent` objects in the chat transcript while still
 projecting events into the existing compact `Session.toolEvents[]` state for
 right-rail compatibility. It does not persist full `AgentActivityEvent` objects
-yet.
+yet. Slice 13F added safer duration helpers, UI-local elapsed markers for live
+Hermes sends, and generic/specific activity precedence so a running public
+activity row can replace the generic `Thinking...` row.
+
+## Duration Semantics
+
+Durations may come from:
+
+- explicit `durationMs` on an activity event;
+- safe `startedAt` and `completedAt` timestamps on a single event;
+- safe start/end timestamps across adjacent grouped events with the same
+  identity, such as a Hermes run id.
+
+Formatting rules:
+
+| Duration | Label |
+| --- | --- |
+| `0ms` | `0s` |
+| `1ms` to `999ms` | `<1s` |
+| seconds | `12s` |
+| minutes | `2m 14s` |
+| hours | `1h 2m 3s` |
+
+Invalid or negative timestamp pairs do not render a duration.
 
 ## Mapping From Hermes Run Events
 
@@ -187,6 +212,7 @@ Render in chat timeline:
 - compact tool/memory/file rows;
 - approval requests while waiting;
 - errors that affect the response.
+- display-only elapsed markers derived from safe UI-local or event timestamps.
 
 Render in right rail:
 
@@ -220,3 +246,5 @@ Expanded by default:
 - No persisted activity timeline is added.
 - No persisted activity-event array is added to workspace state.
 - No approvals, stop/cancel, file upload, or memory mutation is implemented.
+- No hidden/private chain-of-thought is displayed. Future public reasoning
+  summaries require a separate capability-gated slice.

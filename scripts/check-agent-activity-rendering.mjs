@@ -7,6 +7,7 @@ import ts from "typescript";
 const root = resolve(process.cwd());
 const componentPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.tsx");
 const cssPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.module.css");
+const chatViewPath = resolve(root, "apps/web/src/components/chat/ChatView.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
 const checks = [];
 
@@ -51,6 +52,20 @@ function checkComponentSource() {
     "Thinking/running row has a generic label and shimmer styling."
   );
   record(
+    "no-private-reasoning-labels",
+    !component.includes("chain-of-thought") &&
+      !component.includes("private reasoning") &&
+      !component.includes("reasoning summary"),
+    "Activity block source does not render private reasoning or chain-of-thought labels."
+  );
+  record(
+    "specific-running-suppresses-generic-thinking",
+    existsSync(chatViewPath) &&
+      readFileSync(chatViewPath, "utf8").includes("!hasRunningActivity") &&
+      readFileSync(chatViewPath, "utf8").includes("makeElapsedActivityEvent"),
+    "Chat view lets specific running activity replace the generic Thinking row and appends elapsed markers."
+  );
+  record(
     "metadata-rendering",
     component.includes("projectKey") && component.includes("sessionKey") && component.includes("safeJson"),
     "Component renders scope metadata and compact JSON details."
@@ -73,8 +88,10 @@ async function checkHelperBehavior() {
   const activity = await importHelperModule();
   record(
     "duration-format",
-    activity.formatActivityDuration(73_000) === "1m 13s",
-    "Duration formatter supports Worked for style labels."
+    activity.formatActivityDuration(500) === "<1s" &&
+      activity.formatActivityDuration(73_000) === "1m 13s" &&
+      activity.formatActivityDuration(3_723_000) === "1h 2m 3s",
+    "Duration formatter supports subsecond, minute, and hour Worked for style labels."
   );
 
   const event = activity.createActivityEventFromHermesToolEvent({

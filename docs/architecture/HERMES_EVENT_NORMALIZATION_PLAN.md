@@ -58,6 +58,13 @@ projecting them back into the existing compact `ToolEvent` state. Slice 13E
 renders live `AgentActivityEvent` objects in collapsed chat activity blocks
 while leaving full activity-event persistence as future work.
 
+Slice 13F keeps the BFF stream normalizer unchanged but adds UI-local elapsed
+markers around real Hermes sends. The UI captures a local start timestamp before
+opening the existing BFF stream and appends a display-only `elapsed` activity
+event after the stream finishes or reports an error through the existing event
+channel. This does not change Hermes request semantics, Brain Memory behavior,
+or persisted workspace state.
+
 ## Target Normalization Boundary
 
 Future boundary:
@@ -253,6 +260,11 @@ is deferred.
 - terminal error summary;
 - final run summary;
 - elapsed time for long runs.
+
+Slice 13F also clarifies that the generic `Thinking...` row should yield to the
+latest specific active public activity event. The UI must not expose
+hidden/private chain-of-thought or invent reasoning text. Future explicit public
+reasoning summaries should be capability-gated.
 
 ## Commercial-Grade Requirements
 

@@ -176,6 +176,17 @@ change, Hermes streaming change, Brain Memory BFF change, or memory
 mutation/admin action was added. See
 `docs/product/AGENT_ACTIVITY_BLOCKS_13E.md`.
 
+## Checkpoint: Slice 13F thinking and elapsed activity UX
+
+Slice 13F refined live progress affordances on 2026-05-30. The generic
+`Thinking...` row now yields to the latest specific active public activity
+event, run/status events can derive safer durations, real Hermes sends append a
+display-only elapsed marker such as `Worked for 3s`, and regression checks cover
+duration formatting plus no private chain-of-thought labels. Hermes streaming,
+Brain Memory BFF logic, memory scope bridge behavior, stable keys, and
+mutation/admin boundaries remain unchanged. See
+`docs/product/THINKING_ELAPSED_UX_13F.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

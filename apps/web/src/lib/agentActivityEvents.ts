@@ -178,7 +178,7 @@ export function makeElapsedActivityEvent(args: {
     id: args.id ?? `elapsed-${args.startedAt}-${args.completedAt}`,
     type: "elapsed",
     status: "info",
-    title: args.title ?? `Worked for ${formatDuration(args.durationMs)}`,
+    title: args.title ?? `Worked for ${formatActivityDuration(args.durationMs)}`,
     startedAt: args.startedAt,
     completedAt: args.completedAt,
     durationMs: args.durationMs,
@@ -190,6 +190,28 @@ export function makeElapsedActivityEvent(args: {
 
 export function formatActivityDuration(durationMs: number) {
   return formatDuration(durationMs);
+}
+
+export function computeActivityDuration(event: AgentActivityEvent) {
+  return event.durationMs ?? computeRunElapsed(event.startedAt, event.completedAt);
+}
+
+export function computeRunElapsed(startedAt?: string, completedAt?: string) {
+  const started = safeStartedAt(startedAt);
+  const completed = safeCompletedAt(completedAt);
+  if (!started || !completed) {
+    return undefined;
+  }
+  const durationMs = Date.parse(completed) - Date.parse(started);
+  return durationMs >= 0 ? durationMs : undefined;
+}
+
+export function safeStartedAt(value?: string | null) {
+  return safeIsoLikeTime(value);
+}
+
+export function safeCompletedAt(value?: string | null) {
+  return safeIsoLikeTime(value);
 }
 
 export function classifyToolEventSource(
@@ -426,10 +448,25 @@ function normalizeName(value: string) {
   return value.trim().toLowerCase().replace(/[\s.-]+/g, "_");
 }
 
+function safeIsoLikeTime(value?: string | null) {
+  if (!value) {
+    return undefined;
+  }
+  return Number.isFinite(Date.parse(value)) ? value : undefined;
+}
+
 function formatDuration(durationMs: number) {
-  const seconds = Math.max(0, Math.round(durationMs / 1000));
-  const minutes = Math.floor(seconds / 60);
+  const normalizedMs = Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0;
+  if (normalizedMs > 0 && normalizedMs < 1000) {
+    return "<1s";
+  }
+  const seconds = Math.max(0, Math.round(normalizedMs / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
   const remainder = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${remainder}s`;
+  }
   return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
 }
 

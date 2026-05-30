@@ -30,6 +30,8 @@ checkRunEvent();
 checkErrorEvent();
 checkUnknownRunFallback();
 checkElapsedEvent();
+checkDurationFormatting();
+checkDurationHelpers();
 checkSecretRedaction();
 
 const failed = checks.filter((check) => !check.ok);
@@ -196,6 +198,38 @@ function checkElapsedEvent() {
     "elapsed-event",
     event.type === "elapsed" && event.status === "info" && event.title === "Worked for 1m 3s",
     "elapsed helper formats duration and creates an informational event."
+  );
+}
+
+function checkDurationFormatting() {
+  record(
+    "duration-formatting",
+    activity.formatActivityDuration(0) === "0s" &&
+      activity.formatActivityDuration(500) === "<1s" &&
+      activity.formatActivityDuration(12_000) === "12s" &&
+      activity.formatActivityDuration(134_000) === "2m 14s" &&
+      activity.formatActivityDuration(3_723_000) === "1h 2m 3s",
+    "duration formatter covers 0s, subsecond, seconds, minutes, and hours."
+  );
+}
+
+function checkDurationHelpers() {
+  const event = activity.createActivityEventFromHermesRunEvent({
+    type: "run_event",
+    name: "run.completed",
+    status: "completed",
+    payload: { run_id: "run-2" }
+  }, { id: "run-completed", now: "2026-05-30T00:00:04.000Z" });
+
+  record(
+    "duration-helpers",
+    activity.computeActivityDuration({
+      ...event,
+      startedAt: "2026-05-30T00:00:00.000Z"
+    }) === 4_000 &&
+      activity.computeRunElapsed("2026-05-30T00:00:00.000Z", "2026-05-30T00:00:02.500Z") === 2_500 &&
+      activity.computeRunElapsed("bad", "2026-05-30T00:00:02.500Z") === undefined,
+    "duration helpers derive elapsed time only from safe start/end timestamps."
   );
 }
 

@@ -1,5 +1,5 @@
 .section {
-  margin-bottom: 36px;
+  margin-bottom: 44px;
 }
 
 .sectionLabel {
@@ -16,7 +16,7 @@
 .card,
 .detailPanel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   background: transparent;
 }
 
@@ -79,7 +79,7 @@
   min-height: 20px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
+  background: transparent;
   color: var(--text-muted);
   font-size: var(--font-small);
   white-space: nowrap;
@@ -150,7 +150,7 @@
 
 .resultList {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -172,7 +172,7 @@
 .resultButton:focus-visible,
 .resultActive {
   outline: 0;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .detailContent {

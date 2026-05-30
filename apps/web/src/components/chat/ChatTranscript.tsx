@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ChatActivityBlock } from "@/components/chat/ChatActivityBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import type { Project, Session } from "@/data/types";
@@ -50,6 +51,7 @@ export function ChatTranscript({
             onAction={createSession}
           />
         )}
+        {activeSession ? <ChatActivityBlock events={activeSession.toolEvents} /> : null}
         <div className={styles.referenceRow} aria-label="Active scope references">
           <span className={styles.referenceChip}>
             {scopeIcon}

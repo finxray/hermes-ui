@@ -1,0 +1,143 @@
+.block {
+  color: var(--text-secondary);
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-body);
+  line-height: 1.4;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.chevron {
+  display: inline-grid;
+  place-items: center;
+  transition: transform 140ms ease;
+}
+
+.block[open] .chevron {
+  transform: rotate(90deg);
+}
+
+.mockLabel {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.body {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-left: 23px;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+  padding: 9px 0;
+  color: var(--text-secondary);
+}
+
+.row[data-status="started"],
+.row[data-status="pending"] {
+  overflow: hidden;
+}
+
+.row[data-status="started"]::after,
+.row[data-status="pending"]::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.045), transparent);
+  animation: activityShimmer 1.4s linear infinite;
+}
+
+.icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.row[data-status="completed"] .icon,
+.row[data-status="mocked"] .icon {
+  color: var(--accent);
+}
+
+.row[data-status="failed"] .icon {
+  color: var(--danger);
+}
+
+.row[data-status="started"] .icon,
+.row[data-status="pending"] .icon {
+  color: var(--warning);
+}
+
+.content {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.name {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status,
+.detail,
+.time {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.4;
+}
+
+.detail {
+  overflow-wrap: anywhere;
+}
+
+.time {
+  justify-self: end;
+}
+
+@keyframes activityShimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row[data-status="started"]::after,
+  .row[data-status="pending"]::after {
+    animation-duration: 1ms;
+  }
+}

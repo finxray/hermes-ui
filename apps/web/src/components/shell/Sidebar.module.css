@@ -120,7 +120,7 @@
   padding-top: 18px;
   padding-bottom: 2px;
   background:
-    linear-gradient(180deg, transparent, rgba(13, 12, 15, 0.92) 32%, rgba(13, 12, 15, 0.98)),
+    linear-gradient(180deg, transparent, rgba(10, 10, 12, 0.72) 44%, rgba(10, 10, 12, 0.94)),
     transparent;
   z-index: 4;
 }
@@ -136,7 +136,7 @@
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 18px;
-  background: rgba(24, 25, 29, 0.98);
+  background: rgba(18, 19, 23, 0.98);
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.045);

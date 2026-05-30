@@ -15,7 +15,7 @@
   --row-height: clamp(34px, calc(28px + 0.32vw), 44px);
   --topbar-height: clamp(52px, calc(43px + 0.52vw), 70px);
   --rail-width-left: clamp(218px, 11.5vw, 333px);
-  --rail-width-right: clamp(269px, 13.4vw, 397px);
+  --rail-width-right: clamp(323px, 16.1vw, 476px);
   position: relative;
   isolation: isolate;
   display: grid;

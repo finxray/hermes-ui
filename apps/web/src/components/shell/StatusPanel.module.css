@@ -1,5 +1,5 @@
 .section {
-  margin-bottom: 36px;
+  margin-bottom: 44px;
 }
 
 .sectionLabel {
@@ -15,7 +15,7 @@
 
 .card {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   background: transparent;
 }
 
@@ -42,11 +42,14 @@
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 .metric {
-  padding: 4px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .metricValue {
@@ -67,7 +70,7 @@
   min-height: 20px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.045);
+  background: transparent;
   color: var(--text-muted);
   font-size: var(--font-small);
   white-space: nowrap;
@@ -76,7 +79,7 @@
 .capabilities {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px 10px;
 }
 
 .error {

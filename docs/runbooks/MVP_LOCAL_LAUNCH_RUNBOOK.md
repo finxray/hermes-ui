@@ -312,6 +312,20 @@ npm run studio:launch -- --check --base-url http://127.0.0.1:3000
 npm run studio:launch -- --check --smoke --ui-smoke --base-url http://127.0.0.1:3000
 ```
 
+All smoke commands accept the same explicit base URL form:
+
+```powershell
+npm run smoke:mvp -- --base-url http://127.0.0.1:3000
+npm run smoke:ui -- --base-url http://127.0.0.1:3000
+npm run smoke:markdown -- --base-url http://127.0.0.1:3000
+npm run smoke:markdown:long -- --base-url http://127.0.0.1:3000
+```
+
+Browser smokes check a bounded sample of `/_next/static/**` chunks before deep
+interaction. If the selected server has stale chunks, the smoke fails early and
+prints the selected base URL plus manual recovery guidance. Markdown smokes test
+the selected base URL directly; they do not silently switch to another port.
+
 If you need to inspect ownership manually on Windows:
 
 ```powershell

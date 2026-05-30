@@ -371,6 +371,19 @@ with internal scroll; protected wide tables, long links, copy feedback, and raw
 HTML safety. No backend, Hermes, Brain Memory, memory mutation/admin, direct
 service, storage, auth, provider, or export/import behavior changed.
 
+## Checkpoint: Slice 14G smoke base URL hygiene
+
+Slice 14G hardened stale-server recovery and smoke base URL diagnostics on
+2026-05-31. Smoke scripts now print the selected base URL, browser smokes run a
+bounded Next static chunk preflight before deep interaction, markdown smokes no
+longer silently switch ports, and `studio:launch:smoke` passes the selected
+base URL through MVP, UI, markdown, and long markdown smokes. The launcher now
+fails when the selected server is stale/broken while keeping stale non-selected
+servers as warnings with print-only recovery guidance. No process kill, `.next`
+deletion, service start/stop, backend logic change, Hermes/Brain Memory change,
+or export/import was added. See
+`docs/packaging/STUDIO_SMOKE_BASE_URL_HYGIENE_14G.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

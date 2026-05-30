@@ -85,9 +85,13 @@ The smoke checks:
 - no horizontal overflow;
 - no serious browser console, page, or network errors.
 
-If the default `http://127.0.0.1:3000` server predates the new route, the smoke
-can discover the route on another local port in `3000` through `3007`. This is
-for local stale-server recovery only; the canonical route remains `/design/markdown-fixture`.
+As of Slice 14G, the smoke tests the selected base URL directly. If the default
+`http://127.0.0.1:3000` server predates the route or has stale static chunks,
+the smoke fails early with recovery guidance. Run against a healthy server with:
+
+```powershell
+npm run smoke:markdown -- --base-url http://127.0.0.1:<port>
+```
 
 ## Copy Behavior
 
@@ -155,6 +159,10 @@ npm run smoke:markdown:long
 The long fixture covers repeated assistant messages, long lists, long code,
 wide tables, long links, copy stability, bounded code scrolling, and the same
 raw HTML safety model.
+
+Slice 14G made both markdown smokes use the selected base URL directly and added
+static chunk preflight checks so stale Next servers fail before browser
+interaction.
 
 ## Next Recommended Slice
 

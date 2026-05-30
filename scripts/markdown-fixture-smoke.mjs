@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import { chromium } from "playwright";
+import { preflightStaticChunks, printSelectedBaseUrl, selectedBaseUrl } from "./smoke-base-url.mjs";
 
 const args = parseArgs(process.argv.slice(2));
-const defaultBaseUrl = trimSlash(args.baseUrl || "http://127.0.0.1:3000");
-let baseUrl = defaultBaseUrl;
+const baseUrl = selectedBaseUrl(args.baseUrl);
 const timeoutMs = 10_000;
 const report = {
   baseUrl,
@@ -25,13 +25,23 @@ let page;
 await main();
 
 async function main() {
+  printSelectedBaseUrl({ baseUrl, json: args.json, label: "Markdown fixture smoke" });
   for (const arg of args.unknown) {
     addResult("cli-args", "fail", `Unknown argument: ${arg}`);
   }
 
   try {
-    baseUrl = await resolveFixtureBaseUrl();
-    report.baseUrl = baseUrl;
+    const staticPreflight = await preflightStaticChunks({
+      addResult,
+      baseUrl,
+      failName: "static-assets-preflight",
+      timeoutMs
+    });
+    if (!staticPreflight.ok) {
+      finalize();
+      return;
+    }
+
     browser = await launchBrowser();
     const origin = new URL(baseUrl).origin;
     context = await browser.newContext({ viewport: { height: 900, width: 1440 } });
@@ -61,7 +71,7 @@ async function main() {
       addResult(
         "route-load",
         "fail",
-        `Markdown fixture route returned HTTP ${response?.status() ?? "unknown"}. Restart the Web UI server if it predates this route.`
+        `Markdown fixture route at ${baseUrl}/design/markdown-fixture returned HTTP ${response?.status() ?? "unknown"}. If ${baseUrl} is stale, restart that server or pass --base-url for a healthy Studio server.`
       );
       finalize();
       return;
@@ -297,47 +307,6 @@ function parseArgs(values) {
   return parsed;
 }
 
-async function resolveFixtureBaseUrl() {
-  if (args.baseUrl) {
-    return defaultBaseUrl;
-  }
-
-  const candidates = [
-    defaultBaseUrl,
-    ...[3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007].map((port) => `http://127.0.0.1:${port}`)
-  ];
-  for (const candidate of Array.from(new Set(candidates))) {
-    const ok = await hasFixtureRoute(candidate);
-    if (ok) {
-      if (candidate !== defaultBaseUrl) {
-        addResult(
-          "route-base-url-discovery",
-          "pass",
-          `Using markdown fixture route at ${candidate}; default ${defaultBaseUrl} did not serve it.`
-        );
-      }
-      return candidate;
-    }
-  }
-  return defaultBaseUrl;
-}
-
-async function hasFixtureRoute(candidate) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2500);
-  try {
-    const response = await fetch(`${candidate}/design/markdown-fixture`, {
-      cache: "no-store",
-      signal: controller.signal
-    });
-    return response.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function launchBrowser() {
   const launchOptions = {
     headless: !args.headed,
@@ -379,10 +348,6 @@ function safeErrorMessage(error) {
     return "Unknown error.";
   }
   return error.message.replace(/(api[_-]?key|authorization|token|secret)=([^&\s]+)/gi, "$1=[redacted]");
-}
-
-function trimSlash(value) {
-  return value.replace(/\/$/, "");
 }
 
 function icon(status) {

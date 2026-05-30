@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import { chromium } from "playwright";
+import { preflightStaticChunks, printSelectedBaseUrl, selectedBaseUrl } from "./smoke-base-url.mjs";
 
 const args = parseArgs(process.argv.slice(2));
-const baseUrl = trimSlash(args.baseUrl || "http://127.0.0.1:3000");
+const baseUrl = selectedBaseUrl(args.baseUrl);
 const timeoutMs = 10_000;
 const liveSendTimeoutMs = 60_000;
 
@@ -35,12 +36,24 @@ let page;
 await main();
 
 async function main() {
+  printSelectedBaseUrl({ baseUrl, json: args.json, label: "UI interaction smoke" });
   for (const arg of args.unknown) {
     addResult("cli-args", "fail", `Unknown argument: ${arg}`);
   }
 
   const serverReady = await checkServer();
   if (!serverReady) {
+    finalize();
+    return;
+  }
+
+  const staticPreflight = await preflightStaticChunks({
+    addResult,
+    baseUrl,
+    failName: "static-assets-preflight",
+    timeoutMs
+  });
+  if (!staticPreflight.ok) {
     finalize();
     return;
   }
@@ -954,10 +967,6 @@ function safeErrorMessage(error) {
     return "Unknown error.";
   }
   return error.message.replace(/(api[_-]?key|authorization|token|secret)=([^&\s]+)/gi, "$1=[redacted]");
-}
-
-function trimSlash(value) {
-  return value.replace(/\/$/, "");
 }
 
 function truncate(value, maxLength) {

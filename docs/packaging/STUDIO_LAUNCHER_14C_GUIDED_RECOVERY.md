@@ -85,6 +85,25 @@ This uses:
 No smoke script behavior was changed beyond using the already-supported
 `--base-url` option.
 
+## Slice 14G Follow-Up
+
+Slice 14G tightened smoke base URL hygiene after stale servers on `3000` and
+`3005` caused false browser failures.
+
+Current behavior:
+
+- selected stale/broken server is a required launcher failure;
+- stale non-selected servers remain warnings;
+- browser smokes print the selected base URL and run a bounded Next static
+  chunk preflight before deep interaction;
+- markdown smokes no longer silently switch to another port when the selected
+  server is stale;
+- `studio:launch:smoke` passes the selected base URL to MVP, UI, markdown, and
+  long markdown smokes when those scripts are present;
+- recovery commands remain print-only.
+
+See `docs/packaging/STUDIO_SMOKE_BASE_URL_HYGIENE_14G.md`.
+
 ## Stale Server Example
 
 On the Slice 14C checkpoint machine:
@@ -185,9 +204,9 @@ npm run studio:launch -- --check --base-url http://127.0.0.1:3000 --no-port-scan
 
 ## Next Recommended Slice
 
-Slice 14D - Launcher Safety Tests And Help Output.
+Slice 14H - Launcher Contract Tests And Help Output.
 
-Reason: Slice 14C adds new CLI flags and structured recovery output. The next
-increment should add a lightweight script-level contract test for argument
+Reason: the launcher and smokes now share stricter base URL diagnostics. The
+next increment should add a lightweight script-level contract test for argument
 parsing, base URL propagation, JSON shape, and `--help`/usage text without
 adding service management.

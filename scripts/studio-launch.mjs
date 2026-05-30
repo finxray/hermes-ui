@@ -131,6 +131,24 @@ async function main() {
     );
   }
 
+  if (args.smoke && existsSync(join(root, "scripts", "markdown-fixture-smoke.mjs"))) {
+    await runSmokeCommand(
+      "smoke:markdown",
+      `npm run smoke:markdown -- --base-url ${webUiUrl}`,
+      process.execPath,
+      [join(root, "scripts", "markdown-fixture-smoke.mjs"), "--base-url", webUiUrl]
+    );
+  }
+
+  if (args.smoke && existsSync(join(root, "scripts", "markdown-long-fixture-smoke.mjs"))) {
+    await runSmokeCommand(
+      "smoke:markdown:long",
+      `npm run smoke:markdown:long -- --base-url ${webUiUrl}`,
+      process.execPath,
+      [join(root, "scripts", "markdown-long-fixture-smoke.mjs"), "--base-url", webUiUrl]
+    );
+  }
+
   if (args.open) {
     await runOpenCommand();
   }
@@ -469,13 +487,27 @@ function addPortDiagnosticsCheck(ports) {
   const broken = ports.filter((item) => item.classification === "stale-or-broken-studio");
   const occupied = ports.filter((item) => item.classification !== "unreachable");
   const activeTarget = ports.find((item) => item.baseUrl === webUiUrl);
+  const selectedBroken = activeTarget?.classification === "stale-or-broken-studio";
+
+  if (selectedBroken) {
+    addCheck(
+      "port-diagnostics",
+      false,
+      "",
+      `You are testing against stale server ${webUiUrl}. Static chunks failed for the selected base URL; restart that process or pass --base-url for a healthy Studio server.`,
+      "required"
+    );
+    return;
+  }
 
   if (broken.length > 0) {
     addCheck(
       "port-diagnostics",
       false,
       "",
-      `Detected stale/broken Studio server(s): ${broken.map((item) => `${item.baseUrl} (${item.staticAssets?.failures?.length || 0} static failure(s))`).join(", ")}.`,
+      activeTarget?.classification === "likely-studio"
+        ? `Selected server ${webUiUrl} is healthy, but stale/broken Studio server(s) may confuse browser tabs: ${broken.map((item) => `${item.baseUrl} (${item.staticAssets?.failures?.length || 0} static failure(s))`).join(", ")}.`
+        : `Detected stale/broken Studio server(s): ${broken.map((item) => `${item.baseUrl} (${item.staticAssets?.failures?.length || 0} static failure(s))`).join(", ")}.`,
       "warn"
     );
     return;
@@ -845,12 +877,25 @@ function buildRecommendedActions() {
   const healthy = report.diagnostics.healthyStudioPorts;
   const broken = report.diagnostics.brokenStudioPorts;
   const selectedPort = report.diagnostics.ports.find((item) => item.baseUrl === webUiUrl);
+  const selectedBroken = broken.find((item) => item.baseUrl === webUiUrl);
   const canonical = recommendCanonicalBaseUrl();
+
+  if (selectedBroken) {
+    actions.push({
+      command: canonical ? `npm run smoke:ui -- --base-url ${canonical}` : undefined,
+      kind: "selected-stale-server",
+      message: canonical
+        ? `You are testing against stale server ${webUiUrl}. Run UI smoke against healthy server ${canonical}, or restart the process serving ${webUiUrl}.`
+        : `You are testing against stale server ${webUiUrl}. Restart the process serving ${webUiUrl}, then re-run the launcher.`
+    });
+  }
 
   if (broken.length > 0) {
     actions.push({
       kind: "stale-server",
-      message: `Review stale/broken Studio server(s): ${broken.map((item) => item.baseUrl).join(", ")}. Restart the terminal running that server after confirming ownership.`
+      message: selectedBroken
+        ? `Selected stale/broken Studio server: ${selectedBroken.baseUrl}. Restart that server after confirming ownership.`
+        : `Stale/broken non-selected Studio server(s): ${broken.map((item) => item.baseUrl).join(", ")}. This may confuse browser tabs, but selected server ${webUiUrl} is not one of them.`
     });
   }
 
@@ -974,6 +1019,24 @@ function buildRecoveryCommands() {
       command: `npm run studio:launch -- --check --smoke --ui-smoke --base-url ${canonical}`,
       destructive: false,
       label: "Run launcher and smokes against the recommended Studio URL",
+      platform: "all"
+    });
+    commands.push({
+      command: `npm run smoke:ui -- --base-url ${canonical}`,
+      destructive: false,
+      label: "Run UI smoke against the recommended Studio URL",
+      platform: "all"
+    });
+    commands.push({
+      command: `npm run smoke:markdown -- --base-url ${canonical}`,
+      destructive: false,
+      label: "Run markdown smoke against the recommended Studio URL",
+      platform: "all"
+    });
+    commands.push({
+      command: `npm run smoke:markdown:long -- --base-url ${canonical}`,
+      destructive: false,
+      label: "Run long markdown smoke against the recommended Studio URL",
       platform: "all"
     });
   }
@@ -1113,7 +1176,7 @@ async function runSmokeCommand(name, display, command, commandArgs) {
     const { stdout, stderr } = await execFileAsync(command, commandArgs, {
       cwd: root,
       maxBuffer: 1024 * 1024 * 8,
-      timeout: name === "smoke:ui" ? 120_000 : 90_000
+      timeout: name === "smoke:ui" || name.startsWith("smoke:markdown") ? 120_000 : 90_000
     });
     addCommand(name, "pass", display, lastLines(`${stdout}\n${stderr}`));
   } catch (error) {
@@ -1167,7 +1230,10 @@ function makeSuggestions() {
     suggestions.push(`Multiple likely Studio servers are running: ${likelyStudio.map((item) => item.baseUrl).join(", ")}. Prefer ${canonical || "port 3000 when healthy"} or choose one explicitly with --base-url.`);
   }
   if (brokenStudio.length > 0) {
-    suggestions.push(`Stale/broken Studio server detected: ${brokenStudio.map((item) => item.baseUrl).join(", ")}. Run npm run studio:launch -- --check --recovery for copyable recovery commands.`);
+    const selectedBroken = brokenStudio.find((item) => item.baseUrl === webUiUrl);
+    suggestions.push(selectedBroken
+      ? `Selected base URL ${webUiUrl} is stale/broken. Run npm run studio:launch -- --check --recovery for manual recovery commands, or pass --base-url for a healthy Studio server.`
+      : `Stale/broken non-selected Studio server detected: ${brokenStudio.map((item) => item.baseUrl).join(", ")}. This may confuse browser tabs; run npm run studio:launch -- --check --recovery for copyable recovery commands.`);
   }
   if (report.services.staticAssets?.status === "warn") {
     suggestions.push("Static chunk issues usually mean a stale Next server. Restart npm run dev or next start; only then consider removing apps/web/.next.");

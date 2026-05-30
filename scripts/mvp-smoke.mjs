@@ -2,10 +2,11 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { printSelectedBaseUrl, selectedBaseUrl } from "./smoke-base-url.mjs";
 
 const root = resolve(process.cwd());
 const args = parseArgs(process.argv.slice(2));
-const baseUrl = trimSlash(args.baseUrl || "http://127.0.0.1:3000");
+const baseUrl = selectedBaseUrl(args.baseUrl);
 const timeoutMs = 10_000;
 
 const report = {
@@ -25,6 +26,7 @@ const report = {
 await main();
 
 async function main() {
+  printSelectedBaseUrl({ baseUrl, json: args.json, label: "MVP smoke" });
   for (const arg of args.unknown) {
     addResult("cli-args", "fail", `Unknown argument: ${arg}`);
   }
@@ -255,7 +257,7 @@ async function checkOptionalDesignRoute() {
 async function checkGet(path, options = {}) {
   const result = await fetchText(`${baseUrl}${path}`);
   if (!result.ok) {
-    addResult(`GET ${path}`, "fail", `Expected HTTP 2xx but received ${describeFetchResult(result)}.`);
+    addResult(`GET ${path}`, "fail", `Expected HTTP 2xx from ${baseUrl}${path} but received ${describeFetchResult(result)}.`);
     return result;
   }
 
@@ -621,10 +623,6 @@ function authHint(body) {
     return " (Gateway returned a scoped HTTP error)";
   }
   return "";
-}
-
-function trimSlash(value) {
-  return value.replace(/\/$/, "");
 }
 
 function icon(status) {

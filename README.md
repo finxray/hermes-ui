@@ -56,6 +56,17 @@ npm run smoke:ui
 npm run studio:open
 ```
 
+When more than one local Studio server is running, pin checks and smokes to the
+intended server:
+
+```powershell
+npm run studio:launch -- --check --base-url http://127.0.0.1:3000
+npm run smoke:ui -- --base-url http://127.0.0.1:3000
+```
+
+Browser smokes fail early on stale Next static chunks and print manual recovery
+guidance instead of continuing into misleading click failures.
+
 The app opens at `http://127.0.0.1:3000`. The expected Hermes API URL is
 `http://127.0.0.1:8642`; Brain Memory Gateway is optional and usually expected
 at `http://127.0.0.1:8080` when live.

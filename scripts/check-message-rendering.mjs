@@ -15,6 +15,7 @@ const files = {
   bubbleCss: "apps/web/src/components/chat/MessageBubble.module.css",
   markdownSmoke: "scripts/markdown-fixture-smoke.mjs",
   longMarkdownSmoke: "scripts/markdown-long-fixture-smoke.mjs",
+  smokeBaseUrl: "scripts/smoke-base-url.mjs",
   packageJson: "apps/web/package.json",
   rootPackageJson: "package.json"
 };
@@ -35,6 +36,7 @@ const bubble = read(files.bubble);
 const bubbleCss = read(files.bubbleCss);
 const markdownSmoke = read(files.markdownSmoke);
 const longMarkdownSmoke = read(files.longMarkdownSmoke);
+const smokeBaseUrl = read(files.smokeBaseUrl);
 const packageJson = JSON.parse(read(files.packageJson) || "{}");
 const rootPackageJson = JSON.parse(read(files.rootPackageJson) || "{}");
 
@@ -81,6 +83,7 @@ expect(fixtureRoute.includes("/design/markdown-fixture") || fixtureRoute.include
 expect(fixtureRoute.includes("aria-label=\"Markdown fixture\""), "Markdown fixture route exposes a fixture region label.");
 expect(fixtureRoute.includes("<MessageBubble") && fixtureRoute.includes("<MessageMarkdown"), "Fixture route renders complete and partial markdown examples.");
 expect(markdownSmoke.includes("/design/markdown-fixture"), "Markdown browser smoke targets the fixture route.");
+expect(markdownSmoke.includes("preflightStaticChunks") && markdownSmoke.includes("selectedBaseUrl"), "Markdown browser smoke uses selected base URL and static preflight.");
 expect(markdownSmoke.includes("Copy code") && markdownSmoke.includes("Copy message"), "Markdown browser smoke checks copy buttons.");
 expect(markdownSmoke.includes("raw-html-fixture") && markdownSmoke.includes("RAW_HTML_SHOULD_NOT_RENDER"), "Markdown browser smoke checks raw HTML safety.");
 expect(markdownSmoke.includes("target") && markdownSmoke.includes("noreferrer"), "Markdown browser smoke checks safe link attributes.");
@@ -95,9 +98,11 @@ expect(longFixtureRoute.includes("MarkdownLongFixturePage"), "Long markdown fixt
 expect(longFixtureRoute.includes("aria-label=\"Long markdown fixture\""), "Long markdown fixture route exposes a fixture region label.");
 expect(longFixtureRoute.includes("<MessageBubble") && longFixtureRoute.includes("<MessageMarkdown"), "Long fixture route renders complete and partial markdown examples.");
 expect(longMarkdownSmoke.includes("/design/markdown-long-fixture"), "Long markdown browser smoke targets the long fixture route.");
+expect(longMarkdownSmoke.includes("preflightStaticChunks") && longMarkdownSmoke.includes("selectedBaseUrl"), "Long markdown browser smoke uses selected base URL and static preflight.");
 expect(longMarkdownSmoke.includes("maxHeight") && longMarkdownSmoke.includes("overflowY"), "Long markdown browser smoke checks bounded code scrolling.");
 expect(longMarkdownSmoke.includes("fixture-table-scroller"), "Long markdown browser smoke checks table overflow wrapper.");
 expect(longMarkdownSmoke.includes("long-raw-html-fixture") && longMarkdownSmoke.includes("LONG_RAW_HTML_SHOULD_NOT_RENDER"), "Long markdown browser smoke checks raw HTML safety.");
+expect(smokeBaseUrl.includes("DEFAULT_BASE_URL") && smokeBaseUrl.includes("preflightStaticChunks"), "Shared smoke base URL helper exposes default and static preflight.");
 expect(rootPackageJson.scripts?.["smoke:markdown:long"] === "node scripts/markdown-long-fixture-smoke.mjs", "Root package exposes smoke:markdown:long.");
 
 if (failures.length > 0) {

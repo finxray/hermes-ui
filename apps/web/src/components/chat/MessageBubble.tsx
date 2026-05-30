@@ -1,5 +1,6 @@
 import { Link2 } from "lucide-react";
 import type { ChatMessage } from "@/data/types";
+import { CopyTextButton, MessageMarkdown } from "./MessageMarkdown";
 import styles from "./MessageBubble.module.css";
 
 type MessageBubbleProps = {
@@ -7,6 +8,9 @@ type MessageBubbleProps = {
 };
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const isAssistant = message.role === "assistant";
+  const isStreaming = message.status === "streaming";
+
   return (
     <article
       className={styles.message}
@@ -23,13 +27,22 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </div>
         <div className={styles.content}>
           {message.content ? (
-            message.content
-              .split("\n")
-              .map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)
+            isAssistant ? (
+              <MessageMarkdown content={message.content} isStreaming={isStreaming} />
+            ) : (
+              message.content
+                .split("\n")
+                .map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)
+            )
           ) : (
             <p className={styles.streamPlaceholder}>Waiting for Hermes...</p>
           )}
         </div>
+        {isAssistant && message.content ? (
+          <div className={styles.actionRow} aria-label="Assistant message actions">
+            <CopyTextButton className={styles.messageCopyButton} label="Copy message" text={message.content} />
+          </div>
+        ) : null}
         {message.references ? (
           <div className={styles.referenceRow} aria-label="Mock retrieval references">
             {message.references.map((reference) => (

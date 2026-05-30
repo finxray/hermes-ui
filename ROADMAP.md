@@ -335,6 +335,18 @@ No process kill, `.next` deletion, service management, env mutation, backend
 logic change, or export/import was added. See
 `docs/packaging/STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md`.
 
+## Checkpoint: Slice 14D rich response renderer
+
+Slice 14D upgraded assistant message rendering on 2026-05-31. Assistant
+responses now use safe `react-markdown` plus `remark-gfm`, skip raw HTML, avoid
+`dangerouslySetInnerHTML`, render polished headings/lists/quotes/links/tables,
+show dark themed fenced code blocks with lightweight React token coloring, add
+code-copy and full-message copy actions, and avoid eager syntax highlighting
+while messages are streaming. User messages remain simple and right-aligned.
+No Hermes streaming, Brain Memory BFF, memory scope, backend, storage,
+mutation/admin, or export/import behavior changed. See
+`docs/design/RICH_RESPONSE_RENDERER_14D.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

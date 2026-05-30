@@ -1,0 +1,72 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = process.cwd();
+const failures = [];
+
+const files = {
+  markdown: "apps/web/src/components/chat/MessageMarkdown.tsx",
+  markdownCss: "apps/web/src/components/chat/MessageMarkdown.module.css",
+  bubble: "apps/web/src/components/chat/MessageBubble.tsx",
+  bubbleCss: "apps/web/src/components/chat/MessageBubble.module.css",
+  packageJson: "apps/web/package.json"
+};
+
+for (const [name, path] of Object.entries(files)) {
+  if (!existsSync(join(root, path))) {
+    failures.push(`Missing ${name}: ${path}`);
+  }
+}
+
+const markdown = read(files.markdown);
+const markdownCss = read(files.markdownCss);
+const bubble = read(files.bubble);
+const bubbleCss = read(files.bubbleCss);
+const packageJson = JSON.parse(read(files.packageJson) || "{}");
+
+expect(markdown.includes("ReactMarkdown"), "MessageMarkdown uses ReactMarkdown.");
+expect(markdown.includes("remarkGfm"), "MessageMarkdown enables remark-gfm.");
+expect(markdown.includes("skipHtml"), "MessageMarkdown skips raw HTML.");
+expect(!markdown.includes("dangerouslySetInnerHTML"), "MessageMarkdown does not use dangerouslySetInnerHTML.");
+expect(markdown.includes('rel="noreferrer"'), "Links use rel=noreferrer.");
+expect(markdown.includes('target="_blank"'), "Links open externally.");
+expect(markdown.includes("safeHref"), "Links pass through a safe href helper.");
+expect(markdown.includes("CopyTextButton"), "Shared copy button exists.");
+expect(markdown.includes("navigator.clipboard") && markdown.includes("execCommand(\"copy\")"), "Copy handler has Clipboard API and fallback paths.");
+expect(markdown.includes("CodeBlock"), "Fenced code blocks use a dedicated CodeBlock component.");
+expect(markdown.includes("highlightLine") && markdown.includes("tokenizeLine"), "Code blocks use lightweight React token highlighting.");
+expect(markdown.includes("isStreaming || !language"), "Streaming code blocks avoid eager highlighting.");
+expect(markdown.includes("tableScroller"), "GFM tables are wrapped for horizontal scrolling.");
+expect(markdownCss.includes(".codeBlock") && markdownCss.includes(".copyButton"), "Code block and copy button styles exist.");
+expect(markdownCss.includes("overflow-x: auto"), "Long code/table content can scroll horizontally.");
+expect(markdownCss.includes(".tokenKeyword") && markdownCss.includes(".tokenString"), "Syntax token styles exist.");
+expect(bubble.includes("<MessageMarkdown") && bubble.includes('message.role === "assistant"'), "Assistant messages render through MessageMarkdown.");
+expect(bubble.includes("CopyTextButton") && bubble.includes("Copy message"), "Assistant message-level copy action is present.");
+expect(bubble.includes(".split(\"\\n\")"), "User messages keep simple newline-preserving rendering.");
+expect(bubbleCss.includes(".messageCopyButton"), "Message copy action has scoped styling.");
+expect(Boolean(packageJson.dependencies?.["react-markdown"]), "react-markdown dependency is declared.");
+expect(Boolean(packageJson.dependencies?.["remark-gfm"]), "remark-gfm dependency is declared.");
+
+if (failures.length > 0) {
+  console.error("Message rendering checks failed:");
+  for (const failure of failures) {
+    console.error(`- ${failure}`);
+  }
+  process.exit(1);
+}
+
+console.log("Message rendering checks passed.");
+
+function read(path) {
+  try {
+    return readFileSync(join(root, path), "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function expect(ok, message) {
+  if (!ok) {
+    failures.push(message);
+  }
+}

@@ -18,6 +18,7 @@
     "check:agent-activity": "node scripts/check-agent-activity-events.mjs",
     "check:agent-activity-rendering": "node scripts/check-agent-activity-rendering.mjs",
     "check:brain-memory-client": "node scripts/check-brain-memory-client-shapes.mjs",
+    "check-message-rendering": "node scripts/check-message-rendering.mjs",
     "check:ui-structure": "node scripts/check-ui-structure.mjs",
     "check:workspace-state": "node --no-warnings scripts/check-workspace-state.mjs",
     "smoke:mvp": "node scripts/mvp-smoke.mjs",

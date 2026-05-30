@@ -82,6 +82,38 @@
   margin-bottom: 0;
 }
 
+.actionRow {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.messageCopyButton {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-small);
+}
+
+.messageCopyButton:hover {
+  border-color: var(--border-soft);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-secondary);
+}
+
+.messageCopyButton:focus-visible {
+  outline: 2px solid rgba(145, 184, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .streamPlaceholder {
   color: var(--text-muted);
   font-style: italic;

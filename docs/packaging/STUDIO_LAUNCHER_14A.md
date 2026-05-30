@@ -235,3 +235,19 @@ Slice 14B - Launcher Smoke Hardening And Cross-Platform Port Diagnostics.
 Reason: Slice 14A adds a safe local launcher/checklist. The next useful step is
 to harden diagnostics around port ownership, Windows/WSL/macOS differences, and
 stale server recovery without adding automatic service management.
+
+## Slice 14B Follow-Up
+
+Slice 14B completed the first launcher hardening pass. The launcher now scans
+local Web UI ports `3000` through `3007`, classifies likely Studio servers,
+flags stale/broken Studio instances, reports exact failing `/_next/static/**`
+chunks, probes common Brain Memory Gateway URLs `8080` and `8765`, emits
+cross-platform process-hint commands, and includes browser-route and zoom
+guidance.
+
+Detailed behavior is documented in
+`docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`.
+
+The Slice 14A safety boundary remains unchanged: the launcher still does not
+install, start, stop, kill, delete, mutate external services, change backend
+logic, or implement export/import.

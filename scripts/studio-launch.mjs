@@ -9,6 +9,9 @@ const execFileAsync = promisify(execFile);
 const root = resolve(process.cwd());
 const args = parseArgs(process.argv.slice(2));
 const timeoutMs = 3500;
+const portProbeTimeoutMs = 1200;
+const webUiPorts = [3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007];
+const commonBrainMemoryUrls = ["http://127.0.0.1:8080", "http://127.0.0.1:8765"];
 const webUiUrl = trimSlash(process.env.STUDIO_WEB_UI_URL || "http://127.0.0.1:3000");
 const envPath = join(root, "apps", "web", ".env.local");
 const env = readEnvFile(envPath);
@@ -20,6 +23,7 @@ const report = {
   flags: {
     check: args.check,
     devCommand: args.devCommand,
+    json: args.json,
     open: args.open,
     requireBrainMemory: args.requireBrainMemory,
     requireHermes: args.requireHermes,
@@ -41,6 +45,17 @@ const report = {
     brainMemoryBff: null,
     brainMemoryDirect: null
   },
+  diagnostics: {
+    ports: [],
+    processHints: null,
+    browserGuidance: [],
+    brainMemoryUrls: []
+  },
+  summary: {
+    passed: 0,
+    warned: 0,
+    failed: 0
+  },
   suggestions: []
 };
 
@@ -54,6 +69,12 @@ async function main() {
   checkRepo();
   await checkToolchain();
   report.mode = inferMode(report.env);
+  report.diagnostics.ports = await checkWebUiPorts();
+  addPortDiagnosticsCheck(report.diagnostics.ports);
+  report.diagnostics.processHints = await getProcessHints();
+  report.diagnostics.browserGuidance = getBrowserGuidance();
+  report.diagnostics.brainMemoryUrls = await checkBrainMemoryCommonUrls();
+  addBrainMemoryUrlDiagnosticsCheck(report.diagnostics.brainMemoryUrls);
   const webUiResult = await checkWebUi();
   const staticAssetsResult = await checkStaticAssets(webUiResult);
   const hermesBffResult = await checkHermesBff(webUiResult);
@@ -96,6 +117,7 @@ async function main() {
   }
 
   report.suggestions = makeSuggestions();
+  report.summary = summarizeReport();
 
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
@@ -246,35 +268,184 @@ async function checkStaticAssets(rootResult) {
       "Root HTML did not expose Next static asset references. Restart the server if hydration looks stale.",
       "warn"
     );
-    return { status: "warn", checked: 0, failures: [] };
+    return { status: "warn", checked: 0, assets: [], failures: [] };
   }
 
-  const failures = [];
-  for (const path of assets) {
-    const result = await fetchHeadOrGet(`${webUiUrl}${path}`);
-    if (!result.ok) {
-      failures.push(`${path} -> ${describeFetchResult(result)}`);
-    }
-  }
+  const result = await checkStaticAssetList(webUiUrl, assets);
+  const failureText = result.failures
+    .slice(0, 3)
+    .map((failure) => `${failure.path} -> ${failure.status || failure.error || "unknown"}`)
+    .join("; ");
 
   addCheck(
     "next-static-assets",
-    failures.length === 0,
-    `${assets.length} Next static asset(s) responded successfully.`,
-    `Static chunk failure detected: ${failures.slice(0, 3).join("; ")}. Restart the Web UI server; if stale assets persist, stop it and remove apps/web/.next only after confirming the path.`,
+    result.failures.length === 0,
+    `${result.assets.length} Next static asset(s) responded successfully.`,
+    `Static chunk failure detected: ${failureText}. Restart the Web UI server; if stale assets persist, stop it and remove apps/web/.next only after confirming the path.`,
     "warn"
   );
 
   return {
-    status: failures.length === 0 ? "connected" : "warn",
-    checked: assets.length,
-    failures
+    status: result.failures.length === 0 ? "connected" : "warn",
+    checked: result.assets.length,
+    assets: result.assets,
+    failures: result.failures
   };
 }
 
 function extractStaticAssetPaths(html) {
   const matches = html.matchAll(/["'](\/_next\/static\/[^"']+)["']/g);
   return Array.from(new Set(Array.from(matches, (match) => match[1].replace(/&amp;/g, "&"))));
+}
+
+async function checkStaticAssetList(baseUrl, assets) {
+  const results = [];
+  for (const path of assets) {
+    const result = await fetchHeadOrGet(`${baseUrl}${path}`);
+    results.push({
+      error: result.error,
+      ok: result.ok,
+      path,
+      status: result.status || 0
+    });
+  }
+  return {
+    assets: results,
+    failures: results.filter((item) => !item.ok)
+  };
+}
+
+async function checkWebUiPorts() {
+  const diagnostics = [];
+  for (const port of webUiPorts) {
+    const base = `http://127.0.0.1:${port}`;
+    const rootResult = await fetchTextWithTimeout(`${base}/`, portProbeTimeoutMs);
+    if (!rootResult.ok) {
+      diagnostics.push({
+        baseUrl: base,
+        classification: "unreachable",
+        port,
+        root: summarizeFetch(rootResult),
+        staticAssets: { checked: 0, failures: [], status: "skipped" }
+      });
+      continue;
+    }
+
+    const html = typeof rootResult.text === "string" ? rootResult.text : "";
+    const looksLikeStudio = html.includes("Brain Memory Studio");
+    const oldGreenUiPresent = /old green ui|#00ff00|#0f0\b/i.test(html);
+    const nextAssets = extractStaticAssetPaths(html).slice(0, 6);
+    const staticAssets = nextAssets.length > 0
+      ? await checkStaticAssetList(base, nextAssets)
+      : { assets: [], failures: [] };
+    const designRoute = await fetchTextWithTimeout(`${base}/design/codex-shell`, portProbeTimeoutMs);
+    const hermesStatus = await fetchJsonWithTimeout(`${base}/api/hermes/status`, portProbeTimeoutMs);
+    const classification = classifyPort({
+      hermesStatus,
+      looksLikeStudio,
+      oldGreenUiPresent,
+      rootResult,
+      staticAssets
+    });
+
+    diagnostics.push({
+      baseUrl: base,
+      classification,
+      designRoute: {
+        exists: designRoute.status === 200,
+        status: designRoute.status || 0
+      },
+      hermesStatus: {
+        exists: hermesStatus.ok,
+        mode: hermesStatus.body?.mode,
+        reachable: hermesStatus.body?.reachable,
+        status: hermesStatus.status || 0
+      },
+      looksLikeStudio,
+      oldGreenUiPresent,
+      port,
+      root: summarizeFetch(rootResult),
+      staticAssets: {
+        checked: staticAssets.assets.length,
+        failures: staticAssets.failures,
+        status: staticAssets.failures.length === 0 ? "connected" : "warn"
+      }
+    });
+  }
+  return diagnostics;
+}
+
+function classifyPort({ hermesStatus, looksLikeStudio, oldGreenUiPresent, rootResult, staticAssets }) {
+  if (!rootResult.ok) {
+    return "unreachable";
+  }
+  if (looksLikeStudio && (oldGreenUiPresent || staticAssets.failures.length > 0)) {
+    return "stale-or-broken-studio";
+  }
+  if (looksLikeStudio) {
+    return "likely-studio";
+  }
+  if (hermesStatus.ok) {
+    return "possible-studio-bff";
+  }
+  return "unrelated-server";
+}
+
+function summarizeFetch(result) {
+  return {
+    error: result.error,
+    ok: result.ok === true,
+    status: result.status || 0
+  };
+}
+
+function addPortDiagnosticsCheck(ports) {
+  const likely = ports.filter((item) => item.classification === "likely-studio");
+  const broken = ports.filter((item) => item.classification === "stale-or-broken-studio");
+  const occupied = ports.filter((item) => item.classification !== "unreachable");
+  const activeTarget = ports.find((item) => item.baseUrl === webUiUrl);
+
+  if (broken.length > 0) {
+    addCheck(
+      "port-diagnostics",
+      false,
+      "",
+      `Detected stale/broken Studio server(s): ${broken.map((item) => item.baseUrl).join(", ")}.`,
+      "warn"
+    );
+    return;
+  }
+
+  if (likely.length > 1) {
+    addCheck(
+      "port-diagnostics",
+      false,
+      "",
+      `Multiple likely Studio servers detected: ${likely.map((item) => item.baseUrl).join(", ")}.`,
+      "warn"
+    );
+    return;
+  }
+
+  if (activeTarget?.classification === "likely-studio") {
+    addCheck(
+      "port-diagnostics",
+      true,
+      `Active Web UI target ${webUiUrl} is the likely Studio server. Occupied local web ports: ${occupied.length}.`,
+      ""
+    );
+    return;
+  }
+
+  addCheck(
+    "port-diagnostics",
+    false,
+    "",
+    occupied.length > 0
+      ? `No likely Studio server found at ${webUiUrl}; occupied ports: ${occupied.map((item) => `${item.port}:${item.classification}`).join(", ")}.`
+      : `No reachable server found on ports ${webUiPorts[0]}-${webUiPorts.at(-1)}.`,
+    "warn"
+  );
 }
 
 async function checkHermesBff(webUi) {
@@ -383,6 +554,86 @@ async function checkBrainMemoryDirect(brainMemoryEnv) {
   return result;
 }
 
+async function checkBrainMemoryCommonUrls() {
+  const configured = report.env.brainMemory.baseUrl
+    ? trimSlash(report.env.brainMemory.baseUrl)
+    : "";
+  const urls = Array.from(new Set([
+    ...commonBrainMemoryUrls,
+    ...(configured ? [configured] : [])
+  ]));
+
+  const results = [];
+  for (const url of urls) {
+    const result = await fetchJsonWithTimeout(`${url}/health`, portProbeTimeoutMs, {
+      headers: url === configured ? makeBrainMemoryUiAuthHeader() : undefined
+    });
+    results.push({
+      configured: url === configured,
+      meaning: brainMemoryUrlMeaning(url),
+      ok: result.ok,
+      status: result.status || 0,
+      statusLabel: result.ok ? "reachable" : result.error || "unreachable",
+      url: safeUrl(url)
+    });
+  }
+  return results;
+}
+
+function addBrainMemoryUrlDiagnosticsCheck(results) {
+  const configured = results.find((item) => item.configured);
+  const reachable = results.filter((item) => item.ok);
+
+  if (args.requireBrainMemory && reachable.length === 0) {
+    addCheck(
+      "brain-memory-url-diagnostics",
+      false,
+      "",
+      "Brain Memory is required, but common Gateway URLs 8080/8765 and configured URL were not reachable."
+    );
+    return;
+  }
+
+  if (configured?.ok) {
+    addCheck(
+      "brain-memory-url-diagnostics",
+      true,
+      `Configured Brain Memory Gateway URL is reachable: ${configured.url}.`,
+      ""
+    );
+    return;
+  }
+
+  if (reachable.length > 0) {
+    addCheck(
+      "brain-memory-url-diagnostics",
+      false,
+      "",
+      `Brain Memory Gateway-like URL reachable but not configured: ${reachable.map((item) => `${item.url} (${item.meaning})`).join(", ")}.`,
+      "warn"
+    );
+    return;
+  }
+
+  addCheck(
+    "brain-memory-url-diagnostics",
+    false,
+    "",
+    "Common Brain Memory Gateway URLs 8080 and 8765 are down. This is acceptable unless live Brain Memory is required.",
+    "warn"
+  );
+}
+
+function brainMemoryUrlMeaning(url) {
+  if (url.endsWith(":8080")) {
+    return "common compose Gateway URL";
+  }
+  if (url.endsWith(":8765")) {
+    return "standalone helper URL while helper is running";
+  }
+  return "configured Gateway URL";
+}
+
 function checkRequiredServices() {
   if (args.requireHermes) {
     const bffLive = report.services.hermesBff?.ok &&
@@ -407,6 +658,108 @@ function checkRequiredServices() {
       "Required Brain Memory check failed; mock/unconfigured state is not accepted with --require-brain-memory."
     );
   }
+}
+
+async function getProcessHints() {
+  const portsText = webUiPorts.join(",");
+  const hints = {
+    platform: process.platform,
+    parsed: [],
+    suggestions: []
+  };
+
+  if (process.platform === "win32") {
+    const command = `$ports = @(${portsText}); Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort -and $_.State -eq 'Listen' } | Select-Object LocalAddress,LocalPort,State,OwningProcess | ConvertTo-Json -Compress`;
+    hints.suggestions.push(`powershell.exe -NoProfile -Command "${command.replaceAll('"', '\\"')}"`);
+    try {
+      const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", command], {
+        timeout: timeoutMs
+      });
+      hints.parsed = parsePowerShellJson(stdout);
+    } catch (error) {
+      hints.error = safeProcessError(error);
+    }
+    return hints;
+  }
+
+  hints.suggestions.push(`ss -ltnp '( sport = :${webUiPorts.join(" or sport = :")} )'`);
+  if (isWsl()) {
+    hints.suggestions.push(
+      `powershell.exe -NoProfile -Command "$ports = @(${portsText}); Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort -and $_.State -eq 'Listen' } | Select-Object LocalAddress,LocalPort,State,OwningProcess"`
+    );
+  }
+
+  try {
+    const { stdout } = await execFileAsync("ss", ["-ltnp"], { timeout: timeoutMs });
+    hints.parsed = parseSsOutput(stdout);
+  } catch (error) {
+    hints.error = safeProcessError(error);
+  }
+  return hints;
+}
+
+function parsePowerShellJson(value) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    return (Array.isArray(parsed) ? parsed : [parsed]).map((item) => ({
+      localAddress: item.LocalAddress,
+      localPort: item.LocalPort,
+      owningProcess: item.OwningProcess,
+      state: formatTcpState(item.State)
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function formatTcpState(value) {
+  if (value === 2 || value === "2") {
+    return "Listen";
+  }
+  return String(value || "unknown");
+}
+
+function parseSsOutput(value) {
+  return value
+    .split(/\r?\n/)
+    .filter((line) => webUiPorts.some((port) => line.includes(`:${port}`)))
+    .slice(0, 20)
+    .map((line) => line.replace(/\s+/g, " ").trim());
+}
+
+function safeProcessError(error) {
+  if (!(error instanceof Error)) {
+    return "Process hint command failed.";
+  }
+  return error.message.replace(/(api[_-]?key|authorization|token|secret)=([^&\s]+)/gi, "$1=[redacted]");
+}
+
+function isWsl() {
+  if (process.platform !== "linux") {
+    return false;
+  }
+  if (process.env.WSL_DISTRO_NAME) {
+    return true;
+  }
+  try {
+    return existsSync("/proc/version") && /microsoft|wsl/i.test(readFileSync("/proc/version", "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+function getBrowserGuidance() {
+  return [
+    "Open the app at http://127.0.0.1:3000/ unless STUDIO_WEB_UI_URL points elsewhere.",
+    "Keep Chrome/Edge zoom at 100%; press Ctrl+0 before judging layout.",
+    "/design/codex-shell is a reference/prototype route, not the production root.",
+    "If the browser shows an old UI, run npm run studio:launch -- --check and inspect port diagnostics.",
+    "If Codex/browser and your manual browser disagree, confirm they are using the same host and port."
+  ];
 }
 
 function summarizeWebUi(result) {
@@ -554,11 +907,19 @@ async function runOpenCommand() {
 
 function makeSuggestions() {
   const suggestions = [];
+  const likelyStudio = report.diagnostics.ports.filter((item) => item.classification === "likely-studio");
+  const brokenStudio = report.diagnostics.ports.filter((item) => item.classification === "stale-or-broken-studio");
   if (!existsSync(envPath)) {
     suggestions.push("Create env with npm run studio:env -- --mode web-ui-with-hermes or web-ui-only.");
   }
   if (!report.services.webUi?.ok) {
     suggestions.push("Start the Web UI in a separate terminal: npm run dev.");
+  }
+  if (likelyStudio.length > 1) {
+    suggestions.push(`Multiple likely Studio servers are running: ${likelyStudio.map((item) => item.baseUrl).join(", ")}. Close stale terminals manually or choose one URL explicitly with STUDIO_WEB_UI_URL.`);
+  }
+  if (brokenStudio.length > 0) {
+    suggestions.push(`Stale/broken Studio server detected: ${brokenStudio.map((item) => item.baseUrl).join(", ")}. Restart the known Next server manually.`);
   }
   if (report.services.staticAssets?.status === "warn") {
     suggestions.push("Static chunk issues usually mean a stale Next server. Restart npm run dev or next start; only then consider removing apps/web/.next.");
@@ -584,7 +945,19 @@ function makeSuggestions() {
   if (args.devCommand) {
     suggestions.push("The launcher does not start long-running services by default; run npm run dev yourself.");
   }
+  suggestions.push("If the UI looks wrong, confirm the route is /, not /design/codex-shell, and reset Chrome/Edge zoom to 100% with Ctrl+0.");
   return suggestions;
+}
+
+function summarizeReport() {
+  return {
+    passed: report.checks.filter((check) => check.status === "pass").length +
+      report.commands.filter((command) => command.status === "pass").length,
+    warned: report.checks.filter((check) => check.status === "warn").length +
+      report.commands.filter((command) => command.status === "warn").length,
+    failed: report.checks.filter((check) => check.status === "fail").length +
+      report.commands.filter((command) => command.status === "fail").length
+  };
 }
 
 async function fetchText(url, init = {}) {
@@ -602,6 +975,21 @@ async function fetchJson(url, init = {}) {
   });
 }
 
+async function fetchTextWithTimeout(url, customTimeoutMs, init = {}) {
+  return fetchWithTimeout(url, init, async (response) => response.text(), customTimeoutMs);
+}
+
+async function fetchJsonWithTimeout(url, customTimeoutMs, init = {}) {
+  return fetchWithTimeout(url, init, async (response) => {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { parseError: true, preview: text.slice(0, 160) };
+    }
+  }, customTimeoutMs);
+}
+
 async function fetchHeadOrGet(url) {
   const head = await fetchWithTimeout(url, { method: "HEAD" }, async () => "");
   if (head.ok || head.status !== 405) {
@@ -610,9 +998,9 @@ async function fetchHeadOrGet(url) {
   return fetchWithTimeout(url, {}, async () => "");
 }
 
-async function fetchWithTimeout(url, init, readBody) {
+async function fetchWithTimeout(url, init, readBody, customTimeoutMs = timeoutMs) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), customTimeoutMs);
   try {
     const response = await fetch(url, {
       ...init,
@@ -663,7 +1051,7 @@ function addCheck(name, okOrStatus, pass, fail = "", severity = "required") {
         : "fail";
   report.checks.push({
     detail: args.verbose && status !== "pass" ? fail : undefined,
-    message: status === "pass" ? pass : fail,
+    message: typeof okOrStatus === "string" ? pass : status === "pass" ? pass : fail,
     name,
     required: severity !== "warn",
     status
@@ -702,6 +1090,11 @@ function printReport() {
     console.log(`${icon(check.status)} ${check.name}: ${check.message}`);
   }
 
+  printPortDiagnostics();
+  printBrainMemoryUrlDiagnostics();
+  printProcessHints();
+  printBrowserGuidance();
+
   if (report.commands.length > 0) {
     console.log("");
     console.log("Commands");
@@ -717,6 +1110,76 @@ function printReport() {
   console.log("Next commands");
   for (const suggestion of report.suggestions) {
     console.log(`- ${suggestion}`);
+  }
+  console.log("");
+  console.log(`Summary: ${report.summary.passed} passed, ${report.summary.warned} warnings, ${report.summary.failed} failed.`);
+}
+
+function printPortDiagnostics() {
+  const occupied = report.diagnostics.ports.filter((item) => item.classification !== "unreachable");
+  console.log("");
+  console.log("Port diagnostics");
+  if (occupied.length === 0) {
+    console.log(`- No reachable servers on ports ${webUiPorts[0]}-${webUiPorts.at(-1)}.`);
+    return;
+  }
+  for (const item of occupied) {
+    const markers = [
+      item.looksLikeStudio ? "Studio text" : "no Studio text",
+      item.oldGreenUiPresent ? "old green marker present" : "old green absent",
+      item.designRoute?.exists ? "design route" : "no design route",
+      item.hermesStatus?.exists ? `Hermes BFF ${item.hermesStatus.mode || "unknown"}` : "no Hermes BFF",
+      item.staticAssets?.checked ? `${item.staticAssets.checked} static checked` : "no static refs"
+    ];
+    console.log(`- ${item.baseUrl}: ${item.classification} (${markers.join("; ")})`);
+    if (item.staticAssets?.failures?.length > 0) {
+      for (const failure of item.staticAssets.failures.slice(0, 3)) {
+        console.log(`  static fail: ${failure.path} -> ${failure.status || failure.error || "unknown"}`);
+      }
+    }
+  }
+}
+
+function printBrainMemoryUrlDiagnostics() {
+  console.log("");
+  console.log("Brain Memory URL diagnostics");
+  for (const item of report.diagnostics.brainMemoryUrls) {
+    console.log(`- ${item.url}: ${item.statusLabel} (${item.meaning})${item.configured ? " [configured]" : ""}`);
+  }
+}
+
+function printProcessHints() {
+  console.log("");
+  console.log("Process hints");
+  if (report.diagnostics.processHints?.parsed?.length > 0) {
+    for (const item of report.diagnostics.processHints.parsed.slice(0, 12)) {
+      if (typeof item === "string") {
+        console.log(`- ${item}`);
+      } else {
+        console.log(`- ${formatListenerAddress(item.localAddress, item.localPort)} ${item.state} pid=${item.owningProcess}`);
+      }
+    }
+  } else {
+    console.log("- No listener details parsed.");
+  }
+  for (const suggestion of report.diagnostics.processHints?.suggestions || []) {
+    console.log(`- Manual command: ${suggestion}`);
+  }
+}
+
+function formatListenerAddress(address, port) {
+  const value = String(address || "");
+  if (value.includes(":") && !value.startsWith("[")) {
+    return `[${value}]:${port}`;
+  }
+  return `${value || "0.0.0.0"}:${port}`;
+}
+
+function printBrowserGuidance() {
+  console.log("");
+  console.log("Browser guidance");
+  for (const item of report.diagnostics.browserGuidance) {
+    console.log(`- ${item}`);
   }
 }
 

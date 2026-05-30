@@ -13,6 +13,7 @@ the deferred production one-command CLI.
 | Web UI | `http://127.0.0.1:3000` | Next.js app and BFF routes. |
 | Hermes API | `http://127.0.0.1:8642` | Expected Hermes Agent API server URL. |
 | Brain Memory Gateway | `http://127.0.0.1:8080` | Expected live Gateway URL when attached. |
+| Brain Memory helper | `http://127.0.0.1:8765` | Common standalone helper URL while that helper is running. |
 
 ## Command Inventory
 
@@ -99,6 +100,12 @@ The launcher is a non-destructive local checklist. By default it:
 - checks direct Hermes `/health` when `HERMES_API_BASE_URL` is configured;
 - checks Brain Memory through the Web UI BFF when the server is running;
 - checks direct Brain Memory `/health` only when live Gateway mode is enabled;
+- scans Web UI ports `3000` through `3007` for likely/stale Studio servers;
+- reports exact failing `/_next/static/**` assets when a stale server is found;
+- probes common Brain Memory Gateway URLs `8080` and `8765` as warnings unless
+  live Brain Memory is required;
+- prints Windows/WSL/Linux process-hint commands for listener ownership;
+- reminds the operator to use the production root `/` and 100% browser zoom;
 - prints next commands.
 
 Useful variants:
@@ -116,7 +123,8 @@ npm run studio:launch:smoke
 The launcher does not start long-running services, install Hermes, install
 Brain Memory, start Docker, stop Docker, modify `~/.hermes`, kill stale Next
 processes, delete `.next`, print API keys, or implement export/import. See
-`docs/packaging/STUDIO_LAUNCHER_14A.md`.
+`docs/packaging/STUDIO_LAUNCHER_14A.md` and
+`docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`.
 
 ## Web UI Standalone / Mock Mode
 
@@ -271,10 +279,21 @@ Symptoms:
 - composer typing does not enable Send even though source/build changed;
 - Next reports another dev server is already running.
 
-Check port 3000:
+Check the launcher first:
 
 ```powershell
-Get-NetTCPConnection -LocalPort 3000 -State Listen | Select-Object LocalAddress,LocalPort,OwningProcess
+npm run studio:launch -- --check
+```
+
+The launcher scans ports `3000` through `3007`, classifies reachable servers as
+`likely-studio`, `stale-or-broken-studio`, `possible-studio-bff`,
+`unrelated-server`, or `unreachable`, and prints exact failing static assets.
+
+If you need to inspect ownership manually on Windows:
+
+```powershell
+$ports = @(3000,3001,3002,3003,3004,3005,3006,3007)
+Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $ports -contains $_.LocalPort -and $_.State -eq 'Listen' } | Select-Object LocalAddress,LocalPort,State,OwningProcess
 Get-Process -Id <OwningProcess>
 ```
 
@@ -301,8 +320,10 @@ npm run dev
 Do not run broad recursive delete commands outside the repo or without checking
 the path first.
 
-`npm run studio:launch -- --check` also checks static assets and will suggest a
-server restart when the root route is reachable but current chunks fail.
+If the browser shows a good app in one place and an old or broken app in
+another, confirm both browsers are using the same host/port and the production
+root route `/`, not `/design/codex-shell`. Reset Chrome or Edge zoom to 100%
+with `Ctrl+0` before judging layout.
 
 ## WSL / Windows Notes
 
@@ -313,6 +334,11 @@ server restart when the root route is reachable but current chunks fail.
   to reach them.
 - `npm run studio:open` tries the appropriate OS browser opener, including a
   Windows browser from WSL when available.
+- On Windows the launcher uses PowerShell `Get-NetTCPConnection` to parse
+  listeners on ports `3000` through `3007`.
+- On Linux the launcher suggests `ss -ltnp` and parses it when available.
+- On WSL the launcher also prints a PowerShell listener command for checking
+  Windows-owned servers.
 - Do not hardcode personal absolute paths in committed docs or scripts.
 
 ## Secrets Safety

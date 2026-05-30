@@ -311,6 +311,17 @@ Hermes/Brain Memory, modify `~/.hermes`, manage Docker/systemd, kill stale
 servers, delete `.next`, change UI/backend behavior, or implement
 export/import. See `docs/packaging/STUDIO_LAUNCHER_14A.md`.
 
+## Checkpoint: Slice 14B launcher port diagnostics
+
+Slice 14B hardened launcher diagnostics on 2026-05-31. The launcher now scans
+local Web UI ports `3000` through `3007`, classifies likely/stale/unrelated
+servers, reports exact failing Next static chunks, prints Windows/Linux/WSL
+process hints, probes common Brain Memory Gateway URLs `8080` and `8765`, and
+adds browser root/zoom guidance plus structured JSON diagnostics. It remains
+non-destructive: no service install/start/stop, stale-server kill, `.next`
+delete, backend logic change, or export/import was added. See
+`docs/packaging/STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

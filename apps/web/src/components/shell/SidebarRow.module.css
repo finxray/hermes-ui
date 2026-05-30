@@ -1,12 +1,12 @@
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: var(--icon-sm) minmax(0, 1fr) minmax(28px, auto);
-  gap: 9px;
+  grid-template-columns: var(--sidebar-icon-column, var(--icon-sm)) minmax(0, 1fr) var(--sidebar-meta-column, minmax(28px, auto));
+  gap: var(--sidebar-column-gap, 9px);
   align-items: center;
   width: 100%;
   min-height: var(--row-height);
-  padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  padding: 0 var(--sidebar-row-padding-x, clamp(12px, calc(8px + 0.25vw), 18px));
   border: 0;
   border-radius: 15px;
   background: transparent;
@@ -18,10 +18,9 @@
 }
 
 .row[data-depth="1"] {
-  grid-template-columns: 0 minmax(0, 1fr) minmax(20px, auto);
-  gap: 0;
+  grid-template-columns: var(--sidebar-icon-column, var(--icon-sm)) minmax(0, 1fr) var(--sidebar-child-meta-column, minmax(20px, auto));
+  gap: var(--sidebar-column-gap, 9px);
   min-height: calc(var(--row-height) * 0.88);
-  padding-left: calc(clamp(12px, calc(8px + 0.25vw), 18px) + var(--icon-sm) + 14px);
 }
 
 .row:hover,

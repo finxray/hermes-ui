@@ -1,18 +1,29 @@
 .sidebar {
+  --sidebar-rail-padding-x: 15px;
+  --sidebar-row-padding-x: clamp(12px, calc(8px + 0.25vw), 18px);
+  --sidebar-icon-column: var(--icon-sm);
+  --sidebar-column-gap: 9px;
+  --sidebar-meta-column: minmax(28px, auto);
+  --sidebar-child-meta-column: minmax(20px, auto);
   grid-area: left;
   display: flex;
   min-width: 0;
   min-height: 0;
   height: 100%;
   flex-direction: column;
+  direction: rtl;
   overflow: hidden auto;
-  padding: 26px 15px 20px;
+  padding: 26px var(--sidebar-rail-padding-x) 20px;
   background: transparent;
   border: 0;
   transition:
     opacity 500ms cubic-bezier(0.2, 0.8, 0.2, 1),
     transform 500ms cubic-bezier(0.2, 0.8, 0.2, 1),
     padding 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sidebar > * {
+  direction: ltr;
 }
 
 :global([data-left-collapsed="true"]) .sidebar {
@@ -25,18 +36,18 @@
 }
 
 .brand {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--sidebar-icon-column) minmax(0, 1fr);
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  padding: 0 0 36px;
+  gap: var(--sidebar-column-gap);
+  padding: 0 var(--sidebar-row-padding-x) 36px;
 }
 
 .brandIcon {
   display: grid;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: var(--sidebar-icon-column);
+  height: var(--sidebar-icon-column);
   place-items: center;
   color: var(--accent);
 }
@@ -45,8 +56,8 @@
   margin: 0;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: var(--font-ui);
-  font-weight: 650;
+  font-size: var(--font-small);
+  font-weight: 560;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -72,7 +83,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  padding: 0 var(--sidebar-row-padding-x) 0
+    calc(var(--sidebar-row-padding-x) + var(--sidebar-icon-column) + var(--sidebar-column-gap));
   color: var(--text-muted);
   font-size: var(--font-small);
   font-weight: 650;
@@ -145,12 +157,12 @@
 
 .settingsButton {
   display: grid;
-  grid-template-columns: var(--icon-sm) minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: var(--sidebar-icon-column) minmax(0, 1fr);
+  gap: var(--sidebar-column-gap);
   align-items: center;
   width: 100%;
   min-height: var(--row-height);
-  padding: 0 clamp(12px, calc(8px + 0.25vw), 18px);
+  padding: 0 var(--sidebar-row-padding-x);
   border-radius: 15px;
   color: var(--text-secondary);
   cursor: pointer;

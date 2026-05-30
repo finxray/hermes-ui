@@ -27,9 +27,9 @@
 
 .header {
   display: block;
-  width: min(100%, var(--content-width));
+  min-width: 0;
   min-height: auto;
-  margin: clamp(19px, calc(14px + 0.36vw), 30px) auto 0;
+  margin: clamp(19px, calc(14px + 0.36vw), 30px) clamp(18px, 4vw, 58px) 0;
   background: transparent;
 }
 
@@ -41,9 +41,9 @@
   margin: 0;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: var(--font-title);
-  font-weight: 560;
-  line-height: 1.2;
+  font-size: var(--font-small);
+  font-weight: 450;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

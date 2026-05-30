@@ -131,6 +131,16 @@ Contract docs:
 - `docs/architecture/HERMES_EVENT_NORMALIZATION_PLAN.md`
 - `docs/product/AGENT_ORCHESTRATION_SLICE_PLAN.md`
 
+## Checkpoint: Slice 13B session title and history polish
+
+Slice 13B tightened the local ChatGPT-like project/session history model on
+2026-05-30. New sessions now carry additive title metadata, first-message
+auto-title records its source, manual rename wins over later auto-title, recent
+chat/history rows show derived updated-time metadata, and browser/workspace
+smokes cover the new session-history contract. Stable keys, Hermes session ids,
+Brain Memory scope, Hermes streaming, and BFF boundaries remain unchanged. See
+`docs/product/SESSION_HISTORY_CONTRACT_13B.md`.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

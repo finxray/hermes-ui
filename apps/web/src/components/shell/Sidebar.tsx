@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session, WorkspaceState } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
+import { formatSessionUpdatedAt } from "@/lib/workspaceStore";
 import { SidebarRow, SidebarStatusDot } from "./SidebarRow";
 import styles from "./Sidebar.module.css";
 
@@ -120,6 +121,7 @@ export function Sidebar({
                             active={session.id === activeSession?.id}
                             depth={1}
                             label={session.title}
+                            meta={formatSessionUpdatedAt(session.updatedAt)}
                             onClick={() => actions.switchSession(session.id)}
                           />
                         </li>
@@ -135,7 +137,7 @@ export function Sidebar({
 
       <section className={styles.section} aria-labelledby="chats-heading">
         <div className={styles.sectionLabel} id="chats-heading">
-          <span>Chats</span>
+          <span>Recent chats</span>
         </div>
         <ul className={styles.list}>
           {getRecentChats(allSessions).map((session) => (
@@ -144,6 +146,7 @@ export function Sidebar({
                 active={session.id === activeSession?.id}
                 icon={<MessageSquare size={15} />}
                 label={session.title}
+                meta={formatSessionUpdatedAt(session.updatedAt)}
                 onClick={() => actions.switchSession(session.id)}
               />
             </li>

@@ -303,6 +303,7 @@ export const sessions: Session[] = [
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-roadmap",
     title: "Add memory detail and evidence",
+    titleSource: "mock",
     summary: "Slice planning for the Studio shell and future integration path",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -321,6 +322,7 @@ export const sessions: Session[] = [
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-memory-contract",
     title: "Add read-only UI API",
+    titleSource: "mock",
     summary: "Read-only search, evidence, supersession, and audit endpoints",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -339,6 +341,7 @@ export const sessions: Session[] = [
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-evidence-ui",
     title: "Check crash status",
+    titleSource: "mock",
     summary: "Memory console display rules and trust markers",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -357,6 +360,7 @@ export const sessions: Session[] = [
     projectId: "project-hermes-agent",
     hermesSessionId: "hermes-session-runs-api",
     title: "Polish Codex-style UI",
+    titleSource: "mock",
     summary: "Mapping run lifecycle events into a future tool panel",
     memoryScope: sessionScope(
       "project-hermes-agent",
@@ -375,6 +379,7 @@ export const sessions: Session[] = [
     projectId: "project-hermes-agent",
     hermesSessionId: "hermes-session-approval-flow",
     title: "Initialize Hermes UI repo",
+    titleSource: "mock",
     summary: "Mocking approval controls without wiring real Hermes calls",
     memoryScope: sessionScope(
       "project-hermes-agent",
@@ -395,6 +400,7 @@ export const sessions: Session[] = [
     projectId: "project-packaging",
     hermesSessionId: "hermes-session-desktop-package",
     title: "Remove OpenClaw files",
+    titleSource: "mock",
     summary: "Install, run, and health-check expectations",
     memoryScope: sessionScope(
       "project-packaging",
@@ -415,6 +421,7 @@ export const sessions: Session[] = [
     projectId: "project-packaging",
     hermesSessionId: "hermes-session-audit-hermes-integration",
     title: "Audit Hermes integration",
+    titleSource: "mock",
     summary: "Review Hermes API status, streaming, and BFF boundaries",
     memoryScope: sessionScope(
       "project-packaging",
@@ -435,6 +442,7 @@ export const sessions: Session[] = [
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-integrate-brain-memory",
     title: "Integrate Brain Memory with Hermes",
+    titleSource: "mock",
     summary: "Scope bridge and MCP write propagation",
     memoryScope: sessionScope(
       "project-brain-memory",
@@ -453,6 +461,7 @@ export const sessions: Session[] = [
     projectId: "project-brain-memory",
     hermesSessionId: "hermes-session-config-parse-error",
     title: "Fix config parse error",
+    titleSource: "mock",
     summary: "Local runtime config parsing and diagnostics",
     memoryScope: sessionScope(
       "project-brain-memory",

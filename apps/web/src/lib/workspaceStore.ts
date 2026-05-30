@@ -200,6 +200,7 @@ function createSession(state: WorkspaceState): WorkspaceState {
     projectId: project.id,
     hermesSessionId,
     title,
+    titleSource: "default",
     summary: "Empty local mock session",
     memoryScope: makeSessionMemoryScope({
       project,
@@ -256,6 +257,8 @@ function renameSession(state: WorkspaceState, sessionId: string, title: string):
         ? {
             ...item,
             title: cleanTitle,
+            titleSource: "manual" as const,
+            renamedAt: now,
             summary: item.messages.length === 0 ? "Empty local mock session" : item.summary,
             updatedAt: now
           }
@@ -306,21 +309,7 @@ function appendMessage(
   const next = {
     ...state,
     sessions: state.sessions.map((item) =>
-      item.id === sessionId
-        ? {
-            ...item,
-            messages: [...item.messages, message],
-            summary:
-              item.messages.length === 0 && message.role === "user"
-                ? summarizeMessage(message.content)
-                : item.summary,
-            title:
-              isDefaultSessionTitle(item.title) && message.role === "user"
-                ? summarizeTitle(message.content)
-                : item.title,
-            updatedAt: now
-          }
-        : item
+      item.id === sessionId ? appendMessageToSession(item, message, now) : item
     )
   };
   return touchProject(next, session.projectId, now);
@@ -427,6 +416,7 @@ function normalizeSession(session: Session, projects: Project[]): Session {
   return {
     ...session,
     hermesSessionId: session.hermesSessionId || `hermes-${session.id}`,
+    titleSource: normalizeTitleSource(session),
     memoryScope: {
       ...memoryScope,
       tenantId: memoryScope.tenantId || project?.memoryScope.tenantId || DEFAULT_TENANT_ID,
@@ -449,6 +439,32 @@ export function getVisibleSessions(state: WorkspaceState, projectId: string): Se
   return state.sessions
     .filter((session) => session.projectId === projectId && !session.archivedAt)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function formatSessionUpdatedAt(
+  updatedAt: string,
+  nowMs = Date.now()
+): string {
+  const updatedMs = Date.parse(updatedAt);
+  if (!Number.isFinite(updatedMs)) {
+    return "";
+  }
+
+  const diffMs = Math.max(0, nowMs - updatedMs);
+  const minuteMs = 60_000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+
+  if (diffMs < minuteMs) {
+    return "now";
+  }
+  if (diffMs < hourMs) {
+    return `${Math.floor(diffMs / minuteMs)}min`;
+  }
+  if (diffMs < dayMs) {
+    return `${Math.floor(diffMs / hourMs)}h`;
+  }
+  return `${Math.floor(diffMs / dayMs)}d`;
 }
 
 function selectSessionForProject(
@@ -537,11 +553,52 @@ function isDefaultSessionTitle(title: string): boolean {
   return /^New chat(?: \d+)?$/i.test(title.trim());
 }
 
+function appendMessageToSession(session: Session, message: ChatMessage, now: string): Session {
+  const titleSource = session.titleSource ?? normalizeTitleSource(session);
+  const shouldAutoTitle =
+    message.role === "user" &&
+    titleSource === "default" &&
+    isDefaultSessionTitle(session.title);
+  const nextTitle = shouldAutoTitle ? summarizeTitle(message.content) : session.title;
+
+  return {
+    ...session,
+    messages: [...session.messages, message],
+    summary:
+      session.messages.length === 0 && message.role === "user"
+        ? summarizeMessage(message.content)
+        : session.summary,
+    title: nextTitle,
+    titleSource: shouldAutoTitle ? "first-message" : titleSource,
+    firstUserMessageAt:
+      shouldAutoTitle && !session.firstUserMessageAt ? now : session.firstUserMessageAt,
+    updatedAt: now
+  };
+}
+
+function normalizeTitleSource(session: Session): NonNullable<Session["titleSource"]> {
+  if (session.titleSource) {
+    return session.titleSource;
+  }
+  if (isDefaultSessionTitle(session.title)) {
+    return "default";
+  }
+
+  const firstUserMessage = session.messages?.find((message) => message.role === "user");
+  if (firstUserMessage && summarizeTitle(firstUserMessage.content) === session.title) {
+    return "first-message";
+  }
+
+  return "manual";
+}
+
 function summarizeTitle(content: string): string {
   const clean = summarizeMessage(content)
     .replace(/^(please\s+)?(can|could|would)\s+you\s+/i, "")
     .replace(/^(please\s+)/i, "")
+    .replace(/[`"'()[\]{}<>]/g, "")
     .replace(/[?!.,:;]+$/g, "")
+    .replace(/\s+/g, " ")
     .trim();
   if (!clean) {
     return "New chat";

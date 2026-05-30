@@ -259,6 +259,34 @@ async function checkSidebar() {
   } else {
     addResult("sidebar-chat-click", "warn", "No clickable recent chat rows were available.");
   }
+
+  await checkNewChatQuickAction();
+}
+
+async function checkNewChatQuickAction() {
+  const chatAction = page.getByRole("button", { name: "Chat", exact: true });
+  await chatAction.click({ timeout: timeoutMs });
+  const label = await page.waitForFunction(
+    () => {
+      const rows = Array.from(
+        document.querySelectorAll(
+          'section[aria-labelledby="projects-heading"] ul ul button:not([disabled])'
+        )
+      );
+      const active = rows.find((row) => row.getAttribute("aria-current") === "page");
+      const rawText = active instanceof HTMLElement ? active.innerText : active?.textContent;
+      const text = rawText?.replace(/\s+/g, " ").trim() || "";
+      return /^New chat(?: \d+)?\b/.test(text) ? text : null;
+    },
+    null,
+    { timeout: timeoutMs }
+  ).then((value) => value.jsonValue()).catch(() => "");
+  check(
+    "sidebar-new-chat",
+    /^New chat(?: \d+)?\b/.test(label),
+    `New chat quick action created active child row "${label}".`
+  );
+  await checkNoHorizontalOverflow("sidebar-new-chat-overflow");
 }
 
 async function checkRailToggles() {

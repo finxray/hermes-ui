@@ -78,6 +78,9 @@ export type Session = {
   projectId: string;
   hermesSessionId: string;
   title: string;
+  titleSource?: "default" | "first-message" | "manual" | "mock";
+  firstUserMessageAt?: string;
+  renamedAt?: string;
   summary: string;
   memoryScope: SessionMemoryScope;
   createdAt: string;

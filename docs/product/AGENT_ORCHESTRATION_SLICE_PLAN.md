@@ -15,6 +15,9 @@ commercial-grade Hermes-native orchestration studio.
 Goal: make session history trustworthy and pleasant before deeper agent
 orchestration work.
 
+Status: completed in Slice 13B. See
+`docs/product/SESSION_HISTORY_CONTRACT_13B.md`.
+
 Deliver:
 
 - auto session title from first user message;
@@ -154,13 +157,12 @@ Deliver:
 
 ## Recommended Next Slice
 
-Slice 13B - Session title/history polish.
+Slice 13C - Hermes API capabilities-driven UI mapping.
 
 Reason:
 
-- Session storage and auto-titling are key product features, not optional
-  polish.
-- They improve the daily ChatGPT-like workspace before deeper run/activity
-  plumbing.
-- They are lower risk than approvals/stop/provider selection and do not require
-  changing Hermes streaming logic.
+- Slice 13B made local session title/history behavior explicit and covered.
+- The next orchestration risk is making UI controls and placeholders derive
+  from Hermes capabilities rather than hardcoded assumptions.
+- This prepares later run/activity, stop/cancel, approvals, and provider/model
+  slices without changing Hermes streaming logic prematurely.

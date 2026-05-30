@@ -17,15 +17,24 @@ registerHooks({
 const workspaceStore = await import(
   pathToFileURL("apps/web/src/lib/workspaceStore.ts").toString()
 );
-const { createMockWorkspaceState, getVisibleSessions, workspaceReducer } = workspaceStore;
+const {
+  createMockWorkspaceState,
+  formatSessionUpdatedAt,
+  getVisibleSessions,
+  workspaceReducer
+} = workspaceStore;
 
 const base = createMockWorkspaceState();
 
 checkRenamePreservesStableKeys();
 checkUniqueDefaultTitles();
 checkFirstUserMessageTitleCleanup();
+checkManualRenameWins();
+checkUpdatedAtAndSorting();
+checkDerivedTimestampFormatting();
 checkActiveStateRepair();
 checkNormalizationFillsMemoryScopes();
+checkNormalizationFillsTitleMetadata();
 checkArchiveRepairsActiveSession();
 checkResetReturnsValidState();
 
@@ -53,6 +62,8 @@ function checkRenamePreservesStableKeys() {
   assert.equal(renamedProject?.memoryScopeKey, project.memoryScopeKey);
   assert.equal(renamedSession?.memoryScope.stableSessionKey, session.memoryScope.stableSessionKey);
   assert.equal(renamedSession?.hermesSessionId, session.hermesSessionId);
+  assert.equal(renamedSession?.titleSource, "manual");
+  assert(renamedSession?.renamedAt, "manual rename should record renamedAt");
 }
 
 function checkUniqueDefaultTitles() {
@@ -101,8 +112,93 @@ function checkFirstUserMessageTitleCleanup() {
 
   const updated = state.sessions.find((item) => item.id === session.id);
   assert.equal(updated?.title, "Verify memory scope");
+  assert.equal(updated?.titleSource, "first-message");
+  assert(updated?.firstUserMessageAt, "first-message auto-title should record firstUserMessageAt");
   assert.equal(updated?.memoryScope.stableSessionKey, stableSessionKey);
   assert.equal(updated?.hermesSessionId, hermesSessionId);
+}
+
+function checkManualRenameWins() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const stableSessionKey = session.memoryScope.stableSessionKey;
+  const hermesSessionId = session.hermesSessionId;
+
+  state = workspaceReducer(state, {
+    type: "renameSession",
+    sessionId: session.id,
+    title: "Manual session name"
+  });
+  state = workspaceReducer(state, {
+    type: "appendMessage",
+    sessionId: session.id,
+    message: {
+      id: "msg-manual-wins",
+      role: "user",
+      author: "Alexey",
+      createdAt: "12:01",
+      content: "Can you overwrite this title?",
+      status: "complete"
+    }
+  });
+
+  const updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.title, "Manual session name");
+  assert.equal(updated?.titleSource, "manual");
+  assert.equal(updated?.memoryScope.stableSessionKey, stableSessionKey);
+  assert.equal(updated?.hermesSessionId, hermesSessionId);
+}
+
+function checkUpdatedAtAndSorting() {
+  const project = base.projects[0];
+  const session = base.sessions.find((item) => item.projectId === project.id);
+  assert(session, "mock workspace should include a session for updatedAt checks");
+  const previousUpdatedAt = session.updatedAt;
+
+  let state = workspaceReducer(base, {
+    type: "appendMessage",
+    sessionId: session.id,
+    message: {
+      id: "msg-updated-at",
+      role: "user",
+      author: "Alexey",
+      createdAt: "12:02",
+      content: "Touch this session ordering.",
+      status: "complete"
+    }
+  });
+  const updated = state.sessions.find((item) => item.id === session.id);
+  assert(updated?.updatedAt);
+  assert.notEqual(updated?.updatedAt, previousUpdatedAt);
+
+  const older = {
+    ...session,
+    id: "session-order-older",
+    updatedAt: "2026-05-29T08:00:00.000Z"
+  };
+  const newer = {
+    ...session,
+    id: "session-order-newer",
+    updatedAt: "2026-05-29T12:00:00.000Z"
+  };
+  state = {
+    ...base,
+    sessions: [older, newer],
+    activeProjectId: project.id,
+    activeSessionId: older.id
+  };
+  const visible = getVisibleSessions(state, project.id);
+  assert.equal(visible[0]?.id, newer.id);
+  assert.equal(visible[1]?.id, older.id);
+}
+
+function checkDerivedTimestampFormatting() {
+  const now = Date.parse("2026-05-30T12:00:00.000Z");
+  assert.equal(formatSessionUpdatedAt("2026-05-30T11:59:30.000Z", now), "now");
+  assert.equal(formatSessionUpdatedAt("2026-05-30T11:30:00.000Z", now), "30min");
+  assert.equal(formatSessionUpdatedAt("2026-05-30T07:00:00.000Z", now), "5h");
+  assert.equal(formatSessionUpdatedAt("2026-05-29T12:00:00.000Z", now), "1d");
+  assert.equal(formatSessionUpdatedAt("2026-05-28T12:00:00.000Z", now), "2d");
 }
 
 function checkActiveStateRepair() {
@@ -134,6 +230,26 @@ function checkNormalizationFillsMemoryScopes() {
   assert(normalized.projects[0].memoryScopeKey);
   assert(normalized.sessions[0].memoryScope.stableSessionKey);
   assert(normalized.sessions[0].hermesSessionId);
+  assert.equal(
+    normalized.sessions[0].memoryScope.stableSessionKey.includes(normalized.sessions[0].id),
+    true
+  );
+}
+
+function checkNormalizationFillsTitleMetadata() {
+  const defaultLegacy = structuredClone(base);
+  defaultLegacy.sessions[0].title = "New chat 7";
+  delete defaultLegacy.sessions[0].titleSource;
+
+  const defaultNormalized = workspaceReducer(base, { type: "hydrate", state: defaultLegacy });
+  assert.equal(defaultNormalized.sessions[0].titleSource, "default");
+
+  const manualLegacy = structuredClone(base);
+  delete manualLegacy.sessions[0].titleSource;
+  manualLegacy.sessions[0].title = "User chosen title";
+
+  const manualNormalized = workspaceReducer(base, { type: "hydrate", state: manualLegacy });
+  assert.equal(manualNormalized.sessions[0].titleSource, "manual");
 }
 
 function checkArchiveRepairsActiveSession() {

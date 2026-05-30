@@ -2,20 +2,20 @@
   --density-scale: clamp(1, calc(0.82 + 0.018vw), 1.42);
   --content-width: clamp(560px, 30vw, 912px);
   --composer-width: var(--content-width);
-  --font-xs: clamp(13px, calc(12px + 0.08vw), 16px);
-  --font-small: clamp(14px, calc(12.8px + 0.11vw), 18px);
-  --font-body: clamp(16px, calc(14px + 0.16vw), 22px);
-  --font-ui: clamp(17px, calc(14.5px + 0.18vw), 23px);
-  --font-title: clamp(21px, calc(16.5px + 0.22vw), 28px);
-  --font-section-title: clamp(18px, calc(15px + 0.16vw), 24px);
-  --icon-sm: clamp(16px, calc(14px + 0.12vw), 21px);
-  --icon-md: clamp(19px, calc(16px + 0.16vw), 25px);
-  --icon-lg: clamp(24px, calc(20px + 0.22vw), 32px);
-  --control-height: clamp(38px, calc(32px + 0.42vw), 52px);
-  --row-height: clamp(40px, calc(34px + 0.4vw), 54px);
-  --topbar-height: clamp(64px, calc(54px + 0.65vw), 88px);
-  --rail-width-left: clamp(272px, 14.4vw, 416px);
-  --rail-width-right: clamp(336px, 16.8vw, 496px);
+  --font-xs: clamp(11px, calc(10px + 0.06vw), 13px);
+  --font-small: clamp(12px, calc(10.5px + 0.09vw), 14.5px);
+  --font-body: clamp(13px, calc(11.2px + 0.13vw), 17.5px);
+  --font-ui: clamp(14px, calc(11.6px + 0.14vw), 18.5px);
+  --font-title: clamp(17px, calc(13.2px + 0.18vw), 22.5px);
+  --font-section-title: clamp(14.5px, calc(12px + 0.13vw), 19px);
+  --icon-sm: clamp(13px, calc(11.2px + 0.1vw), 17px);
+  --icon-md: clamp(15px, calc(12.8px + 0.13vw), 20px);
+  --icon-lg: clamp(19px, calc(16px + 0.18vw), 26px);
+  --control-height: clamp(32px, calc(27px + 0.34vw), 42px);
+  --row-height: clamp(34px, calc(28px + 0.32vw), 44px);
+  --topbar-height: clamp(52px, calc(43px + 0.52vw), 70px);
+  --rail-width-left: clamp(218px, 11.5vw, 333px);
+  --rail-width-right: clamp(269px, 13.4vw, 397px);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -111,9 +111,9 @@
 
 @media (max-width: 1180px) {
   .shell {
-    --rail-width-left: 300px;
+    --rail-width-left: 240px;
     --rail-width-right: 0px;
-    grid-template-columns: minmax(0, 300px) minmax(0, 1fr) minmax(0, 0px);
+    grid-template-columns: minmax(0, 240px) minmax(0, 1fr) minmax(0, 0px);
   }
 
   .shell[data-left-collapsed="true"],
@@ -128,7 +128,7 @@
 
 @media (max-width: 760px) {
   .shell {
-    --topbar-height: 72px;
+    --topbar-height: 58px;
     grid-template-areas:
       "top"
       "main";

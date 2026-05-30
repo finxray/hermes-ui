@@ -27,9 +27,9 @@
 
 .header {
   display: block;
-  width: auto;
+  width: min(100%, var(--content-width));
   min-height: auto;
-  margin: clamp(24px, calc(18px + 0.45vw), 38px) clamp(22px, 2.6vw, 42px) 0;
+  margin: clamp(19px, calc(14px + 0.36vw), 30px) auto 0;
   background: transparent;
 }
 

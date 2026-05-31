@@ -554,15 +554,28 @@ Slice 15D passed an opt-in UI-driven live Brain Memory timeline smoke on
 `docs/checkpoints/UI_MEMORY_TIMELINE_LIVE_SMOKE_15D.md`. The smoke runs through
 the visible Web UI composer, verifies a Brain Memory activity block in chat,
 verifies the right-rail Memory timeline, and confirms the live marker through
-Gateway-mediated BFF search/inspect. The smoke currently records a tenant
-alignment warning: the UI workspace tenant is `tenant-local`, while Hermes MCP
-stores through the Gateway under `local-dev`; the same project/session stable
-keys are preserved and different-project search remains negative. No Brain
-Memory mutation/admin UI, direct browser-to-Gateway/storage path, direct
-browser-to-Hermes path, Hermes streaming logic change, Brain Memory BFF change,
-or env secret commit was added. The next recommended slice is Slice 15E: align
-the live Brain Memory tenant/scope contract between the Web UI workspace context
-and Hermes MCP, then make the 15D smoke a strict same-tenant assertion.
+Gateway-mediated BFF search/inspect. The smoke recorded a tenant alignment
+warning that was resolved in Slice 15E. No Brain Memory mutation/admin UI,
+direct browser-to-Gateway/storage path, direct browser-to-Hermes path, Hermes
+streaming logic change, Brain Memory BFF change, or env secret commit was
+added.
+
+## Checkpoint: Slice 15E Brain Memory tenant alignment
+
+Slice 15E aligned the local Web UI tenant/scope contract with Hermes MCP and
+Brain Memory Gateway on 2026-05-31 and recorded the result in
+`docs/checkpoints/BRAIN_MEMORY_TENANT_ALIGNMENT_15E.md`. `local-dev` is now the
+canonical local MVP tenant. New local/mock workspace state uses `local-dev`,
+legacy `tenant-local` localStorage scopes normalize to `local-dev` only for the
+old default stable-key pattern, and project ids, session ids, display titles,
+title metadata, and Hermes session ids are preserved. The live memory timeline
+smoke is now strict same-tenant and passed with 78 checks, 0 warnings, and 0
+failures. No tenant checks were loosened, no Brain Memory mutation/admin UI,
+direct browser-to-Gateway/storage path, direct browser-to-Hermes path, Hermes
+streaming logic change, Brain Memory BFF change, or env secret commit was
+added. The next recommended slice is Slice 15F: add tenant/scope diagnostics
+that compare Web UI, Hermes MCP, and Gateway key posture without printing
+secrets.
 
 ## 5. Recommended technical direction
 

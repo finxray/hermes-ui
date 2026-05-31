@@ -112,6 +112,15 @@ Known tenant note:
   the marker is scoped to the UI project/session keys and is absent from a
   different project search.
 
+Slice 15E follow-up:
+
+- The local MVP canonical tenant is now `local-dev`.
+- New Web UI local/mock workspace state uses `local-dev`.
+- Legacy `tenant-local` localStorage scopes normalize to `local-dev` when they
+  match the old local default stable-key pattern.
+- `npm run smoke:ui:memory-live` is now strict same-tenant and no longer uses
+  the 15D fallback.
+
 ## Route Matrix
 
 | Route | Result |
@@ -174,8 +183,8 @@ are live services and should be left running.
   Hermes run stop capability checks.
 - Provider/model selector polish.
 - Further UI polish.
-- Tenant alignment between the UI mock workspace tenant and the live Hermes MCP
-  Brain Memory tenant.
+- Tenant diagnostics that compare Web UI, Hermes MCP, and Gateway key posture
+  without printing secrets.
 
 ## Next Recommended Slice
 

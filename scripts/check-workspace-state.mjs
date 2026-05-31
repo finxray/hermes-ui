@@ -17,15 +17,20 @@ registerHooks({
 const workspaceStore = await import(
   pathToFileURL("apps/web/src/lib/workspaceStore.ts").toString()
 );
+const memoryScopeBridge = await import(
+  pathToFileURL("apps/web/src/lib/memoryScopeBridge.ts").toString()
+);
 const replayHelpers = await import(
   pathToFileURL("apps/web/src/lib/persistedActivityReplay.ts").toString()
 );
 const {
+  DEFAULT_TENANT_ID,
   createMockWorkspaceState,
   formatSessionUpdatedAt,
   getVisibleSessions,
   workspaceReducer
 } = workspaceStore;
+const { buildMemoryScopeBridgeInstruction } = memoryScopeBridge;
 const { createSessionExportPreview } = replayHelpers;
 
 const base = createMockWorkspaceState();
@@ -37,6 +42,9 @@ checkManualRenameWins();
 checkUpdatedAtAndSorting();
 checkDerivedTimestampFormatting();
 checkActiveStateRepair();
+checkDefaultTenant();
+checkLegacyTenantNormalization();
+checkMemoryScopeBridgeTenant();
 checkNormalizationFillsMemoryScopes();
 checkNormalizationFillsTitleMetadata();
 checkRunRecordPersistence();
@@ -222,6 +230,91 @@ function checkActiveStateRepair() {
       )
     );
   }
+}
+
+function checkDefaultTenant() {
+  assert.equal(DEFAULT_TENANT_ID, "local-dev");
+  assert.notEqual(DEFAULT_TENANT_ID, "*");
+  assert.equal(base.projects[0].memoryScope.tenantId, DEFAULT_TENANT_ID);
+  assert.equal(base.sessions[0].memoryScope.tenantId, DEFAULT_TENANT_ID);
+  assert(base.projects[0].memoryScope.stableProjectKey.includes("studio:local-dev:project:"));
+  assert(base.sessions[0].memoryScope.stableSessionKey.includes("studio:local-dev:project:"));
+}
+
+function checkLegacyTenantNormalization() {
+  const legacy = structuredClone(base);
+  const project = legacy.projects[0];
+  const session = legacy.sessions.find((item) => item.projectId === project.id);
+  assert(session, "legacy normalization check needs a project session");
+
+  const projectId = project.id;
+  const sessionId = session.id;
+  const projectTitle = project.name;
+  const sessionTitle = session.title;
+  const hermesSessionId = session.hermesSessionId;
+
+  project.memoryScopeKey = `studio:tenant-local:project:${projectId}`;
+  project.memoryScope.tenantId = "tenant-local";
+  project.memoryScope.stableProjectKey = `studio:tenant-local:project:${projectId}`;
+  session.memoryScope.tenantId = "tenant-local";
+  session.memoryScope.stableSessionKey =
+    `studio:tenant-local:project:${projectId}:session:${sessionId}`;
+
+  const normalized = workspaceReducer(base, { type: "hydrate", state: legacy });
+  const normalizedProject = normalized.projects.find((item) => item.id === projectId);
+  const normalizedSession = normalized.sessions.find((item) => item.id === sessionId);
+
+  assert.equal(normalizedProject?.id, projectId);
+  assert.equal(normalizedProject?.name, projectTitle);
+  assert.equal(normalizedProject?.memoryScope.tenantId, DEFAULT_TENANT_ID);
+  assert.equal(
+    normalizedProject?.memoryScope.stableProjectKey,
+    `studio:local-dev:project:${projectId}`
+  );
+  assert.equal(normalizedProject?.memoryScopeKey, `studio:local-dev:project:${projectId}`);
+  assert.equal(normalizedSession?.id, sessionId);
+  assert.equal(normalizedSession?.title, sessionTitle);
+  assert.equal(normalizedSession?.hermesSessionId, hermesSessionId);
+  assert.equal(normalizedSession?.memoryScope.tenantId, DEFAULT_TENANT_ID);
+  assert.equal(
+    normalizedSession?.memoryScope.stableSessionKey,
+    `studio:local-dev:project:${projectId}:session:${sessionId}`
+  );
+}
+
+function checkMemoryScopeBridgeTenant() {
+  const project = base.projects[0];
+  const session = base.sessions.find((item) => item.projectId === project.id);
+  assert(session, "memory scope bridge check needs a project session");
+
+  const instruction = buildMemoryScopeBridgeInstruction({
+    project: {
+      id: project.id,
+      title: project.name,
+      stableKey: project.memoryScope.stableProjectKey,
+      tenantId: project.memoryScope.tenantId,
+      retrievalProfile: project.memoryScope.retrievalProfile,
+      contextPolicy: project.memoryScope.contextPolicy,
+      pinnedMemoryIds: project.memoryScope.pinnedMemoryIds
+    },
+    session: {
+      id: session.id,
+      title: session.title,
+      stableKey: session.memoryScope.stableSessionKey,
+      hermesSessionId: session.hermesSessionId,
+      includeProjectContext: session.memoryScope.includeProjectContext,
+      includeSessionContext: session.memoryScope.includeSessionContext
+    },
+    ui: {
+      source: "hermes-ui",
+      workspaceVersion: 1
+    }
+  });
+
+  assert(instruction.includes("- tenantId: local-dev"));
+  assert(instruction.includes(`projectKey="${project.memoryScope.stableProjectKey}"`));
+  assert(instruction.includes(`sessionKey="${session.memoryScope.stableSessionKey}"`));
+  assert(!instruction.includes("tenant-local"));
 }
 
 function checkNormalizationFillsMemoryScopes() {

@@ -540,7 +540,7 @@ async function checkComposer() {
 }
 
 async function runLiveMemoryTimelineSmoke({ sendButton }) {
-  const marker = `BM_UI_MEMORY_TIMELINE_15D_${timestampMarker()}_${randomMarker()}`;
+  const marker = `BM_UI_MEMORY_TIMELINE_15E_${timestampMarker()}_${randomMarker()}`;
   const ackMarker = "BM_UI_MEMORY_TIMELINE_STORED";
   const message = `Store this harmless UI timeline marker in Brain Memory exactly: ${marker}. Then reply ${ackMarker}.`;
   const textarea = page.getByLabel("Message", { exact: true });
@@ -660,42 +660,14 @@ async function checkBrainMemoryMarkerSearch(marker) {
     `Using current UI scope project=${context.project.stableKey}, session=${context.session?.stableKey || "none"}.`
   );
 
-  let search = await postJson("/api/brain-memory/search", {
+  const search = await postJson("/api/brain-memory/search", {
     context,
     limit: 10,
     query: marker
   });
-  let effectiveContext = context;
-  let markerResults = Array.isArray(search.body?.results)
+  const markerResults = Array.isArray(search.body?.results)
     ? search.body.results.filter((result) => JSON.stringify(result).includes(marker))
     : [];
-  if (markerResults.length === 0 && context.project.tenantId !== "local-dev") {
-    const localDevContext = {
-      ...context,
-      project: {
-        ...context.project,
-        tenantId: "local-dev"
-      }
-    };
-    const localDevSearch = await postJson("/api/brain-memory/search", {
-      context: localDevContext,
-      limit: 10,
-      query: marker
-    });
-    const localDevMarkerResults = Array.isArray(localDevSearch.body?.results)
-      ? localDevSearch.body.results.filter((result) => JSON.stringify(result).includes(marker))
-      : [];
-    if (localDevMarkerResults.length > 0) {
-      addResult(
-        "memory-live-bff-search-ui-tenant",
-        "warn",
-        `UI tenant ${context.project.tenantId} did not return marker; Hermes MCP stored it under local-dev with the same project/session keys.`
-      );
-      search = localDevSearch;
-      effectiveContext = localDevContext;
-      markerResults = localDevMarkerResults;
-    }
-  }
   const first = markerResults[0] ?? search.body?.results?.[0];
   const searchOk = search.ok && search.body?.mode === "real" && markerResults.length > 0;
   addResult(
@@ -710,8 +682,27 @@ async function checkBrainMemoryMarkerSearch(marker) {
     return;
   }
 
+  const searchTenant = search.body?.scope?.tenantId;
+  check(
+    "memory-live-bff-search-tenant",
+    !searchTenant || searchTenant === context.project.tenantId,
+    searchTenant
+      ? `BFF search scope tenant matched UI tenant ${context.project.tenantId}.`
+      : "BFF search response did not expose tenant; strict tenant behavior is verified by same-context search success and no fallback."
+  );
+  const resultProjectOk = !first.projectKey || first.projectKey === context.project.stableKey;
+  const resultSessionOk = !first.sessionKey || first.sessionKey === context.session?.stableKey;
+  const resultScopeOk =
+    first.scopeStatus === "matching-session" ||
+    (!first.scopeStatus && resultProjectOk && resultSessionOk);
+  check(
+    "memory-live-bff-result-scope",
+    resultProjectOk && resultSessionOk && resultScopeOk,
+    `Search result scope project=${first.projectKey || "unknown"}, session=${first.sessionKey || "none"}, status=${first.scopeStatus || "unknown"}.`
+  );
+
   const inspect = await postJson("/api/brain-memory/memory/inspect", {
-    context: effectiveContext,
+    context,
     memoryId: first.id
   });
   const detail = inspect.body?.detail;
@@ -725,15 +716,24 @@ async function checkBrainMemoryMarkerSearch(marker) {
   );
   if (inspectOk) {
     const scopeText = `project=${detail.projectKey || "unknown"}, session=${detail.sessionKey || "none"}, scope=${detail.scopeStatus || "unknown"}`;
-    addResult("memory-live-inspect-scope", "pass", `Inspect scope: ${scopeText}.`);
+    const detailTenant = detail.scope?.tenantId;
+    const tenantOk = !detailTenant || detailTenant === context.project.tenantId;
+    const projectOk = detail.projectKey === context.project.stableKey;
+    const sessionOk = detail.sessionKey === context.session?.stableKey;
+    const scopeOk = detail.scopeStatus === "matching-session";
+    addResult(
+      "memory-live-inspect-scope",
+      tenantOk && projectOk && sessionOk && scopeOk ? "pass" : "fail",
+      `${scopeText}${detailTenant ? `, tenant=${detailTenant}` : ""}.`
+    );
   }
 
   const differentProjectContext = {
-    ...effectiveContext,
+    ...context,
     project: {
-      ...effectiveContext.project,
-      id: `${effectiveContext.project.id}-different`,
-      stableKey: `${effectiveContext.project.stableKey}:different`
+      ...context.project,
+      id: `${context.project.id}-different`,
+      stableKey: `${context.project.stableKey}:different`
     }
   };
   const differentProjectSearch = await postJson("/api/brain-memory/search", {
@@ -1277,7 +1277,7 @@ async function currentBrainMemoryContext() {
         id: project.id,
         retrievalProfile: project.memoryScope?.retrievalProfile || "balanced",
         stableKey: project.memoryScope?.stableProjectKey || project.memoryScopeKey || project.id,
-        tenantId: project.memoryScope?.tenantId || "tenant-local",
+        tenantId: project.memoryScope?.tenantId || "local-dev",
         title: project.name
       },
       session: {

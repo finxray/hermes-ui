@@ -559,10 +559,10 @@ function checkSessionExportPreviewShape() {
     createdAt: "2026-05-30T00:00:00.000Z",
     updatedAt: "2026-05-30T00:00:10.000Z",
     memoryScope: {
-      tenantId: "tenant-local",
+      tenantId: "local-dev",
       projectId: "project-export",
       sessionId: "session-export",
-      stableSessionKey: "studio:tenant-local:project:project-export:session:session-export",
+      stableSessionKey: "studio:local-dev:project:project-export:session:session-export",
       includeProjectContext: true,
       includeSessionContext: true
     },

@@ -105,6 +105,16 @@ Memory scope remains stable-key based:
 - title changes do not change project or session scope;
 - title changes do not affect the memory-scope instruction bridge.
 
+Slice 15E tenant alignment keeps these identity rules while aligning the local
+MVP tenant with Hermes MCP and Brain Memory Gateway:
+
+- new local/default workspace scopes use tenant `local-dev`;
+- legacy local `tenant-local` scopes normalize to `local-dev` only when their
+  stable keys match the old local default pattern;
+- project ids, session ids, display titles, title metadata, and Hermes session
+  ids are preserved;
+- custom tenant/stable-key values are not rewritten by the local migration.
+
 ## History Ordering
 
 Visible sessions inside a project are sorted by `updatedAt` descending.

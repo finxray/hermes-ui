@@ -253,6 +253,12 @@ tenant-authorized read key into the Web UI server process as
 it to browser JavaScript. Prefer a temporary process env when verifying a live
 reconnect so `apps/web/.env.local` does not need to change.
 
+For the local MVP contract, the canonical tenant is `local-dev`. The Web UI
+local/mock workspace, Hermes MCP default tenant, and Gateway read/search
+context should agree on `local-dev`. Legacy browser-local workspaces that used
+the old default `tenant-local` are normalized on load when they match the old
+default stable-key pattern.
+
 Verify through the Web UI BFF:
 
 ```powershell

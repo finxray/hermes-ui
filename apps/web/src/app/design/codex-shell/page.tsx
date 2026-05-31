@@ -202,7 +202,7 @@ export default function CodexShellPrototypePage() {
             </article>
           ))}
           <p className={styles.scopeLine}>
-            Scope: studio:tenant-local:project:project-brain-memory / Route: Browser to BFF to
+            Scope: studio:local-dev:project:project-brain-memory / Route: Browser to BFF to
             Hermes
           </p>
         </div>

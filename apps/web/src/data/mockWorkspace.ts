@@ -11,7 +11,7 @@ import type {
 
 const createdAt = "2026-05-29T09:00:00.000Z";
 const updatedAt = "2026-05-29T09:18:00.000Z";
-const tenantId = "tenant-local";
+const tenantId = "local-dev";
 
 function projectScope(
   projectId: string,
@@ -56,7 +56,7 @@ export const projects: Project[] = [
     name: "brain-memory",
     description: "Gateway-scoped persistent memory and UI console",
     icon: "BM",
-    memoryScopeKey: "studio:tenant-local:project:project-brain-memory",
+    memoryScopeKey: "studio:local-dev:project:project-brain-memory",
     memoryScope: projectScope(
       "project-brain-memory",
       "Use canonical architecture and Gateway contract notes before session-local chat history.",
@@ -72,7 +72,7 @@ export const projects: Project[] = [
     name: "hermes-ui",
     description: "API server, runs, approvals, and tool events",
     icon: "HA",
-    memoryScopeKey: "studio:tenant-local:project:project-hermes-agent",
+    memoryScopeKey: "studio:local-dev:project:project-hermes-agent",
     memoryScope: projectScope(
       "project-hermes-agent",
       "Prefer Hermes API discovery, run events, and session continuity facts.",
@@ -88,7 +88,7 @@ export const projects: Project[] = [
     name: "projects",
     description: "Local desktop, Docker, and release workflow",
     icon: "PK",
-    memoryScopeKey: "studio:tenant-local:project:project-packaging",
+    memoryScopeKey: "studio:local-dev:project:project-packaging",
     memoryScope: projectScope(
       "project-packaging",
       "Keep setup, environment, and release packaging context scoped away from agent-runtime design.",
@@ -103,7 +103,7 @@ export const projects: Project[] = [
     name: "integrations  brain-memory",
     description: "External service wiring and optional Brain Memory attach mode",
     icon: "IN",
-    memoryScopeKey: "studio:tenant-local:project:project-integrations",
+    memoryScopeKey: "studio:local-dev:project:project-integrations",
     memoryScope: projectScope(
       "project-integrations",
       "Integration context should stay provider-neutral and keep optional services decoupled.",

@@ -115,7 +115,7 @@ Implemented now:
 - Hermes session continuity uses the path id in
   `/api/sessions/{hermes_session_id}/chat/stream`.
 - `X-Hermes-Session-Key` is set to the project stable key, for example
-  `studio:tenant-local:project:project-brain-memory`.
+  `studio:local-dev:project:project-brain-memory`.
 - The request body includes a `metadata.context` object with the structured
   project/session/UI metadata.
 - Slice 08D adds a temporary BFF memory-scope bridge. When

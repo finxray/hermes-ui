@@ -16,7 +16,9 @@ import type {
 
 export const WORKSPACE_STORAGE_KEY = "hermes-ui.workspace.v1";
 export const WORKSPACE_STORAGE_VERSION = 1;
-export const DEFAULT_TENANT_ID = "tenant-local";
+export const DEFAULT_TENANT_ID = "local-dev";
+
+const LEGACY_LOCAL_TENANT_ID = "tenant-local";
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|credential|password|secret|token/i;
 const BEARER_VALUE_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
@@ -472,16 +474,26 @@ function touchProject(state: WorkspaceState, projectId: string, updatedAt: strin
 
 function normalizeProject(project: Project): Project {
   const memoryScope = project.memoryScope ?? makeProjectMemoryScope(project);
-  const memoryScopeKey = project.memoryScopeKey || memoryScope.stableProjectKey;
+  const tenantId = normalizeTenantId(memoryScope.tenantId);
+  const stableProjectKey = normalizeProjectStableKey(
+    memoryScope.stableProjectKey || project.memoryScopeKey,
+    tenantId,
+    project.id
+  );
+  const memoryScopeKey = normalizeProjectStableKey(
+    project.memoryScopeKey || memoryScope.stableProjectKey,
+    tenantId,
+    project.id
+  );
 
   return {
     ...project,
     memoryScopeKey,
     memoryScope: {
       ...memoryScope,
-      tenantId: memoryScope.tenantId || DEFAULT_TENANT_ID,
+      tenantId,
       projectId: memoryScope.projectId || project.id,
-      stableProjectKey: memoryScope.stableProjectKey || memoryScopeKey,
+      stableProjectKey,
       retrievalProfile: memoryScope.retrievalProfile || "balanced",
       pinnedMemoryIds: memoryScope.pinnedMemoryIds ?? [],
       contextPolicy: memoryScope.contextPolicy || "balanced"
@@ -498,6 +510,15 @@ function normalizeSession(session: Session, projects: Project[]): Session {
       sessionId: session.id,
       title: session.title
     });
+  const tenantId = normalizeTenantId(
+    memoryScope.tenantId || project?.memoryScope.tenantId || DEFAULT_TENANT_ID
+  );
+  const stableSessionKey = normalizeSessionStableKey(
+    memoryScope.stableSessionKey,
+    tenantId,
+    session.projectId,
+    session.id
+  );
 
   return {
     ...session,
@@ -505,12 +526,10 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     titleSource: normalizeTitleSource(session),
     memoryScope: {
       ...memoryScope,
-      tenantId: memoryScope.tenantId || project?.memoryScope.tenantId || DEFAULT_TENANT_ID,
+      tenantId,
       projectId: memoryScope.projectId || session.projectId,
       sessionId: memoryScope.sessionId || session.id,
-      stableSessionKey:
-        memoryScope.stableSessionKey ||
-        makeSessionStableKey(project?.memoryScope.tenantId ?? DEFAULT_TENANT_ID, session.projectId, session.id),
+      stableSessionKey,
       includeProjectContext: memoryScope.includeProjectContext !== false,
       includeSessionContext: memoryScope.includeSessionContext !== false
     },
@@ -696,6 +715,38 @@ function makeProjectStableKey(tenantId: string, projectId: string): string {
 
 function makeSessionStableKey(tenantId: string, projectId: string, sessionId: string): string {
   return `studio:${tenantId}:project:${projectId}:session:${sessionId}`;
+}
+
+function normalizeTenantId(value: string): string {
+  const tenantId = value || DEFAULT_TENANT_ID;
+  return tenantId === LEGACY_LOCAL_TENANT_ID ? DEFAULT_TENANT_ID : tenantId;
+}
+
+function normalizeProjectStableKey(
+  value: string | undefined,
+  tenantId: string,
+  projectId: string
+): string {
+  const stableKey = value || "";
+  const legacyStableKey = makeProjectStableKey(LEGACY_LOCAL_TENANT_ID, projectId);
+  if (!stableKey || stableKey === legacyStableKey) {
+    return makeProjectStableKey(tenantId, projectId);
+  }
+  return stableKey;
+}
+
+function normalizeSessionStableKey(
+  value: string | undefined,
+  tenantId: string,
+  projectId: string,
+  sessionId: string
+): string {
+  const stableKey = value || "";
+  const legacyStableKey = makeSessionStableKey(LEGACY_LOCAL_TENANT_ID, projectId, sessionId);
+  if (!stableKey || stableKey === legacyStableKey) {
+    return makeSessionStableKey(tenantId, projectId, sessionId);
+  }
+  return stableKey;
 }
 
 function normalizeArtifactKind(value: unknown): Artifact["kind"] {

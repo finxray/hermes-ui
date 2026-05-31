@@ -2,18 +2,44 @@
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { registerHooks } from "node:module";
 
 const root = resolve(process.cwd());
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    const resolvedAlias = resolveTsAlias(specifier);
+    if (resolvedAlias) {
+      return {
+        shortCircuit: true,
+        url: pathToFileURL(resolvedAlias).toString()
+      };
+    }
+
+    const resolvedRelative = resolveRelativeTs(specifier, context.parentURL);
+    if (resolvedRelative) {
+      return {
+        shortCircuit: true,
+        url: pathToFileURL(resolvedRelative).toString()
+      };
+    }
+
+    return nextResolve(specifier, context);
+  }
+});
+
+const disabledRouteResponseValidation = await import(
+  pathToFileURL(resolve(root, "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts")).toString()
+);
+
 const args = parseArgs(process.argv.slice(2));
 const routePath = "apps/web/src/app/api/hermes/runs/chat/stream/route.ts";
 const sessionRoutePath = "apps/web/src/app/api/hermes/chat/stream/route.ts";
 const experimentalRoutePath = "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts";
 const routeUrlPath = "/api/hermes/runs/chat/stream";
-const validDisabledRequestBody = {
-  agentAccessMode: "ask_before_tools",
-  clientRunId: "client-run-route-guard-16q",
-  hermesSessionId: "hermes-session-route-guard-16q",
+const validMinimalDisabledRequestBody = {
   memoryScope: {
     includeProjectContext: true,
     includeSessionContext: true,
@@ -21,7 +47,16 @@ const validDisabledRequestBody = {
     stableSessionKey: "session-stable-route-guard-16q",
     tenantId: "local-dev"
   },
-  message: "Validate that the disabled route stays disabled for a valid future Runs request.",
+  message: "Validate that the disabled route stays disabled for a valid minimal Runs request.",
+  projectId: "project-route-guard-16q",
+  sessionId: "session-route-guard-16q"
+};
+const validFullFutureDisabledRequestBody = {
+  ...validMinimalDisabledRequestBody,
+  agentAccessMode: "ask_before_tools",
+  clientRunId: "client-run-route-guard-16q",
+  hermesSessionId: "hermes-session-route-guard-16q",
+  message: "Validate that the disabled route stays disabled for a valid full future Runs request.",
   model: "future-model-disabled",
   options: {
     includeActivity: true,
@@ -29,25 +64,33 @@ const validDisabledRequestBody = {
     stream: true,
     timeoutMs: 30_000
   },
-  projectId: "project-route-guard-16q",
-  provider: "future-provider-disabled",
-  sessionId: "session-route-guard-16q"
+  provider: "future-provider-disabled"
 };
+const validDisabledRequestBody = validFullFutureDisabledRequestBody;
 const invalidDisabledRequestBody = {
-  ...validDisabledRequestBody,
+  ...validFullFutureDisabledRequestBody,
   agentAccessMode: "unbounded_runtime_access"
 };
 const validChatOnlyDisabledRequestBody = {
-  ...validDisabledRequestBody,
+  ...validMinimalDisabledRequestBody,
   agentAccessMode: "chat_only"
 };
 const validFullAccessDisabledRequestBody = {
-  ...validDisabledRequestBody,
+  ...validFullFutureDisabledRequestBody,
   agentAccessMode: "full_access"
 };
+const invalidMissingScopeDisabledRequestBody = {
+  message: "Validate that missing scope remains a disabled validation failure.",
+  projectId: "project-route-guard-16q",
+  sessionId: "session-route-guard-16q"
+};
 const credentialDisabledRequestBody = {
-  ...validDisabledRequestBody,
+  ...validFullFutureDisabledRequestBody,
   apiKey: "fixture-credential-value"
+};
+const oversizedMessageDisabledRequestBody = {
+  ...validMinimalDisabledRequestBody,
+  message: "x".repeat(8_001)
 };
 
 const sourceResult = checkSourceGuard();
@@ -128,19 +171,38 @@ function checkSourceGuard() {
 
 async function checkLiveGuard(baseUrl) {
   const url = new URL(routeUrlPath, normalizeBaseUrl(baseUrl));
-  const validBody = await postDisabledRoute(url, validDisabledRequestBody);
+  const minimalBody = await postDisabledRoute(url, validMinimalDisabledRequestBody, {
+    expectedErrorKinds: [],
+    expectedRequestValidationOk: true
+  });
+  assertDisabledEnvelope(minimalBody);
+  assertNoEnabledAgentAccess(minimalBody);
+  assert.equal(minimalBody.requestValidation?.attempted, true, "Valid minimal request should be validation-checked.");
+  assert.equal(minimalBody.requestValidation?.ok, true, "Valid minimal request should have validation ok posture.");
+  assert.deepEqual(minimalBody.requestValidation?.errorKinds, [], "Valid minimal request should not report validation errors.");
+
+  const validBody = await postDisabledRoute(url, validDisabledRequestBody, {
+    expectedErrorKinds: [],
+    expectedRequestValidationOk: true
+  });
   assertDisabledEnvelope(validBody);
   assertNoEnabledAgentAccess(validBody);
   assert.equal(validBody.requestValidation?.attempted, true, "Valid request should be validation-checked.");
   assert.equal(validBody.requestValidation?.ok, true, "Valid request should have validation ok posture.");
   assert.deepEqual(validBody.requestValidation?.errorKinds, [], "Valid request should not report validation errors.");
 
-  const chatOnlyBody = await postDisabledRoute(url, validChatOnlyDisabledRequestBody);
+  const chatOnlyBody = await postDisabledRoute(url, validChatOnlyDisabledRequestBody, {
+    expectedErrorKinds: [],
+    expectedRequestValidationOk: true
+  });
   assertDisabledEnvelope(chatOnlyBody);
   assertNoEnabledAgentAccess(chatOnlyBody);
   assert.equal(chatOnlyBody.requestValidation?.ok, true, "chat_only should validate but stay disabled.");
 
-  const fullAccessBody = await postDisabledRoute(url, validFullAccessDisabledRequestBody);
+  const fullAccessBody = await postDisabledRoute(url, validFullAccessDisabledRequestBody, {
+    expectedErrorKinds: [],
+    expectedRequestValidationOk: true
+  });
   assertDisabledEnvelope(fullAccessBody);
   assertNoEnabledAgentAccess(fullAccessBody);
   assert.equal(fullAccessBody.requestValidation?.ok, true, "full_access should validate but stay disabled.");
@@ -148,7 +210,10 @@ async function checkLiveGuard(baseUrl) {
   assert.equal(fullAccessBody.execution?.hermesCalled, false, "full_access must not call Hermes while disabled.");
   assert.equal(fullAccessBody.execution?.brainMemoryCalled, false, "full_access must not call Brain Memory while disabled.");
 
-  const invalidBody = await postDisabledRoute(url, invalidDisabledRequestBody);
+  const invalidBody = await postDisabledRoute(url, invalidDisabledRequestBody, {
+    expectedErrorKinds: ["invalid_agent_access_mode"],
+    expectedRequestValidationOk: false
+  });
   assertDisabledEnvelope(invalidBody);
   assertNoEnabledAgentAccess(invalidBody);
   assert.equal(invalidBody.requestValidation?.attempted, true, "Invalid request should be validation-checked.");
@@ -159,7 +224,23 @@ async function checkLiveGuard(baseUrl) {
     "Invalid request should report invalid_agent_access_mode."
   );
 
-  const credentialBody = await postDisabledRoute(url, credentialDisabledRequestBody);
+  const missingScopeBody = await postDisabledRoute(url, invalidMissingScopeDisabledRequestBody, {
+    expectedErrorKinds: ["missing_memory_scope"],
+    expectedRequestValidationOk: false
+  });
+  assertDisabledEnvelope(missingScopeBody);
+  assertNoEnabledAgentAccess(missingScopeBody);
+  assert.equal(missingScopeBody.requestValidation?.ok, false, "Missing scope request should fail validation posture.");
+  assert.equal(
+    missingScopeBody.requestValidation?.errorKinds?.includes("missing_memory_scope"),
+    true,
+    "Missing scope request should report missing_memory_scope."
+  );
+
+  const credentialBody = await postDisabledRoute(url, credentialDisabledRequestBody, {
+    expectedErrorKinds: ["forbidden_credential_field"],
+    expectedRequestValidationOk: false
+  });
   assertDisabledEnvelope(credentialBody);
   assertNoEnabledAgentAccess(credentialBody);
   assert.equal(credentialBody.requestValidation?.ok, false, "Credential request should have validation failure posture.");
@@ -169,10 +250,23 @@ async function checkLiveGuard(baseUrl) {
     "Credential request should report forbidden_credential_field."
   );
 
+  const oversizedBody = await postDisabledRoute(url, oversizedMessageDisabledRequestBody, {
+    expectedErrorKinds: ["message_too_large"],
+    expectedRequestValidationOk: false
+  });
+  assertDisabledEnvelope(oversizedBody);
+  assertNoEnabledAgentAccess(oversizedBody);
+  assert.equal(oversizedBody.requestValidation?.ok, false, "Oversized request should have validation failure posture.");
+  assert.equal(
+    oversizedBody.requestValidation?.errorKinds?.includes("message_too_large"),
+    true,
+    "Oversized request should report message_too_large."
+  );
+
   return `${url.toString()} returned disabled HTTP 501 JSON.`;
 }
 
-async function postDisabledRoute(url, body) {
+async function postDisabledRoute(url, body, validationOptions) {
   const response = await fetch(url, {
     body: JSON.stringify(body),
     headers: {
@@ -184,7 +278,17 @@ async function postDisabledRoute(url, body) {
   assert.equal(response.status, 501, `${url.toString()} should return HTTP 501 while disabled.`);
   assert.equal(contentType.includes("application/json"), true, "Disabled route should return JSON, not SSE.");
   assert.equal(contentType.includes("text/event-stream"), false, "Disabled route must not start an event stream.");
-  return response.json();
+  const responseBody = await response.json();
+  const validationResult = disabledRouteResponseValidation.validateHermesRunsDisabledRouteResponse(responseBody, {
+    ...validationOptions,
+    httpStatus: response.status
+  });
+  assert.deepEqual(
+    validationResult,
+    { errors: [], ok: true },
+    `Disabled route response contract failed: ${validationResult.ok ? "" : validationResult.errors.join("; ")}`
+  );
+  return responseBody;
 }
 
 function assertDisabledEnvelope(body) {
@@ -297,4 +401,28 @@ function parseArgs(argv) {
 
 function normalizeBaseUrl(baseUrl) {
   return baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+}
+
+function resolveTsAlias(specifier) {
+  if (!specifier.startsWith("@/")) {
+    return null;
+  }
+  return resolveTsCandidate(resolve(root, "apps/web/src", specifier.slice(2)));
+}
+
+function resolveRelativeTs(specifier, parentUrl) {
+  if (!parentUrl || (!specifier.startsWith("./") && !specifier.startsWith("../"))) {
+    return null;
+  }
+  const parentPath = fileURLToPath(parentUrl);
+  return resolveTsCandidate(resolve(dirname(parentPath), specifier));
+}
+
+function resolveTsCandidate(candidate) {
+  for (const path of [candidate, `${candidate}.ts`, `${candidate}.tsx`, resolve(candidate, "index.ts")]) {
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+  return null;
 }

@@ -699,13 +699,48 @@ Boundaries:
 - no approval buttons;
 - no direct browser-to-Hermes/Gateway/storage path.
 
+### 16U - Disabled Runs Lifecycle Route-Response Fixture And Migration Gate Checklist
+
+Goal: pin representative disabled route responses and the migration checklist
+before any production Runs runtime implementation.
+
+Status: completed in Slice 16U. See
+`docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md`.
+
+Deliver:
+
+- `hermesRunsDisabledRouteResponseFixtures` for valid minimal, valid full
+  future, missing memory scope, credential-like field, and oversized message
+  cases;
+- pure `validateHermesRunsDisabledRouteResponse` helper;
+- route guard live checks for valid minimal/full, invalid missing scope,
+  credential-like, and oversized request bodies;
+- migration gates for production route implementation and default migration;
+- source checks proving the disabled route still returns HTTP 501 and does not
+  call Hermes, Brain Memory Gateway, storage, service env, or the memory scope
+  bridge.
+
+Boundaries:
+
+- no production Runs execution runtime;
+- no Hermes run creation;
+- no Hermes or Brain Memory Gateway call from the disabled route;
+- no memory scope bridge import from the disabled route;
+- no service env secret read from the disabled route;
+- no change to `/api/hermes/chat/stream`;
+- no production composer switch;
+- no composer Agent access selector UI;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path.
+
 ## Recommended Next Slice
 
-Slice 16U - disabled Runs lifecycle route-response fixture and migration gate
-checklist.
+Slice 16V - production Runs implementation ADR and feature-flag contract.
 
 Reason:
 
-- Slice 16T adds a no-runtime lifecycle dry-run posture to the disabled route.
-- The next safe step is to pin representative route-response fixtures and a
-  migration gate checklist before any experimental-to-production bridge.
+- Slice 16U pins the disabled route response contract and production migration
+  gates.
+- The next safe step is a docs/check-only ADR that names the exact production
+  Runs feature flag, rollback posture, live smoke gates, and implementation
+  acceptance criteria before any runtime code is added.

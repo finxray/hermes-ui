@@ -36,6 +36,12 @@ const lifecycle = await import(
 const fixtures = await import(
   pathToFileURL(resolve(root, "apps/web/src/data/hermesRunsBffLifecycleFixtures.ts")).toString()
 );
+const disabledRouteResponseFixtures = await import(
+  pathToFileURL(resolve(root, "apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts")).toString()
+);
+const disabledRouteResponseValidation = await import(
+  pathToFileURL(resolve(root, "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts")).toString()
+);
 
 const checks = [];
 const expectedStages = [
@@ -60,6 +66,8 @@ const runtimeStages = expectedStages.filter((stage) => stage !== "validate_reque
 checkAllLifecycleStagesDefined();
 checkFixtureMatrix();
 checkRuntimeStagesNotExecuted();
+checkDisabledRouteResponseFixtures();
+checkDisabledRouteResponseSourcePurity();
 checkDisabledReasonAndNoSecrets();
 checkSourcePurity();
 checkDisabledRouteLifecyclePosture();
@@ -127,6 +135,65 @@ function checkRuntimeStagesNotExecuted() {
     "runtime-stages-not-executed",
     ok && plans.every(allRuntimeExecutionFalse),
     "all runtime lifecycle stages and runtime execution flags remain false while the route is disabled."
+  );
+}
+
+function checkDisabledRouteResponseFixtures() {
+  const routeResponseFixtures = disabledRouteResponseFixtures.hermesRunsDisabledRouteResponseFixtures;
+  const expectedNames = [
+    "valid-minimal-disabled-route-response",
+    "valid-full-future-disabled-route-response",
+    "invalid-missing-scope-disabled-route-response",
+    "credential-field-disabled-route-response",
+    "oversized-message-disabled-route-response"
+  ];
+  const results = routeResponseFixtures.map((fixture) => {
+    const result = disabledRouteResponseValidation.validateHermesRunsDisabledRouteResponse(fixture.response, {
+      expectedErrorKinds: fixture.expectedErrorKinds,
+      expectedRequestValidationOk: fixture.expectedRequestValidationOk,
+      httpStatus: fixture.httpStatus
+    });
+    return result.ok;
+  });
+
+  record(
+    "disabled-route-response-fixtures",
+    routeResponseFixtures.length === expectedNames.length &&
+      expectedNames.every((name) => routeResponseFixtures.some((fixture) => fixture.name === name)) &&
+      routeResponseFixtures.every((fixture) => fixture.httpStatus === 501) &&
+      results.every(Boolean),
+    "valid minimal, valid full future, missing scope, credential, and oversized response fixtures match the disabled HTTP 501 contract."
+  );
+}
+
+function checkDisabledRouteResponseSourcePurity() {
+  const combined = [
+    "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts",
+    "apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts"
+  ]
+    .map((file) => readFileSync(resolve(root, file), "utf8"))
+    .join("\n");
+  const forbiddenTokens = [
+    "@hermes-ui/hermes-client",
+    "@hermes-ui/brain-memory-client",
+    "NextResponse",
+    "buildMemoryScopeBridgeInstruction",
+    "process.env",
+    "fetch(",
+    "/v1/runs",
+    "/api/sessions",
+    "searchBrainMemory",
+    "inspectBrainMemory",
+    "localStorage",
+    "sessionStorage",
+    "readFileSync",
+    "writeFileSync"
+  ];
+
+  record(
+    "disabled-route-response-source-pure",
+    forbiddenTokens.every((token) => !combined.includes(token)),
+    "disabled route response helper and fixtures have no network, env, route, storage, service, or memory bridge code."
   );
 }
 

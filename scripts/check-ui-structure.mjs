@@ -39,9 +39,11 @@ const requiredFiles = [
   "apps/web/src/types/hermesRunsBffEvents.ts",
   "apps/web/src/data/agentAccessPolicyFixtures.ts",
   "apps/web/src/data/hermesRunsBffLifecycleFixtures.ts",
+  "apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts",
   "apps/web/src/data/hermesRunsBffRequestFixtures.ts",
   "apps/web/src/data/hermesRunsBffEventFixtures.ts",
   "apps/web/src/lib/hermesRunsBffLifecycleDryRun.ts",
+  "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts",
   "apps/web/src/lib/hermesRunsBffRequestValidation.ts",
   "apps/web/src/lib/hermesRunsBffEventReducer.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
@@ -68,6 +70,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md",
   "docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md",
   "docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md",
+  "docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md",
   "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
@@ -311,6 +314,11 @@ const hermesRunsLifecycleDryRunCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md"), "utf8")
   : "";
+const hermesRunsProductionMigrationGate = existsSync(
+  join(root, "docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md")
+)
+  ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -356,12 +364,20 @@ const hermesRunsLifecycleFixturesSource = readFileSync(
   join(root, "apps/web/src/data/hermesRunsBffLifecycleFixtures.ts"),
   "utf8"
 );
+const hermesRunsDisabledRouteResponseFixturesSource = readFileSync(
+  join(root, "apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts"),
+  "utf8"
+);
 const hermesRunsBffRequestValidationSource = readFileSync(
   join(root, "apps/web/src/lib/hermesRunsBffRequestValidation.ts"),
   "utf8"
 );
 const hermesRunsLifecycleDryRunSource = readFileSync(
   join(root, "apps/web/src/lib/hermesRunsBffLifecycleDryRun.ts"),
+  "utf8"
+);
+const hermesRunsDisabledRouteResponseValidationSource = readFileSync(
+  join(root, "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts"),
   "utf8"
 );
 const hermesRunsBffEventTypesSource = readFileSync(
@@ -1580,6 +1596,28 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs Production Migration Gate 16U",
+  "Current Decision",
+  "not ready to implement production Runs default",
+  "Gates Already Green",
+  "Gates Still Required Before Production Runs Route Implementation",
+  "Gates Required Before Runs Becomes Default",
+  "Non-Goals",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "No production Runs execution",
+  "No composer Agent access selector UI",
+  "No approval buttons",
+  "No direct browser-to-Hermes path",
+  "No direct browser-to-Brain Memory Gateway path",
+  "No direct storage access",
+  "Slice 16V"
+]) {
+  if (!hermesRunsProductionMigrationGate.includes(token)) {
+    failures.push(`Hermes Runs production migration gate doc is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "AgentAccessPolicyFixture",
   "agentAccessPolicyFixtures",
   "agentAccessPolicyFixtureModes",
@@ -1659,9 +1697,48 @@ for (const token of [
 }
 
 for (const token of [
+  "HERMES_RUNS_DISABLED_ROUTE_HTTP_STATUS",
+  "HERMES_RUNS_DISABLED_ROUTE_REASON",
+  "validateHermesRunsDisabledRouteResponse",
+  "expectedRequestValidationOk",
+  "expectedErrorKinds",
+  "requestValidation.rawRequestEchoed",
+  "lifecycleDryRun.runtimeExecution",
+  "disabled response must not include",
+  "disabled response must not contain secret-like data"
+]) {
+  if (!hermesRunsDisabledRouteResponseValidationSource.includes(token)) {
+    failures.push(`Hermes Runs disabled route response validator is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "HermesRunsDisabledRouteResponseFixture",
+  "hermesRunsDisabledValidMinimalResponseFixture",
+  "hermesRunsDisabledValidFullFutureResponseFixture",
+  "hermesRunsDisabledInvalidMissingScopeResponseFixture",
+  "hermesRunsDisabledCredentialFieldResponseFixture",
+  "hermesRunsDisabledOversizedMessageResponseFixture",
+  "hermesRunsDisabledRouteResponseFixtures",
+  "expectedRequestValidationOk",
+  "missing_memory_scope",
+  "forbidden_credential_field",
+  "message_too_large",
+  "rawRequestEchoed: false",
+  "storageAccess: false",
+  "createHermesRunsBffLifecycleDryRun"
+]) {
+  if (!hermesRunsDisabledRouteResponseFixturesSource.includes(token)) {
+    failures.push(`Hermes Runs disabled route response fixtures source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "checkAllLifecycleStagesDefined",
   "checkFixtureMatrix",
   "checkRuntimeStagesNotExecuted",
+  "checkDisabledRouteResponseFixtures",
+  "checkDisabledRouteResponseSourcePurity",
   "checkDisabledReasonAndNoSecrets",
   "checkSourcePurity",
   "checkDisabledRouteLifecyclePosture",
@@ -1669,6 +1746,7 @@ for (const token of [
   "checkNoAgentAccessSelector",
   "checkPackageScript",
   "createHermesRunsBffLifecycleDryRun",
+  "validateHermesRunsDisabledRouteResponse",
   "runtime-stages-not-executed",
   "production_runs_route_not_enabled"
 ]) {
@@ -1777,11 +1855,37 @@ for (const token of [
 }
 
 for (const token of [
+  "@hermes-ui/hermes-client",
+  "@hermes-ui/brain-memory-client",
+  "NextResponse",
+  "buildMemoryScopeBridgeInstruction",
+  "process.env",
+  "fetch(",
+  "/v1/runs",
+  "/api/sessions",
+  "searchBrainMemory",
+  "inspectBrainMemory",
+  "localStorage",
+  "sessionStorage",
+  "readFileSync",
+  "writeFileSync"
+]) {
+  if (
+    hermesRunsDisabledRouteResponseFixturesSource.includes(token) ||
+    hermesRunsDisabledRouteResponseValidationSource.includes(token)
+  ) {
+    failures.push(`Hermes Runs disabled route response contract source includes forbidden token: ${token}`);
+  }
+}
+
+for (const token of [
   "checkValidFixturesPass",
   "checkInvalidFixturesFail",
   "checkProviderModelFutureFieldsRemainInert",
   "checkForbiddenCredentialFieldRejected",
+  "checkDisabledRouteResponseFixtures",
   "checkValidationSourceIsPure",
+  "checkDisabledRouteResponseSourceIsPure",
   "checkDisabledRouteValidationEcho",
   "checkProductionSessionStreamStillPresent",
   "checkNoComposerRunsSelector"
@@ -1882,11 +1986,16 @@ for (const token of [
   "source guard",
   "production_runs_route_not_enabled",
   "status: 501",
+  "validMinimalDisabledRequestBody",
+  "validFullFutureDisabledRequestBody",
   "validDisabledRequestBody",
   "validChatOnlyDisabledRequestBody",
   "validFullAccessDisabledRequestBody",
   "invalidDisabledRequestBody",
+  "invalidMissingScopeDisabledRequestBody",
   "credentialDisabledRequestBody",
+  "oversizedMessageDisabledRequestBody",
+  "validateHermesRunsDisabledRouteResponse",
   "requestValidation",
   "lifecycleDryRun",
   "assertNoEnabledAgentAccess",
@@ -1895,7 +2004,9 @@ for (const token of [
   "hermesCalled: false",
   "brainMemoryCalled: false",
   "eventStreamStarted: false",
+  "missing_memory_scope",
   "forbidden_credential_field",
+  "message_too_large",
   "HERMES_RUNS_PRODUCTION_ROUTE_GUARD_OK",
   "--base-url",
   "--source-only"

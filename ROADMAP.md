@@ -1172,6 +1172,25 @@ stable-key change, or Brain Memory mutation/admin UI was added. See
 recommended slice is Slice 16U: disabled Runs lifecycle route-response fixture
 and migration gate checklist.
 
+## Checkpoint: Slice 16U Hermes Runs disabled route-response baseline
+
+Slice 16U pins representative disabled response fixtures for
+`POST /api/hermes/runs/chat/stream` and adds the production migration gate
+checklist in
+`docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md`.
+`apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts` covers valid
+minimal, valid full future, missing memory scope, credential-like field, and
+oversized message cases. `validateHermesRunsDisabledRouteResponse` and the
+route guard verify HTTP 501, `reason=production_runs_route_not_enabled`,
+redacted validation posture, lifecycle dry-run posture, no runtime ids, no
+approval actions, no secret-like response data, and no Hermes/Gateway/storage
+execution. Production chat still uses `/api/hermes/chat/stream`; no production
+Runs execution, composer switch, composer Agent access selector UI, approval
+buttons, direct browser-to-Hermes/Gateway path, memory bridge change,
+stable-key change, or Brain Memory mutation/admin UI was added. The next
+recommended slice is Slice 16V: production Runs implementation ADR and
+feature-flag contract.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

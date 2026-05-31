@@ -520,12 +520,12 @@ approval buttons, production Runs execution, or composer switch was added.
 
 ## Next Recommended Slice
 
-Slice 16U: disabled Runs lifecycle route-response fixture and migration gate
-checklist.
+Slice 16V: production Runs implementation ADR and feature-flag contract.
 
-Reason: Slice 16T adds a no-runtime lifecycle dry-run posture to the disabled
-production route. The next safe step is to pin route-response fixtures and a
-migration gate checklist before any experimental-to-production bridge.
+Reason: Slice 16U pins representative disabled route responses and the
+migration gate checklist. The next safe step is to document the exact feature
+flag, rollback posture, live smoke gates, and acceptance criteria before any
+production Runs runtime implementation begins.
 
 ## Slice 16T Lifecycle Dry-Run Update
 
@@ -541,3 +541,15 @@ finalization, done, and error stages.
 `lifecycleDryRun`. The dry-run output marks runtime stages as not executed,
 sets all runtime execution flags false, and keeps production session stream as
 the default.
+
+## Slice 16U Disabled Response Fixture Update
+
+Slice 16U adds `apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts`,
+`apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts`, and
+`docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md`.
+
+The fixtures pin valid minimal, valid full future, missing memory scope,
+credential-like field, and oversized message responses. The pure validation
+helper checks the disabled HTTP 501 response contract, redacted validation
+posture, lifecycle dry-run posture, no runtime ids, no approval actions, no
+secret-like response data, and no Hermes/Gateway/storage execution.

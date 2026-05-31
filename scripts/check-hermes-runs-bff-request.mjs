@@ -32,6 +32,12 @@ registerHooks({
 
 const fixtures = await import(pathToFileURL(resolve(root, "apps/web/src/data/hermesRunsBffRequestFixtures.ts")).toString());
 const validation = await import(pathToFileURL(resolve(root, "apps/web/src/lib/hermesRunsBffRequestValidation.ts")).toString());
+const disabledRouteResponseFixtures = await import(
+  pathToFileURL(resolve(root, "apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts")).toString()
+);
+const disabledRouteResponseValidation = await import(
+  pathToFileURL(resolve(root, "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts")).toString()
+);
 
 const checks = [];
 
@@ -39,7 +45,9 @@ checkValidFixturesPass();
 checkInvalidFixturesFail();
 checkProviderModelFutureFieldsRemainInert();
 checkForbiddenCredentialFieldRejected();
+checkDisabledRouteResponseFixtures();
 checkValidationSourceIsPure();
+checkDisabledRouteResponseSourceIsPure();
 checkDisabledRouteValidationEcho();
 checkProductionSessionStreamStillPresent();
 checkNoComposerRunsSelector();
@@ -116,6 +124,34 @@ function checkForbiddenCredentialFieldRejected() {
   );
 }
 
+function checkDisabledRouteResponseFixtures() {
+  const ok = disabledRouteResponseFixtures.hermesRunsDisabledRouteResponseFixtures.every((fixture) => {
+    const result = disabledRouteResponseValidation.validateHermesRunsDisabledRouteResponse(fixture.response, {
+      expectedErrorKinds: fixture.expectedErrorKinds,
+      expectedRequestValidationOk: fixture.expectedRequestValidationOk,
+      httpStatus: fixture.httpStatus
+    });
+    return result.ok;
+  });
+
+  record(
+    "disabled-route-response-fixtures",
+    ok &&
+      disabledRouteResponseFixtures.hermesRunsDisabledValidMinimalResponseFixture.expectedRequestValidationOk === true &&
+      disabledRouteResponseFixtures.hermesRunsDisabledValidFullFutureResponseFixture.expectedRequestValidationOk === true &&
+      disabledRouteResponseFixtures.hermesRunsDisabledInvalidMissingScopeResponseFixture.expectedErrorKinds.includes(
+        "missing_memory_scope"
+      ) &&
+      disabledRouteResponseFixtures.hermesRunsDisabledCredentialFieldResponseFixture.expectedErrorKinds.includes(
+        "forbidden_credential_field"
+      ) &&
+      disabledRouteResponseFixtures.hermesRunsDisabledOversizedMessageResponseFixture.expectedErrorKinds.includes(
+        "message_too_large"
+      ),
+    "disabled route response fixtures cover valid minimal, valid full future, missing scope, credential, and oversized request postures."
+  );
+}
+
 function checkValidationSourceIsPure() {
   const files = [
     "apps/web/src/types/hermesRunsBffRequest.ts",
@@ -144,6 +180,36 @@ function checkValidationSourceIsPure() {
     "validation-source-pure",
     forbiddenTokens.every((token) => !combined.includes(token)),
     "request types, fixtures, and validator have no network, service, env, storage, route, or memory bridge code."
+  );
+}
+
+function checkDisabledRouteResponseSourceIsPure() {
+  const files = [
+    "apps/web/src/lib/hermesRunsDisabledRouteResponseValidation.ts",
+    "apps/web/src/data/hermesRunsDisabledRouteResponseFixtures.ts"
+  ];
+  const combined = files.map((file) => readFileSync(resolve(root, file), "utf8")).join("\n");
+  const forbiddenTokens = [
+    "@hermes-ui/hermes-client",
+    "@hermes-ui/brain-memory-client",
+    "NextResponse",
+    "buildMemoryScopeBridgeInstruction",
+    "process.env",
+    "fetch(",
+    "/v1/runs",
+    "/api/sessions",
+    "searchBrainMemory",
+    "inspectBrainMemory",
+    "localStorage",
+    "sessionStorage",
+    "readFileSync",
+    "writeFileSync"
+  ];
+
+  record(
+    "disabled-route-response-source-pure",
+    forbiddenTokens.every((token) => !combined.includes(token)),
+    "disabled route response fixtures and validator have no network, service, env, storage, route, or memory bridge code."
   );
 }
 

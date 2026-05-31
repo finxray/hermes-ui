@@ -362,12 +362,12 @@ approval buttons were added.
 
 ## Next Recommended Slices
 
-Slice 16U: disabled Runs lifecycle route-response fixture and migration gate
-checklist.
+Slice 16V: production Runs implementation ADR and feature-flag contract.
 
-Reason: Slice 16T adds a no-runtime lifecycle dry-run posture to the disabled
-production route. The next safe step is to pin route-response fixtures and a
-migration gate checklist before any experimental-to-production bridge.
+Reason: Slice 16U pins the disabled production route response fixtures and the
+migration gate checklist. The next safe step is to document the exact flag,
+rollback posture, live smoke gates, and acceptance criteria before production
+Runs runtime code is added.
 
 ## Slice 16T Lifecycle Dry-Run Update
 
@@ -385,3 +385,16 @@ The disabled `POST /api/hermes/runs/chat/stream` route now returns a compact
 marked `executed: false`; runtime execution flags remain false; and no Hermes,
 Brain Memory Gateway, memory scope bridge, service env, storage, or event
 stream path was added.
+
+## Slice 16U Disabled Response Fixture Update
+
+Slice 16U adds disabled route-response fixtures and the production migration
+gate checklist in
+`docs/architecture/HERMES_RUNS_PRODUCTION_MIGRATION_GATE_16U.md`.
+
+The fixture contract pins valid minimal, valid full future, missing memory
+scope, credential-like field, and oversized message responses for
+`POST /api/hermes/runs/chat/stream`. Every fixture remains HTTP 501 with
+`reason: "production_runs_route_not_enabled"`, `sessionStreamDefault: true`,
+redacted validation posture, lifecycle dry-run posture, and no runtime
+execution. Production chat still uses `/api/hermes/chat/stream`.

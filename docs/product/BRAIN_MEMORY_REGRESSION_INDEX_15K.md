@@ -11,6 +11,9 @@ checks that protect them. It is a launch-readiness reference for future slices:
 new work should update this file when it changes Brain Memory read behavior,
 adds coverage, or intentionally moves a deferred capability into scope.
 
+Slice 15L adds the read-only launch gate in
+`docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
+
 The architecture remains:
 
 ```text
@@ -98,6 +101,8 @@ The following remain deferred and must not be implied by current read-only UI:
 - delete/supersede/pin/mark-stale controls;
 - future project-level memory writes;
 - export/import;
+- automatic context compaction;
+- manual context compaction;
 - real stop/cancel streaming beyond current UI/BFF abort posture;
 - provider/model selector polish.
 
@@ -117,6 +122,5 @@ Confirmed read-only boundaries for Slice 15K:
 
 ## Next Recommended Slice
 
-Slice 15L: create a short launch-gate README for Brain Memory MVP read-only QA
-that tells a maintainer exactly which checks to run for docs-only, non-live UI,
-and opt-in live Brain Memory releases.
+Slice 15M: refresh the release/RC notes to point at the read-only QA gate and
+separate default, browser, and live Brain Memory claims.

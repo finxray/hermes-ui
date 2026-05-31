@@ -5,6 +5,8 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const docPath = join(root, "docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md");
+const compactionRoadmapPath = join(root, "docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md");
+const qaGatePath = join(root, "docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md");
 const failures = [];
 
 if (!existsSync(docPath)) {
@@ -86,6 +88,9 @@ if (!existsSync(docPath)) {
   }
 }
 
+checkSlice15LDocs();
+checkNoCompactionRuntime();
+
 if (failures.length > 0) {
   console.error("Brain Memory regression index checks failed:");
   for (const failure of failures) {
@@ -99,5 +104,70 @@ console.log("Brain Memory regression index checks passed.");
 function requireToken(doc, token, message) {
   if (!doc.includes(token)) {
     failures.push(message);
+  }
+}
+
+function checkSlice15LDocs() {
+  if (!existsSync(compactionRoadmapPath)) {
+    failures.push("Missing docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md.");
+  } else {
+    const doc = readFileSync(compactionRoadmapPath, "utf8");
+    for (const token of [
+      "Status: Deferred product contract. Not implemented.",
+      "manual compaction",
+      "automatic compaction",
+      "Brain Memory-backed",
+      "project/session",
+      "no hidden chain-of-thought",
+      "no silent fact changes",
+      "compactedSummaryId",
+      "coveredMessageRange",
+      "toolActivitySummary",
+      "All stages are deferred"
+    ]) {
+      requireToken(doc, token, `Compaction roadmap is missing token: ${token}`);
+    }
+  }
+
+  if (!existsSync(qaGatePath)) {
+    failures.push("Missing docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md.");
+  } else {
+    const doc = readFileSync(qaGatePath, "utf8");
+    for (const token of [
+      "npm run check:brain-memory-client",
+      "npm run check:brain-memory-regression-index",
+      "npm run check:tenant-scope",
+      "npm run check:workspace-state",
+      "npm run check:ui-structure",
+      "npm run typecheck",
+      "npm run build",
+      "npm audit --audit-level=moderate",
+      "npm run smoke:ui:memory-live",
+      "npm run smoke:ui:memory-scope",
+      "node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory",
+      "memory mutation/admin UI",
+      "automatic context compaction",
+      "manual context compaction"
+    ]) {
+      requireToken(doc, token, `Read-only QA gate is missing token: ${token}`);
+    }
+  }
+}
+
+function checkNoCompactionRuntime() {
+  const forbiddenPaths = [
+    "apps/web/src/app/api/context-compaction",
+    "apps/web/src/app/api/compaction",
+    "apps/web/src/app/api/brain-memory/compact",
+    "apps/web/src/app/api/brain-memory/compaction",
+    "scripts/context-compaction.mjs",
+    "scripts/compact-session.mjs",
+    "scripts/session-context-compaction.mjs"
+  ];
+
+  for (const path of forbiddenPaths) {
+    if (existsSync(join(root, path))) {
+      failures.push(`Unexpected compaction runtime path exists: ${path}`);
+    }
   }
 }

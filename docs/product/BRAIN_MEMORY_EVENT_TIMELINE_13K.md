@@ -159,6 +159,14 @@ Slice 15K follow-up:
 - The MVP Brain Memory read-only regression coverage map is indexed in
   `docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md`.
 
+Slice 15L follow-up:
+
+- The read-only Brain Memory QA gate is documented in
+  `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
+- Future Session Context Compaction is documented as deferred in
+  `docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md`; no compaction runtime
+  or compacted memory writes are implemented.
+
 ## Redaction
 
 Timeline details are collapsed by default and redacted before display. The

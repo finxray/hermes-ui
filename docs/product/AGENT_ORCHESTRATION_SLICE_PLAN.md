@@ -236,6 +236,25 @@ Deliver:
 - keep all behavior local, explicit, and display-only until the contract is
   proven.
 
+### Future - Session Context Compaction
+
+Goal: preserve long-session continuity with user-visible, Brain Memory-backed
+summaries without exposing hidden chain-of-thought.
+
+Status: deferred. See
+`docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md`.
+
+Deliver later:
+
+- manual compaction first;
+- automatic compaction threshold later;
+- compacted summaries stored through approved Brain Memory paths with
+  project/session scope;
+- transparent `Context compacted` UI and summary inspection;
+- include/exclude compacted context controls;
+- redaction and audit metadata;
+- no silent fact changes or hidden reasoning exposure.
+
 ## Recommended Next Slice
 
 Slice 13P - Local Export Download And Import Validation Contract.

@@ -64,6 +64,16 @@ Browser UI -> Web UI Backend/BFF -> Brain Memory Gateway UI API -> controlled re
 
 The Web UI must never bypass the Brain Memory Gateway to mutate memory.
 
+## Future / Deferred: Session Context Compaction
+
+Session Context Compaction is a future Brain Memory Studio capability, not an
+implemented feature. The intended path is manual compaction first, automatic
+compaction later, Brain Memory-backed summaries, explicit project/session
+scope, transparent and auditable UI, and no hidden chain-of-thought. Future
+summaries should preserve durable decisions, constraints, files touched, tool
+activity, memory links, and open tasks without silently changing facts. See
+`docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md`.
+
 ## Checkpoint: Slice 12A MVP baseline
 
 Slice 12A captured an MVP launch-readiness baseline on 2026-05-30. The current
@@ -668,6 +678,22 @@ path, direct browser-to-Hermes path, direct storage access, Hermes streaming
 change, Brain Memory BFF change, memory-scope bridge change, or secret commit
 was added. The next recommended slice is Slice 15L: create a launch-gate README
 for Brain Memory MVP read-only QA modes.
+
+## Checkpoint: Slice 15L Brain Memory read-only QA gate
+
+Slice 15L added the Brain Memory MVP read-only QA gate and future Session
+Context Compaction roadmap note on 2026-05-31. The QA gate in
+`docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md` separates required default
+checks, optional browser/fixture checks, and optional live Hermes/Brain Memory
+checks before making read-only MVP claims. The compaction roadmap in
+`docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md` documents manual-first and
+automatic-later compaction as deferred, Brain Memory-backed, project/session
+scoped, transparent, auditable, and free of hidden chain-of-thought. No
+compaction runtime, memory mutation/admin UI, direct browser-to-Gateway path,
+direct browser-to-Hermes path, direct storage access, Hermes streaming change,
+Brain Memory BFF change, memory-scope bridge change, or secret commit was
+added. The next recommended slice is Slice 15M: refresh release/RC notes to
+point at the read-only QA gate.
 
 ## 5. Recommended technical direction
 

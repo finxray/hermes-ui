@@ -37,6 +37,14 @@ const invalidDisabledRequestBody = {
   ...validDisabledRequestBody,
   agentAccessMode: "unbounded_runtime_access"
 };
+const validChatOnlyDisabledRequestBody = {
+  ...validDisabledRequestBody,
+  agentAccessMode: "chat_only"
+};
+const validFullAccessDisabledRequestBody = {
+  ...validDisabledRequestBody,
+  agentAccessMode: "full_access"
+};
 const credentialDisabledRequestBody = {
   ...validDisabledRequestBody,
   apiKey: "fixture-credential-value"
@@ -120,12 +128,27 @@ async function checkLiveGuard(baseUrl) {
   const url = new URL(routeUrlPath, normalizeBaseUrl(baseUrl));
   const validBody = await postDisabledRoute(url, validDisabledRequestBody);
   assertDisabledEnvelope(validBody);
+  assertNoEnabledAgentAccess(validBody);
   assert.equal(validBody.requestValidation?.attempted, true, "Valid request should be validation-checked.");
   assert.equal(validBody.requestValidation?.ok, true, "Valid request should have validation ok posture.");
   assert.deepEqual(validBody.requestValidation?.errorKinds, [], "Valid request should not report validation errors.");
 
+  const chatOnlyBody = await postDisabledRoute(url, validChatOnlyDisabledRequestBody);
+  assertDisabledEnvelope(chatOnlyBody);
+  assertNoEnabledAgentAccess(chatOnlyBody);
+  assert.equal(chatOnlyBody.requestValidation?.ok, true, "chat_only should validate but stay disabled.");
+
+  const fullAccessBody = await postDisabledRoute(url, validFullAccessDisabledRequestBody);
+  assertDisabledEnvelope(fullAccessBody);
+  assertNoEnabledAgentAccess(fullAccessBody);
+  assert.equal(fullAccessBody.requestValidation?.ok, true, "full_access should validate but stay disabled.");
+  assert.equal(fullAccessBody.execution?.hermesRunCreated, false, "full_access must not create a Hermes run.");
+  assert.equal(fullAccessBody.execution?.hermesCalled, false, "full_access must not call Hermes while disabled.");
+  assert.equal(fullAccessBody.execution?.brainMemoryCalled, false, "full_access must not call Brain Memory while disabled.");
+
   const invalidBody = await postDisabledRoute(url, invalidDisabledRequestBody);
   assertDisabledEnvelope(invalidBody);
+  assertNoEnabledAgentAccess(invalidBody);
   assert.equal(invalidBody.requestValidation?.attempted, true, "Invalid request should be validation-checked.");
   assert.equal(invalidBody.requestValidation?.ok, false, "Invalid request should have validation failure posture.");
   assert.equal(
@@ -136,6 +159,7 @@ async function checkLiveGuard(baseUrl) {
 
   const credentialBody = await postDisabledRoute(url, credentialDisabledRequestBody);
   assertDisabledEnvelope(credentialBody);
+  assertNoEnabledAgentAccess(credentialBody);
   assert.equal(credentialBody.requestValidation?.ok, false, "Credential request should have validation failure posture.");
   assert.equal(
     credentialBody.requestValidation?.errorKinds?.includes("forbidden_credential_field"),
@@ -221,6 +245,15 @@ function assertDisabledEnvelope(body) {
   assert.equal("runId" in body, false, "Disabled route must not return runId.");
   assert.equal("hermesRunId" in body, false, "Disabled route must not return hermesRunId.");
   assert.equal(body.requestValidation?.rawRequestEchoed, false, "Disabled route must not echo raw request data.");
+}
+
+function assertNoEnabledAgentAccess(body) {
+  assert.equal(body.mode, "disabled", "Disabled route must not claim enabled mode.");
+  assert.equal(body.agentAccessSelector, "future-only", "Agent access selector must remain future-only.");
+  assert.equal("agentAccessModeEnabled" in body, false, "Disabled route must not expose enabled Agent access state.");
+  assert.equal("approvalButtons" in body, false, "Disabled route must not expose approval buttons.");
+  assert.equal("approvalActions" in body, false, "Disabled route must not expose approval actions.");
+  assert.equal("enabledModes" in body, false, "Disabled route must not expose enabled Agent access modes.");
 }
 
 function parseArgs(argv) {

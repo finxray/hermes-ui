@@ -192,10 +192,20 @@ switch, or composer Agent access selector UI was implemented.
 
 ## Next Recommended Slice
 
-Slice 16S - disabled Runs policy fixture matrix and source-only Agent access
-rendering guard.
+Slice 16T - production Runs BFF lifecycle dry-run contract and no-runtime
+source guard.
 
-Reason: approval display and future access semantics are documented, but still
-not enforceable from the composer. The next safe step is a pure fixture matrix
-that proves each future mode maps to allowed, blocked, and approval-required
-behavior before any selector UI appears.
+Reason: the policy fixture matrix now guards approval/access modes without
+composer exposure. The next safe step is to define the disabled Runs lifecycle
+dry run before any production route can execute.
+
+## Slice 16S Agent Access Fixture Matrix Update
+
+Slice 16S adds deterministic Agent access policy fixtures and
+`npm run check:agent-access-policy`. The check proves `ask_before_tools`
+requires `approval.request` plus BFF approval enforcement, while all future
+modes remain `productionUiEnabled: false` and `enforcementAvailable: false`.
+
+Production approval UI remains display-only. No approval buttons, BFF approval
+action route, production Runs execution, composer Runs switch, or composer
+Agent access selector UI was implemented.

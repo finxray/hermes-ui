@@ -140,10 +140,23 @@ policy access, not unrestricted system access.
 
 ## Next Recommended Slice
 
-Slice 16S: disabled Runs policy fixture matrix and source-only Agent access
-rendering guard.
+Slice 16T: production Runs BFF lifecycle dry-run contract and no-runtime
+source guard.
 
-Reason: the policy semantics are now documented and the disabled route can echo
-request validation posture. The next safe step is a pure policy fixture matrix
-that proves each future mode maps to allowed/blocked/approval-required behavior
-without adding a composer selector or runtime execution.
+Reason: Slice 16S added deterministic policy fixtures and source-only guards
+without UI exposure. The next safe step is to define the disabled production
+Runs lifecycle dry run before any route can execute.
+
+## Slice 16S Policy Matrix Update
+
+Slice 16S adds `apps/web/src/data/agentAccessPolicyFixtures.ts` with
+contract-only fixtures for `chat_only`, `read_only_tools`,
+`ask_before_tools`, `full_access`, and `custom`. Every fixture has
+`productionUiEnabled: false` and `enforcementAvailable: false`.
+
+`npm run check:agent-access-policy` verifies all modes are present, disabled,
+and unenforced; `Full access` is not unrestricted OS/system access;
+`chat_only` blocks tools; `read_only_tools` blocks writes, commands, and
+external actions; `ask_before_tools` requires `approval.request` plus BFF
+approval enforcement; `custom` remains future-only; and production UI still
+has no composer Agent access selector UI or enabled `Full access` copy.

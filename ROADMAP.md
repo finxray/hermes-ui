@@ -1131,6 +1131,25 @@ change, or Brain Memory mutation/admin UI was added. See
 The next recommended slice is Slice 16S: disabled Runs policy fixture matrix
 and source-only Agent access rendering guard.
 
+## Checkpoint: Slice 16S Agent access policy matrix
+
+Slice 16S adds deterministic Agent access policy fixtures and source-only
+guards for the future `chat_only`, `read_only_tools`, `ask_before_tools`,
+`full_access`, and `custom` modes. `npm run check:agent-access-policy`
+verifies every mode remains `productionUiEnabled=false` and
+`enforcementAvailable=false`, `full_access` is not unrestricted OS/system
+access, read-only and chat-only policies block side effects, the production UI
+has no enabled `Full access` selector copy, Composer has no Agent access
+selector UI or approval buttons, and the disabled Runs route still validates
+`agentAccessMode` without execution. The route guard now covers `chat_only`,
+`full_access`, and invalid `agentAccessMode` disabled-route cases. Production
+chat still uses `/api/hermes/chat/stream`; no production Runs composer switch,
+approval buttons, direct browser-to-Hermes/Gateway path, storage path, memory
+bridge change, stable-key change, or Brain Memory mutation/admin UI was added.
+See `docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md`. The next
+recommended slice is Slice 16T: production Runs BFF lifecycle dry-run contract
+and no-runtime source guard.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

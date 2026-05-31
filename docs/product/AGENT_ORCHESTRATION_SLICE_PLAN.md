@@ -632,14 +632,48 @@ Boundaries:
 - no direct browser-to-Hermes/Gateway/storage path;
 - no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
 
+### 16S - Disabled Runs Policy Fixture Matrix And Source-Only Agent Access Rendering Guard
+
+Goal: add deterministic policy fixtures and source-only guards so Agent access
+UI cannot appear enabled before BFF/Hermes enforcement exists.
+
+Status: completed in Slice 16S. See
+`docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md`.
+
+Deliver:
+
+- `agentAccessPolicyFixtures` for `chat_only`, `read_only_tools`,
+  `ask_before_tools`, `full_access`, and `custom`;
+- every mode marked `productionUiEnabled: false` and
+  `enforcementAvailable: false`;
+- explicit `full_access` warning that it is configured policy access, not
+  unrestricted OS/system access;
+- `npm run check:agent-access-policy`;
+- source-only guard that Composer has no Agent access selector UI;
+- source-only guard that production UI has no enabled `Full access` selector
+  copy;
+- disabled route guard cases for `chat_only`, `full_access`, and invalid
+  `agentAccessMode`.
+
+Boundaries:
+
+- no production Runs execution runtime;
+- no change to `/api/hermes/chat/stream`;
+- no production composer switch;
+- no composer Agent access selector UI;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path;
+- no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
+
 ## Recommended Next Slice
 
-Slice 16S - disabled Runs policy fixture matrix and source-only Agent access
-rendering guard.
+Slice 16T - production Runs BFF lifecycle dry-run contract and no-runtime
+source guard.
 
 Reason:
 
-- Slice 16R added disabled route validation echo and the Agent access approval
-  policy contract without runtime execution or UI selector work.
-- The next safe step is a pure policy fixture matrix and source-only rendering
-  guard before any composer exposure.
+- Slice 16S added deterministic policy fixtures and source-only UI guards
+  without runtime execution or selector exposure.
+- The next safe step is to specify a disabled production Runs lifecycle dry run
+  for submit, event stream, terminal reconciliation, stop, and approval without
+  calling Hermes from the production route.

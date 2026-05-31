@@ -37,12 +37,14 @@ const requiredFiles = [
   "apps/web/src/app/api/hermes/chat/stream/route.ts",
   "apps/web/src/types/hermesRunsBffRequest.ts",
   "apps/web/src/types/hermesRunsBffEvents.ts",
+  "apps/web/src/data/agentAccessPolicyFixtures.ts",
   "apps/web/src/data/hermesRunsBffRequestFixtures.ts",
   "apps/web/src/data/hermesRunsBffEventFixtures.ts",
   "apps/web/src/lib/hermesRunsBffRequestValidation.ts",
   "apps/web/src/lib/hermesRunsBffEventReducer.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
   "scripts/check-hermes-runs-bff-request.mjs",
+  "scripts/check-agent-access-policy.mjs",
   "scripts/check-hermes-runs-bff-events.mjs",
   "scripts/hermes-runs-production-route-guard.mjs",
   "scripts/hermes-runs-replay-ui-smoke.mjs",
@@ -61,6 +63,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_GUARD_16P.md",
   "docs/checkpoints/HERMES_RUNS_REQUEST_VALIDATION_16Q.md",
   "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md",
+  "docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md",
   "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
@@ -294,6 +297,11 @@ const agentAccessApprovalPolicy = existsSync(
 )
   ? readFileSync(join(root, "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md"), "utf8")
   : "";
+const agentAccessPolicyMatrixCheckpoint = existsSync(
+  join(root, "docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -331,6 +339,10 @@ const hermesRunsBffRequestFixturesSource = readFileSync(
   join(root, "apps/web/src/data/hermesRunsBffRequestFixtures.ts"),
   "utf8"
 );
+const agentAccessPolicyFixturesSource = readFileSync(
+  join(root, "apps/web/src/data/agentAccessPolicyFixtures.ts"),
+  "utf8"
+);
 const hermesRunsBffRequestValidationSource = readFileSync(
   join(root, "apps/web/src/lib/hermesRunsBffRequestValidation.ts"),
   "utf8"
@@ -357,6 +369,10 @@ const hermesRunsProductionRouteGuardScript = readFileSync(
 );
 const hermesRunsBffRequestCheckScript = readFileSync(
   join(root, "scripts/check-hermes-runs-bff-request.mjs"),
+  "utf8"
+);
+const agentAccessPolicyCheckScript = readFileSync(
+  join(root, "scripts/check-agent-access-policy.mjs"),
   "utf8"
 );
 const hermesRunsReplayPreviewSource = readFileSync(
@@ -1486,6 +1502,75 @@ for (const token of [
 }
 
 for (const token of [
+  "Agent Access Policy Matrix 16S",
+  "agentAccessPolicyFixtures",
+  "chat_only",
+  "read_only_tools",
+  "ask_before_tools",
+  "full_access",
+  "custom",
+  "productionUiEnabled: false",
+  "enforcementAvailable: false",
+  "Full access",
+  "not unrestricted OS",
+  "npm run check:agent-access-policy",
+  "No composer Agent access selector UI",
+  "No approval buttons",
+  "No enabled `Full access` production UI",
+  "agentAccessSelector: \"future-only\"",
+  "Slice 16T"
+]) {
+  if (!agentAccessPolicyMatrixCheckpoint.includes(token)) {
+    failures.push(`Agent access policy matrix checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "AgentAccessPolicyFixture",
+  "agentAccessPolicyFixtures",
+  "agentAccessPolicyFixtureModes",
+  "chat_only",
+  "read_only_tools",
+  "ask_before_tools",
+  "full_access",
+  "custom",
+  "productionUiEnabled: false",
+  "enforcementAvailable: false",
+  "expectedToolPolicy",
+  "expectedApprovalBehavior",
+  "brainMemoryReadAllowed",
+  "brainMemoryWriteAllowed",
+  "commandAllowed",
+  "externalActionAllowed",
+  "Full access is not unrestricted OS",
+  "future-only"
+]) {
+  if (!agentAccessPolicyFixturesSource.includes(token)) {
+    failures.push(`Agent access policy fixtures source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "checkAllModesPresent",
+  "checkAllModesDisabled",
+  "checkFullAccessWarning",
+  "checkModePolicySemantics",
+  "checkValidatorModeContract",
+  "checkNoComposerSelector",
+  "checkNoEnabledFullAccessProductionUi",
+  "checkNoApprovalButtonsInComposer",
+  "checkDisabledRouteStillDisabled",
+  "checkRouteGuardCoversAgentAccessModes",
+  "validChatOnlyDisabledRequestBody",
+  "validFullAccessDisabledRequestBody",
+  "invalid_agent_access_mode"
+]) {
+  if (!agentAccessPolicyCheckScript.includes(token)) {
+    failures.push(`Agent access policy check script is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "HERMES_RUNS_BFF_REQUEST_SCHEMA_VERSION",
   "HERMES_RUNS_BFF_AGENT_ACCESS_MODES",
   "HermesRunsBffRequest",
@@ -1587,6 +1672,10 @@ if (!packageJson.includes("\"check:hermes-runs-bff-request\"")) {
   failures.push("package.json is missing check:hermes-runs-bff-request script.");
 }
 
+if (!packageJson.includes("\"check:agent-access-policy\"")) {
+  failures.push("package.json is missing check:agent-access-policy script.");
+}
+
 for (const token of [
   "streamHermesSessionChat",
   "request.signal",
@@ -1661,9 +1750,14 @@ for (const token of [
   "production_runs_route_not_enabled",
   "status: 501",
   "validDisabledRequestBody",
+  "validChatOnlyDisabledRequestBody",
+  "validFullAccessDisabledRequestBody",
   "invalidDisabledRequestBody",
   "credentialDisabledRequestBody",
   "requestValidation",
+  "assertNoEnabledAgentAccess",
+  "agentAccessMode: \"chat_only\"",
+  "agentAccessMode: \"full_access\"",
   "hermesCalled: false",
   "brainMemoryCalled: false",
   "eventStreamStarted: false",

@@ -189,6 +189,21 @@ node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url ht
 
 ## Recommended Release Decision
 
+Slice 17A adds the current completion audit and final live smoke checklist:
+
+- `docs/release/MVP_COMPLETION_AUDIT_17A.md`
+- `docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`
+- `docs/release/RELEASE_DECISION_17A.md`
+
+The 17A recommendation is **conditionally complete** for a local/demo MVP RC
+after the safe non-live gate passes. Browser and live-service claims still
+require one healthy selected Web UI base URL and intentionally running services.
+
+Runs production implementation is deferred/post-MVP. Session stream remains the
+MVP production execution path. Brain Memory is read-only in MVP; mutation/admin,
+export/import, provider/model runtime switching, artifact upload/download, and
+production installer work remain deferred.
+
 Treat the current state as RC-ready only after:
 
 - the safe release gate passes;

@@ -1191,6 +1191,27 @@ stable-key change, or Brain Memory mutation/admin UI was added. The next
 recommended slice is Slice 16V: production Runs implementation ADR and
 feature-flag contract.
 
+## Checkpoint: Slice 17A MVP completion audit
+
+Slice 17A parks production Runs work as post-MVP and audits the current product
+against the MVP completion criteria. The current recommendation is
+conditionally complete for a local/demo MVP RC after the safe non-live gate
+passes. Browser and live-service claims require one healthy selected Web UI
+base URL and intentionally running Hermes/Brain Memory services.
+
+The audit and smoke matrix are documented in
+`docs/release/MVP_COMPLETION_AUDIT_17A.md`,
+`docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`, and
+`docs/release/RELEASE_DECISION_17A.md`.
+
+MVP production chat still uses `/api/hermes/chat/stream`; Brain Memory remains
+read-only in MVP; production Runs implementation, Agent access selector UI,
+approval buttons, memory mutation/admin UI, export/import, provider/model
+runtime switching, artifact upload/download, automatic context compaction,
+cross-channel discovery, and production installer work remain deferred. The
+next recommended slice is Slice 17B: final RC browser/live smoke run and
+decision record.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

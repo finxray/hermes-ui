@@ -75,8 +75,17 @@ Memory services.
 
 For release preparation, see `docs/release/MANUAL_RC_CHECKLIST.md` and
 `docs/release/RELEASE_NOTES_TEMPLATE.md`. Current MVP candidate notes live in
-`docs/release/MVP_RC_NOTES.md`. Read-only Brain Memory release claims should
-also follow `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
+`docs/release/MVP_RC_NOTES.md`. Slice 17A records the MVP completion audit and
+final live smoke checklist in `docs/release/MVP_COMPLETION_AUDIT_17A.md` and
+`docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`. Read-only Brain Memory
+release claims should also follow
+`docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
+
+The MVP production execution path is still the Hermes session stream through
+`/api/hermes/chat/stream`. Production Runs, Agent access selector UI, approval
+buttons, memory mutation/admin UI, export/import, provider/model runtime
+switching, artifact upload/download, and production installer work remain
+post-MVP unless a later slice explicitly resumes them.
 
 ## Boundary
 

@@ -17,6 +17,8 @@ Hermes, Brain Memory, Docker, systemd, `~/.hermes`, or local secrets.
 - [ ] Run `npm install`.
 - [ ] Run `npm run check:packaging`.
 - [ ] Run `npm run release:check`.
+- [ ] Review `docs/release/MVP_COMPLETION_AUDIT_17A.md`.
+- [ ] Review `docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`.
 - [ ] Record failures exactly; do not relabel failed checks as warnings.
 
 ## 3. Launcher Gate
@@ -136,6 +138,9 @@ node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url <h
 
 Deferred features that must remain named when relevant:
 
+- production Runs implementation/default;
+- Agent access selector UI;
+- approval buttons/action routes;
 - memory mutation/admin;
 - auth/classification;
 - durable evidence/supersession/audit;
@@ -145,4 +150,5 @@ Deferred features that must remain named when relevant:
 - scalable infinite/progressive loading runtime.
 
 Record the final decision in `docs/release/RELEASE_DECISION_RECORD.md` or a
-candidate-specific copy.
+candidate-specific copy. Slice 17A records the current audit posture in
+`docs/release/RELEASE_DECISION_17A.md`.

@@ -21,7 +21,10 @@ const docs = {
   studioLauncher14A: readText("docs/packaging/STUDIO_LAUNCHER_14A.md"),
   studioLauncher14H: readText("docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md"),
   studioLauncher14I: readText("docs/packaging/STUDIO_LAUNCHER_14I_HEALTHY_SERVER_RECOVERY.md"),
-  studioWeb14J: readText("docs/packaging/STUDIO_WEB_DEV_14J.md")
+  studioWeb14J: readText("docs/packaging/STUDIO_WEB_DEV_14J.md"),
+  mvpCompletionAudit17A: readText("docs/release/MVP_COMPLETION_AUDIT_17A.md"),
+  finalMvpLiveSmokeChecklist17A: readText("docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md"),
+  releaseDecision17A: readText("docs/release/RELEASE_DECISION_17A.md")
 };
 
 const scripts = {
@@ -69,7 +72,10 @@ function checkRequiredDocs() {
     "docs/packaging/STUDIO_WEB_DEV_14J.md",
     "docs/checkpoints/MVP_CHECKPOINT_12A.md",
     "docs/checkpoints/MVP_SMOKE_12B.md",
-    "docs/checkpoints/UI_INTERACTION_SMOKE_12E.md"
+    "docs/checkpoints/UI_INTERACTION_SMOKE_12E.md",
+    "docs/release/MVP_COMPLETION_AUDIT_17A.md",
+    "docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md",
+    "docs/release/RELEASE_DECISION_17A.md"
   ];
 
   for (const path of required) {
@@ -174,7 +180,9 @@ function checkReadmeLinks() {
     "docs/packaging/README.md",
     "docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md",
     "docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md",
-    "docs/packaging/PACKAGING_READINESS_14K.md"
+    "docs/packaging/PACKAGING_READINESS_14K.md",
+    "docs/release/MVP_COMPLETION_AUDIT_17A.md",
+    "docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md"
   ];
   for (const link of expected) {
     passIf(`readme-link:${link}`, docs.readme.includes(link), `README links ${link}.`);
@@ -217,6 +225,50 @@ function checkPackagingDocs() {
   passIf("one-command:14k-checkpoint", docs.oneCommandPlan.includes("Slice 14K"), "One-command CLI plan records the 14K checkpoint.");
   passIf("runbook:release-check", docs.mvpRunbook.includes("npm run release:check"), "MVP runbook documents release:check.");
   passIf("startup:studio-web", docs.localStartupGuide.includes("npm run studio:web"), "Local startup guide uses studio:web.");
+  checkMvpCompletionDocs();
+}
+
+function checkMvpCompletionDocs() {
+  const auditTerms = [
+    "MVP Completion Audit 17A",
+    "conditionally complete",
+    "Production chat still uses `/api/hermes/chat/stream`",
+    "Runs production implementation remains deferred/post-MVP",
+    "Brain Memory UI remains read-only for MVP",
+    "No Agent access selector UI is part of MVP",
+    "No approval buttons are part of MVP",
+    "No memory mutation/admin controls are part of MVP",
+    "No export/import runtime is part of MVP",
+    "Slice 17B"
+  ];
+  for (const term of auditTerms) {
+    passIf(`mvp-audit:${term}`, docs.mvpCompletionAudit17A.includes(term), `MVP completion audit includes ${term}.`);
+  }
+
+  const checklistTerms = [
+    "Final MVP Live Smoke Checklist 17A",
+    "Default Non-Live Checks",
+    "Browser Checks With Healthy Selected Web UI",
+    "Live Hermes And Brain Memory Checks",
+    "Runs Experimental Checks, Optional/Post-MVP",
+    "production chat still uses `/api/hermes/chat/stream`",
+    "production Runs implementation remains deferred",
+    "no Agent access selector UI exists",
+    "no approval buttons exist"
+  ];
+  for (const term of checklistTerms) {
+    passIf(`mvp-checklist:${term}`, docs.finalMvpLiveSmokeChecklist17A.includes(term), `Final smoke checklist includes ${term}.`);
+  }
+
+  for (const term of [
+    "Release Decision 17A",
+    "Conditionally complete",
+    "Production chat still uses the session stream",
+    "Runs production implementation remains deferred/post-MVP",
+    "Slice 17B"
+  ]) {
+    passIf(`release-17a:${term}`, docs.releaseDecision17A.includes(term), `17A release decision includes ${term}.`);
+  }
 }
 
 function checkNoPrematureClaims() {

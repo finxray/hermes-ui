@@ -8,6 +8,13 @@ Decision commit: `773f7f4 docs: consolidate local bundle readiness checklist`
 
 Pass with known limitations.
 
+Slice 17A supersedes the current release framing for MVP completion status.
+See `docs/release/RELEASE_DECISION_17A.md` and
+`docs/release/MVP_COMPLETION_AUDIT_17A.md`. The updated recommendation is
+conditionally complete for a local/demo MVP RC after the safe non-live gate
+passes, with browser/live claims gated by a healthy selected Web UI server and
+intentionally running services.
+
 The local MVP package remains acceptable for a Web UI + Hermes local RC when a
 healthy selected Web UI server and Hermes service are running. Brain Memory
 Gateway live mode remains optional/deferred in the current environment; the

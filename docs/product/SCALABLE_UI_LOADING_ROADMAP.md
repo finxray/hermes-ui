@@ -126,7 +126,8 @@ token.
 
 ## Staged Implementation
 
-Most stages are deferred:
+All stages are deferred unless a prior measurement slice already completed the
+docs/checkpoint work:
 
 1. Docs/contract only.
 2. Measure current transcript/list performance.

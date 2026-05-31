@@ -288,6 +288,7 @@ Do not add direct browser-to-Gateway calls or direct storage access.
 | `npm run smoke:ui:memory-live:headed` | Visible optional live Brain Memory timeline smoke. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Live Hermes gate. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Live Brain Memory Gateway gate. |
+| `npm run check:tenant-scope` | Verifies local MVP tenant/scope diagnostics, redaction, and strict same-tenant smoke boundaries. |
 | `npm run check:workspace-state` | Project/session reducer and local state contract. |
 | `npm run check:brain-memory-client` | Brain Memory client response shape contract. |
 | `npm run check:studio-launch` | Studio launcher help, JSON shape, base URL, redaction, recovery, and safety contract. |

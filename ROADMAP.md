@@ -577,6 +577,21 @@ added. The next recommended slice is Slice 15F: add tenant/scope diagnostics
 that compare Web UI, Hermes MCP, and Gateway key posture without printing
 secrets.
 
+## Checkpoint: Slice 15F tenant/scope diagnostics
+
+Slice 15F added a read-only tenant/scope diagnostics readout and developer
+check on 2026-05-31 and recorded the result in
+`docs/checkpoints/TENANT_SCOPE_DIAGNOSTICS_15F.md`. The Context rail now shows
+collapsed diagnostics for the active UI tenant, project/session stable keys,
+Hermes status, Brain Memory BFF status, scope bridge state, and redacted key
+posture. `npm run check:tenant-scope` verifies local-dev scope, legacy
+tenant-local normalization, custom tenant preservation, redaction, and source
+boundaries. Live Hermes, Brain Memory Gateway, strict UI memory smoke, MVP
+smoke, typecheck, build, and audit passed. No tenant checks were loosened, no
+Brain Memory mutation/admin UI, direct browser-to-Gateway/storage path, direct
+browser-to-Hermes path, or secret commit was added. The next recommended slice
+is Slice 15G: broaden read-only multi-session scope-isolation regression.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

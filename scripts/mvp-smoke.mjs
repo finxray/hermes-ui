@@ -130,6 +130,7 @@ async function checkSourceSmokeTargets() {
   const topBar = readFile("apps/web/src/components/shell/TopBar.tsx");
   const sidebar = readFile("apps/web/src/components/shell/Sidebar.tsx");
   const contextRail = readFile("apps/web/src/components/shell/ContextRail.tsx");
+  const tenantDiagnostics = readFile("apps/web/src/lib/tenantScopeDiagnostics.ts");
   const memoryConsole = readFile("apps/web/src/components/memory/BrainMemoryConsole.tsx");
   const memoryTimeline = readFile("apps/web/src/lib/memoryTimeline.ts");
   const composer = readFile("apps/web/src/components/chat/Composer.tsx");
@@ -172,6 +173,15 @@ async function checkSourceSmokeTargets() {
     "ui:files-artifacts-disabled-download",
     contextRail.includes("Local/mock only") && contextRail.includes("Download unavailable"),
     "Files tab clearly distinguishes local/mock artifacts from unavailable downloads."
+  );
+  checkSource(
+    "ui:tenant-scope-diagnostics",
+    contextRail.includes("Tenant / scope diagnostics") &&
+      contextRail.includes("Read-only drift check") &&
+      contextRail.includes("buildTenantScopeDiagnostics") &&
+      tenantDiagnostics.includes("redactTenantScopePosture") &&
+      !tenantDiagnostics.includes("fetch("),
+    "Context tab exposes read-only tenant/scope diagnostics without direct service calls."
   );
   checkSource(
     "ui:memory-activity-timeline",

@@ -23,6 +23,7 @@
     "check-message-rendering": "node scripts/check-message-rendering.mjs",
     "check:packaging": "node scripts/check-packaging-readiness.mjs",
     "check:studio-launch": "node scripts/check-studio-launch-contract.mjs",
+    "check:tenant-scope": "node --no-warnings scripts/check-tenant-scope-diagnostics.mjs",
     "check:ui-structure": "node scripts/check-ui-structure.mjs",
     "check:workspace-state": "node --no-warnings scripts/check-workspace-state.mjs",
     "release:check": "npm run check:packaging && npm run check:studio-launch && npm run check:workspace-state && npm run check:brain-memory-client && npm run check:agent-activity && npm run check:agent-activity-rendering && npm run check-message-rendering && npm run check:ui-structure && npm run typecheck && npm run build && npm audit --audit-level=moderate",

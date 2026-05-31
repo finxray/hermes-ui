@@ -207,8 +207,8 @@ left running.
   mutation/admin actions, export/import, and production one-command packaging
   remain deferred.
 
-## Next Recommended Slice
+## Follow-up
 
-Slice 15F: add a small tenant/scope diagnostics readout or developer check that
-compares Web UI workspace tenant, Hermes MCP tenant posture, and Gateway key
-allowlist posture without printing secrets.
+Slice 15F added the read-only tenant/scope diagnostics readout and developer
+check recommended here. See
+`docs/checkpoints/TENANT_SCOPE_DIAGNOSTICS_15F.md`.

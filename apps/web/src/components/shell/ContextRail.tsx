@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
 import { createRunReplaySummary, createSessionExportPreview } from "@/lib/persistedActivityReplay";
+import { buildTenantScopeDiagnostics, type TenantScopeDiagnostics } from "@/lib/tenantScopeDiagnostics";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { PersistedActivityEvent, Project, Session } from "@/data/types";
@@ -24,6 +25,7 @@ type ContextRailProps = {
   isHermesStatusLoading: boolean;
   refreshBrainMemoryStatus: () => void;
   refreshHermesStatus: () => void;
+  tenantScopePosture: TenantScopeDiagnostics["redactedPosture"] | null;
 };
 
 type PanelTab = "context" | "memory" | "tools" | "files";
@@ -37,7 +39,8 @@ export function ContextRail({
   isBrainMemoryStatusLoading,
   isHermesStatusLoading,
   refreshBrainMemoryStatus,
-  refreshHermesStatus
+  refreshHermesStatus,
+  tenantScopePosture
 }: ContextRailProps) {
   const [activeTab, setActiveTab] = useState<PanelTab>("context");
   const memoryEvidence = activeSession?.memoryEvidence ?? [];
@@ -75,6 +78,13 @@ export function ContextRail({
               status={hermesStatus}
             />
             <ActiveContextSection activeProject={activeProject} activeSession={activeSession} />
+            <TenantScopeDiagnosticsSection
+              activeProject={activeProject}
+              activeSession={activeSession}
+              brainMemoryStatus={brainMemoryStatus}
+              hermesStatus={hermesStatus}
+              redactedPosture={tenantScopePosture}
+            />
             <RunHistorySection runRecords={runRecords} />
             <ExportPreviewSection activeSession={activeSession} />
             <ContextContractSection activeProject={activeProject} activeSession={activeSession} />
@@ -103,6 +113,90 @@ export function ContextRail({
         {activeTab === "files" ? <FilesSection artifacts={artifacts} hermesStatus={hermesStatus} /> : null}
       </div>
     </aside>
+  );
+}
+
+function TenantScopeDiagnosticsSection({
+  activeProject,
+  activeSession,
+  brainMemoryStatus,
+  hermesStatus,
+  redactedPosture
+}: {
+  activeProject: Project;
+  activeSession: Session | null;
+  brainMemoryStatus: NormalizedBrainMemoryStatus | null;
+  hermesStatus: NormalizedHermesStatus | null;
+  redactedPosture: TenantScopeDiagnostics["redactedPosture"] | null;
+}) {
+  const diagnostics = buildTenantScopeDiagnostics({
+    activeProject,
+    activeSession,
+    brainMemoryStatus,
+    hermesStatus,
+    redactedPosture
+  });
+  const status =
+    diagnostics.checks.errors.length > 0
+      ? "drift"
+      : diagnostics.checks.warnings.length > 0
+        ? "watch"
+        : "aligned";
+
+  return (
+    <section className={styles.section} aria-labelledby="tenant-scope-diagnostics-heading">
+      <SectionLabel
+        id="tenant-scope-diagnostics-heading"
+        icon={<KeyRound size={13} />}
+        label="Tenant / scope diagnostics"
+      />
+      <details className={styles.diagnosticsDetails}>
+        <summary>
+          <span>Read-only drift check</span>
+          <span className={styles.pill}>{status}</span>
+        </summary>
+        <div className={styles.fieldGrid}>
+          <ContextField label="Tenant" value={diagnostics.ui.tenantId} />
+          <ContextField label="Project key" value={diagnostics.ui.projectStableKey} />
+          <ContextField label="Session key" value={diagnostics.ui.sessionStableKey} />
+          <ContextField label="Hermes session" value={diagnostics.ui.hermesSessionId ?? "No active session"} />
+          <ContextField
+            label="Brain Memory"
+            value={`${diagnostics.brainMemoryBff.mode}${diagnostics.brainMemoryBff.reachable ? " / reachable" : ""}`}
+          />
+          <ContextField
+            label="Hermes"
+            value={diagnostics.hermes.reachable ? "real / reachable" : "unreachable or checking"}
+          />
+          <ContextField
+            label="Scope bridge"
+            value={diagnostics.hermes.memoryScopeBridgeActive ? "active" : "deferred"}
+          />
+          <ContextField
+            label="Gateway memory key"
+            value={formatKeyState(diagnostics.redactedPosture.gatewayMemoryKeySet)}
+          />
+          <ContextField
+            label="Allowed tenants"
+            value={diagnostics.redactedPosture.allowedTenantsSummary ?? "not exposed to browser"}
+          />
+        </div>
+        {diagnostics.checks.errors.length > 0 ? (
+          <ul className={styles.diagnosticsList} aria-label="Tenant scope errors">
+            {diagnostics.checks.errors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        ) : null}
+        {diagnostics.checks.warnings.length > 0 ? (
+          <ul className={styles.diagnosticsList} aria-label="Tenant scope warnings">
+            {diagnostics.checks.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        ) : null}
+      </details>
+    </section>
   );
 }
 
@@ -626,4 +720,14 @@ function ContextField({ label, value }: { label: string; value: string }) {
       <span className={styles.fieldValue}>{value}</span>
     </div>
   );
+}
+
+function formatKeyState(value?: boolean) {
+  if (value === true) {
+    return "set";
+  }
+  if (value === false) {
+    return "not set";
+  }
+  return "not exposed to browser";
 }

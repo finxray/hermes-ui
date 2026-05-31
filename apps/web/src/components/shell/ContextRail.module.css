@@ -273,10 +273,38 @@
   font-size: var(--font-small);
 }
 
-.exportDetails summary {
+.exportDetails summary,
+.diagnosticsDetails summary {
   cursor: pointer;
   color: var(--text-primary);
   font-weight: 650;
+}
+
+.diagnosticsDetails {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+}
+
+.diagnosticsDetails summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.diagnosticsDetails[open] summary {
+  margin-bottom: 12px;
+}
+
+.diagnosticsList {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.4;
 }
 
 .exportJson {

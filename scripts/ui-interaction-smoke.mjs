@@ -459,6 +459,7 @@ async function checkRightRailTabs() {
         page.getByText("Run history", { exact: true }).first(),
         "Context tab exposes local Web UI run history."
       );
+      await checkTenantScopeDiagnostics();
       await expectVisible(
         "right-rail-run-history-empty-state",
         page.getByText("No runs in this session yet", { exact: true }).first(),
@@ -595,9 +596,35 @@ async function runLiveMemoryTimelineSmoke({ sendButton }) {
 
   await checkMemoryActivityBlock();
   await checkMemoryTimelineRail();
+  await checkTenantScopeDiagnostics();
   await checkBrainMemoryMarkerSearch(marker);
   await checkNoVisibleSecrets("memory-live-visible-secrets");
   await checkNoHorizontalOverflow("memory-live-overflow");
+}
+
+async function checkTenantScopeDiagnostics() {
+  const contextTab = page.getByRole("button", { name: "Show context panel", exact: true });
+  await contextTab.click({ timeout: timeoutMs });
+  await expectVisible(
+    "tenant-scope-diagnostics-section",
+    page.getByText("Tenant / scope diagnostics", { exact: true }).first(),
+    "Context tab exposes tenant/scope diagnostics."
+  );
+  const diagnostics = page.locator('section[aria-labelledby="tenant-scope-diagnostics-heading"] details');
+  const isOpen = await diagnostics.evaluate((node) => node instanceof HTMLDetailsElement && node.open);
+  if (!isOpen) {
+    await diagnostics.locator("summary").click({ timeout: timeoutMs });
+  }
+  await expectVisible(
+    "tenant-scope-diagnostics-tenant",
+    diagnostics.getByText("local-dev", { exact: true }).first(),
+    "Tenant/scope diagnostics shows the local-dev tenant."
+  );
+  await expectHidden(
+    "tenant-scope-diagnostics-no-drift",
+    diagnostics.getByText(/tenant-local|tenant mismatch|drift detected/i).first(),
+    "Tenant/scope diagnostics does not show a tenant mismatch warning."
+  );
 }
 
 async function checkMemoryActivityBlock() {

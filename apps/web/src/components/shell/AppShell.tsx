@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
+import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnosticsPosture";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { useState } from "react";
 import type { AgentActivityEvent } from "@/types/agentActivity";
@@ -15,6 +16,7 @@ export function AppShell() {
   const { actions, activeProject, activeSession, isHydrated, state } = useWorkspaceState();
   const hermesStatus = useHermesStatus();
   const brainMemoryStatus = useBrainMemoryStatus();
+  const tenantScopePosture = useTenantScopeDiagnosticsPosture();
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -90,6 +92,7 @@ export function AppShell() {
         isHermesStatusLoading={hermesStatus.isLoading}
         refreshBrainMemoryStatus={brainMemoryStatus.refresh}
         refreshHermesStatus={hermesStatus.refresh}
+        tenantScopePosture={tenantScopePosture.posture}
       />
     </main>
   );

@@ -33,8 +33,10 @@ Future production Runs chat should use a BFF-only route:
 POST /api/hermes/runs/chat/stream
 ```
 
-This route is a contract only in Slice 16N. It must remain absent until a later
-implementation slice explicitly adds it behind the correct migration gate.
+This route is a contract only in Slice 16N. Slice 16P later adds the final path
+as a disabled HTTP 501 skeleton only; it still must not execute Runs until a
+future implementation slice explicitly adds execution behind the correct
+migration gate.
 
 The browser must never call Hermes directly. No direct browser-to-Hermes,
 browser-to-Brain Memory Gateway, or browser-to-storage path is allowed.
@@ -414,10 +416,11 @@ enabled composer control until:
 - it says No direct browser-to-Hermes;
 - it says Agent access selector remains future-only;
 - `/api/hermes/chat/stream` remains present;
-- `apps/web/src/app/api/hermes/runs/chat` does not exist unless a later slice
-  intentionally implements it behind an explicit production migration gate;
-- the future route name `POST /api/hermes/runs/chat/stream` appears only as
-  contract text until that later implementation slice.
+- `apps/web/src/app/api/hermes/runs/chat/stream/route.ts` exists only as a
+  disabled HTTP 501 skeleton after Slice 16P;
+- the disabled route source contains no Hermes client import, Gateway call,
+  memory scope bridge import, `fetch(` call, `/v1/runs`, or `/api/sessions`
+  token until a later production migration slice.
 
 ## Non-Goals
 
@@ -456,12 +459,24 @@ This does not implement `POST /api/hermes/runs/chat/stream`. Production chat
 still uses `/api/hermes/chat/stream`, and the Agent access selector remains
 future-only.
 
+## Slice 16P Disabled Route Update
+
+Slice 16P adds `apps/web/src/app/api/hermes/runs/chat/stream/route.ts` as a
+disabled production-shaped skeleton. `POST /api/hermes/runs/chat/stream`
+returns HTTP 501 JSON with `reason: "production_runs_route_not_enabled"`,
+`sessionStreamDefault: true`, `hermesRunCreated: false`,
+`hermesCalled: false`, `brainMemoryCalled: false`,
+`eventStreamStarted: false`, and `agentAccessSelector: "future-only"`.
+
+The skeleton does not call Hermes or Brain Memory Gateway, does not import the
+memory scope bridge, does not start SSE, does not change
+`/api/hermes/chat/stream`, and does not add a production composer Runs switch.
+
 ## Next Recommended Slice
 
-Slice 16P: disabled production-shaped Runs BFF route skeleton and contract
-response guard.
+Slice 16Q: disabled Runs BFF request validation contract and dry-run source
+checks.
 
-Reason: 16N defines the future route and envelope contract, and 16O adds typed
-fixtures plus reducer checks. The next safe step is an explicitly disabled
-server-side route skeleton that cannot execute a run or become the composer
-default.
+Reason: 16P adds the final route path as a disabled skeleton. The next safe
+step is bounded request-shape validation and dry-run-only checks while keeping
+HTTP 501, no run creation, no Hermes/Gateway call, and no composer switch.

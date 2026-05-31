@@ -33,12 +33,14 @@ const requiredFiles = [
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts",
+  "apps/web/src/app/api/hermes/runs/chat/stream/route.ts",
   "apps/web/src/app/api/hermes/chat/stream/route.ts",
   "apps/web/src/types/hermesRunsBffEvents.ts",
   "apps/web/src/data/hermesRunsBffEventFixtures.ts",
   "apps/web/src/lib/hermesRunsBffEventReducer.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
   "scripts/check-hermes-runs-bff-events.mjs",
+  "scripts/hermes-runs-production-route-guard.mjs",
   "scripts/hermes-runs-replay-ui-smoke.mjs",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
@@ -52,6 +54,7 @@ const requiredFiles = [
   "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md",
   "docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md",
   "docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md",
+  "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_GUARD_16P.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -264,6 +267,11 @@ const hermesRunsBffEventFixturesCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md"), "utf8")
   : "";
+const hermesRunsDisabledRouteCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_GUARD_16P.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_GUARD_16P.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -289,6 +297,10 @@ const productionHermesChatStreamRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/chat/stream/route.ts"),
   "utf8"
 );
+const hermesRunsDisabledProductionRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/runs/chat/stream/route.ts"),
+  "utf8"
+);
 const hermesRunsBffEventTypesSource = readFileSync(
   join(root, "apps/web/src/types/hermesRunsBffEvents.ts"),
   "utf8"
@@ -303,6 +315,10 @@ const hermesRunsBffEventReducerSource = readFileSync(
 );
 const hermesRunsBffEventCheckScript = readFileSync(
   join(root, "scripts/check-hermes-runs-bff-events.mjs"),
+  "utf8"
+);
+const hermesRunsProductionRouteGuardScript = readFileSync(
+  join(root, "scripts/hermes-runs-production-route-guard.mjs"),
   "utf8"
 );
 const hermesRunsReplayPreviewSource = readFileSync(
@@ -1023,6 +1039,10 @@ if (!packageJson.includes("\"smoke:hermes:runs:replay-ui\"")) {
   failures.push("package.json is missing smoke:hermes:runs:replay-ui script.");
 }
 
+if (!packageJson.includes("\"smoke:hermes:runs:route-guard\"")) {
+  failures.push("package.json is missing smoke:hermes:runs:route-guard script.");
+}
+
 if (!packageJson.includes("\"smoke:hermes:runs:stop\"")) {
   failures.push("package.json is missing smoke:hermes:runs:stop script.");
 }
@@ -1250,7 +1270,7 @@ for (const token of [
   "activityReplay",
   "npm run check:hermes-runs-bff-events",
   "Production chat still uses `/api/hermes/chat/stream`",
-  "No production `POST /api/hermes/runs/chat/stream` runtime",
+  "No production Runs execution runtime",
   "No composer Agent access selector",
   "No direct browser-to-Hermes path",
   "Slice 16P"
@@ -1321,11 +1341,32 @@ for (const token of [
   "checkStopSequence",
   "checkErrorSequence",
   "checkReplaySnapshotHydrates",
-  "checkProductionRunsRouteAbsent",
+  "checkDisabledProductionRunsRoute",
   "checkNoDirectBrowserHermesPath"
 ]) {
   if (!hermesRunsBffEventCheckScript.includes(token)) {
     failures.push(`Hermes Runs BFF event check script is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Disabled Route Guard 16P",
+  "POST /api/hermes/runs/chat/stream",
+  "HTTP 501",
+  "production_runs_route_not_enabled",
+  "sessionStreamDefault: true",
+  "hermesRunCreated: false",
+  "hermesCalled: false",
+  "brainMemoryCalled: false",
+  "eventStreamStarted: false",
+  "productionChatUntouched: true",
+  "No direct browser-to-Hermes path",
+  "No production Runs composer switch",
+  "npm run smoke:hermes:runs:route-guard",
+  "Slice 16Q"
+]) {
+  if (!hermesRunsDisabledRouteCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs disabled route checkpoint is missing token: ${token}`);
   }
 }
 
@@ -1340,6 +1381,73 @@ for (const token of [
 ]) {
   if (!productionHermesChatStreamRoute.includes(token)) {
     failures.push(`Production Hermes session stream route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "PRODUCTION_RUNS_ROUTE_DISABLED_REASON",
+  "production_runs_route_not_enabled",
+  "DisabledHermesRunsChatStreamResponse",
+  "sessionStreamDefault: true",
+  "hermesRunCreated: false",
+  "hermesCalled: false",
+  "brainMemoryCalled: false",
+  "eventStreamStarted: false",
+  "productionChatUntouched: true",
+  "directBrowserHermes: false",
+  "directBrowserBrainMemory: false",
+  "directStorageAccess: false",
+  "approvalCalled: false",
+  "stopCalled: false",
+  "composerRunsSwitch: false",
+  "agentAccessSelector: \"future-only\"",
+  "status: 501",
+  "Cache-Control"
+]) {
+  if (!hermesRunsDisabledProductionRoute.includes(token)) {
+    failures.push(`Disabled production Runs route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "@hermes-ui/hermes-client",
+  "streamHermesSessionChat",
+  "runHermesRunsExperimentalChat",
+  "runHermesRunsProbe",
+  "runHermesRunsApprovalProbe",
+  "runHermesRunsStopProbe",
+  "runHermesRunsMemoryProbe",
+  "buildMemoryScopeBridgeInstruction",
+  "process.env.HERMES",
+  "process.env.BRAIN_MEMORY",
+  "fetch(",
+  "/v1/runs",
+  "/api/sessions",
+  "searchBrainMemory",
+  "inspectBrainMemory",
+  "localStorage",
+  "readFileSync",
+  "writeFileSync"
+]) {
+  if (hermesRunsDisabledProductionRoute.includes(token)) {
+    failures.push(`Disabled production Runs route includes forbidden token: ${token}`);
+  }
+}
+
+for (const token of [
+  "routePath",
+  "source guard",
+  "production_runs_route_not_enabled",
+  "status: 501",
+  "hermesCalled: false",
+  "brainMemoryCalled: false",
+  "eventStreamStarted: false",
+  "HERMES_RUNS_PRODUCTION_ROUTE_GUARD_OK",
+  "--base-url",
+  "--source-only"
+]) {
+  if (!hermesRunsProductionRouteGuardScript.includes(token)) {
+    failures.push(`Hermes Runs production route guard script is missing token: ${token}`);
   }
 }
 
@@ -1364,7 +1472,6 @@ if (!packageJson.includes("\"smoke:hermes:runs\"")) {
 }
 
 const forbiddenRunRoutePaths = [
-  "apps/web/src/app/api/hermes/runs/chat",
   "apps/web/src/app/api/hermes/runs/stop",
   "apps/web/src/app/api/hermes/runs/approval",
   "apps/web/src/app/api/hermes/runs/stream",

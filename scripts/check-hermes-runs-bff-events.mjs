@@ -47,7 +47,7 @@ checkReplaySnapshotHydrates();
 checkNoHiddenReasoningField();
 checkNoSecretLikeFixtureData();
 checkProductionSessionRouteStillPresent();
-checkProductionRunsRouteAbsent();
+checkDisabledProductionRunsRoute();
 checkNoDirectBrowserHermesPath();
 checkPackageScript();
 
@@ -254,13 +254,55 @@ function checkProductionSessionRouteStillPresent() {
   );
 }
 
-function checkProductionRunsRouteAbsent() {
-  const routePath = resolve(root, "apps/web/src/app/api/hermes/runs/chat");
+function checkDisabledProductionRunsRoute() {
+  const routePath = resolve(root, "apps/web/src/app/api/hermes/runs/chat/stream/route.ts");
+  const routeSource = existsSync(routePath) ? readFileSync(routePath, "utf8") : "";
+  const requiredTokens = [
+    "PRODUCTION_RUNS_ROUTE_DISABLED_REASON",
+    "production_runs_route_not_enabled",
+    "DisabledHermesRunsChatStreamResponse",
+    "sessionStreamDefault: true",
+    "hermesRunCreated: false",
+    "hermesCalled: false",
+    "brainMemoryCalled: false",
+    "eventStreamStarted: false",
+    "productionChatUntouched: true",
+    "directBrowserHermes: false",
+    "directBrowserBrainMemory: false",
+    "directStorageAccess: false",
+    "approvalCalled: false",
+    "stopCalled: false",
+    "composerRunsSwitch: false",
+    "agentAccessSelector: \"future-only\"",
+    "status: 501"
+  ];
+  const forbiddenTokens = [
+    "@hermes-ui/hermes-client",
+    "streamHermesSessionChat",
+    "runHermesRunsExperimentalChat",
+    "runHermesRunsProbe",
+    "runHermesRunsApprovalProbe",
+    "runHermesRunsStopProbe",
+    "runHermesRunsMemoryProbe",
+    "buildMemoryScopeBridgeInstruction",
+    "process.env.HERMES",
+    "process.env.BRAIN_MEMORY",
+    "fetch(",
+    "/v1/runs",
+    "/api/sessions",
+    "searchBrainMemory",
+    "inspectBrainMemory",
+    "localStorage",
+    "readFileSync",
+    "writeFileSync"
+  ];
 
   record(
-    "production-runs-route-absent",
-    !existsSync(routePath),
-    "production /api/hermes/runs/chat/stream route is not implemented in this fixture slice."
+    "production-runs-route-disabled",
+    existsSync(routePath) &&
+      requiredTokens.every((token) => routeSource.includes(token)) &&
+      forbiddenTokens.every((token) => !routeSource.includes(token)),
+    "production /api/hermes/runs/chat/stream exists only as a disabled HTTP 501 skeleton and cannot call Hermes or Gateway."
   );
 }
 
@@ -287,8 +329,9 @@ function checkPackageScript() {
 
   record(
     "package-script",
-    packageJson.includes("\"check:hermes-runs-bff-events\""),
-    "package.json exposes npm run check:hermes-runs-bff-events."
+    packageJson.includes("\"check:hermes-runs-bff-events\"") &&
+      packageJson.includes("\"smoke:hermes:runs:route-guard\""),
+    "package.json exposes the BFF event check and disabled production route guard."
   );
 }
 

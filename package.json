@@ -38,6 +38,7 @@
     "smoke:hermes:runs:approval": "node scripts/hermes-runs-approval-probe.mjs",
     "smoke:hermes:runs:experimental-chat": "node scripts/hermes-runs-experimental-chat.mjs",
     "smoke:hermes:runs:memory": "node scripts/hermes-runs-memory-probe.mjs",
+    "smoke:hermes:runs:route-guard": "node scripts/hermes-runs-production-route-guard.mjs",
     "smoke:hermes:runs:replay-ui": "node scripts/hermes-runs-replay-ui-smoke.mjs",
     "smoke:hermes:runs:stop": "node scripts/hermes-runs-stop-probe.mjs",
     "smoke:sidebar:large": "node scripts/sidebar-large-smoke.mjs",

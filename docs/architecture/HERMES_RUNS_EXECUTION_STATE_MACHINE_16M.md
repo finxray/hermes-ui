@@ -318,12 +318,25 @@ and `done` behavior against local `RunRecord` and `activityReplay` state.
 No production Runs execution route, composer selector, approval buttons, direct
 browser-to-Hermes path, or Agent access selector was implemented.
 
+## Slice 16P Disabled Route Update
+
+Slice 16P adds the production-shaped route path
+`POST /api/hermes/runs/chat/stream` as a disabled HTTP 501 JSON skeleton only.
+It returns `reason: "production_runs_route_not_enabled"`,
+`sessionStreamDefault: true`, `hermesRunCreated: false`,
+`hermesCalled: false`, `brainMemoryCalled: false`, and
+`eventStreamStarted: false`.
+
+This still does not implement production Runs execution, change
+`/api/hermes/chat/stream`, add a production Runs composer switch, add approval
+buttons, call Hermes, call Brain Memory Gateway, or add a direct
+browser-to-Hermes path.
+
 ## Next Recommended Slices
 
-Slice 16P: disabled production-shaped Runs BFF route skeleton and contract
-response guard.
+Slice 16Q: disabled Runs BFF request validation contract and dry-run source
+checks.
 
-Reason: 16M defines the state machine, 16N defines the future BFF route and
-event envelope, and 16O adds browser-side fixture/reducer coverage. The next
-safe step is a disabled server-side skeleton that proves route shape without
-runtime execution or composer exposure.
+Reason: the final route path now exists as a disabled skeleton. The next safe
+step is request-shape validation and dry-run diagnostics that preserve HTTP
+501, no runtime execution, and no composer exposure.

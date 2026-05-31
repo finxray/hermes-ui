@@ -116,7 +116,8 @@ The check verifies:
 - no hidden reasoning field exists in the new app source;
 - fixture/source data is secret-free;
 - production `/api/hermes/chat/stream` remains present;
-- production `/api/hermes/runs/chat/stream` route is not implemented;
+- production `/api/hermes/runs/chat/stream` has only a disabled HTTP 501
+  skeleton after Slice 16P;
 - browser source still avoids direct Hermes `/v1/runs` or `/api/sessions`
   calls.
 
@@ -125,7 +126,7 @@ reducer, script, checkpoint, and package script.
 
 ## Non-Goals
 
-- No production `POST /api/hermes/runs/chat/stream` runtime.
+- No production Runs execution runtime.
 - No production composer Runs switch.
 - No production composer Runs selector.
 - No composer Agent access selector.
@@ -158,3 +159,16 @@ side typed envelope plus deterministic reducer checks. The next safe step is a
 server-side route skeleton that is explicitly disabled by default and returns a
 non-runtime contract response, with source checks proving it cannot execute a
 run or become the composer default.
+
+## Slice 16P Update
+
+Slice 16P added the disabled route skeleton at
+`POST /api/hermes/runs/chat/stream`. The route returns HTTP 501 JSON with
+`reason: "production_runs_route_not_enabled"`, `sessionStreamDefault: true`,
+`hermesRunCreated: false`, `hermesCalled: false`, `brainMemoryCalled: false`,
+and `eventStreamStarted: false`. It still has no production Runs execution
+runtime, no composer Runs switch, no direct browser-to-Hermes path, and no
+Gateway/storage path.
+
+Next recommended slice: Slice 16Q: disabled Runs BFF request validation
+contract and dry-run source checks.

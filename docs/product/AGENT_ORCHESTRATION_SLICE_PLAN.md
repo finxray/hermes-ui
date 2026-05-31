@@ -526,7 +526,7 @@ Deliver:
   state;
 - `npm run check:hermes-runs-bff-events`;
 - source checks proving the session stream remains present and the production
-  Runs chat route remains absent.
+  Runs chat route is disabled-by-default after Slice 16P.
 
 Boundaries:
 
@@ -536,15 +536,44 @@ Boundaries:
 - no approval buttons;
 - no direct browser-to-Hermes/Gateway/storage path.
 
+### 16P - Disabled Production-Shaped Runs BFF Route Skeleton
+
+Goal: add the final production-shaped Runs chat route path while keeping it
+disabled by default and source-guarded against runtime execution.
+
+Status: completed in Slice 16P. See
+`docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_GUARD_16P.md`.
+
+Deliver:
+
+- `POST /api/hermes/runs/chat/stream` route skeleton;
+- HTTP 501 JSON disabled response with
+  `reason: "production_runs_route_not_enabled"`;
+- explicit response flags for no Hermes run creation, no Hermes call, no Brain
+  Memory call, no event stream, and session stream still default;
+- `npm run smoke:hermes:runs:route-guard`;
+- `npm run check:hermes-runs-bff-events` updated to expect a disabled
+  skeleton instead of an absent route;
+- `npm run check:ui-structure` source guard for the skeleton and guard script.
+
+Boundaries:
+
+- no production Runs execution runtime;
+- no change to `/api/hermes/chat/stream`;
+- no production composer switch;
+- no composer Agent access selector;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path;
+- no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
+
 ## Recommended Next Slice
 
-Slice 16P - disabled production-shaped Runs BFF route skeleton and contract
-response guard.
+Slice 16Q - disabled Runs BFF request validation contract and dry-run source
+checks.
 
 Reason:
 
-- Slice 16N defines the future route/event contract and Slice 16O encodes the
-  browser-side envelope fixtures.
-- The next safe step is a server-side route skeleton that is explicitly
-  disabled by default and proves route shape without executing Runs or becoming
-  the composer default.
+- Slice 16P adds the final route path as a disabled skeleton.
+- The next safe step is bounded request-shape validation and dry-run-only
+  diagnostics while preserving HTTP 501, no Hermes/Gateway calls, no run
+  creation, and no composer switch.

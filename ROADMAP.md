@@ -1079,6 +1079,22 @@ memory mutation/admin UI, or Agent access selector was added. The next
 recommended slice is Slice 16P: disabled production-shaped Runs BFF route
 skeleton and contract response guard.
 
+## Checkpoint: Slice 16P Hermes Runs disabled production route guard
+
+Slice 16P added `POST /api/hermes/runs/chat/stream` as a production-shaped
+disabled route skeleton only. The route returns HTTP 501 JSON with
+`reason=production_runs_route_not_enabled`, `sessionStreamDefault=true`,
+`hermesRunCreated=false`, `hermesCalled=false`, `brainMemoryCalled=false`, and
+`eventStreamStarted=false`. `npm run smoke:hermes:runs:route-guard`,
+`npm run check:hermes-runs-bff-events`, and `npm run check:ui-structure` guard
+that the route exists only as a disabled contract response and does not import
+or call Hermes, Brain Memory Gateway, storage, or the memory scope bridge.
+Production chat still uses `/api/hermes/chat/stream`; no production Runs
+composer switch, approval buttons, direct browser-to-Hermes/Gateway path,
+provider/model switching, memory mutation/admin UI, or Agent access selector
+was added. The next recommended slice is Slice 16Q: disabled Runs BFF request
+validation contract and dry-run source checks.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

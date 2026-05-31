@@ -276,12 +276,14 @@ Deliver later:
 
 ## Recommended Next Slice
 
-Slice 16B - Runs API Harmless Probe Via BFF.
+Slice 16C - Runs Event Normalization Parity With AgentActivityEvent.
 
 Reason:
 
-- Slice 16A recommends keeping session stream as the default production path
-  until a BFF-owned Runs path proves parity.
-- The next safe step is a harmless BFF-mediated Runs capability/status probe
-  with no UI execution switch, no live run creation requirement, and no direct
-  browser-to-Hermes call.
+- Slice 16B proved that the Web UI BFF can create one harmless Hermes run,
+  consume run events, and poll status without switching production chat away
+  from session streaming.
+- The next safe step is a docs/test-focused normalization parity slice for
+  `message.delta`, `reasoning.available`, `run.completed`, failures,
+  cancellation, tool events, and approval events before any experimental UI
+  execution mode exists.

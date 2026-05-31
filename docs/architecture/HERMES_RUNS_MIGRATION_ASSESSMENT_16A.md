@@ -546,3 +546,16 @@ Session stream remains default until proven otherwise. The Runs API is
 promising and likely necessary for the next tier of orchestration, but the
 Studio should migrate only through a BFF-only, feature-flagged, parity-tested
 path.
+
+## Slice 16B Probe Update
+
+Slice 16B added the BFF-only diagnostic route
+`POST /api/hermes/runs/probe` and `npm run smoke:hermes:runs`. The live probe
+completed one harmless run with prompt `Reply exactly: HERMES_RUNS_PROBE_OK`,
+observed `message.delta`, `reasoning.available`, and `run.completed`, and
+reported 0 tool events, 0 Brain Memory tool events, and 0 approval events. See
+`docs/checkpoints/HERMES_RUNS_PROBE_16B.md`.
+
+This does not change the 16A decision: session stream remains the production
+default until Runs proves full event, Brain Memory scope, stop, approval, and
+replay parity.

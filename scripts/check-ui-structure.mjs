@@ -31,6 +31,7 @@ const requiredFiles = [
   "apps/web/src/data/largeArtifactsToolsFixture.ts",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
+  "apps/web/src/app/api/hermes/runs/probe/route.ts",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 
@@ -169,11 +170,24 @@ const hermesRunsMigrationAssessment = readFileSync(
   join(root, "docs/architecture/HERMES_RUNS_MIGRATION_ASSESSMENT_16A.md"),
   "utf8"
 );
+const hermesRunsProbeCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_PROBE_16B.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_PROBE_16B.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
 );
 const packageJson = readFileSync(join(root, "package.json"), "utf8");
+const hermesRunsProbeRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/runs/probe/route.ts"),
+  "utf8"
+);
+const hermesRunsProbeScript = existsSync(join(root, "scripts/hermes-runs-probe.mjs"))
+  ? readFileSync(join(root, "scripts/hermes-runs-probe.mjs"), "utf8")
+  : "";
+const hermesClientSource = readFileSync(join(root, "packages/hermes-client/src/index.ts"), "utf8");
 
 for (const token of [
   "Read-only detail",
@@ -528,8 +542,67 @@ for (const token of [
   }
 }
 
+for (const token of [
+  "Hermes Runs Probe 16B",
+  "POST /api/hermes/runs/probe",
+  "HERMES_RUNS_PROBE_OK",
+  "Brain Memory tools involved: no",
+  "Server-side run stop remains untested",
+  "Approval actions remain untested",
+  "composer Agent access selector was not implemented",
+  "Slice 16C: Runs event normalization parity with AgentActivityEvent"
+]) {
+  if (!hermesRunsProbeCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs probe checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "runHermesRunsProbe",
+  "Cache-Control",
+  "no-store"
+]) {
+  if (!hermesRunsProbeRoute.includes(token)) {
+    failures.push(`Hermes Runs probe BFF route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "/api/hermes/runs/probe",
+  "--require-hermes",
+  "--base-url",
+  "brainMemoryToolEvents",
+  "approvalEvents"
+]) {
+  if (!hermesRunsProbeScript.includes(token)) {
+    failures.push(`Hermes Runs probe script is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "runHermesRunsProbe",
+  "HERMES_RUNS_PROBE_PROMPT",
+  "HERMES_RUNS_PROBE_EXPECTED_TEXT",
+  "/v1/runs",
+  "/v1/runs/${encodeURIComponent(args.runId)}/events",
+  "stopCalled: false",
+  "approvalCalled: false",
+  "browserDirectHermes: false",
+  "memoryMutationRequested: false"
+]) {
+  if (!hermesClientSource.includes(token)) {
+    failures.push(`Hermes client Runs probe helper is missing token: ${token}`);
+  }
+}
+
+if (!packageJson.includes("\"smoke:hermes:runs\"")) {
+  failures.push("package.json is missing smoke:hermes:runs script.");
+}
+
 const forbiddenRunRoutePaths = [
-  "apps/web/src/app/api/hermes/runs",
+  "apps/web/src/app/api/hermes/runs/stop",
+  "apps/web/src/app/api/hermes/runs/approval",
+  "apps/web/src/app/api/hermes/runs/stream",
   "apps/web/src/app/api/hermes/run"
 ];
 

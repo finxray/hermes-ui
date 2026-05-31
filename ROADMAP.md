@@ -848,6 +848,23 @@ browser-to-service path, storage path, or memory mutation/admin behavior was
 changed. The next recommended slice is Slice 16B: Runs API harmless probe via
 BFF, no UI execution switch.
 
+## Checkpoint: Slice 16B Hermes Runs harmless probe
+
+Slice 16B added a BFF-only diagnostic Runs probe on 2026-05-31. The new
+`POST /api/hermes/runs/probe` route and `npm run smoke:hermes:runs` command
+create one short chat-only Hermes run with prompt
+`Reply exactly: HERMES_RUNS_PROBE_OK`, stream `/v1/runs/{run_id}/events`, poll
+`/v1/runs/{run_id}`, and return a redacted normalized summary. The live probe
+against `http://127.0.0.1:3002` succeeded with run
+`run_a3743ab56e10437fb2a722edd8ecbc76`, final status `completed`, event types
+`message.delta`, `reasoning.available`, and `run.completed`, and 0 tool,
+Brain Memory tool, or approval events. Production chat still uses session
+streaming; no server-side run stop, approval action, composer Agent access
+selector, direct browser-to-Hermes path, Brain Memory BFF change, memory scope
+bridge change, stable-key change, storage path, or memory mutation/admin UI was
+added. See `docs/checkpoints/HERMES_RUNS_PROBE_16B.md`. The next recommended
+slice is Slice 16C: Runs event normalization parity with AgentActivityEvent.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

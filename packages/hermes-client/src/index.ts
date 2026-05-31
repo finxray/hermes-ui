@@ -9,6 +9,8 @@ import type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesModelDescriptor,
+  HermesRunProbeEvent,
+  HermesRunsProbeResult,
   HermesStatusError,
   HermesUiCapabilities,
   NormalizedHermesStatus
@@ -41,10 +43,17 @@ export type {
   HermesFastStreamProfile,
   HermesModelDescriptor,
   HermesModelSelectionStatus,
+  HermesRunProbeEvent,
+  HermesRunsProbeResult,
   HermesStatusError,
   HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
+
+const HERMES_RUNS_PROBE_EXPECTED_TEXT = "HERMES_RUNS_PROBE_OK";
+const HERMES_RUNS_PROBE_PROMPT = `Reply exactly: ${HERMES_RUNS_PROBE_EXPECTED_TEXT}`;
+const RUNS_PROBE_TIMEOUT_MS = 20_000;
+const PROBE_PREVIEW_LIMIT = 600;
 
 export async function getHermesStatus(
   config: HermesClientConfig
@@ -384,6 +393,246 @@ export async function streamHermesSessionChat(
   };
 }
 
+export async function runHermesRunsProbe(
+  config: HermesClientConfig,
+  options: {
+    memoryScopeKey?: string | null;
+    prompt?: string;
+    sessionId?: string;
+    timeoutMs?: number;
+  } = {}
+): Promise<HermesRunsProbeResult> {
+  const checkedAt = new Date().toISOString();
+  const startedAt = Date.now();
+  const prompt = options.prompt ?? HERMES_RUNS_PROBE_PROMPT;
+  const expectedText = HERMES_RUNS_PROBE_EXPECTED_TEXT;
+  const timeoutMs = options.timeoutMs ?? RUNS_PROBE_TIMEOUT_MS;
+  const sessionId = sanitizeHermesId(
+    options.sessionId ?? `hermes-ui-runs-probe-${Date.now().toString(36)}`
+  );
+
+  const baseResult = {
+    checkedAt,
+    expectedText,
+    prompt,
+    runId: null,
+    sessionId,
+    status: null,
+    finalStatus: null,
+    eventTypes: [],
+    events: [],
+    assistantTextPreview: "",
+    outputPreview: "",
+    timings: {
+      durationMs: 0,
+      eventStreamMs: null
+    },
+    counts: {
+      events: 0,
+      messageDeltaEvents: 0,
+      toolEvents: 0,
+      brainMemoryToolEvents: 0,
+      approvalEvents: 0
+    },
+    safety: {
+      route: "bff-only" as const,
+      promptKind: "chat-only" as const,
+      stopCalled: false as const,
+      approvalCalled: false as const,
+      browserDirectHermes: false as const,
+      memoryMutationRequested: false as const
+    }
+  };
+
+  const finish = (
+    result: Omit<HermesRunsProbeResult, "timings"> & {
+      timings?: Partial<HermesRunsProbeResult["timings"]>;
+    }
+  ): HermesRunsProbeResult => ({
+    ...result,
+    timings: {
+      durationMs: Date.now() - startedAt,
+      eventStreamMs: result.timings?.eventStreamMs ?? null
+    }
+  });
+
+  if (config.enabled === false) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      error: {
+        kind: "disabled",
+        message: "Real Hermes is disabled for this UI process."
+      }
+    });
+  }
+
+  if (!config.baseUrl?.trim()) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      error: {
+        kind: "unconfigured",
+        message: "Set HERMES_API_BASE_URL to enable the Hermes Runs probe."
+      }
+    });
+  }
+
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "failed",
+      error: {
+        kind: "invalid_config",
+        message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL."
+      }
+    });
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const capabilities = await fetchJsonEndpoint({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    path: "/v1/capabilities",
+    signal: config.signal,
+    timeoutMs
+  });
+
+  if (!capabilities.ok) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      error: capabilities.error
+    });
+  }
+
+  const features = objectRecord(capabilities.data?.features);
+  if (
+    features &&
+    (features.run_submission === false ||
+      features.run_status === false ||
+      features.run_events_sse === false)
+  ) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      error: {
+        kind: "bad_response",
+        message: "Hermes does not advertise the required Runs probe capabilities."
+      }
+    });
+  }
+
+  const createResult = await createHermesRun({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    memoryScopeKey: options.memoryScopeKey ?? "hermes-ui-runs-probe",
+    prompt,
+    sessionId,
+    signal: config.signal,
+    timeoutMs
+  });
+
+  if (!createResult.ok) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "failed",
+      error: createResult.error
+    });
+  }
+
+  const eventStartedAt = Date.now();
+  const eventsResult = await readHermesRunEvents({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    runId: createResult.runId,
+    signal: config.signal,
+    timeoutMs
+  });
+  const eventStreamMs = Date.now() - eventStartedAt;
+
+  const statusResult = await getHermesRunStatus({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    runId: createResult.runId,
+    signal: config.signal,
+    timeoutMs
+  });
+
+  if (!eventsResult.ok) {
+    return finish({
+      ...baseResult,
+      runId: createResult.runId,
+      status: createResult.status,
+      ok: false,
+      mode: "failed",
+      error: eventsResult.error,
+      timings: { eventStreamMs }
+    });
+  }
+
+  const events = eventsResult.events.map(normalizeRunProbeEvent);
+  const eventTypes = Array.from(new Set(events.map((event) => event.event))).sort();
+  const assistantText = eventsResult.rawEvents
+    .filter((event) => asString(event.event) === "message.delta")
+    .map((event) => asString(event.delta))
+    .join("");
+  const output = asString(statusResult.ok ? statusResult.data.output : null) ||
+    asString(eventsResult.rawEvents.find((event) => asString(event.event) === "run.completed")?.output);
+  const finalStatus = statusResult.ok ? statusResult.data : null;
+  const finalStatusName = asString(finalStatus?.status) || createResult.status;
+  const combinedText = `${assistantText}\n${output}`;
+  const toolEvents = events.filter((event) => event.event.startsWith("tool."));
+  const brainMemoryToolEvents = toolEvents.filter((event) =>
+    normalizeName(event.toolName ?? "").includes("brain_memory") ||
+    normalizeName(event.toolName ?? "").includes("memory")
+  );
+  const approvalEvents = events.filter((event) => event.event.startsWith("approval."));
+  const messageDeltaEvents = events.filter((event) => event.event === "message.delta");
+  const success =
+    finalStatusName === "completed" &&
+    eventTypes.includes("run.completed") &&
+    combinedText.includes(expectedText);
+
+  return finish({
+    ...baseResult,
+    runId: createResult.runId,
+    status: finalStatusName || createResult.status,
+    finalStatus,
+    eventTypes,
+    events,
+    assistantTextPreview: truncatePreview(assistantText),
+    outputPreview: truncatePreview(output),
+    counts: {
+      events: events.length,
+      messageDeltaEvents: messageDeltaEvents.length,
+      toolEvents: toolEvents.length,
+      brainMemoryToolEvents: brainMemoryToolEvents.length,
+      approvalEvents: approvalEvents.length
+    },
+    ok: success,
+    mode: success ? "success" : "failed",
+    error: success
+      ? null
+      : {
+          kind: "bad_response",
+          message: "Hermes Runs probe did not complete with the expected assistant text."
+        },
+    timings: { eventStreamMs }
+  });
+}
+
 export function normalizeHermesSseEvent(
   eventName: string,
   payload: Record<string, unknown> | null
@@ -489,6 +738,273 @@ async function checkSessionStreamingCapability(args: {
     return typeof advertised === "boolean" ? advertised : null;
   } catch {
     return null;
+  } finally {
+    abort.cleanup();
+  }
+}
+
+async function createHermesRun(args: {
+  apiKey?: string | null;
+  base: URL;
+  fetchImpl: typeof fetch;
+  memoryScopeKey?: string | null;
+  prompt: string;
+  sessionId: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<
+  | { ok: true; runId: string; status: string }
+  | { ok: false; error: HermesChatError }
+> {
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
+  const headers = new Headers({
+    Accept: "application/json",
+    "Content-Type": "application/json"
+  });
+  applyHermesAuth(headers, args.apiKey);
+  const memoryScopeKey = sanitizeHeaderValue(args.memoryScopeKey ?? null);
+  if (memoryScopeKey) {
+    headers.set("X-Hermes-Session-Key", memoryScopeKey);
+  }
+
+  try {
+    const response = await args.fetchImpl(buildEndpointUrl(args.base, "/v1/runs"), {
+      body: JSON.stringify({
+        input: args.prompt,
+        instructions: "Do not use tools, memory, commands, files, web browsing, or external resources. Reply with the exact requested text only.",
+        session_id: args.sessionId
+      }),
+      cache: "no-store",
+      headers,
+      method: "POST",
+      signal: abort.signal
+    });
+    const data = await readJsonObject(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, "/v1/runs")
+        }
+      };
+    }
+    const runId = asString(data?.run_id);
+    if (!runId) {
+      return {
+        ok: false,
+        error: {
+          kind: "bad_response",
+          message: "Hermes /v1/runs did not return a run_id."
+        }
+      };
+    }
+    return {
+      ok: true,
+      runId,
+      status: asString(data?.status) || "unknown"
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: normalizeChatFetchError(error)
+    };
+  } finally {
+    abort.cleanup();
+  }
+}
+
+async function getHermesRunStatus(args: {
+  apiKey?: string | null;
+  base: URL;
+  fetchImpl: typeof fetch;
+  runId: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: HermesChatError }
+> {
+  const result = await fetchJsonEndpoint({
+    apiKey: args.apiKey,
+    base: args.base,
+    fetchImpl: args.fetchImpl,
+    path: `/v1/runs/${encodeURIComponent(args.runId)}`,
+    signal: args.signal,
+    timeoutMs: args.timeoutMs
+  });
+  return result.ok ? { ok: true, data: result.data } : { ok: false, error: result.error };
+}
+
+async function readHermesRunEvents(args: {
+  apiKey?: string | null;
+  base: URL;
+  fetchImpl: typeof fetch;
+  runId: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<
+  | { ok: true; rawEvents: Record<string, unknown>[]; events: HermesRunProbeEvent[] }
+  | { ok: false; error: HermesChatError }
+> {
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
+  const headers = new Headers({ Accept: "text/event-stream" });
+  applyHermesAuth(headers, args.apiKey);
+
+  let response: Response;
+  try {
+    response = await args.fetchImpl(
+      buildEndpointUrl(args.base, `/v1/runs/${encodeURIComponent(args.runId)}/events`),
+      {
+        cache: "no-store",
+        headers,
+        signal: abort.signal
+      }
+    );
+  } catch (error) {
+    abort.cleanup();
+    return { ok: false, error: normalizeChatFetchError(error) };
+  }
+
+  if (!response.ok) {
+    abort.cleanup();
+    const data = await readJsonObject(response);
+    return {
+      ok: false,
+      error: {
+        kind: "http_error",
+        message: await safeHermesErrorMessageFromData(response.status, data, "/v1/runs/{run_id}/events")
+      }
+    };
+  }
+
+  if (!response.body) {
+    abort.cleanup();
+    return {
+      ok: false,
+      error: {
+        kind: "bad_response",
+        message: "Hermes run events endpoint did not return a stream body."
+      }
+    };
+  }
+
+  const rawEvents: Record<string, unknown>[] = [];
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const parsed = parseRunEventFrame(frame);
+        if (parsed) {
+          rawEvents.push(parsed);
+        }
+      }
+    }
+    if (buffer.trim()) {
+      const parsed = parseRunEventFrame(buffer);
+      if (parsed) {
+        rawEvents.push(parsed);
+      }
+    }
+  } catch (error) {
+    return { ok: false, error: normalizeChatFetchError(error) };
+  } finally {
+    abort.cleanup();
+    reader.releaseLock();
+  }
+
+  return {
+    ok: true,
+    rawEvents,
+    events: rawEvents.map(normalizeRunProbeEvent)
+  };
+}
+
+function parseRunEventFrame(frame: string): Record<string, unknown> | null {
+  const dataLines: string[] = [];
+  for (const line of frame.split(/\r?\n/)) {
+    if (!line || line.startsWith(":")) {
+      continue;
+    }
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trimStart());
+    }
+  }
+  if (dataLines.length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(dataLines.join("\n")) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRunProbeEvent(event: Record<string, unknown>): HermesRunProbeEvent {
+  return {
+    event: asString(event.event) || "unknown",
+    keys: Object.keys(event).sort(),
+    runId: asString(event.run_id) || undefined,
+    timestamp: typeof event.timestamp === "number" || typeof event.timestamp === "string"
+      ? event.timestamp
+      : undefined,
+    deltaPreview: truncatePreview(asString(event.delta)) || undefined,
+    outputPreview: truncatePreview(asString(event.output)) || undefined,
+    toolName: asString(event.tool) || asString(event.tool_name) || undefined,
+    errorPreview: truncatePreview(asString(event.error)) || undefined
+  };
+}
+
+async function fetchJsonEndpoint(args: {
+  apiKey?: string | null;
+  base: URL;
+  fetchImpl: typeof fetch;
+  path: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: HermesChatError }
+> {
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
+  const headers = new Headers({ Accept: "application/json" });
+  applyHermesAuth(headers, args.apiKey);
+
+  try {
+    const response = await args.fetchImpl(buildEndpointUrl(args.base, args.path), {
+      cache: "no-store",
+      headers,
+      signal: abort.signal
+    });
+    const data = await readJsonObject(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, args.path)
+        }
+      };
+    }
+    return { ok: true, data: data ?? {} };
+  } catch (error) {
+    return {
+      ok: false,
+      error: normalizeChatFetchError(error)
+    };
   } finally {
     abort.cleanup();
   }
@@ -1008,6 +1524,21 @@ async function safeHermesErrorMessage(response: Response, path: string): Promise
   return `${path} returned HTTP ${response.status}.`;
 }
 
+async function safeHermesErrorMessageFromData(
+  status: number,
+  data: Record<string, unknown> | null,
+  path: string
+): Promise<string> {
+  const error = data?.error;
+  if (error && typeof error === "object" && !Array.isArray(error)) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return `${path} returned HTTP ${status}: ${message}`;
+    }
+  }
+  return `${path} returned HTTP ${status}.`;
+}
+
 function chatFailure(
   status: number,
   kind: HermesChatError["kind"],
@@ -1025,4 +1556,13 @@ function chatFailure(
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function truncatePreview(value: string): string {
+  const clean = value.replace(/\s+/g, " ").trim();
+  return clean.length > PROBE_PREVIEW_LIMIT ? `${clean.slice(0, PROBE_PREVIEW_LIMIT)}...` : clean;
+}
+
+function normalizeName(value: string) {
+  return value.trim().toLowerCase().replace(/[\s.-]+/g, "_");
 }

@@ -244,3 +244,50 @@ export type HermesChatStreamResult =
       status: number;
       error: HermesChatError;
     };
+
+export type HermesRunProbeEvent = {
+  event: string;
+  keys: string[];
+  runId?: string;
+  timestamp?: string | number;
+  deltaPreview?: string;
+  outputPreview?: string;
+  toolName?: string;
+  errorPreview?: string;
+};
+
+export type HermesRunsProbeResult = {
+  ok: boolean;
+  mode: "success" | "skipped" | "failed";
+  checkedAt: string;
+  prompt: string;
+  expectedText: string;
+  runId: string | null;
+  sessionId: string | null;
+  status: string | null;
+  finalStatus: Record<string, unknown> | null;
+  eventTypes: string[];
+  events: HermesRunProbeEvent[];
+  assistantTextPreview: string;
+  outputPreview: string;
+  timings: {
+    durationMs: number;
+    eventStreamMs: number | null;
+  };
+  counts: {
+    events: number;
+    messageDeltaEvents: number;
+    toolEvents: number;
+    brainMemoryToolEvents: number;
+    approvalEvents: number;
+  };
+  safety: {
+    route: "bff-only";
+    promptKind: "chat-only";
+    stopCalled: false;
+    approvalCalled: false;
+    browserDirectHermes: false;
+    memoryMutationRequested: false;
+  };
+  error: HermesChatError | null;
+};

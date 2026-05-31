@@ -7,6 +7,8 @@ const root = process.cwd();
 const docPath = join(root, "docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md");
 const compactionRoadmapPath = join(root, "docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md");
 const qaGatePath = join(root, "docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md");
+const scalableLoadingRoadmapPath = join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md");
+const roadmapPath = join(root, "ROADMAP.md");
 const failures = [];
 
 if (!existsSync(docPath)) {
@@ -89,7 +91,9 @@ if (!existsSync(docPath)) {
 }
 
 checkSlice15LDocs();
+checkSlice15MDocs();
 checkNoCompactionRuntime();
+checkNoScalableLoadingRuntime();
 
 if (failures.length > 0) {
   console.error("Brain Memory regression index checks failed:");
@@ -97,6 +101,42 @@ if (failures.length > 0) {
     console.error(`- ${failure}`);
   }
   process.exit(1);
+}
+
+function checkSlice15MDocs() {
+  if (!existsSync(scalableLoadingRoadmapPath)) {
+    failures.push("Missing docs/product/SCALABLE_UI_LOADING_ROADMAP.md.");
+  } else {
+    const doc = readFileSync(scalableLoadingRoadmapPath, "utf8");
+    for (const token of [
+      "Status: Deferred product contract. Not implemented.",
+      "Show more",
+      "load more on scroll",
+      "scroll restoration",
+      "bounded rendering",
+      "virtualization/windowing",
+      "pagination first",
+      "avoid per-token full transcript rerender",
+      "All stages are deferred",
+      "no hidden filtering",
+      "no silent event dropping"
+    ]) {
+      requireToken(doc, token, `Scalable UI loading roadmap is missing token: ${token}`);
+    }
+  }
+
+  if (existsSync(roadmapPath)) {
+    const roadmap = readFileSync(roadmapPath, "utf8");
+    for (const token of [
+      "Future / Deferred: Scalable UI Loading",
+      "not an implemented feature",
+      "Context compaction runtime",
+      "export/import",
+      "Slice 15M"
+    ]) {
+      requireToken(roadmap, token, `Roadmap is missing Slice 15M/deferred token: ${token}`);
+    }
+  }
 }
 
 console.log("Brain Memory regression index checks passed.");
@@ -168,6 +208,24 @@ function checkNoCompactionRuntime() {
   for (const path of forbiddenPaths) {
     if (existsSync(join(root, path))) {
       failures.push(`Unexpected compaction runtime path exists: ${path}`);
+    }
+  }
+}
+
+function checkNoScalableLoadingRuntime() {
+  const forbiddenPaths = [
+    "apps/web/src/lib/pagination.ts",
+    "apps/web/src/lib/virtualization.ts",
+    "apps/web/src/hooks/useInfiniteScroll.ts",
+    "apps/web/src/hooks/usePagination.ts",
+    "apps/web/src/components/ui/VirtualizedList.tsx",
+    "scripts/measure-ui-loading.mjs",
+    "scripts/long-session-performance.mjs"
+  ];
+
+  for (const path of forbiddenPaths) {
+    if (existsSync(join(root, path))) {
+      failures.push(`Unexpected scalable-loading runtime path exists: ${path}`);
     }
   }
 }

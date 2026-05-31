@@ -63,6 +63,9 @@ export/import.
 - Real provider/model runtime switching.
 - Production one-command CLI.
 - Durable evidence/supersession storage.
+- Durable audit trail.
+- Context compaction runtime.
+- Scalable infinite/progressive loading runtime.
 - Export/import.
 
 ## Packaging Modes
@@ -167,16 +170,21 @@ Use these only when the relevant services are intentionally live and configured:
 
 ```powershell
 node scripts/mvp-smoke.mjs --require-hermes --base-url http://127.0.0.1:<port>
-node scripts/mvp-smoke.mjs --require-brain-memory --base-url http://127.0.0.1:<port>
 npm run smoke:ui:send -- --base-url http://127.0.0.1:<port>
 npm run smoke:ui:stop -- --base-url http://127.0.0.1:<port>
 npm run smoke:ui:replay -- --base-url http://127.0.0.1:<port>
+npm run smoke:ui:memory-live -- --base-url http://127.0.0.1:<port>
+npm run smoke:ui:memory-scope -- --base-url http://127.0.0.1:<port>
+node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url http://127.0.0.1:<port>
 npm run smoke:markdown -- --base-url http://127.0.0.1:<port>
 npm run smoke:markdown:long -- --base-url http://127.0.0.1:<port>
+npm run smoke:memory-detail -- --base-url http://127.0.0.1:<port>
 ```
 
 Hermes must be real/reachable for send, stop, and replay smokes. Brain Memory
-Gateway must be real/reachable for `--require-brain-memory`.
+Gateway must be real/reachable for the memory-live, memory-scope, and combined
+MVP live smoke. Live Brain Memory claims should follow
+`docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
 
 ## Deferred / Not Claimable Yet
 
@@ -193,6 +201,8 @@ Do not claim these as implemented:
 - real provider/model runtime switching;
 - full auth/classification;
 - memory admin/mutation UI;
+- context compaction runtime;
+- scalable infinite/progressive loading runtime;
 - export/import.
 
 ## Safety Boundaries
@@ -221,7 +231,9 @@ It must not be described yet as:
 - a managed Brain Memory installer;
 - a Docker/systemd service manager;
 - a product with durable export/import;
-- a product with memory mutation/admin controls.
+- a product with memory mutation/admin controls;
+- a product with implemented context compaction;
+- a product with implemented infinite/progressive loading.
 
 ## Next Recommended Slice
 

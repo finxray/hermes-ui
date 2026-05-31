@@ -255,6 +255,23 @@ Deliver later:
 - redaction and audit metadata;
 - no silent fact changes or hidden reasoning exposure.
 
+### Future - Scalable UI Loading Contract
+
+Goal: define how long transcripts and large operational panels load without
+rendering huge lists or creating scroll jank.
+
+Status: deferred. See `docs/product/SCALABLE_UI_LOADING_ROADMAP.md`.
+
+Deliver later:
+
+- docs-only scalable-loading contract;
+- current transcript/list performance measurements;
+- sidebar session/project pagination and `Show more`;
+- activity and memory timeline pagination;
+- chat transcript virtualization if measurement shows it is needed;
+- cross-channel session discovery pagination when cross-channel sessions exist;
+- keyboard and accessibility preservation for all progressive loading.
+
 ## Recommended Next Slice
 
 Slice 13P - Local Export Download And Import Validation Contract.

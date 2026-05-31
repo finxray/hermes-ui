@@ -74,6 +74,16 @@ summaries should preserve durable decisions, constraints, files touched, tool
 activity, memory links, and open tasks without silently changing facts. See
 `docs/product/SESSION_CONTEXT_COMPACTION_ROADMAP.md`.
 
+## Future / Deferred: Scalable UI Loading
+
+Scalable UI loading is a future capability, not an implemented feature. The
+intended path is to measure long transcripts and large lists, add list limits
+and `Show more` first, then add run/memory timeline pagination, chat transcript
+virtualization only if needed, and cross-channel session pagination later. It
+must preserve smooth scrolling, accessibility, visible "more available" states,
+and no silent event dropping. See
+`docs/product/SCALABLE_UI_LOADING_ROADMAP.md`.
+
 ## Checkpoint: Slice 12A MVP baseline
 
 Slice 12A captured an MVP launch-readiness baseline on 2026-05-30. The current
@@ -694,6 +704,24 @@ direct browser-to-Hermes path, direct storage access, Hermes streaming change,
 Brain Memory BFF change, memory-scope bridge change, or secret commit was
 added. The next recommended slice is Slice 15M: refresh release/RC notes to
 point at the read-only QA gate.
+
+## Checkpoint: Slice 15M RC notes and scalable UI loading roadmap
+
+Slice 15M refreshed release/RC notes on 2026-05-31 so default local MVP,
+browser smoke, live Hermes, and live Brain Memory claims are separated. Live
+Brain Memory claims now point at
+`docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`. The deferred scalable UI
+loading roadmap in `docs/product/SCALABLE_UI_LOADING_ROADMAP.md` documents
+future `Show more`, scroll-loading, pagination, virtualization/windowing,
+bounded rendering, and accessibility requirements for long transcripts and
+large panels. Context compaction runtime, scalable loading runtime,
+export/import, memory mutation/admin UI, production installer, durable
+evidence/supersession/audit, and auth/classification remain deferred. No UI
+runtime behavior, pagination, infinite scroll, compaction runtime, direct
+browser-to-Gateway path, direct browser-to-Hermes path, direct storage access,
+Hermes streaming change, Brain Memory BFF change, or secret commit was added.
+The next recommended slice is Slice 15N: create a long-session performance
+measurement plan before implementing scalable loading.
 
 ## 5. Recommended technical direction
 

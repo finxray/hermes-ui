@@ -75,7 +75,8 @@ Memory services.
 
 For release preparation, see `docs/release/MANUAL_RC_CHECKLIST.md` and
 `docs/release/RELEASE_NOTES_TEMPLATE.md`. Current MVP candidate notes live in
-`docs/release/MVP_RC_NOTES.md`.
+`docs/release/MVP_RC_NOTES.md`. Read-only Brain Memory release claims should
+also follow `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
 
 ## Boundary
 

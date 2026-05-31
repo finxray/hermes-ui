@@ -144,9 +144,24 @@ stale server was killed or modified.
 - Final one-command GitHub distribution.
 - Durable export/import.
 - Memory mutation/admin controls.
+- Context compaction runtime.
+- Scalable infinite/progressive loading runtime.
 - Direct browser-to-Hermes or browser-to-Brain-Memory access.
 - Direct Postgres, Redis, Qdrant, RAGLight, SQLite, or memory-storage access.
 
+## Slice 15M Release-Claim Refresh
+
+Slice 15M supersedes the release-claim framing for future RC notes:
+
+- default local MVP claims allow mock/unconfigured Brain Memory;
+- browser smoke claims require one healthy selected Web UI base URL;
+- live Hermes claims require Hermes real/reachable through the BFF;
+- live Brain Memory claims require Hermes, Brain Memory Gateway, and the
+  tenant-bound read key, and should follow
+  `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`;
+- context compaction runtime and scalable infinite/progressive loading runtime
+  remain deferred.
+
 ## Next Recommended Slice
 
-Slice 15A - Live Brain Memory full E2E reconnect.
+Slice 15M - Refresh release/RC notes and add scalable UI loading roadmap.

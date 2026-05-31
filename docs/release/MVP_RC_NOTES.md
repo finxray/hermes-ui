@@ -18,6 +18,65 @@ The app remains intentionally local-first. Browser code calls the Web UI BFF;
 the BFF calls Hermes and Brain Memory Gateway where configured. Hermes remains
 the agent runtime. Brain Memory Gateway remains the memory authority.
 
+## Claim Levels
+
+### Default Local MVP Claims
+
+The default local MVP claim is valid after the safe non-live gate passes:
+
+- the Web UI can run locally;
+- Hermes is optional unless a live Hermes gate is run;
+- Brain Memory can be mock, disabled, or unconfigured;
+- read-only Brain Memory UI surfaces are safe in mock/unconfigured mode;
+- browser code calls only the Web UI BFF;
+- no direct storage access is used.
+
+Default mode does not prove live Hermes streaming or live Brain Memory Gateway
+search/inspect.
+
+### Browser Smoke Claims
+
+Browser smoke claims are valid only against a healthy selected base URL. Use the
+same selected URL for all browser checks.
+
+```powershell
+npm run smoke:ui -- --base-url http://127.0.0.1:<port>
+npm run smoke:markdown -- --base-url http://127.0.0.1:<port>
+npm run smoke:markdown:long -- --base-url http://127.0.0.1:<port>
+npm run smoke:memory-detail -- --base-url http://127.0.0.1:<port>
+```
+
+`smoke:memory-detail` is deterministic and non-live. It verifies the read-only
+detail fixture without requiring Hermes or Brain Memory Gateway.
+
+### Live Hermes Claims
+
+Live Hermes claims require Hermes to be real/reachable through the Web UI BFF:
+
+```powershell
+npm run smoke:ui:send -- --base-url http://127.0.0.1:<port>
+npm run smoke:ui:stop -- --base-url http://127.0.0.1:<port>
+node scripts/mvp-smoke.mjs --require-hermes --base-url http://127.0.0.1:<port>
+```
+
+If Hermes is absent, record that state as unconfigured or not running. Do not
+claim live Hermes behavior.
+
+### Live Brain Memory Claims
+
+Live Brain Memory claims require Hermes, Brain Memory Gateway, and the
+tenant-bound memory read key to be intentionally configured. They are covered
+by `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
+
+```powershell
+npm run smoke:ui:memory-live -- --base-url http://127.0.0.1:<port>
+npm run smoke:ui:memory-scope -- --base-url http://127.0.0.1:<port>
+node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url http://127.0.0.1:<port>
+```
+
+Live Brain Memory claims must name the selected base URL and whether Hermes and
+Brain Memory Gateway were real/reachable through the BFF.
+
 ## Highlights
 
 - Codex-style Hermes UI shell replaces the old green UI.
@@ -68,6 +127,8 @@ the agent runtime. Brain Memory Gateway remains the memory authority.
 - Provider/model runtime switching is deferred.
 - Full auth/classification is deferred.
 - Memory admin/mutation UI is deferred.
+- Context compaction runtime is deferred.
+- Scalable infinite/progressive loading runtime is deferred.
 - Cross-channel Telegram/CLI run discovery is deferred.
 - Hermes Runs API migration is not done.
 - Real server-side run stop is not implemented for the current session-stream
@@ -82,6 +143,8 @@ the agent runtime. Brain Memory Gateway remains the memory authority.
 - Final one-command GitHub distribution.
 - Durable export/import.
 - Memory mutation/admin controls.
+- Context compaction runtime.
+- Scalable infinite/progressive loading runtime.
 - Direct browser-to-Hermes or browser-to-Brain-Memory access.
 - Direct storage access.
 
@@ -110,6 +173,7 @@ npm run studio:launch -- --check --base-url http://127.0.0.1:<port>
 npm run smoke:ui -- --base-url http://127.0.0.1:<port>
 npm run smoke:markdown -- --base-url http://127.0.0.1:<port>
 npm run smoke:markdown:long -- --base-url http://127.0.0.1:<port>
+npm run smoke:memory-detail -- --base-url http://127.0.0.1:<port>
 ```
 
 Optional live-service gate:
@@ -118,7 +182,9 @@ Optional live-service gate:
 npm run smoke:ui:send -- --base-url http://127.0.0.1:<port>
 npm run smoke:ui:stop -- --base-url http://127.0.0.1:<port>
 node scripts/mvp-smoke.mjs --require-hermes --base-url http://127.0.0.1:<port>
-node scripts/mvp-smoke.mjs --require-brain-memory --base-url http://127.0.0.1:<port>
+npm run smoke:ui:memory-live -- --base-url http://127.0.0.1:<port>
+npm run smoke:ui:memory-scope -- --base-url http://127.0.0.1:<port>
+node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url http://127.0.0.1:<port>
 ```
 
 ## Recommended Release Decision
@@ -128,6 +194,8 @@ Treat the current state as RC-ready only after:
 - the safe release gate passes;
 - one healthy selected Web UI server is verified;
 - browser smokes pass against that selected base URL;
+- live Brain Memory claims, when made, pass the read-only QA gate in
+  `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`;
 - optional live-service failures are classified as unconfigured rather than
   silently claimed as passing.
 

@@ -50,6 +50,8 @@ npm run studio:launch -- --check --base-url http://127.0.0.1:<port>
 - [ ] Run `npm run smoke:ui -- --base-url <healthy-url>`.
 - [ ] Run `npm run smoke:markdown -- --base-url <healthy-url>`.
 - [ ] Run `npm run smoke:markdown:long -- --base-url <healthy-url>`.
+- [ ] Run `npm run smoke:memory-detail -- --base-url <healthy-url>`.
+- [ ] Confirm browser smoke claims name the healthy selected base URL.
 - [ ] Confirm no horizontal overflow is reported.
 - [ ] Confirm stale static chunk checks passed before interaction checks.
 
@@ -75,14 +77,18 @@ Run live checks only when Brain Memory Gateway is intentionally live and the
 tenant-bound read key is configured.
 
 - [ ] Confirm Brain Memory status through the Web UI BFF.
+- [ ] Follow `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md` before
+  claiming live read-only Brain Memory MVP behavior.
 - [ ] If Gateway is live, search a known safe memory through the UI or BFF
   smoke.
 - [ ] If a result is available, inspect detail through the existing read-only
   BFF inspect route.
-- [ ] Run this only when live Gateway/key are available:
+- [ ] Run these only when live Gateway/key are available:
 
 ```powershell
-node scripts/mvp-smoke.mjs --require-brain-memory --base-url <healthy-url>
+npm run smoke:ui:memory-live -- --base-url <healthy-url>
+npm run smoke:ui:memory-scope -- --base-url <healthy-url>
+node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url <healthy-url>
 ```
 
 - [ ] If Brain Memory is mock/unconfigured, record that state as accepted for
@@ -115,6 +121,9 @@ node scripts/mvp-smoke.mjs --require-brain-memory --base-url <healthy-url>
 - [ ] No direct browser-to-Brain-Memory path is added.
 - [ ] No direct storage access is added.
 - [ ] No memory mutation/admin action is added.
+- [ ] No context compaction runtime is added.
+- [ ] No infinite scroll, virtualization, or runtime pagination is added unless
+  that is the explicit slice being tested.
 
 ## 10. Release Decision
 
@@ -124,6 +133,16 @@ node scripts/mvp-smoke.mjs --require-brain-memory --base-url <healthy-url>
   optional live services or deferred features are documented.
 - [ ] Blocked: required source/build/audit/browser checks failed or selected
   server could not be verified healthy.
+
+Deferred features that must remain named when relevant:
+
+- memory mutation/admin;
+- auth/classification;
+- durable evidence/supersession/audit;
+- production installer;
+- export/import;
+- context compaction runtime;
+- scalable infinite/progressive loading runtime.
 
 Record the final decision in `docs/release/RELEASE_DECISION_RECORD.md` or a
 candidate-specific copy.

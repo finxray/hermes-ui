@@ -268,3 +268,11 @@ Observed normalized inspect summary:
 Slice 15J: add a read-only Memory detail fixture and non-live browser smoke for
 detail/evidence/supersession/audit UI states, so not_implemented rendering can
 be checked without live Hermes or Brain Memory services.
+
+## Slice 15J Follow-Up
+
+Slice 15J added `/design/memory-detail-fixture` and `npm run smoke:memory-detail`
+for deterministic non-live coverage of this contract. The fixture renders the
+existing `MemoryDetailPanel` with static full-detail, not implemented evidence,
+not implemented supersession-chain, metadata-only audit, wrong-scope error, and
+metadata redaction sentinel cases. The production BFF contract is unchanged.

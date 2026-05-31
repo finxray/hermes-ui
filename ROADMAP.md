@@ -640,6 +640,22 @@ Memory BFF logic change, or secret commit was added. See
 Slice 15J: add a read-only Memory detail fixture and non-live browser smoke for
 detail/evidence/supersession/audit UI states.
 
+## Checkpoint: Slice 15J memory detail fixture smoke
+
+Slice 15J added deterministic non-live Memory detail fixture coverage on
+2026-05-31. `/design/memory-detail-fixture` renders the existing read-only
+detail panel with static full-detail, not_implemented evidence,
+not_implemented supersession-chain, metadata-only audit, wrong-scope error, and
+metadata redaction sentinel cases. `npm run smoke:memory-detail` verifies the
+fixture route, honest copy, no mutation/admin controls, no raw secret sentinel
+text, no service calls, and no overflow without requiring live Hermes or Brain
+Memory Gateway. No Brain Memory mutation/admin UI, direct
+browser-to-Gateway/storage path, direct browser-to-Hermes path, Hermes
+streaming change, Brain Memory BFF logic change, memory-scope bridge change, or
+secret commit was added. See
+`docs/product/MEMORY_DETAIL_FIXTURE_SMOKE_15J.md`. The next recommended slice is
+Slice 15K: add an MVP read-only memory search/detail regression index.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

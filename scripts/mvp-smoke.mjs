@@ -113,6 +113,8 @@ async function checkSourceSmokeTargets() {
     "apps/web/src/components/memory/BrainMemoryConsole.tsx",
     "apps/web/src/components/chat/Composer.tsx",
     "apps/web/src/lib/memoryTimeline.ts",
+    "apps/web/src/data/memoryDetailFixture.ts",
+    "apps/web/src/app/design/memory-detail-fixture/page.tsx",
     "docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md",
     "docs/product/MEMORY_DETAIL_CONTRACT_15I.md",
     "docs/product/COMMAND_EXECUTION_DETAILS_13L.md",
@@ -135,6 +137,8 @@ async function checkSourceSmokeTargets() {
   const memoryConsole = readFile("apps/web/src/components/memory/BrainMemoryConsole.tsx");
   const memoryDetailPanel = readFile("apps/web/src/components/memory/MemoryDetailPanel.tsx");
   const memoryDetailContract = readFile("docs/product/MEMORY_DETAIL_CONTRACT_15I.md");
+  const memoryDetailFixture = readFile("apps/web/src/data/memoryDetailFixture.ts");
+  const memoryDetailFixturePage = readFile("apps/web/src/app/design/memory-detail-fixture/page.tsx");
   const memoryTimeline = readFile("apps/web/src/lib/memoryTimeline.ts");
   const composer = readFile("apps/web/src/components/chat/Composer.tsx");
   const uiSmoke = readFile("scripts/ui-interaction-smoke.mjs");
@@ -239,6 +243,16 @@ async function checkSourceSmokeTargets() {
       !memoryDetailPanel.includes("Supersede memory") &&
       !memoryDetailPanel.includes("Pin memory"),
     "Memory detail panel exposes no mutation/admin action labels."
+  );
+  checkSource(
+    "ui:memory-detail-fixture-route",
+    memoryDetailFixture.includes("fullScopedMemoryDetailFixture") &&
+      memoryDetailFixture.includes("wrongScopeMemoryDetailFixture") &&
+      memoryDetailFixture.includes("status: \"not_implemented\"") &&
+      memoryDetailFixture.includes("fixture-api-key-should-not-render") &&
+      memoryDetailFixturePage.includes("MemoryDetailPanel") &&
+      readFile("package.json").includes("\"smoke:memory-detail\""),
+    "Memory detail fixture route and smoke script are registered for non-live detail coverage."
   );
   checkSource(
     "ui:command-detail-rendering",

@@ -1,0 +1,48 @@
+.page {
+  min-height: 100dvh;
+  padding: 48px clamp(18px, 5vw, 72px);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+.header,
+.fixture {
+  width: min(760px, 100%);
+  margin: 0 auto;
+}
+
+.header {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 28px;
+}
+
+.header p {
+  margin: 0;
+  color: var(--accent);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.header span {
+  max-width: 680px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.fixture {
+  min-width: 0;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 24px;
+}
+
+.fixture + .fixture {
+  margin-top: 32px;
+}

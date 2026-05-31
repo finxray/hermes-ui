@@ -131,7 +131,7 @@ function GatewayMemoryDetail({
       {detail.metadata ? (
         <details className={styles.metadata}>
           <summary>Audit metadata</summary>
-          <pre>{JSON.stringify(detail.metadata, null, 2)}</pre>
+          <pre>{safeMetadataJson(detail.metadata)}</pre>
         </details>
       ) : null}
     </div>
@@ -187,4 +187,35 @@ export function ContextField({ label, value }: { label: string; value: string })
       <span className={styles.fieldValue}>{value}</span>
     </div>
   );
+}
+
+function safeMetadataJson(value: Record<string, unknown>) {
+  return JSON.stringify(redactMetadata(value), null, 2);
+}
+
+function redactMetadata(value: unknown, depth = 0): unknown {
+  if (depth > 8) {
+    return "[redacted:depth]";
+  }
+  if (typeof value === "string") {
+    return value
+      .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
+      .replace(
+        /\b(api[_-]?key|authorization|credential|password|secret|token)\s*[:=]\s*["']?[^"'\s,;]+/gi,
+        "$1=[redacted]"
+      );
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactMetadata(item, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    const redacted: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) {
+      redacted[key] = /api[_-]?key|authorization|bearer|credential|password|secret|token/i.test(key)
+        ? "[redacted]"
+        : redactMetadata(child, depth + 1);
+    }
+    return redacted;
+  }
+  return value;
 }

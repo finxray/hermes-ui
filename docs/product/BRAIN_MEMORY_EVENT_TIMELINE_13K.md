@@ -145,6 +145,15 @@ Slice 15I follow-up:
 - Audit is metadata-only for now; there is no durable audit trail endpoint in
   the current UI read contract.
 
+Slice 15J follow-up:
+
+- `/design/memory-detail-fixture` renders the same detail panel with static
+  fixture data and no live service calls.
+- `npm run smoke:memory-detail` verifies the read-only detail labels,
+  not_implemented evidence/supersession copy, metadata-only audit, metadata
+  redaction, and absence of mutation controls without requiring live Hermes or
+  Brain Memory Gateway.
+
 ## Redaction
 
 Timeline details are collapsed by default and redacted before display. The

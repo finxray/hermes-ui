@@ -130,3 +130,8 @@ Treat the current state as RC-ready only after:
 - browser smokes pass against that selected base URL;
 - optional live-service failures are classified as unconfigured rather than
   silently claimed as passing.
+
+The current refreshed decision is recorded in
+`docs/release/RELEASE_DECISION_14P.md`: pass with known limitations for the
+local Web UI + Hermes MVP path, with live Brain Memory Gateway still
+optional/deferred unless explicitly configured and checked.

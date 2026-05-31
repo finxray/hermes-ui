@@ -486,6 +486,21 @@ runbook steps. No installer, one-command bundle, export/import, service
 automation, backend/Hermes/Brain Memory logic change, UI behavior change, env
 mutation, or direct browser-to-service path was added.
 
+## Checkpoint: Slice 14P final RC decision refresh
+
+Slice 14P refreshed the manual RC decision on 2026-05-31 after the 14N
+Windows/WSL launcher hardening and 14O local bundle checklist consolidation.
+`docs/release/RELEASE_DECISION_14P.md` records a pass-with-known-limitations
+decision for the current local Web UI + Hermes MVP path. Safe release checks,
+launcher contract checks, help output, build, typecheck, audit, and the
+`studio:web -- --port 3002 --dry-run` recovery check passed. The live launcher
+diagnostic found no currently reachable Web UI server and did not claim live
+Hermes or live Brain Memory Gateway availability. No installer, final
+one-command bundle, export/import, service automation, backend/Hermes/Brain
+Memory logic change, UI behavior change, env mutation, or direct
+browser-to-service path was added. The next recommended functional slice is
+Slice 15A: live Brain Memory full E2E reconnect.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

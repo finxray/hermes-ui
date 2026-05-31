@@ -8,6 +8,9 @@ This manifest defines the current packaging posture for Hermes UI / Brain
 Memory Studio. It is a readiness baseline and release gate, not a production
 installer.
 
+For the current operator-facing local MVP / RC flow, start with
+`docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md`.
+
 Slice 14K is docs and checks only. It does not build the final one-command
 GitHub distribution, does not install services, and does not implement
 export/import.

@@ -11,6 +11,8 @@ const docs = {
   readiness: readText("docs/packaging/PACKAGING_READINESS_14K.md"),
   readme: readText("README.md"),
   roadmap: readText("ROADMAP.md"),
+  packagingIndex: readText("docs/packaging/README.md"),
+  localBundleChecklist: readText("docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md"),
   packagingModes: readText("docs/packaging/PACKAGING_MODES.md"),
   oneCommandPlan: readText("docs/packaging/ONE_COMMAND_CLI_PLAN.md"),
   localStartupGuide: readText("docs/packaging/LOCAL_STARTUP_GUIDE.md"),
@@ -52,6 +54,8 @@ function main() {
 function checkRequiredDocs() {
   const required = [
     "docs/packaging/PACKAGING_READINESS_14K.md",
+    "docs/packaging/README.md",
+    "docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md",
     "docs/packaging/PACKAGING_MODES.md",
     "docs/packaging/ONE_COMMAND_CLI_PLAN.md",
     "docs/packaging/LOCAL_STARTUP_GUIDE.md",
@@ -167,10 +171,10 @@ function checkEnvExamples() {
 function checkReadmeLinks() {
   const expected = [
     "docs/packaging/PACKAGING_MODES.md",
+    "docs/packaging/README.md",
+    "docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md",
     "docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md",
-    "docs/packaging/PACKAGING_READINESS_14K.md",
-    "docs/packaging/STUDIO_WEB_DEV_14J.md",
-    "docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md"
+    "docs/packaging/PACKAGING_READINESS_14K.md"
   ];
   for (const link of expected) {
     passIf(`readme-link:${link}`, docs.readme.includes(link), `README links ${link}.`);
@@ -202,6 +206,13 @@ function checkPackagingDocs() {
   passIf("modes:web-ui-standalone", docs.packagingModes.includes("Web UI Standalone"), "Packaging modes document Web UI standalone.");
   passIf("modes:brain-memory-standalone", docs.packagingModes.includes("Brain Memory Standalone"), "Packaging modes document Brain Memory standalone.");
   passIf("modes:bundle-future", docs.packagingModes.includes("future") && docs.packagingModes.includes("not implemented"), "Packaging modes label bundle as future/not implemented.");
+  passIf("packaging-index:local-bundle", docs.packagingIndex.includes("LOCAL_BUNDLE_CHECKLIST_14O.md"), "Packaging index links the local bundle checklist.");
+  passIf("packaging-index:one-command-future", docs.packagingIndex.includes("ONE_COMMAND_CLI_PLAN.md") && /not\s+implemented\s+yet/i.test(docs.packagingIndex), "Packaging index labels one-command CLI as future.");
+  passIf("local-bundle:modes", docs.localBundleChecklist.includes("Web UI standalone / mock Brain Memory") && docs.localBundleChecklist.includes("Web UI + Hermes") && docs.localBundleChecklist.includes("Web UI + attach-later Brain Memory"), "Local bundle checklist summarizes current supported modes.");
+  passIf("local-bundle:quick-path", docs.localBundleChecklist.includes("npm run studio:web -- --port 3002 --open") && docs.localBundleChecklist.includes("npm run smoke:ui -- --base-url http://127.0.0.1:3002"), "Local bundle checklist includes the 3002 quick path.");
+  passIf("local-bundle:brain-memory-mock", docs.localBundleChecklist.includes("acceptable for the UI and checks to report Brain Memory as mock"), "Local bundle checklist accepts mock/unconfigured Brain Memory for MVP.");
+  passIf("local-bundle:release-gate", docs.localBundleChecklist.includes("npm run release:check") && /browser\s+smokes\s+or\s+live\s+services/i.test(docs.localBundleChecklist), "Local bundle checklist documents release gate scope.");
+  passIf("local-bundle:deferred", docs.localBundleChecklist.includes("production installer") && docs.localBundleChecklist.includes("final one-command GitHub bundle") && docs.localBundleChecklist.includes("export/import"), "Local bundle checklist keeps deferred items explicit.");
   passIf("one-command:future-plan", docs.oneCommandPlan.includes("future plan") && docs.oneCommandPlan.includes("not an implemented production CLI"), "One-command CLI is documented as future only.");
   passIf("one-command:14k-checkpoint", docs.oneCommandPlan.includes("Slice 14K"), "One-command CLI plan records the 14K checkpoint.");
   passIf("runbook:release-check", docs.mvpRunbook.includes("npm run release:check"), "MVP runbook documents release:check.");
@@ -211,6 +222,8 @@ function checkPackagingDocs() {
 function checkNoPrematureClaims() {
   const claimTexts = [
     docs.readme,
+    docs.packagingIndex,
+    docs.localBundleChecklist,
     docs.packagingModes,
     docs.oneCommandPlan,
     docs.readiness,
@@ -235,6 +248,8 @@ function checkNoPrematureClaims() {
 function checkSecretSafety() {
   const filesToScan = {
     "README.md": docs.readme,
+    "docs/packaging/README.md": docs.packagingIndex,
+    "docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md": docs.localBundleChecklist,
     "docs/packaging/PACKAGING_READINESS_14K.md": docs.readiness,
     "docs/packaging/PACKAGING_MODES.md": docs.packagingModes,
     "docs/packaging/ONE_COMMAND_CLI_PLAN.md": docs.oneCommandPlan,

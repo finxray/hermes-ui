@@ -7,6 +7,9 @@ For the current MVP demo runbook, smoke-test matrix, stale dev-server recovery,
 browser scaling notes, and secrets checklist, see
 `docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`.
 
+For the consolidated local MVP / RC bundle path, start with
+`docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md`.
+
 ## A. Web UI Standalone With Hermes
 
 Use this when Hermes API server is running and Brain Memory is not required.

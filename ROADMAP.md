@@ -473,6 +473,19 @@ unrelated process killing, service management, `.next` deletion, env mutation,
 Docker/systemd automation, or export/import was added. See
 `docs/packaging/STUDIO_WEB_DEV_WINDOWS_HARDENING_14N.md`.
 
+## Checkpoint: Slice 14O local bundle checklist consolidation
+
+Slice 14O consolidated the current local MVP / RC packaging path on
+2026-05-31. `docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md` is now the first
+operator checklist for supported modes, the `3002` Web UI recovery path,
+Hermes live verification, attach-later Brain Memory, stale-server recovery,
+release gates, safety boundaries, and deferred/not-claimable features.
+`docs/packaging/README.md` indexes packaging, launcher, startup, recovery, and
+release docs. README now links to the checklist instead of duplicating long
+runbook steps. No installer, one-command bundle, export/import, service
+automation, backend/Hermes/Brain Memory logic change, UI behavior change, env
+mutation, or direct browser-to-service path was added.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

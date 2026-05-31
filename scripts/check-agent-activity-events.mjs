@@ -34,6 +34,11 @@ checkCommandOutputRedaction();
 checkCommandSourceChannel();
 checkArtifactPayload();
 checkRunEvent();
+checkRunsMessageDeltaIgnored();
+checkRunsReasoningSafe();
+checkRunsCompletedStatus();
+checkRunsToolAndApprovalParity();
+checkRunsUnknownFallback();
 checkApprovalRequested();
 checkApprovalResponded();
 checkApprovalDenied();
@@ -292,6 +297,121 @@ function checkRunEvent() {
       event.title === "Run Started" &&
       event.hermes?.runId === "run-1",
     "run.started maps to a running status event."
+  );
+}
+
+function checkRunsMessageDeltaIgnored() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    event: "message.delta",
+    delta: "Hello",
+    run_id: "run-runs-message"
+  }, { id: "runs-message-delta" });
+  const summary = activity.summarizeHermesRunsEvent({
+    event: "message.delta",
+    delta: "Hello"
+  });
+
+  record(
+    "runs-message-delta-ignored",
+    event === null &&
+      summary.activityEvent === false &&
+      summary.policy === "assistant text buffer only",
+    "Runs message.delta is treated as assistant text buffering, not a per-delta activity row."
+  );
+}
+
+function checkRunsReasoningSafe() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    event: "reasoning.available",
+    run_id: "run-runs-reasoning",
+    text: "private reasoning should not render",
+    nested: {
+      reasoning: "nested reasoning should not render"
+    },
+    timestamp: "2026-05-31T00:00:00.000Z"
+  }, { id: "runs-reasoning-safe" });
+  const serialized = JSON.stringify(event);
+
+  record(
+    "runs-reasoning-safe",
+    event.type === "reasoning" &&
+      event.status === "info" &&
+      event.title === "Thinking signal received" &&
+      event.summary.includes("Reasoning text is not rendered") &&
+      event.details.text === "[omitted: reasoning text not rendered]" &&
+      event.details.nested.reasoning === "[omitted: reasoning text not rendered]" &&
+      event.hermes?.eventType === "reasoning.available" &&
+      event.metadata?.rawReasoningTextRendered === false &&
+      !serialized.includes("private reasoning should not render"),
+    "Runs reasoning.available maps to a safe public signal without rendering raw reasoning text."
+  );
+}
+
+function checkRunsCompletedStatus() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    event: "run.completed",
+    output: "HERMES_RUNS_PROBE_OK",
+    run_id: "run-runs-completed",
+    timestamp: "2026-05-31T00:00:05.000Z",
+    duration: 1.25
+  }, { id: "runs-completed" });
+
+  record(
+    "runs-completed-status",
+    event.type === "status" &&
+      event.status === "completed" &&
+      event.title === "Run completed" &&
+      event.summary === "Hermes run completed." &&
+      event.completedAt === "2026-05-31T00:00:05.000Z" &&
+      event.durationMs === 1250 &&
+      event.hermes?.runId === "run-runs-completed",
+    "Runs run.completed maps to a completed status activity with stable correlation metadata."
+  );
+}
+
+function checkRunsToolAndApprovalParity() {
+  const tool = activity.createActivityEventFromHermesRunsEvent({
+    event: "tool.completed",
+    preview: "Found 2 memories",
+    result_count: 2,
+    run_id: "run-runs-tool",
+    tool: "memory_search"
+  }, { id: "runs-tool" });
+  const approval = activity.createActivityEventFromHermesRunsEvent({
+    choices: ["once", "deny"],
+    event: "approval.request",
+    prompt: "Allow action?",
+    run_id: "run-runs-approval"
+  }, { id: "runs-approval" });
+
+  record(
+    "runs-tool-and-approval-parity",
+    tool.type === "memory" &&
+      tool.status === "completed" &&
+      tool.title === "Searched memory" &&
+      tool.memory?.operation === "search" &&
+      approval.type === "approval" &&
+      approval.status === "waiting_for_approval" &&
+      approval.approval?.actionAvailable === false,
+    "Runs tool and approval events reuse existing AgentActivityEvent parity mappings."
+  );
+}
+
+function checkRunsUnknownFallback() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    event: "run.heartbeat",
+    run_id: "run-runs-heartbeat",
+    seq: 3
+  }, { id: "runs-unknown" });
+
+  record(
+    "runs-unknown-fallback",
+    event.type === "status" &&
+      event.status === "info" &&
+      event.title === "Run Heartbeat" &&
+      event.collapsedByDefault === true &&
+      event.hermes?.eventType === "run.heartbeat",
+    "Unknown Runs lifecycle events fall back to safe compact informational status rows."
   );
 }
 

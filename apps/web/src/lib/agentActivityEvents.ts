@@ -11,6 +11,8 @@ type ActivityOptions = {
   now?: string;
 };
 
+type HermesRunsEvent = Record<string, unknown>;
+
 type MemoryOperation =
   | "store"
   | "search"
@@ -70,6 +72,117 @@ export function createActivityEventFromHermesStreamEvent(
     };
   }
   return null;
+}
+
+export function createActivityEventFromHermesRunsEvent(
+  event: HermesRunsEvent,
+  options: ActivityOptions = {}
+): AgentActivityEvent | null {
+  const eventType = normalizeHermesRunsEventType(event);
+
+  if (eventType === "message.delta") {
+    return null;
+  }
+
+  if (eventType.startsWith("tool.")) {
+    const toolName = asString(event.tool) || asString(event.tool_name) || "Hermes tool";
+    return createActivityEventFromHermesToolEvent({
+      type: "tool_event",
+      name: toolName,
+      status: hermesRunsToolStatus(eventType),
+      payload: {
+        ...event,
+        event: eventType,
+        tool_name: toolName
+      }
+    }, options);
+  }
+
+  if (eventType.startsWith("approval.")) {
+    return createActivityEventFromHermesApprovalEvent({
+      type: "approval_event",
+      name: eventType,
+      status: eventType.replace("approval.", ""),
+      payload: {
+        ...event,
+        event: eventType
+      }
+    }, options);
+  }
+
+  if (eventType === "reasoning.available") {
+    const occurredAt = getPayloadTime(event) ?? options.now;
+    return {
+      id: makeActivityId("reasoning", `${eventType}-info`, event, options),
+      type: "reasoning",
+      status: "info",
+      title: "Thinking signal received",
+      summary: "Hermes emitted a public reasoning availability signal. Reasoning text is not rendered.",
+      completedAt: occurredAt,
+      collapsedByDefault: true,
+      details: redactHermesRunsActivityDetails(event, eventType),
+      source: "hermes",
+      hermes: getHermesRunsCorrelation(event, eventType),
+      metadata: getHermesRunsMetadata(event, eventType, false)
+    };
+  }
+
+  const status = hermesRunsStatus(eventType, event);
+  const type = activityTypeForRunEvent(eventType, status);
+  const occurredAt = getPayloadTime(event) ?? options.now;
+
+  return {
+    id: makeActivityId(type, `${eventType}-${status}`, event, options),
+    type,
+    status,
+    title: titleFromHermesRunsEvent(eventType, type),
+    summary: summaryFromHermesRunsEvent(eventType, status),
+    startedAt: status === "queued" || status === "running" ? occurredAt : undefined,
+    completedAt:
+      status === "completed" || status === "failed" || status === "cancelled" ? occurredAt : undefined,
+    collapsedByDefault: type !== "approval" && status !== "failed",
+    details: redactHermesRunsActivityDetails(event, eventType),
+    durationMs: getRunDurationMs(event),
+    source: "hermes",
+    hermes: getHermesRunsCorrelation(event, eventType),
+    artifact: getArtifactData(event, status),
+    metadata: getHermesRunsMetadata(event, eventType, false)
+  };
+}
+
+export function normalizeHermesRunsEventType(event: HermesRunsEvent | string): string {
+  const raw = typeof event === "string"
+    ? event
+    : asString(event.event) || asString(event.type) || asString(event.name);
+  const normalized = normalizeName(raw);
+  return normalized ? normalized.replaceAll("_", ".") : "unknown";
+}
+
+export function summarizeHermesRunsEvent(event: HermesRunsEvent): {
+  activityEvent: boolean;
+  eventType: string;
+  policy: string;
+} {
+  const eventType = normalizeHermesRunsEventType(event);
+  if (eventType === "message.delta") {
+    return {
+      activityEvent: false,
+      eventType,
+      policy: "assistant text buffer only"
+    };
+  }
+  if (eventType === "reasoning.available") {
+    return {
+      activityEvent: true,
+      eventType,
+      policy: "public signal only; reasoning text omitted"
+    };
+  }
+  return {
+    activityEvent: true,
+    eventType,
+    policy: "normalized AgentActivityEvent"
+  };
 }
 
 export function createActivityEventFromHermesToolEvent(
@@ -443,6 +556,148 @@ function activityTypeForRunEvent(eventType: string, status: AgentActivityStatus)
     return "error";
   }
   return "status";
+}
+
+function hermesRunsToolStatus(eventType: string): Extract<
+  Extract<HermesChatStreamEvent, { type: "tool_event" }>["status"],
+  "started" | "completed" | "failed"
+> {
+  if (eventType.includes("failed") || eventType.includes("error")) {
+    return "failed";
+  }
+  if (eventType.includes("completed") || eventType.includes("done") || eventType.includes("finished")) {
+    return "completed";
+  }
+  return "started";
+}
+
+function hermesRunsStatus(eventType: string, event: HermesRunsEvent): AgentActivityStatus {
+  const explicit = asString(event.status);
+  if (explicit) {
+    return normalizeActivityStatus(explicit);
+  }
+  if (eventType === "run.completed") {
+    return "completed";
+  }
+  if (eventType === "run.failed") {
+    return "failed";
+  }
+  if (eventType === "run.cancelled" || eventType === "run.canceled") {
+    return "cancelled";
+  }
+  if (eventType === "run.started" || eventType === "run.running") {
+    return "running";
+  }
+  if (eventType === "run.queued") {
+    return "queued";
+  }
+  return normalizeActivityStatus(eventType);
+}
+
+function titleFromHermesRunsEvent(eventType: string, type: AgentActivityType) {
+  if (eventType === "run.completed") {
+    return "Run completed";
+  }
+  if (eventType === "run.failed") {
+    return "Run failed";
+  }
+  if (eventType === "run.cancelled" || eventType === "run.canceled") {
+    return "Run cancelled";
+  }
+  if (eventType === "run.started") {
+    return "Run started";
+  }
+  if (eventType === "run.running") {
+    return "Run running";
+  }
+  if (eventType === "run.queued") {
+    return "Run queued";
+  }
+  return titleFromEventType(eventType, type);
+}
+
+function summaryFromHermesRunsEvent(eventType: string, status: AgentActivityStatus) {
+  if (eventType === "run.completed") {
+    return "Hermes run completed.";
+  }
+  if (eventType === "run.failed") {
+    return "Hermes run failed.";
+  }
+  if (eventType === "run.cancelled" || eventType === "run.canceled") {
+    return "Hermes run was cancelled.";
+  }
+  if (eventType.startsWith("run.") && status === "info") {
+    return "Hermes emitted an informational run event.";
+  }
+  return undefined;
+}
+
+function getHermesRunsCorrelation(event: HermesRunsEvent, eventType: string): AgentActivityEvent["hermes"] {
+  return {
+    eventType,
+    messageId: asString(event.message_id) || asString(event.messageId) || undefined,
+    runId: asString(event.run_id) || asString(event.runId) || undefined,
+    sessionId: asString(event.session_id) || asString(event.sessionId) || undefined,
+    toolCallId: asString(event.tool_call_id) || asString(event.toolCallId) || undefined,
+    toolName: asString(event.tool) || asString(event.tool_name) || undefined
+  };
+}
+
+function getHermesRunsMetadata(
+  event: HermesRunsEvent,
+  eventType: string,
+  includesReasoningText: boolean
+): Record<string, unknown> | undefined {
+  const base = getActivityMetadata(event) ?? {};
+  const metadata: Record<string, unknown> = {
+    ...base,
+    runsEventType: eventType,
+    runsEventKeys: Object.keys(event).sort(),
+    rawReasoningTextRendered: includesReasoningText
+  };
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
+}
+
+function getRunDurationMs(event: HermesRunsEvent) {
+  const durationMs =
+    asNumber(event.duration_ms) ??
+    asNumber(event.durationMs) ??
+    asNumber(event.elapsed_ms) ??
+    asNumber(event.elapsedMs);
+  if (durationMs !== undefined) {
+    return durationMs;
+  }
+  const durationSeconds = asNumber(event.duration);
+  return durationSeconds !== undefined ? Math.max(0, Math.round(durationSeconds * 1000)) : undefined;
+}
+
+function redactHermesRunsActivityDetails(event: HermesRunsEvent, eventType: string) {
+  const redacted = objectRecord(redactActivityDetails(event));
+  if (!redacted) {
+    return redacted;
+  }
+  if (eventType !== "reasoning.available") {
+    return redacted;
+  }
+  return omitReasoningText(redacted);
+}
+
+function omitReasoningText(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(omitReasoningText);
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (/^(text|content|delta|reasoning|reasoning_text|thoughts|chain_of_thought)$/i.test(key)) {
+      result[key] = "[omitted: reasoning text not rendered]";
+    } else {
+      result[key] = omitReasoningText(child);
+    }
+  }
+  return result;
 }
 
 function titleFromEventType(eventType: string, type: AgentActivityType): string {

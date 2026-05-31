@@ -865,6 +865,22 @@ bridge change, stable-key change, storage path, or memory mutation/admin UI was
 added. See `docs/checkpoints/HERMES_RUNS_PROBE_16B.md`. The next recommended
 slice is Slice 16C: Runs event normalization parity with AgentActivityEvent.
 
+## Checkpoint: Slice 16C Hermes Runs event normalization parity
+
+Slice 16C added a dedicated frontend normalizer for raw Hermes Runs event
+payloads on 2026-05-31. `message.delta` is intentionally treated as assistant
+text buffer data rather than an activity row, `reasoning.available` maps to a
+generic public `Thinking signal received` event with raw reasoning-like text
+omitted, `run.completed` maps to a completed status event, and tool/approval
+events reuse the existing `AgentActivityEvent` parity mappings. The Runs probe
+script now prints an observed normalization-policy summary, but production chat
+still uses `/api/hermes/chat/stream`. No production Runs stream route,
+server-side run stop, approval action route, composer Agent access selector,
+direct browser-to-Hermes path, Brain Memory BFF change, memory scope bridge
+change, stable-key change, storage path, or memory mutation/admin UI was
+added. See `docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md`. The next
+recommended slice is Slice 16D: Brain Memory MCP parity test in Runs flow.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

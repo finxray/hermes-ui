@@ -274,16 +274,33 @@ Deliver later:
 - cross-channel session discovery pagination when cross-channel sessions exist;
 - keyboard and accessibility preservation for all progressive loading.
 
+### 16C - Runs Event Normalization Parity With AgentActivityEvent
+
+Goal: map raw Hermes Runs event payloads into the existing
+`AgentActivityEvent` model before any experimental Runs UI execution mode.
+
+Status: completed in Slice 16C. See
+`docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md`.
+
+Deliver:
+
+- `message.delta` documented as assistant text buffer data, not activity rows;
+- `reasoning.available` mapped as a safe public signal without raw reasoning
+  text;
+- `run.completed`, failure, cancellation, tool, approval, and unknown event
+  parity checks;
+- probe reporting that summarizes observed event normalization policy;
+- no production chat switch, run stop, approval action, or Agent access
+  selector.
+
 ## Recommended Next Slice
 
-Slice 16C - Runs Event Normalization Parity With AgentActivityEvent.
+Slice 16D - Brain Memory MCP Parity Test In Runs Flow.
 
 Reason:
 
-- Slice 16B proved that the Web UI BFF can create one harmless Hermes run,
-  consume run events, and poll status without switching production chat away
-  from session streaming.
-- The next safe step is a docs/test-focused normalization parity slice for
-  `message.delta`, `reasoning.available`, `run.completed`, failures,
-  cancellation, tool events, and approval events before any experimental UI
-  execution mode exists.
+- Slice 16C proved the frontend can normalize raw Runs lifecycle, reasoning,
+  tool, approval, and unknown event shapes into `AgentActivityEvent`.
+- The next safe step is an opt-in BFF-mediated live parity probe proving whether
+  Runs can invoke Brain Memory MCP tools with the same project/session scope as
+  the current session-stream path.

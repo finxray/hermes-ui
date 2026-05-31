@@ -251,6 +251,28 @@ async function checkHelperBehavior() {
     "Approval helper produces a waiting display-only activity event for rendering."
   );
 
+  const runsDelta = activity.createActivityEventFromHermesRunsEvent({
+    delta: "token",
+    event: "message.delta",
+    run_id: "run-render-runs"
+  }, { id: "render-runs-delta" });
+  const runsReasoning = activity.createActivityEventFromHermesRunsEvent({
+    event: "reasoning.available",
+    run_id: "run-render-runs",
+    text: "do not render reasoning text"
+  }, { id: "render-runs-reasoning" });
+  const serializedReasoning = JSON.stringify(runsReasoning);
+
+  record(
+    "runs-event-helper-render-shape",
+    runsDelta === null &&
+      runsReasoning.type === "reasoning" &&
+      runsReasoning.title === "Thinking signal received" &&
+      runsReasoning.details.text === "[omitted: reasoning text not rendered]" &&
+      !serializedReasoning.includes("do not render reasoning text"),
+    "Runs event helper suppresses message deltas and renders reasoning.available as a safe public signal."
+  );
+
   const command = activity.createActivityEventFromHermesToolEvent({
     type: "tool_event",
     name: "run_command",

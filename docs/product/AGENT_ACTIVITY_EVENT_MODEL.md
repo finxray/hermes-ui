@@ -172,6 +172,13 @@ channel, ids, command/memory/approval/artifact display metadata, details
 previews, and activity timing while excluding secrets, binary data, raw stdout
 streams, and command rerun behavior.
 
+Slice 16C adds `createActivityEventFromHermesRunsEvent` for raw Hermes Runs
+JSON events. This keeps Runs event parity in the `AgentActivityEvent` model
+without changing the production chat path. Runs `message.delta` returns `null`
+because it belongs in the assistant text buffer, not the activity timeline.
+Runs `reasoning.available` becomes a generic public reasoning signal and omits
+raw reasoning-like text from details.
+
 Approval fields:
 
 ```ts
@@ -232,7 +239,8 @@ Future BFF run events should normalize:
 
 | Hermes run event | AgentActivityEvent mapping |
 | --- | --- |
-| `message.delta` | Assistant text buffer and optional streaming status. |
+| `message.delta` | Assistant text buffer only by default; no per-delta activity row. |
+| `reasoning.available` | `reasoning` / `info`, title `Thinking signal received`, raw reasoning-like text omitted. |
 | `tool.started` | Tool row running. |
 | `tool.completed` | Tool row completed. |
 | `tool.failed` | Tool/error row failed. |
@@ -242,6 +250,9 @@ Future BFF run events should normalize:
 | `run.completed` | Run summary/status completed. |
 | `run.failed` | Error row and run status failed. |
 | `run.cancelled` | Cancellation row/status cancelled. |
+
+Current implemented Runs mapping is documented in
+`docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md`.
 
 ## Memory Fields
 

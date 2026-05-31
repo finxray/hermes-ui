@@ -95,6 +95,9 @@ function printReport(report) {
   console.log(`- toolEvents: ${report.counts?.toolEvents ?? 0}`);
   console.log(`- brainMemoryToolEvents: ${report.counts?.brainMemoryToolEvents ?? 0}`);
   console.log(`- approvalEvents: ${report.counts?.approvalEvents ?? 0}`);
+  for (const line of normalizationPolicyLines(report.events ?? [])) {
+    console.log(`- normalizedActivity: ${line}`);
+  }
   console.log(`- assistantTextPreview: ${report.assistantTextPreview || "none"}`);
   console.log(`- outputPreview: ${report.outputPreview || "none"}`);
   if (report.error) {
@@ -104,4 +107,30 @@ function printReport(report) {
 
 function ensureTrailingSlash(value) {
   return value.endsWith("/") ? value : `${value}/`;
+}
+
+function normalizationPolicyLines(events) {
+  const counts = new Map();
+  for (const event of events) {
+    const eventType = event?.event || "unknown";
+    counts.set(eventType, (counts.get(eventType) ?? 0) + 1);
+  }
+  return Array.from(counts.entries()).map(([eventType, count]) => {
+    if (eventType === "message.delta") {
+      return `${eventType} x${count} -> assistant text buffer only`;
+    }
+    if (eventType === "reasoning.available") {
+      return `${eventType} x${count} -> safe public reasoning signal`;
+    }
+    if (eventType === "run.completed") {
+      return `${eventType} x${count} -> completed AgentActivityEvent status`;
+    }
+    if (eventType.startsWith("tool.")) {
+      return `${eventType} x${count} -> tool/memory/command AgentActivityEvent`;
+    }
+    if (eventType.startsWith("approval.")) {
+      return `${eventType} x${count} -> display-only approval AgentActivityEvent`;
+    }
+    return `${eventType} x${count} -> compact informational AgentActivityEvent`;
+  });
 }

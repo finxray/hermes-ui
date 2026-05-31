@@ -87,6 +87,15 @@ Slice 13L keeps the BFF normalizer unchanged and adds structured command
 metadata extraction in the frontend activity mapper. Command output rendering
 is display-only; the browser does not execute commands or call Hermes directly.
 
+Slice 16C adds a dedicated frontend adapter for raw Hermes Runs JSON event
+payloads. It maps `/v1/runs/{run_id}/events` payloads into the same
+`AgentActivityEvent` model without switching production chat away from the
+session stream. `message.delta` remains assistant text buffer data and does not
+produce one activity row per delta. `reasoning.available` maps to a generic,
+public `reasoning` signal titled `Thinking signal received`; raw
+reasoning-like text fields are omitted from details so hidden/private
+chain-of-thought is not rendered.
+
 ## Target Normalization Boundary
 
 Future boundary:
@@ -129,7 +138,8 @@ For `/v1/runs` and `/v1/runs/{run_id}/events`:
 
 | Hermes event payload field | Target handling |
 | --- | --- |
-| `event: "message.delta"` | Assistant text buffer plus streaming status. |
+| `event: "message.delta"` | Assistant text buffer only by default; no per-delta `AgentActivityEvent`. |
+| `event: "reasoning.available"` | Public `reasoning`/`info` signal with raw reasoning-like text omitted. |
 | `event: "approval.request"` | Approval activity, status `waiting_for_approval`. |
 | `event: "approval.responded"` | Complete approval row with chosen response. |
 | `event: "run.completed"` | Run summary, status `completed`. |
@@ -139,7 +149,10 @@ For `/v1/runs` and `/v1/runs/{run_id}/events`:
 | Tool callback events | Tool rows with running/completed/failed/progress. |
 
 Run event SSE currently sends JSON inside `data:` frames rather than named SSE
-event fields. The BFF should parse both styles.
+event fields. The BFF should parse both styles. Slice 16C covers frontend
+normalization of the raw payload shape only; future production Runs streaming
+still needs a BFF execution route, assistant text buffering, and correlation
+with local `RunRecord` state before any default switch.
 
 ## Approval Mapping
 

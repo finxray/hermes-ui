@@ -32,6 +32,7 @@ const requiredFiles = [
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
+  "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 
@@ -175,6 +176,11 @@ const hermesRunsProbeCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_PROBE_16B.md"), "utf8")
   : "";
+const hermesRunsEventNormalizationCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -188,6 +194,10 @@ const hermesRunsProbeScript = existsSync(join(root, "scripts/hermes-runs-probe.m
   ? readFileSync(join(root, "scripts/hermes-runs-probe.mjs"), "utf8")
   : "";
 const hermesClientSource = readFileSync(join(root, "packages/hermes-client/src/index.ts"), "utf8");
+const agentActivityEventsSource = readFileSync(
+  join(root, "apps/web/src/lib/agentActivityEvents.ts"),
+  "utf8"
+);
 
 for (const token of [
   "Read-only detail",
@@ -550,10 +560,28 @@ for (const token of [
   "Server-side run stop remains untested",
   "Approval actions remain untested",
   "composer Agent access selector was not implemented",
-  "Slice 16C: Runs event normalization parity with AgentActivityEvent"
+  "HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
+  "Slice 16D: Brain Memory MCP parity test in Runs flow"
 ]) {
   if (!hermesRunsProbeCheckpoint.includes(token)) {
     failures.push(`Hermes Runs probe checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Event Normalization 16C",
+  "createActivityEventFromHermesRunsEvent",
+  "`message.delta`",
+  "`reasoning.available`",
+  "Thinking signal received",
+  "[omitted: reasoning text not rendered]",
+  "`run.completed`",
+  "Production chat was not switched to Runs",
+  "composer Agent access selector was not implemented",
+  "Slice 16D: Brain Memory MCP parity test in Runs flow"
+]) {
+  if (!hermesRunsEventNormalizationCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs event normalization checkpoint is missing token: ${token}`);
   }
 }
 
@@ -571,6 +599,7 @@ for (const token of [
   "/api/hermes/runs/probe",
   "--require-hermes",
   "--base-url",
+  "normalizedActivity",
   "brainMemoryToolEvents",
   "approvalEvents"
 ]) {
@@ -592,6 +621,22 @@ for (const token of [
 ]) {
   if (!hermesClientSource.includes(token)) {
     failures.push(`Hermes client Runs probe helper is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "createActivityEventFromHermesRunsEvent",
+  "normalizeHermesRunsEventType",
+  "summarizeHermesRunsEvent",
+  "eventType === \"message.delta\"",
+  "eventType === \"reasoning.available\"",
+  "Thinking signal received",
+  "[omitted: reasoning text not rendered]",
+  "titleFromHermesRunsEvent",
+  "hermesRunsToolStatus"
+]) {
+  if (!agentActivityEventsSource.includes(token)) {
+    failures.push(`Agent activity Runs normalizer is missing token: ${token}`);
   }
 }
 

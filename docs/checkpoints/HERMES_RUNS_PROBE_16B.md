@@ -211,6 +211,9 @@ Use Slice 16C to build a focused Runs event normalization parity contract with
 `AgentActivityEvent`, including `message.delta`, `reasoning.available`,
 `run.completed`, `run.failed`, cancellation, tool events, and approval events.
 
+Slice 16C completed that frontend normalization parity layer. See
+`docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md`.
+
 ## Next Recommended Slice
 
-Slice 16C: Runs event normalization parity with AgentActivityEvent.
+Slice 16D: Brain Memory MCP parity test in Runs flow.

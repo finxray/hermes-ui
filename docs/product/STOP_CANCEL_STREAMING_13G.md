@@ -180,6 +180,16 @@ composer itself runs through a durable `/v1/runs` execution path, Studio stop
 behavior remains client/BFF stream abort and must continue reporting
 `serverSideRunStop: false`.
 
+Slice 16M update:
+
+`docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md` defines the
+future production Runs stop contract. Browser stop should call only the Web UI
+BFF with local run correlation, the BFF should validate ownership and call
+`POST /v1/runs/{run_id}/stop`, and the UI should reconcile
+`stopping -> stopped` or `stopping -> cancelled` from events/status before
+marking the `RunRecord` terminal. This remains future contract work and does
+not change the current session-stream stop behavior.
+
 ## Boundaries Confirmed
 
 No Brain Memory BFF logic changed.

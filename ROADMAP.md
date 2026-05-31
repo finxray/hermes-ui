@@ -1028,6 +1028,21 @@ added. See
 recommended slice is Slice 16M: gated production Runs execution state machine
 contract.
 
+## Checkpoint: Slice 16M Hermes Runs execution state machine
+
+Slice 16M defined the future gated production Runs execution state machine in
+`docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`. The contract
+covers `idle`, `preparing_context`, `creating_run`, `streaming_events`,
+`waiting_for_approval`, `stopping`, `stopped`, `completed`, `failed`,
+`reconnecting`, `replaying`, and `cancelled`; Browser/BFF/Hermes/Brain Memory
+responsibilities; stop and approval contracts; future Agent access selector
+policy mapping; migration gates; and rollback to `/api/hermes/chat/stream`.
+Production chat still uses the session stream; experimental Runs remains
+flag-gated; no production Runs composer switch, approval buttons, direct
+browser-to-Hermes/Gateway path, storage path, memory admin UI, provider/model
+switching, or composer Agent access selector was added. The next recommended
+slice is Slice 16N: BFF production Runs route contract and event envelope.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

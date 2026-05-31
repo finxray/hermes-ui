@@ -339,3 +339,16 @@ This remains a smoke/test path only. Production chat still uses
 browser-to-Hermes or browser-to-Gateway path was added; and the composer Agent
 access selector was not implemented. See
 `docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md`.
+
+## Slice 16M State Machine Update
+
+Slice 16M defines how a future production Runs option should move through
+`idle`, `preparing_context`, `creating_run`, `streaming_events`,
+`waiting_for_approval`, `stopping`, `stopped`, `completed`, `failed`,
+`reconnecting`, `replaying`, and `cancelled`.
+
+The state machine keeps this replay decision intact: `RunRecord.id` remains
+local, Hermes `run_id` stays in `hermesRunId`, `message.delta` belongs in the
+assistant transcript buffer, and `activityReplay[]` stores only bounded
+redacted non-delta activity. See
+`docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`.

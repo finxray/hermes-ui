@@ -44,6 +44,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md",
   "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md",
   "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md",
+  "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -240,6 +241,11 @@ const hermesRunsReplayUiHydrationCheckpoint = existsSync(
   join(root, "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md")
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md"), "utf8")
+  : "";
+const hermesRunsExecutionStateMachine = existsSync(
+  join(root, "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md")
+)
+  ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md"), "utf8")
   : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
@@ -1126,6 +1132,36 @@ for (const token of [
 ]) {
   if (!hermesRunsReplayUiHydrationCheckpoint.includes(token)) {
     failures.push(`Hermes Runs replay UI hydration checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Execution State Machine 16M",
+  "session stream remains the production default",
+  "HERMES_UI_EXPERIMENTAL_RUNS_MODE",
+  "idle",
+  "preparing_context",
+  "creating_run",
+  "streaming_events",
+  "waiting_for_approval",
+  "stopping",
+  "reconnecting",
+  "replaying",
+  "Browser Responsibilities",
+  "BFF Responsibilities",
+  "Stop Contract",
+  "Approval Contract",
+  "Agent Access Selector Future Contract",
+  "Migration Gates",
+  "Rollback Plan",
+  "future-only",
+  "No production Runs execution implementation",
+  "No production composer Runs selector",
+  "No direct browser-to-Hermes",
+  "Slice 16N"
+]) {
+  if (!hermesRunsExecutionStateMachine.includes(token)) {
+    failures.push(`Hermes Runs execution state machine doc is missing token: ${token}`);
   }
 }
 

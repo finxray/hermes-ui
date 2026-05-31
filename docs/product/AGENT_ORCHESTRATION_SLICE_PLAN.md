@@ -459,14 +459,34 @@ Deliver:
 - no production chat switch, composer Agent access selector, approval buttons,
   provider/model switching, direct browser-to-Hermes path, or memory admin UI.
 
+### 16M - Gated Production Runs Execution State Machine Contract
+
+Goal: define the production Runs state machine and migration gates before any
+composer switch.
+
+Status: completed in Slice 16M. See
+`docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`.
+
+Deliver:
+
+- state machine for `idle`, `preparing_context`, `creating_run`,
+  `streaming_events`, `waiting_for_approval`, `stopping`, `stopped`,
+  `completed`, `failed`, `reconnecting`, `replaying`, and `cancelled`;
+- Browser/BFF/Hermes/Brain Memory responsibility split;
+- future server-side Runs stop contract;
+- future Runs approval action contract;
+- future Agent access selector policy mapping;
+- migration gates and rollback plan;
+- no production chat switch, production Runs composer selector, approval
+  buttons, direct browser-to-Hermes path, or memory admin UI.
+
 ## Recommended Next Slice
 
-Slice 16M - gated production Runs execution state machine contract.
+Slice 16N - BFF production Runs route contract and event envelope.
 
 Reason:
 
-- Slice 16L proves the existing UI can render a Runs-backed record after
-  isolated test hydration.
-- The next safe step is to define the future flag-gated production state
-  machine for create/update/complete/stop/reconcile behavior before wiring it
-  into the composer.
+- Slice 16M defines the lifecycle states and responsibility split.
+- The next safe step is to specify future BFF request, response, stream event,
+  stop, approval, validation, and rollback envelopes before any browser
+  composer option exists.

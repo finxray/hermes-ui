@@ -694,3 +694,15 @@ experimental Runs remains flag-gated.
 
 See `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`. The next
 recommended slice is Slice 16K: experimental Runs RunRecord/replay prototype.
+
+## Slice 16M State Machine Update
+
+Slice 16M adds the production Runs execution state machine contract in
+`docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`.
+
+The 16A decision still stands: session stream remains the production default.
+Runs may become a production composer option only after a BFF-owned
+submit/events/status lifecycle, server-side stop, approval policy, replay
+updates, reconnect behavior, browser smokes, source checks, and rollback gates
+are implemented and verified. No production Runs composer switch was added in
+16M.

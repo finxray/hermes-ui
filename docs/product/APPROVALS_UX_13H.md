@@ -148,6 +148,20 @@ Broader regression checks should still run before merging each slice:
 - Auth/classification policy for approval-sensitive actions.
 - Gateway-mediated Brain Memory admin/mutation actions.
 
+## Slice 16M Runs Approval Contract Update
+
+Slice 16M defines the future Runs approval action contract without adding
+buttons. A future Runs-backed composer may enter `waiting_for_approval` after
+the BFF observes `approval.request`. The browser may submit a choice only to
+the Web UI BFF, and the BFF must validate run ownership, project/session scope,
+allowed choices, and Agent access policy before calling
+`/v1/runs/{run_id}/approval`.
+
+Approval controls remain unavailable on the current session-stream composer.
+The Agent access selector is documented as future-only and must not appear
+enabled until enforcement exists. See
+`docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`.
+
 ## Next Recommended Slice
 
 Slice 13I - Files/Artifacts Panel.

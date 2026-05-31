@@ -656,3 +656,23 @@ Gateway path, direct storage path, or memory mutation/admin UI was added.
 
 See `docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md`. The next
 recommended slice is Slice 16I: Runs Brain Memory live env/runbook hardening.
+
+## Slice 16I Env Hardening Update
+
+Slice 16I hardened the Runs + Brain Memory live smoke diagnostics without
+changing the production default. The Runs memory probe now reports redacted Web
+UI BFF env posture and a normalized `blockerCategory` such as
+`brain_memory_key_missing`, `brain_memory_key_unauthorized`,
+`brain_memory_ui_bearer_unauthorized`, `scope_mismatch`, or
+`runs_mcp_failure`.
+
+The runbook now distinguishes `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`, which
+authorizes tenant-bound search/inspect readback, from `BRAIN_MEMORY_UI_API_KEY`,
+which is only the optional `/ui/**` bearer gate. The local MCP posture remains
+`BRAIN_MEMORY_DEFAULT_TENANT_ID=local-dev`.
+
+Production chat still uses `/api/hermes/chat/stream`, and experimental Runs
+remains flag-gated.
+
+See `docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md`. The next
+recommended slice is Slice 16J: Runs replay/history reconciliation plan.

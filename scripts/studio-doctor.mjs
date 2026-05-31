@@ -323,8 +323,14 @@ function makeSuggestions(currentReport) {
     !currentReport.env.brainMemory.gatewayMemoryApiKeySet
   ) {
     suggestions.push(
-      "For real memory search, set BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY unless Gateway loopback dev bypass is explicitly enabled."
+      "For real memory search and Runs memory smokes, set BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY unless Gateway loopback dev bypass is explicitly enabled."
     );
+  }
+  if (currentReport.services.brainMemoryDirect.httpStatus === 401) {
+    suggestions.push("Brain Memory Gateway returned 401: check optional BRAIN_MEMORY_UI_API_KEY, not the tenant memory key.");
+  }
+  if (currentReport.services.brainMemoryDirect.httpStatus === 403) {
+    suggestions.push("Brain Memory Gateway returned 403: check BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY tenant authorization.");
   }
   if (currentReport.installMode === "bundle-ready") {
     suggestions.push("Run npm run dev, then npm run studio:open to use the bundle-ready local setup.");
@@ -367,6 +373,7 @@ function printReport(currentReport) {
   );
   console.log(`Brain Memory real mode: ${currentReport.env.brainMemory.enableRealGateway || "(not set)"}`);
   console.log(`Brain Memory UI state: ${currentReport.brainMemoryUi}`);
+  console.log("Brain Memory key roles: UI API key is optional bearer auth; tenant memory key authorizes scoped memory reads.");
   console.log("");
 
   console.log("Services");

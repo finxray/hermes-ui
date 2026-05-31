@@ -225,12 +225,21 @@ BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8080
 BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true
 BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY=<redacted tenant-bound read key>
 BRAIN_MEMORY_UI_API_KEY=<optional redacted UI bearer>
+BRAIN_MEMORY_MCP_API_KEY_SET=<optional redacted boolean for diagnostics>
 ```
 
 Notes:
 
-- `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` authorizes tenant-bound search/detail.
-- `BRAIN_MEMORY_UI_API_KEY` is only the optional `/ui/**` bearer gate.
+- `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` authorizes tenant-bound search/detail
+  from the Web UI BFF and is required for reliable Runs + Brain Memory live
+  smokes unless Gateway local-dev bypass is intentionally enabled.
+- `BRAIN_MEMORY_UI_API_KEY` is only the optional `/ui/**` bearer gate. A 401
+  usually means this optional bearer is missing or invalid.
+- A 403 on search/detail usually means the tenant-bound memory key is missing,
+  wrong, or not authorized for the active tenant/scope.
+- `BRAIN_MEMORY_MCP_API_KEY_SET` is a redacted diagnostics-only boolean. Hermes
+  MCP still needs its own Brain Memory API key posture; do not copy the key
+  value into docs or browser-visible config.
 - Restart the Web UI process after changing `apps/web/.env.local`.
 
 Verify Gateway directly:
@@ -276,6 +285,56 @@ Expected auth failure meanings:
 
 The UI must still access Brain Memory only through the Web UI BFF and Gateway.
 Do not add direct browser-to-Gateway calls or direct storage access.
+
+## Runs + Brain Memory Live Env Posture
+
+Hermes Runs memory smokes use the same BFF readback path as the Brain Memory
+console plus the Hermes MCP write path:
+
+```text
+script -> Web UI BFF /api/hermes/runs/memory-probe
+  -> Hermes /v1/runs
+  -> Hermes Brain Memory MCP -> Brain Memory Gateway
+  -> Web UI BFF Brain Memory search/inspect readback
+```
+
+Required Web UI BFF env:
+
+```text
+HERMES_API_BASE_URL=http://127.0.0.1:8642
+HERMES_UI_ENABLE_REAL_HERMES=true
+BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8080
+BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true
+BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY=<redacted tenant-bound read key>
+BRAIN_MEMORY_UI_API_KEY=<optional redacted UI bearer if Gateway requires it>
+```
+
+Required Hermes MCP posture:
+
+```text
+BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8080
+BRAIN_MEMORY_DEFAULT_TENANT_ID=local-dev
+BRAIN_MEMORY_API_KEY=<redacted MCP/Gateway key>
+BRAIN_MEMORY_CALLER_LABEL=<local caller label>
+```
+
+The canonical local MVP tenant is `local-dev`; Web UI project/session stable
+keys, Hermes MCP default tenant, and Gateway key authorization should agree on
+that tenant.
+
+Verification:
+
+```powershell
+npm run smoke:hermes:runs:memory -- --base-url http://127.0.0.1:3002 --require-hermes --require-brain-memory
+node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url http://127.0.0.1:3002
+```
+
+The Runs memory probe prints redacted env posture and a normalized blocker
+category when it fails. Categories include `hermes_unreachable`,
+`brain_memory_disabled`, `brain_memory_gateway_unreachable`,
+`brain_memory_key_missing`, `brain_memory_key_unauthorized`,
+`brain_memory_ui_bearer_unauthorized`, `marker_not_stored`,
+`marker_not_found`, `scope_mismatch`, `runs_mcp_failure`, and `unknown`.
 
 ## Smoke Test Matrix
 

@@ -39,6 +39,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md",
+  "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
   "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md",
@@ -215,6 +216,11 @@ const hermesRunsDefaultDecisionCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md"), "utf8")
   : "";
+const hermesRunsBrainMemoryEnvCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -248,6 +254,9 @@ const hermesRunsApprovalProbeScript = existsSync(join(root, "scripts/hermes-runs
   : "";
 const hermesRunsExperimentalChatScript = existsSync(join(root, "scripts/hermes-runs-experimental-chat.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-experimental-chat.mjs"), "utf8")
+  : "";
+const hermesRunsMemoryProbeScript = existsSync(join(root, "scripts/hermes-runs-memory-probe.mjs"))
+  ? readFileSync(join(root, "scripts/hermes-runs-memory-probe.mjs"), "utf8")
   : "";
 const hermesRunsStopProbeScript = existsSync(join(root, "scripts/hermes-runs-stop-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-stop-probe.mjs"), "utf8")
@@ -801,6 +810,19 @@ for (const token of [
 }
 
 for (const token of [
+  "blockerCategory",
+  "brainMemoryGatewayMemoryKeySet",
+  "brainMemoryUiBearerSet",
+  "brain_memory_key_missing",
+  "brain_memory_ui_bearer_unauthorized",
+  "runs_mcp_failure"
+]) {
+  if (!hermesRunsMemoryProbeScript.includes(token)) {
+    failures.push(`Hermes Runs memory probe script is missing diagnostics token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsProbe",
   "HERMES_RUNS_PROBE_PROMPT",
   "HERMES_RUNS_PROBE_EXPECTED_TEXT",
@@ -899,6 +921,22 @@ for (const token of [
   }
 }
 
+for (const token of [
+  "blockerCategory",
+  "envPosture",
+  "brain_memory_gateway_unreachable",
+  "brain_memory_key_missing",
+  "brain_memory_key_unauthorized",
+  "brain_memory_ui_bearer_unauthorized",
+  "marker_not_found",
+  "scope_mismatch",
+  "runs_mcp_failure"
+]) {
+  if (!hermesRunsMemoryProbeRoute.includes(token)) {
+    failures.push(`Hermes Runs memory probe route is missing diagnostics token: ${token}`);
+  }
+}
+
 if (!packageJson.includes("\"smoke:hermes:runs:memory\"")) {
   failures.push("package.json is missing smoke:hermes:runs:memory script.");
 }
@@ -927,6 +965,22 @@ for (const token of [
 ]) {
   if (!hermesRunsDefaultDecisionCheckpoint.includes(token)) {
     failures.push(`Hermes Runs default decision checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Brain Memory Env Hardening 16I",
+  "BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY",
+  "BRAIN_MEMORY_UI_API_KEY",
+  "BRAIN_MEMORY_DEFAULT_TENANT_ID=local-dev",
+  "brain_memory_key_missing",
+  "brain_memory_ui_bearer_unauthorized",
+  "session stream remains the production default",
+  "experimental Runs remains flag-gated",
+  "Slice 16J: Runs replay/history reconciliation plan"
+]) {
+  if (!hermesRunsBrainMemoryEnvCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs Brain Memory env checkpoint is missing token: ${token}`);
   }
 }
 

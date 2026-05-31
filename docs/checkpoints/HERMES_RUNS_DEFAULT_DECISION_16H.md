@@ -189,3 +189,14 @@ Slice 16I: Runs Brain Memory live env/runbook hardening.
 Reason: before any production default migration, the team needs a repeatable
 local/release runbook and guardrail check proving that the Web UI BFF has the
 required Brain Memory live env for Runs memory readback.
+
+## Slice 16I Follow-Up
+
+Slice 16I added that env/runbook hardening. The Runs memory probe now reports
+redacted Web UI BFF env posture plus normalized blocker categories for Hermes
+reachability, Brain Memory Gateway reachability, tenant memory key
+missing/unauthorized, optional UI bearer unauthorized, marker readback,
+scope mismatch, and Runs/MCP failure.
+
+This does not change the 16H decision: session stream remains the production
+default and Hermes Runs remains experimental.

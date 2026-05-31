@@ -961,6 +961,22 @@ memory mutation/admin UI was added. See
 `docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md`. The next recommended
 slice is Slice 16I: Runs Brain Memory live env/runbook hardening.
 
+## Checkpoint: Slice 16I Hermes Runs Brain Memory env hardening
+
+Slice 16I hardened the live env/runbook path for Runs + Brain Memory smokes.
+The Runs memory probe now returns redacted Web UI BFF env posture and a
+normalized blocker category for Hermes reachability, Gateway reachability,
+tenant memory key missing/unauthorized, optional UI bearer unauthorized,
+marker/search failures, scope mismatch, and Runs/MCP failures. Env templates
+and runbooks now distinguish `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` from the
+optional `BRAIN_MEMORY_UI_API_KEY` and document the local `local-dev` Hermes
+MCP posture. Production chat still uses `/api/hermes/chat/stream`; experimental
+Runs remains flag-gated; no direct browser-to-Hermes/Gateway path, storage
+path, memory admin UI, approval buttons, provider/model switching, or composer
+Agent access selector was added. See
+`docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md`. The next
+recommended slice is Slice 16J: Runs replay/history reconciliation plan.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

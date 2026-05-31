@@ -7,6 +7,7 @@ import {
   type NormalizedBrainMemorySearchResponse
 } from "@hermes-ui/brain-memory-client";
 import {
+  getHermesStatus,
   runHermesRunsProbe,
   type HermesChatContext,
   type HermesRunsProbeResult
@@ -22,12 +23,33 @@ export const runtime = "nodejs";
 const ACK_TEXT = "BM_RUNS_MEMORY_STORED";
 const DEFAULT_TIMEOUT_MS = 35_000;
 const MAX_BODY_BYTES = 8_000;
+const BLOCKER_CATEGORIES = [
+  "hermes_unreachable",
+  "brain_memory_disabled",
+  "brain_memory_gateway_unreachable",
+  "brain_memory_key_missing",
+  "brain_memory_key_unauthorized",
+  "brain_memory_ui_bearer_unauthorized",
+  "marker_not_stored",
+  "marker_not_found",
+  "scope_mismatch",
+  "runs_mcp_failure",
+  "unknown"
+] as const;
+
+type BlockerCategory = (typeof BLOCKER_CATEGORIES)[number];
 
 export async function POST(request: Request) {
   const body = await readOptionalBody(request);
   const marker = sanitizeMarker(body.marker) ?? makeMarker();
   const context = makeProbeContext(body);
   const checkedAt = new Date().toISOString();
+  const hermesConfig = {
+    apiKey: process.env.HERMES_API_KEY,
+    baseUrl: process.env.HERMES_API_BASE_URL,
+    enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
+    timeoutMs: DEFAULT_TIMEOUT_MS
+  };
   const brainMemoryConfig = {
     baseUrl: process.env.BRAIN_MEMORY_GATEWAY_URL,
     enabled: process.env.BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY === "true",
@@ -36,31 +58,57 @@ export async function POST(request: Request) {
     timeoutMs: 7_500,
     uiApiKey: process.env.BRAIN_MEMORY_UI_API_KEY
   };
+  const envPosture = brainMemoryEnvPosture();
+  const hermesStatus = await getHermesStatus(hermesConfig);
 
   const brainMemoryStatus = await getBrainMemoryStatus(brainMemoryConfig);
-  if (brainMemoryStatus.mode !== "real" || brainMemoryStatus.reachable !== true) {
+  if (hermesStatus.mode !== "real" || hermesStatus.reachable !== true) {
+    const blocker = {
+      category: "hermes_unreachable" as const,
+      message: "Hermes is not real/reachable for the Runs memory probe."
+    };
     return json({
       ok: false,
       mode: "skipped",
       checkedAt,
       marker,
       context: publicContext(context),
+      hermesStatus,
       brainMemoryStatus,
+      envPosture,
+      blockerCategory: blocker.category,
+      blocker: blocker.message,
+      error: {
+        kind: hermesStatus.error?.kind ?? "unconfigured",
+        message: blocker.message
+      },
+      safety: safetySummary()
+    });
+  }
+
+  if (brainMemoryStatus.mode !== "real" || brainMemoryStatus.reachable !== true) {
+    const blocker = classifyBrainMemoryStatusBlocker(brainMemoryStatus);
+    return json({
+      ok: false,
+      mode: "skipped",
+      checkedAt,
+      marker,
+      context: publicContext(context),
+      hermesStatus,
+      brainMemoryStatus,
+      envPosture,
+      blockerCategory: blocker.category,
+      blocker: blocker.message,
       error: {
         kind: brainMemoryStatus.error?.kind ?? "unconfigured",
-        message: "Brain Memory Gateway is not real/reachable for the Runs memory probe."
+        message: blocker.message
       },
       safety: safetySummary()
     });
   }
 
   const run = await runHermesRunsProbe(
-    {
-      apiKey: process.env.HERMES_API_KEY,
-      baseUrl: process.env.HERMES_API_BASE_URL,
-      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
-      timeoutMs: DEFAULT_TIMEOUT_MS
-    },
+    hermesConfig,
     {
       expectedText: ACK_TEXT,
       instructions: makeMemoryProbeInstructions(context),
@@ -111,6 +159,9 @@ export async function POST(request: Request) {
     scope.differentProjectAbsent &&
     scope.differentSessionAbsent &&
     normalization.memoryActivityEvents > 0;
+  const blocker = parityPassed
+    ? null
+    : classifyBlocker({ envPosture, inspect, normalization, run, sameSessionSearch, scope });
 
   return json({
     ok: parityPassed,
@@ -119,7 +170,9 @@ export async function POST(request: Request) {
     marker,
     expectedText: ACK_TEXT,
     context: publicContext(context),
+    hermesStatus,
     brainMemoryStatus,
+    envPosture,
     tenantPosture: {
       redactedPosture: redactTenantScopePosture({
         allowedTenants: parseAllowedTenants(process.env.BRAIN_MEMORY_ALLOWED_TENANTS_SUMMARY),
@@ -138,7 +191,8 @@ export async function POST(request: Request) {
     inspect: summarizeInspect(inspect),
     scope,
     safety: safetySummary(),
-    blocker: parityPassed ? null : blockerFor({ inspect, normalization, run, sameSessionSearch, scope })
+    blockerCategory: blocker?.category ?? null,
+    blocker: blocker?.message ?? null
   });
 }
 
@@ -263,32 +317,140 @@ function summarizeInspect(response: NormalizedBrainMemoryInspectResponse | null)
   };
 }
 
-function blockerFor(args: {
+function classifyBlocker(args: {
+  envPosture: ReturnType<typeof brainMemoryEnvPosture>;
   inspect: NormalizedBrainMemoryInspectResponse | null;
   normalization: ReturnType<typeof summarizeRunsNormalization>;
   run: HermesRunsProbeResult;
   sameSessionSearch: Awaited<ReturnType<typeof waitForMarkerSearch>> | null;
   scope: ReturnType<typeof summarizeScope>;
-}) {
+}): { category: BlockerCategory; message: string } {
   if (!args.run.ok) {
-    return "Hermes Runs memory probe did not complete with the expected acknowledgement.";
+    if (args.run.counts.brainMemoryToolEvents === 0) {
+      return {
+        category: "runs_mcp_failure",
+        message: "Hermes Runs did not expose a Brain Memory tool event for the memory probe."
+      };
+    }
+    return {
+      category: "marker_not_stored",
+      message: "Hermes Runs memory probe did not complete with the expected acknowledgement."
+    };
+  }
+  const searchError = args.sameSessionSearch?.response?.error ?? null;
+  const searchAuthBlocker = classifyBrainMemoryReadError(searchError, args.envPosture);
+  if (searchAuthBlocker) {
+    return searchAuthBlocker;
   }
   if (!args.sameSessionSearch?.found) {
-    return "Hermes replied, but Brain Memory BFF search did not find the marker in the same project/session scope.";
+    return {
+      category: "marker_not_found",
+      message: "Hermes replied, but Brain Memory BFF search did not find the marker in the same project/session scope."
+    };
+  }
+  const inspectAuthBlocker = classifyBrainMemoryReadError(args.inspect?.error ?? null, args.envPosture);
+  if (inspectAuthBlocker) {
+    return inspectAuthBlocker;
   }
   if (!args.inspect?.detail) {
-    return "Brain Memory BFF inspect did not return detail for the stored marker.";
+    return {
+      category: "marker_not_found",
+      message: "Brain Memory BFF inspect did not return detail for the stored marker."
+    };
   }
   if (!args.scope.inspectMatchesProject || !args.scope.inspectMatchesSession) {
-    return "Brain Memory inspect detail did not match the expected project/session scope.";
+    return {
+      category: "scope_mismatch",
+      message: "Brain Memory inspect detail did not match the expected project/session scope."
+    };
   }
   if (!args.scope.differentProjectAbsent || !args.scope.differentSessionAbsent) {
-    return "Brain Memory scope isolation failed for different project or different session search.";
+    return {
+      category: "scope_mismatch",
+      message: "Brain Memory scope isolation failed for different project or different session search."
+    };
   }
   if (args.normalization.memoryActivityEvents === 0) {
-    return "Runs completed and BFF search found the marker, but no Brain Memory tool event was exposed in the Runs event stream.";
+    return {
+      category: "runs_mcp_failure",
+      message: "Runs completed and BFF search found the marker, but no Brain Memory tool event was exposed in the Runs event stream."
+    };
   }
-  return "Runs Brain Memory parity did not satisfy all required checks.";
+  return {
+    category: "unknown",
+    message: "Runs Brain Memory parity did not satisfy all required checks."
+  };
+}
+
+function classifyBrainMemoryStatusBlocker(
+  status: Awaited<ReturnType<typeof getBrainMemoryStatus>>
+): { category: BlockerCategory; message: string } {
+  if (status.error?.kind === "disabled" || status.error?.kind === "unconfigured" || status.mode === "mock") {
+    return {
+      category: "brain_memory_disabled",
+      message: "Brain Memory real Gateway mode is disabled or unconfigured for the Web UI BFF."
+    };
+  }
+  if (status.error?.kind === "unauthorized") {
+    return {
+      category: "brain_memory_ui_bearer_unauthorized",
+      message: "Brain Memory Gateway rejected the optional UI bearer during status/capability checks."
+    };
+  }
+  if (status.error?.kind === "network" || status.error?.kind === "timeout") {
+    return {
+      category: "brain_memory_gateway_unreachable",
+      message: "Brain Memory Gateway URL is configured but unreachable from the Web UI BFF."
+    };
+  }
+  return {
+    category: "brain_memory_gateway_unreachable",
+    message: "Brain Memory Gateway is not real/reachable for the Runs memory probe."
+  };
+}
+
+function classifyBrainMemoryReadError(
+  error: NormalizedBrainMemorySearchResponse["error"] | NormalizedBrainMemoryInspectResponse["error"],
+  envPosture: ReturnType<typeof brainMemoryEnvPosture>
+): { category: BlockerCategory; message: string } | null {
+  if (!error) {
+    return null;
+  }
+  if (error.kind === "unauthorized") {
+    return {
+      category: "brain_memory_ui_bearer_unauthorized",
+      message: envPosture.uiBearerSet
+        ? "Brain Memory Gateway rejected the configured optional UI bearer."
+        : "Brain Memory Gateway requires an optional UI bearer, but BRAIN_MEMORY_UI_API_KEY is not set for the Web UI BFF."
+    };
+  }
+  if (error.kind === "forbidden") {
+    return {
+      category: envPosture.gatewayMemoryKeySet ? "brain_memory_key_unauthorized" : "brain_memory_key_missing",
+      message: envPosture.gatewayMemoryKeySet
+        ? "Brain Memory Gateway rejected the tenant-bound memory key for this project/session scope."
+        : "Brain Memory Gateway requires BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY for tenant-bound memory reads."
+    };
+  }
+  if (error.kind === "network" || error.kind === "timeout") {
+    return {
+      category: "brain_memory_gateway_unreachable",
+      message: "Brain Memory Gateway became unreachable during search/inspect readback."
+    };
+  }
+  return null;
+}
+
+function brainMemoryEnvPosture() {
+  return {
+    realGatewayEnabled: process.env.BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY === "true",
+    gatewayUrlConfigured: Boolean(process.env.BRAIN_MEMORY_GATEWAY_URL?.trim()),
+    gatewayMemoryKeySet: Boolean(process.env.BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY?.trim()),
+    legacyApiKeySet: Boolean(process.env.BRAIN_MEMORY_API_KEY?.trim()),
+    uiBearerSet: Boolean(process.env.BRAIN_MEMORY_UI_API_KEY?.trim()),
+    mcpApiKeyObservedByWebUi: process.env.BRAIN_MEMORY_MCP_API_KEY_SET === "true",
+    expectedLocalTenantId: "local-dev"
+  };
 }
 
 function findMarkerResult(response: NormalizedBrainMemorySearchResponse, marker: string) {

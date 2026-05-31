@@ -1350,7 +1350,13 @@ function makeSuggestions() {
     suggestions.push("Hermes was required. Start Hermes API, verify HERMES_API_BASE_URL, and restart the Web UI after env changes.");
   }
   if (report.env.brainMemory.enableRealGateway === "true" && !report.env.brainMemory.gatewayMemoryApiKeySet) {
-    suggestions.push("Brain Memory live mode is enabled; set BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY unless Gateway dev bypass is intentional.");
+    suggestions.push("Brain Memory live mode is enabled; set BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY for tenant-bound search/detail and Runs memory smokes unless Gateway dev bypass is intentional.");
+  }
+  if (report.services.brainMemoryDirect?.status === 401) {
+    suggestions.push("Brain Memory Gateway returned 401. Check optional BRAIN_MEMORY_UI_API_KEY; it is separate from the tenant memory key.");
+  }
+  if (report.services.brainMemoryDirect?.status === 403) {
+    suggestions.push("Brain Memory Gateway returned 403. Check BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY tenant authorization for local-dev.");
   }
   if (args.requireBrainMemory && !(report.services.brainMemoryBff?.body?.mode === "real" && report.services.brainMemoryBff?.body?.reachable === true)) {
     suggestions.push("Brain Memory was required. Start Gateway, verify BRAIN_MEMORY_GATEWAY_URL and keys, and restart the Web UI.");
@@ -1557,6 +1563,7 @@ function printReport() {
   console.log(`Brain Memory real mode: ${report.env.brainMemory.enableRealGateway || "(not set)"}`);
   console.log(`Brain Memory UI API key: ${report.env.brainMemory.uiApiKeySet ? "set" : "not set"}`);
   console.log(`Brain Memory tenant memory key: ${report.env.brainMemory.gatewayMemoryApiKeySet ? "set" : "not set"}`);
+  console.log("Brain Memory key roles: UI API key is optional bearer auth; tenant memory key authorizes scoped memory reads.");
   console.log("");
 
   console.log("Checks");

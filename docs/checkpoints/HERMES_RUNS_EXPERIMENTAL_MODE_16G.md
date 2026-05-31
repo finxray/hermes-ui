@@ -209,6 +209,15 @@ for the Web UI BFF readback, not as a failure of
 `POST /api/hermes/runs/experimental-chat` and not as proof that Runs cannot use
 Brain Memory.
 
+## Slice 16I Clarification
+
+Slice 16I added normalized Runs memory smoke blocker categories so the earlier
+16G failure mode is no longer just a generic unauthorized readback. Future
+failures should identify whether the blocker is Gateway reachability, missing
+or unauthorized `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`, optional
+`BRAIN_MEMORY_UI_API_KEY` bearer rejection, scope mismatch, or actual Runs/MCP
+behavior.
+
 ## Next Recommended Slice
 
 Slice 16H: Runs default migration decision.

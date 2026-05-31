@@ -384,14 +384,30 @@ Decision:
   16H full-env memory probe passed;
 - do not add a composer Agent access selector yet.
 
+### 16I - Runs Brain Memory Live Env/Runbook Hardening
+
+Goal: make Runs + Brain Memory smoke failures identify the env or runtime
+blocker instead of returning a generic unauthorized readback.
+
+Status: completed in Slice 16I. See
+`docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md`.
+
+Deliver:
+
+- redacted Web UI BFF env posture in the Runs memory probe;
+- normalized blocker categories for Gateway config/auth, marker readback,
+  scope mismatch, and Runs/MCP failure;
+- runbook/env template documentation for `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`
+  versus optional `BRAIN_MEMORY_UI_API_KEY`;
+- no production chat switch, composer Agent access selector, approval buttons,
+  provider/model switching, direct browser-to-Hermes path, or memory admin UI.
+
 ## Recommended Next Slice
 
-Slice 16I - Runs Brain Memory live env/runbook hardening.
+Slice 16J - Runs replay/history reconciliation plan.
 
 Reason:
 
-- Slice 16H proves Runs has useful diagnostic coverage, but the live Brain
-  Memory readback env needs a repeatable runbook and guardrail before any
-  production default migration is safe.
-- The next safe step is documenting and checking the exact Web UI BFF env
-  required for Runs + Brain Memory readback.
+- Slice 16I improves live env diagnostics for Runs + Brain Memory.
+- The next default-migration blocker is reconciling Hermes Runs history,
+  replay, reconnect, and existing persisted activity snapshots.

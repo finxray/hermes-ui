@@ -96,12 +96,20 @@ BRAIN_MEMORY_GATEWAY_URL=http://127.0.0.1:8080
 BRAIN_MEMORY_UI_ENABLE_REAL_GATEWAY=true
 BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY=<redacted tenant-bound read key>
 BRAIN_MEMORY_UI_API_KEY=<optional redacted UI bearer>
+BRAIN_MEMORY_MCP_API_KEY_SET=<optional redacted diagnostics boolean>
 ```
 
 `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` authorizes tenant-bound read-only memory
 search. `BRAIN_MEMORY_UI_API_KEY` is only the optional `/ui/**` bearer gate.
 Both remain server-side BFF concerns; browser JavaScript must not receive API
 keys.
+
+For Runs + Brain Memory smokes, the selected Web UI server must have the same
+live Brain Memory BFF env as the Brain Memory console. Hermes MCP also needs
+its own Brain Memory Gateway URL, default tenant `local-dev`, API key, and
+caller label. A 401 points at the optional UI bearer; a 403 points at the
+tenant-bound memory key or tenant authorization. Do not fake a live pass when
+the marker write succeeds but BFF search/inspect readback is unauthorized.
 
 Run live Brain Memory gates only after Gateway and the tenant read key are
 configured:
@@ -110,6 +118,7 @@ configured:
 curl http://127.0.0.1:8080/health
 npm run studio:doctor
 node scripts/mvp-smoke.mjs --require-brain-memory --base-url http://127.0.0.1:<port>
+npm run smoke:hermes:runs:memory -- --base-url http://127.0.0.1:<port> --require-hermes --require-brain-memory
 ```
 
 ## Stale Server Recovery

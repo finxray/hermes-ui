@@ -1,7 +1,7 @@
 "use client";
 
 import { Activity, Database, FileText, FolderGit2, History, KeyRound, ShieldCheck, Terminal } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -29,6 +29,20 @@ type ContextRailProps = {
 };
 
 type PanelTab = "context" | "memory" | "tools" | "files";
+
+const SESSION_EXPORT_EXCLUDED_FIELDS = [
+  "api keys and credentials",
+  "full raw Hermes payloads",
+  "full stdout/stderr/output beyond previews",
+  "binary/blob data",
+  "direct service URLs with secrets"
+];
+
+type ExportPreviewCache = {
+  buildMs: number;
+  cacheKey: string;
+  previewJson: string;
+};
 
 export function ContextRail({
   activeProject,
@@ -452,6 +466,28 @@ function PersistedReplayList({ events }: { events: PersistedActivityEvent[] }) {
 }
 
 function ExportPreviewSection({ activeSession }: { activeSession: Session | null }) {
+  const [isExportPreviewOpen, setIsExportPreviewOpen] = useState(false);
+  const [exportPreviewCache, setExportPreviewCache] = useState<ExportPreviewCache | null>(null);
+  const exportPreviewCacheKey = activeSession ? createExportPreviewCacheKey(activeSession) : null;
+
+  useEffect(() => {
+    if (!activeSession || !isExportPreviewOpen || !exportPreviewCacheKey) {
+      return;
+    }
+    if (exportPreviewCache?.cacheKey === exportPreviewCacheKey) {
+      return;
+    }
+
+    const startedAt = performance.now();
+    const preview = createSessionExportPreview(activeSession, activeSession.updatedAt);
+    const previewJson = JSON.stringify(preview, null, 2);
+    setExportPreviewCache({
+      buildMs: Math.round(performance.now() - startedAt),
+      cacheKey: exportPreviewCacheKey,
+      previewJson
+    });
+  }, [activeSession, exportPreviewCache?.cacheKey, exportPreviewCacheKey, isExportPreviewOpen]);
+
   if (!activeSession) {
     return (
       <section className={styles.section} aria-labelledby="export-preview-heading">
@@ -461,13 +497,15 @@ function ExportPreviewSection({ activeSession }: { activeSession: Session | null
     );
   }
 
-  const preview = createSessionExportPreview(activeSession, activeSession.updatedAt);
-  const runCount = preview.runs.length;
-  const replayEventCount = preview.runs.reduce(
-    (total, run) => total + run.activityReplay.length,
+  const runCount = activeSession.runRecords.length;
+  const replayEventCount = activeSession.runRecords.reduce(
+    (total, run) => total + (run.activityReplay?.length ?? 0),
     0
   );
-  const previewJson = JSON.stringify(preview, null, 2);
+  const previewJson =
+    exportPreviewCache?.cacheKey === exportPreviewCacheKey ? exportPreviewCache.previewJson : "";
+  const previewBuildMs =
+    exportPreviewCache?.cacheKey === exportPreviewCacheKey ? exportPreviewCache.buildMs : undefined;
 
   return (
     <section className={styles.section} aria-labelledby="export-preview-heading">
@@ -484,27 +522,54 @@ function ExportPreviewSection({ activeSession }: { activeSession: Session | null
           </div>
         </div>
         <div className={styles.metrics}>
-          <Metric label="messages" value={preview.messages.length} />
+          <Metric label="messages" value={activeSession.messages.length} />
           <Metric label="runs" value={runCount} />
           <Metric label="replay events" value={replayEventCount} />
-          <Metric label="excluded fields" value={preview.excluded.length} />
+          <Metric label="excluded fields" value={SESSION_EXPORT_EXCLUDED_FIELDS.length} />
         </div>
         <div className={styles.fieldGrid}>
-          <ContextField label="Session title" value={preview.session.title} />
-          <ContextField label="Updated" value={formatRunDate(preview.session.updatedAt)} />
+          <ContextField label="Session title" value={activeSession.title} />
+          <ContextField label="Updated" value={formatRunDate(activeSession.updatedAt)} />
         </div>
         <ul className={styles.excludedList} aria-label="Excluded export fields">
-          {preview.excluded.map((item) => (
+          {SESSION_EXPORT_EXCLUDED_FIELDS.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-        <details className={styles.exportDetails}>
+        <details
+          className={styles.exportDetails}
+          onToggle={(event) => setIsExportPreviewOpen(event.currentTarget.open)}
+        >
           <summary>Preview JSON</summary>
-          <pre className={styles.exportJson}>{previewJson}</pre>
+          {previewJson ? (
+            <pre
+              className={styles.exportJson}
+              data-export-preview-build-ms={previewBuildMs}
+              data-export-preview-json="ready"
+            >
+              {previewJson}
+            </pre>
+          ) : (
+            <div className={styles.exportPlaceholder}>Preparing local preview...</div>
+          )}
         </details>
       </div>
     </section>
   );
+}
+
+function createExportPreviewCacheKey(session: Session) {
+  const replayEventCount = session.runRecords.reduce(
+    (total, run) => total + (run.activityReplay?.length ?? 0),
+    0
+  );
+  return [
+    session.id,
+    session.updatedAt,
+    session.messages.length,
+    session.runRecords.length,
+    replayEventCount
+  ].join(":");
 }
 
 function replayFallback(event: PersistedActivityEvent) {

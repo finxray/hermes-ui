@@ -756,6 +756,22 @@ secret commit was added. The next recommended slice is Slice 15P: lazily
 construct local export preview JSON only when the Preview JSON detail is
 opened.
 
+## Checkpoint: Slice 15P lazy export preview construction
+
+Slice 15P lazily constructs the Context rail local export preview JSON only
+after the user opens the `Preview JSON` disclosure. The visible summary counts
+remain immediate, while the long-session fixture now verifies 0 hidden export
+JSON characters before open and the same 494,133-character redacted preview
+after open. The smoke also records open-triggered preview build timing and
+continues to require 0 service calls and 0 px horizontal overflow. No export
+download/import, backend export, runtime pagination, infinite scroll,
+virtualization, context compaction, Hermes streaming change, Brain Memory BFF
+change, memory-scope bridge change, direct storage access, or memory
+mutation/admin action was added. See
+`docs/performance/LAZY_EXPORT_PREVIEW_15P.md`. The next recommended slice is
+Slice 15Q: add a larger sidebar/session-list measurement variant and decide
+whether sidebar `Show more` is needed before transcript virtualization.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -162,7 +162,9 @@ Behavior:
 The helper `createSessionExportPreview(session)` defines a local export preview
 shape. Slice 13O exposes this shape as a collapsed, local-only Context rail
 preview without adding copy/download, filesystem writes, backend export, cloud
-backup, or import:
+backup, or import. As of Slice 15P, the Context rail constructs the large JSON
+preview only when the user opens the `Preview JSON` disclosure; the visible
+summary counts remain immediate and local:
 
 ```ts
 type SessionExportPreview = {

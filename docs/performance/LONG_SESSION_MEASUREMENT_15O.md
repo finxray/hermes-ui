@@ -2,7 +2,7 @@
 
 Date: 2026-05-31
 
-Status: Measurement and decision checkpoint. No runtime scalable-loading behavior was implemented.
+Status: Measurement and decision checkpoint. No runtime scalable-loading behavior was implemented in 15O. Slice 15P completed the first targeted follow-up.
 
 ## Scope
 
@@ -35,6 +35,7 @@ The measured fixture contains:
 - `renderedSidebarProjectCount`, `renderedSidebarSessionCount`, and total sidebar rows
 - `renderedDetailsCount` and `openDetailsCount`
 - Context rail counts for run rows, persisted replay rows, retrieved memory rows, collapsed export state, and export preview JSON size
+- 15P follow-up metrics for lazy export preview construction before and after opening the JSON disclosure
 - horizontal overflow in pixels
 - transcript scroll down/up timing
 - right rail tab switch timing for Memory, Tools, Files, and Context
@@ -67,7 +68,7 @@ Measured locally against `http://127.0.0.1:3003` on 2026-05-31 with a temporary 
 | Run rows visible on Context tab | 8 |
 | Persisted replay rows visible | 8 |
 | Retrieved memory rows visible | 16 |
-| Export preview JSON size | 494,133 characters |
+| Export preview JSON size before 15P | 494,133 characters |
 | Export preview details open | false |
 | Scroll down/up | 16 ms / 10 ms |
 | Memory tab switch | 287 ms |
@@ -109,7 +110,7 @@ Warnings in default mode:
 
 ## Decision
 
-First future runtime scalable-loading target: **Export preview lazy construction**.
+First runtime scalable-loading target: **Export preview lazy construction**.
 
 Reasoning:
 
@@ -119,7 +120,22 @@ Reasoning:
 - The largest measured hidden work is the collapsed export preview JSON: 494,133 characters are built on the default Context tab even though the JSON is inside a closed `<details>`.
 - Lazy construction of export preview JSON is narrower and lower-risk than transcript windowing, while directly reducing hidden work that scales with transcript and replay size.
 
-The chosen implementation slice should only defer export-preview JSON construction until the user opens the preview detail. It should not add download/export/import behavior, backend export, storage access, runtime pagination, infinite scroll, or virtualization.
+Slice 15P implemented this target by deferring export-preview JSON construction until the user opens the preview detail. It did not add download/export/import behavior, backend export, storage access, runtime pagination, infinite scroll, or virtualization.
+
+## 15P Follow-Up Result
+
+Slice 15P added `docs/performance/LAZY_EXPORT_PREVIEW_15P.md` and updated the
+long-session smoke to assert the lazy behavior.
+
+Measured locally against `http://127.0.0.1:3003` on 2026-05-31:
+
+| Metric | Result |
+| --- | ---: |
+| Export preview JSON before opening details | 0 characters |
+| Export preview built before opening details | false |
+| Export preview JSON after opening details | 494,133 characters |
+| Export preview build time after opening details | 3 ms |
+| Smoke summary | 35 passed, 0 warnings, 0 failures |
 
 ## Deferred
 
@@ -134,4 +150,4 @@ The chosen implementation slice should only defer export-preview JSON constructi
 
 ## Next Recommended Slice
 
-Slice 15P: lazily construct the local export preview JSON only when the collapsed Preview JSON detail is opened, keeping the feature local-only, read-only, and free of backend export/import behavior.
+Slice 15Q: add a larger sidebar/session-list measurement variant and decide whether sidebar `Show more` is needed before transcript virtualization.

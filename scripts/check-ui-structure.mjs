@@ -110,6 +110,7 @@ const memoryDetailFixturePage = readFileSync(
   "utf8"
 );
 const memoryDetailSmoke = readFileSync(join(root, "scripts/memory-detail-fixture-smoke.mjs"), "utf8");
+const contextRail = readFileSync(join(root, "apps/web/src/components/shell/ContextRail.tsx"), "utf8");
 const longSessionFixture = readFileSync(join(root, "apps/web/src/data/longSessionFixture.ts"), "utf8");
 const longSessionFixturePage = readFileSync(
   join(root, "apps/web/src/app/design/long-session-fixture/page.tsx"),
@@ -122,6 +123,10 @@ const longSessionPlan = readFileSync(
 );
 const longSessionMeasurement = readFileSync(
   join(root, "docs/performance/LONG_SESSION_MEASUREMENT_15O.md"),
+  "utf8"
+);
+const lazyExportPreviewMeasurement = readFileSync(
+  join(root, "docs/performance/LAZY_EXPORT_PREVIEW_15P.md"),
   "utf8"
 );
 const scalableLoadingRoadmap = readFileSync(
@@ -224,6 +229,10 @@ for (const token of [
 
 for (const token of [
   "fixture-no-service-calls",
+  "fixture-export-preview-lazy-before-open",
+  "exportPreviewBuiltBeforeOpen",
+  "exportPreviewBuildWarnMs",
+  "exportPreviewBuildMs",
   "fixture-details-collapsed-by-default",
   "fixture-message-count",
   "fixture-sidebar-session-count",
@@ -238,6 +247,23 @@ for (const token of [
   if (!longSessionSmoke.includes(token)) {
     failures.push(`Long-session smoke is missing ${token}`);
   }
+}
+
+for (const token of [
+  "isExportPreviewOpen",
+  "exportPreviewCache",
+  "createExportPreviewCacheKey",
+  "onToggle",
+  "SESSION_EXPORT_EXCLUDED_FIELDS",
+  "Preparing local preview"
+]) {
+  if (!contextRail.includes(token)) {
+    failures.push(`ContextRail lazy export preview contract is missing ${token}`);
+  }
+}
+
+if (contextRail.includes("const runCount = preview.runs.length;")) {
+  failures.push("ContextRail still eagerly stringifies export preview JSON during render.");
 }
 
 for (const token of [
@@ -266,7 +292,23 @@ for (const token of [
 }
 
 for (const token of [
+  "Lazy Export Preview 15P",
+  "Before 15P",
+  "After 15P",
+  "local-only",
+  "redaction and bounding",
+  "no download",
+  "no import",
+  "no backend export"
+]) {
+  if (!lazyExportPreviewMeasurement.includes(token)) {
+    failures.push(`Lazy export preview report is missing ${token}`);
+  }
+}
+
+for (const token of [
   "LONG_SESSION_MEASUREMENT_15O.md",
+  "LAZY_EXPORT_PREVIEW_15P.md",
   "lazy construction of export preview JSON",
   "not transcript virtualization"
 ]) {

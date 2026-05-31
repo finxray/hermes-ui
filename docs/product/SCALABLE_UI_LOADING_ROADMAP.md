@@ -20,12 +20,18 @@ Slice 15N adds the first measurement baseline in
 fixture measures current long-session behavior before this roadmap changes any
 runtime loading behavior.
 
-Slice 15O adds the first measured report in
+Slice 15O added the first measured report in
 `docs/performance/LONG_SESSION_MEASUREMENT_15O.md`. The fixture currently
 renders and scrolls 120 transcript messages and 100 sidebar sessions
 acceptably, while the collapsed export preview still constructs about 494 KB
 of JSON on the default Context tab. The first recommended runtime target is
 lazy construction of export preview JSON, not transcript virtualization.
+
+Slice 15P implemented that first target in
+`docs/performance/LAZY_EXPORT_PREVIEW_15P.md`. The Context rail now keeps the
+local export summary visible while constructing the large preview JSON only
+after the `Preview JSON` disclosure opens. The slice stayed local-only and did
+not add backend export, import, pagination, infinite scroll, or virtualization.
 
 ## Why It Matters
 
@@ -97,14 +103,15 @@ token.
 
 ## Staged Implementation
 
-All stages are deferred:
+Most stages are deferred:
 
 1. Docs/contract only.
 2. Measure current transcript/list performance.
-3. Add list limits plus `Show more`.
-4. Add run and memory timeline pagination.
-5. Add chat transcript virtualization if needed.
-6. Add cross-channel session discovery pagination later.
+3. Lazily construct collapsed raw preview/details content.
+4. Add list limits plus `Show more`.
+5. Add run and memory timeline pagination.
+6. Add chat transcript virtualization if needed.
+7. Add cross-channel session discovery pagination later.
 
 Each stage should include targeted checks or browser smokes before being used
 as a release claim.
@@ -130,7 +137,7 @@ boundaries.
 
 ## Not Implemented
 
-Slice 15M does not implement:
+Slices 15M through 15P do not implement:
 
 - infinite scroll;
 - virtualization/windowing;
@@ -144,6 +151,6 @@ Slice 15M does not implement:
 
 ## Next Recommended Slice
 
-After the Slice 15O measurement report, start with lazy construction of the
-local export preview JSON. Keep it local-only and do not add backend export,
-import, runtime pagination, infinite scroll, or virtualization in that slice.
+After the Slice 15P lazy export preview fix, add a larger sidebar/session-list
+measurement variant and decide whether sidebar `Show more` is needed before
+transcript virtualization.

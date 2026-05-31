@@ -8,6 +8,7 @@ const baseUrl = selectedBaseUrl(args.baseUrl);
 const timeoutMs = 15_000;
 const runStartedAt = Date.now();
 const budget = {
+  exportPreviewBuildWarnMs: 1_000,
   routeLoadWarnMs: 5_000,
   scrollActionWarnMs: 100,
   tabSwitchWarnMs: 500
@@ -111,6 +112,7 @@ async function main() {
     await checkFixtureChrome();
     await checkTranscriptScale();
     await checkRailAndDetails();
+    await checkLazyExportPreview();
     await checkSidebarScale();
     await checkScrollResponsiveness();
     await checkRightRailTabSwitching();
@@ -211,6 +213,59 @@ async function checkRailAndDetails() {
     "Export preview section is visible and collapsed details remain closed."
   );
   report.metrics.contextRail = await collectContextRailMetrics();
+}
+
+async function checkLazyExportPreview() {
+  const before = report.metrics.contextRail ?? await collectContextRailMetrics();
+  check(
+    "fixture-export-preview-lazy-before-open",
+    before.exportPreviewBuiltBeforeOpen === false && before.exportJsonCharsBeforeOpen === 0,
+    `Export preview JSON before open: built=${before.exportPreviewBuiltBeforeOpen}, chars=${before.exportJsonCharsBeforeOpen}.`
+  );
+
+  const summary = page.locator('section[aria-labelledby="export-preview-heading"] details summary').first();
+  const startedAt = Date.now();
+  await summary.click({ timeout: timeoutMs });
+  const preview = page.locator('section[aria-labelledby="export-preview-heading"] pre[data-export-preview-json="ready"]').first();
+  await preview.waitFor({ state: "visible", timeout: timeoutMs });
+  const opened = await page.evaluate(() => {
+    const exportPreview = document.querySelector('[aria-labelledby="export-preview-heading"]');
+    const exportJson = exportPreview?.querySelector('pre[data-export-preview-json="ready"]');
+    const buildMsValue = exportJson instanceof HTMLElement
+      ? Number(exportJson.dataset.exportPreviewBuildMs)
+      : Number.NaN;
+    return {
+      buildMs: Number.isFinite(buildMsValue) ? buildMsValue : undefined,
+      clickToVisibleMs: Date.now(),
+      detailsOpen: exportPreview?.querySelector("details")?.hasAttribute("open") ?? false,
+      jsonSize: exportJson?.textContent?.length ?? 0
+    };
+  });
+  const clickToVisibleMs = Date.now() - startedAt;
+  report.metrics.exportPreview = {
+    buildMs: opened.buildMs,
+    builtAfterOpen: opened.jsonSize > 0,
+    clickToVisibleMs,
+    detailsOpen: opened.detailsOpen,
+    exportPreviewBuildMs: opened.buildMs,
+    jsonSize: opened.jsonSize
+  };
+  check(
+    "fixture-export-preview-open",
+    opened.detailsOpen === true,
+    `Preview JSON details open after click: ${opened.detailsOpen}.`
+  );
+  check(
+    "fixture-export-preview-json-rendered",
+    opened.jsonSize > 0,
+    `Export preview JSON rendered after open with ${opened.jsonSize} characters.`
+  );
+  addTimingWarning(
+    "fixture-export-preview-build-budget",
+    opened.buildMs ?? clickToVisibleMs,
+    budget.exportPreviewBuildWarnMs,
+    "Export preview build"
+  );
 }
 
 async function checkSidebarScale() {
@@ -352,8 +407,11 @@ async function collectContextRailMetrics() {
     const retrievedMemory = document.querySelector('[aria-labelledby="retrieved-memory-heading"]');
     const exportPreview = document.querySelector('[aria-labelledby="export-preview-heading"]');
     const exportJson = exportPreview?.querySelector("pre");
+    const exportJsonCharsBeforeOpen = exportJson?.textContent?.length ?? 0;
     return {
-      exportJsonChars: exportJson?.textContent?.length ?? 0,
+      exportJsonChars: exportJsonCharsBeforeOpen,
+      exportJsonCharsBeforeOpen,
+      exportPreviewBuiltBeforeOpen: Boolean(exportJson?.textContent?.includes('"exportVersion"')),
       exportPreviewDetailsOpen: exportPreview?.querySelector("details")?.hasAttribute("open") ?? false,
       persistedReplayRows: replay?.querySelectorAll("li").length ?? 0,
       retrievedMemoryRows: retrievedMemory?.querySelectorAll("li").length ?? 0,

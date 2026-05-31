@@ -559,3 +559,17 @@ reported 0 tool events, 0 Brain Memory tool events, and 0 approval events. See
 This does not change the 16A decision: session stream remains the production
 default until Runs proves full event, Brain Memory scope, stop, approval, and
 replay parity.
+
+## Slice 16D Brain Memory Parity Update
+
+Slice 16D added an opt-in BFF-only Runs Brain Memory probe at
+`POST /api/hermes/runs/memory-probe` and `npm run smoke:hermes:runs:memory`.
+The live probe stored marker `BM_RUNS_MEMORY_16D_20260531120408_50ZNHG`
+through Hermes Runs -> Brain Memory MCP, observed `tool.started` and
+`tool.completed` Brain Memory events, found the marker through the Web UI BFF
+search route, inspected the detail through the Web UI BFF inspect route, and
+verified different-project and different-session isolation.
+
+This improves the Runs parity evidence, but it still does not switch the
+production default. Server-side run stop, approval actions, reconnect/replay
+correlation, and feature-flagged experimental UI execution remain unproven.

@@ -293,14 +293,31 @@ Deliver:
 - no production chat switch, run stop, approval action, or Agent access
   selector.
 
+### 16D - Brain Memory MCP Parity Test In Runs Flow
+
+Goal: prove whether Hermes Runs can invoke Brain Memory MCP with the same
+project/session scope as the current session-stream path.
+
+Status: completed in Slice 16D. See
+`docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md`.
+
+Deliver:
+
+- opt-in BFF-only Runs Brain Memory probe;
+- harmless scoped marker write through Hermes MCP;
+- BFF search/inspect readback;
+- different-project and different-session isolation checks;
+- Runs memory/tool event normalization parity;
+- no production chat switch, run stop, approval action, or Agent access
+  selector.
+
 ## Recommended Next Slice
 
-Slice 16D - Brain Memory MCP Parity Test In Runs Flow.
+Slice 16E - Server-Side Run Stop Experiment.
 
 Reason:
 
-- Slice 16C proved the frontend can normalize raw Runs lifecycle, reasoning,
-  tool, approval, and unknown event shapes into `AgentActivityEvent`.
-- The next safe step is an opt-in BFF-mediated live parity probe proving whether
-  Runs can invoke Brain Memory MCP tools with the same project/session scope as
-  the current session-stream path.
+- Slice 16D proved Runs can store a Brain Memory marker through Hermes MCP,
+  expose Brain Memory tool events, and preserve BFF search/inspect scope.
+- The next safe control-plane gap is proving Hermes `/v1/runs/{run_id}/stop`
+  through a BFF-only experiment without changing the production chat default.

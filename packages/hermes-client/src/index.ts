@@ -396,8 +396,12 @@ export async function streamHermesSessionChat(
 export async function runHermesRunsProbe(
   config: HermesClientConfig,
   options: {
+    expectedText?: string;
+    instructions?: string;
+    memoryMutationRequested?: boolean;
     memoryScopeKey?: string | null;
     prompt?: string;
+    promptKind?: HermesRunsProbeResult["safety"]["promptKind"];
     sessionId?: string;
     timeoutMs?: number;
   } = {}
@@ -405,7 +409,7 @@ export async function runHermesRunsProbe(
   const checkedAt = new Date().toISOString();
   const startedAt = Date.now();
   const prompt = options.prompt ?? HERMES_RUNS_PROBE_PROMPT;
-  const expectedText = HERMES_RUNS_PROBE_EXPECTED_TEXT;
+  const expectedText = options.expectedText ?? HERMES_RUNS_PROBE_EXPECTED_TEXT;
   const timeoutMs = options.timeoutMs ?? RUNS_PROBE_TIMEOUT_MS;
   const sessionId = sanitizeHermesId(
     options.sessionId ?? `hermes-ui-runs-probe-${Date.now().toString(36)}`
@@ -436,11 +440,11 @@ export async function runHermesRunsProbe(
     },
     safety: {
       route: "bff-only" as const,
-      promptKind: "chat-only" as const,
+      promptKind: options.promptKind ?? "chat-only",
       stopCalled: false as const,
       approvalCalled: false as const,
       browserDirectHermes: false as const,
-      memoryMutationRequested: false as const
+      memoryMutationRequested: Boolean(options.memoryMutationRequested)
     }
   };
 
@@ -534,6 +538,7 @@ export async function runHermesRunsProbe(
     apiKey: config.apiKey,
     base,
     fetchImpl,
+    instructions: options.instructions,
     memoryScopeKey: options.memoryScopeKey ?? "hermes-ui-runs-probe",
     prompt,
     sessionId,
@@ -582,7 +587,7 @@ export async function runHermesRunsProbe(
     });
   }
 
-  const events = eventsResult.events.map(normalizeRunProbeEvent);
+  const events = eventsResult.events;
   const eventTypes = Array.from(new Set(events.map((event) => event.event))).sort();
   const assistantText = eventsResult.rawEvents
     .filter((event) => asString(event.event) === "message.delta")
@@ -747,6 +752,7 @@ async function createHermesRun(args: {
   apiKey?: string | null;
   base: URL;
   fetchImpl: typeof fetch;
+  instructions?: string;
   memoryScopeKey?: string | null;
   prompt: string;
   sessionId: string;
@@ -771,7 +777,8 @@ async function createHermesRun(args: {
     const response = await args.fetchImpl(buildEndpointUrl(args.base, "/v1/runs"), {
       body: JSON.stringify({
         input: args.prompt,
-        instructions: "Do not use tools, memory, commands, files, web browsing, or external resources. Reply with the exact requested text only.",
+        instructions: args.instructions ??
+          "Do not use tools, memory, commands, files, web browsing, or external resources. Reply with the exact requested text only.",
         session_id: args.sessionId
       }),
       cache: "no-store",

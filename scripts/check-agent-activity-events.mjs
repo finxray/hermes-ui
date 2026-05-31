@@ -38,6 +38,8 @@ checkRunsMessageDeltaIgnored();
 checkRunsReasoningSafe();
 checkRunsCompletedStatus();
 checkRunsToolAndApprovalParity();
+checkRunsCommandParity();
+checkRunsEventIdsUnique();
 checkRunsUnknownFallback();
 checkApprovalRequested();
 checkApprovalResponded();
@@ -394,6 +396,56 @@ function checkRunsToolAndApprovalParity() {
       approval.status === "waiting_for_approval" &&
       approval.approval?.actionAvailable === false,
     "Runs tool and approval events reuse existing AgentActivityEvent parity mappings."
+  );
+}
+
+function checkRunsCommandParity() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    command: "npm test",
+    event: "tool.completed",
+    exit_code: 0,
+    run_id: "run-runs-command",
+    stdout: "ok",
+    tool: "run_command"
+  }, { id: "runs-command" });
+
+  record(
+    "runs-command-parity",
+    event.type === "command" &&
+      event.status === "completed" &&
+      event.title === "Command completed" &&
+      event.command?.command === "npm test" &&
+      event.command?.stdoutPreview === "ok",
+    "Runs command-like tool payload maps to command activity when command shape is present."
+  );
+}
+
+function checkRunsEventIdsUnique() {
+  const events = [
+    activity.createActivityEventFromHermesRunsEvent({
+      event: "tool.started",
+      run_id: "run-runs-ids",
+      tool: "memory_search",
+      tool_call_id: "tool-call-a"
+    }),
+    activity.createActivityEventFromHermesRunsEvent({
+      event: "tool.completed",
+      run_id: "run-runs-ids",
+      tool: "memory_search",
+      tool_call_id: "tool-call-b"
+    }),
+    activity.createActivityEventFromHermesRunsEvent({
+      event: "run.completed",
+      run_id: "run-runs-ids",
+      seq: 99
+    })
+  ].filter(Boolean);
+  const ids = new Set(events.map((event) => event.id));
+
+  record(
+    "runs-event-ids-unique",
+    events.length === 3 && ids.size === 3,
+    "Runs activity event ids stay unique when Hermes provides tool call or sequence identifiers."
   );
 }
 

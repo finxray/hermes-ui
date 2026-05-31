@@ -194,3 +194,10 @@ The next slice should keep the production session stream as default and add an
 opt-in, BFF-mediated live probe that proves whether Runs with the existing
 memory scope header and bridge instruction can invoke Brain Memory MCP tools
 with the same project/session scoping as the current session-stream path.
+
+## Slice 16D Update
+
+Slice 16D completed the live Runs Brain Memory parity probe. Runs stored a
+scoped marker through Brain Memory MCP, exposed Brain Memory tool events,
+passed BFF search/inspect readback, and preserved project/session isolation.
+See `docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md`.

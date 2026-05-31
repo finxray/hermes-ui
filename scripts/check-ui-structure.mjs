@@ -31,7 +31,9 @@ const requiredFiles = [
   "apps/web/src/data/largeArtifactsToolsFixture.ts",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
+  "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
+  "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
@@ -181,6 +183,11 @@ const hermesRunsEventNormalizationCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md"), "utf8")
   : "";
+const hermesRunsBrainMemoryParityCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -188,6 +195,10 @@ const scalableLoadingRoadmap = readFileSync(
 const packageJson = readFileSync(join(root, "package.json"), "utf8");
 const hermesRunsProbeRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/probe/route.ts"),
+  "utf8"
+);
+const hermesRunsMemoryProbeRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/runs/memory-probe/route.ts"),
   "utf8"
 );
 const hermesRunsProbeScript = existsSync(join(root, "scripts/hermes-runs-probe.mjs"))
@@ -586,6 +597,23 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs Brain Memory Parity 16D",
+  "POST /api/hermes/runs/memory-probe",
+  "smoke:hermes:runs:memory",
+  "BM_RUNS_MEMORY_16D_20260531120408_50ZNHG",
+  "run_9598780e01984716b2676e4c11f7ef2c",
+  "Brain Memory tool events | 2",
+  "Different project",
+  "different session",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "Slice 16E: server-side run stop experiment"
+]) {
+  if (!hermesRunsBrainMemoryParityCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs Brain Memory parity checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsProbe",
   "Cache-Control",
   "no-store"
@@ -617,11 +645,35 @@ for (const token of [
   "stopCalled: false",
   "approvalCalled: false",
   "browserDirectHermes: false",
-  "memoryMutationRequested: false"
+  "memoryMutationRequested"
 ]) {
   if (!hermesClientSource.includes(token)) {
     failures.push(`Hermes client Runs probe helper is missing token: ${token}`);
   }
+}
+
+for (const token of [
+  "runHermesRunsProbe",
+  "searchBrainMemory",
+  "inspectBrainMemory",
+  "buildMemoryScopeBridgeInstruction",
+  "createActivityEventFromHermesRunsEvent",
+  "memoryMutationRequested: true",
+  "promptKind: \"memory-probe\"",
+  "BM_RUNS_MEMORY_STORED",
+  "differentProjectAbsent",
+  "differentSessionAbsent",
+  "browserDirectHermes: false",
+  "browserDirectBrainMemory: false",
+  "directStorageAccess: false"
+]) {
+  if (!hermesRunsMemoryProbeRoute.includes(token)) {
+    failures.push(`Hermes Runs memory probe route is missing token: ${token}`);
+  }
+}
+
+if (!packageJson.includes("\"smoke:hermes:runs:memory\"")) {
+  failures.push("package.json is missing smoke:hermes:runs:memory script.");
 }
 
 for (const token of [

@@ -881,6 +881,25 @@ change, stable-key change, storage path, or memory mutation/admin UI was
 added. See `docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md`. The next
 recommended slice is Slice 16D: Brain Memory MCP parity test in Runs flow.
 
+## Checkpoint: Slice 16D Hermes Runs Brain Memory parity
+
+Slice 16D added an opt-in BFF-only Runs Brain Memory parity probe on
+2026-05-31. `POST /api/hermes/runs/memory-probe` and
+`npm run smoke:hermes:runs:memory` send a harmless scoped marker through Hermes
+Runs with the existing memory-scope bridge, verify Brain Memory MCP tool events,
+then read the marker through the existing Brain Memory BFF search/inspect
+routes. The live probe passed with marker
+`BM_RUNS_MEMORY_16D_20260531120408_50ZNHG`, run
+`run_9598780e01984716b2676e4c11f7ef2c`, event types `message.delta`,
+`reasoning.available`, `tool.started`, `tool.completed`, and `run.completed`,
+2 Brain Memory tool events, matching-session inspect detail, and absent
+different-project/different-session searches. Production chat still uses
+`/api/hermes/chat/stream`; no direct browser-to-Hermes/Gateway path, storage
+path, memory admin UI, run stop, approval action, Agent access selector, auth
+classification, or export/import behavior was added. See
+`docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md`. The next
+recommended slice is Slice 16E: server-side run stop experiment.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -283,11 +283,11 @@ export type HermesRunsProbeResult = {
   };
   safety: {
     route: "bff-only";
-    promptKind: "chat-only";
+    promptKind: "chat-only" | "memory-probe";
     stopCalled: false;
     approvalCalled: false;
     browserDirectHermes: false;
-    memoryMutationRequested: false;
+    memoryMutationRequested: boolean;
   };
   error: HermesChatError | null;
 };

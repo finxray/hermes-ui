@@ -50,6 +50,12 @@ scroll timing, 0 service calls, and 0 px overflow. Based on that evidence,
 Files/artifacts Show More, legacy tool-event pagination, and command-detail
 lazy rendering are deferred for now.
 
+Slice 15S consolidated the measurement track in
+`docs/performance/SCALABLE_LOADING_DECISION_15S.md`. The decision is to keep
+runtime Show More, pagination, infinite scroll, and virtualization deferred for
+now because the measured MVP-scale fixtures remain acceptable and the one hidden
+export-preview cost was already fixed by lazy construction.
+
 ## Why It Matters
 
 Brain Memory Studio is expected to accumulate:
@@ -154,7 +160,7 @@ boundaries.
 
 ## Not Implemented
 
-Slices 15M through 15R do not implement:
+Slices 15M through 15S do not implement:
 
 - infinite scroll;
 - virtualization/windowing;
@@ -168,7 +174,7 @@ Slices 15M through 15R do not implement:
 
 ## Next Recommended Slice
 
-After the Slice 15R Files/artifacts and legacy tool-event measurement, create a
-scalable-loading decision checkpoint that consolidates 15N through 15R
-measurements and chooses the first runtime implementation only if the evidence
-now justifies one.
+After the Slice 15S decision checkpoint, keep scalable loading deferred until
+real user data or smoke warnings cross the documented revisit triggers. The
+next recommended architecture slice is Slice 16A: Hermes Runs API migration
+assessment.

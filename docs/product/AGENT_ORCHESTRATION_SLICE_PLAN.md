@@ -260,7 +260,9 @@ Deliver later:
 Goal: define how long transcripts and large operational panels load without
 rendering huge lists or creating scroll jank.
 
-Status: deferred. See `docs/product/SCALABLE_UI_LOADING_ROADMAP.md`.
+Status: measured and deferred for MVP. See
+`docs/product/SCALABLE_UI_LOADING_ROADMAP.md` and
+`docs/performance/SCALABLE_LOADING_DECISION_15S.md`.
 
 Deliver later:
 
@@ -274,11 +276,12 @@ Deliver later:
 
 ## Recommended Next Slice
 
-Slice 13P - Local Export Download And Import Validation Contract.
+Slice 16A - Hermes Runs API Migration Assessment.
 
 Reason:
 
-- Slice 13O made the local export shape visible and proved persisted replay
-  survives reload in an opt-in browser smoke.
-- The next gap is a validated local export/download/import contract that stays
-  explicit, redacted, versioned, and independent of backend persistence.
+- Slice 15S closed the current scalable-loading measurement track without
+  justifying runtime Show More, pagination, or virtualization yet.
+- The next architecture risk is moving from the current session-stream path
+  toward a Hermes `/v1/runs` control plane for richer run events, approvals,
+  stop/cancel behavior, and future cross-channel discovery.

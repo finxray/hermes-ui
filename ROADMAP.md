@@ -814,6 +814,22 @@ next recommended slice is Slice 15S: create a scalable-loading decision
 checkpoint that consolidates 15N through 15R measurements and chooses the first
 runtime implementation only if the evidence now justifies one.
 
+## Checkpoint: Slice 15S scalable-loading decision
+
+Slice 15S consolidated the scalable-loading measurement track on 2026-05-31.
+The decision record in `docs/performance/SCALABLE_LOADING_DECISION_15S.md`
+summarizes long-session, large-sidebar, lazy export-preview, large
+Files/artifacts, legacy tool-row, activity-detail, memory timeline, and command
+preview measurements. Based on the current MVP-scale fixtures, runtime Show
+More, pagination, infinite scroll, and virtualization remain deferred. The
+existing bounded/collapsed design is acceptable for now, measurement smokes stay
+in place, and scalable loading should be revisited only when real user data or
+smoke warnings cross the documented thresholds. No context compaction runtime,
+backend feature, Hermes streaming change, Brain Memory BFF change, direct
+browser-to-service path, direct storage access, or memory mutation/admin action
+was added. The next recommended slice is Slice 16A: Hermes Runs API migration
+assessment.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

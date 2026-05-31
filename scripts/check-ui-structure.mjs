@@ -161,6 +161,10 @@ const largeArtifactsToolsMeasurement = readFileSync(
   join(root, "docs/performance/ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md"),
   "utf8"
 );
+const scalableLoadingDecision = readFileSync(
+  join(root, "docs/performance/SCALABLE_LOADING_DECISION_15S.md"),
+  "utf8"
+);
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -465,11 +469,41 @@ for (const token of [
   "LAZY_EXPORT_PREVIEW_15P.md",
   "SIDEBAR_LARGE_MEASUREMENT_15Q.md",
   "ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md",
+  "SCALABLE_LOADING_DECISION_15S.md",
   "lazy construction of export preview JSON",
-  "not transcript virtualization"
+  "not transcript virtualization",
+  "runtime Show More, pagination, infinite scroll, and virtualization deferred"
 ]) {
   if (!scalableLoadingRoadmap.includes(token)) {
     failures.push(`Scalable UI loading roadmap is missing 15O measurement link token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Scalable Loading Decision 15S",
+  "do not implement runtime Show More, pagination, infinite scroll, or",
+  "virtualization yet",
+  "LONG_SESSION_MEASUREMENT_15O.md",
+  "LAZY_EXPORT_PREVIEW_15P.md",
+  "SIDEBAR_LARGE_MEASUREMENT_15Q.md",
+  "ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md",
+  "transcript count above 500 messages becomes slow",
+  "sidebar above 2,000 visible rows becomes slow",
+  "Files/artifacts above 1,000 rows becomes slow",
+  "right rail tab switch exceeds 500 ms",
+  "scroll action exceeds 100 ms",
+  "page-level horizontal overflow appears",
+  "export preview becomes eager again",
+  "live users report jank",
+  "Context compaction runtime",
+  "Cross-channel session pagination",
+  "Transcript virtualization",
+  "Sidebar Show More",
+  "Right rail timeline pagination",
+  "Slice 16A: Hermes Runs API migration assessment"
+]) {
+  if (!scalableLoadingDecision.includes(token)) {
+    failures.push(`Scalable loading decision is missing token: ${token}`);
   }
 }
 

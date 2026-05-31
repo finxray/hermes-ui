@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  createHermesRunsBffLifecycleDryRun,
+  type HermesRunsBffLifecycleDryRun
+} from "@/lib/hermesRunsBffLifecycleDryRun";
+import {
   validateHermesRunsBffRequest
 } from "@/lib/hermesRunsBffRequestValidation";
 import type {
@@ -38,6 +42,7 @@ type DisabledHermesRunsChatStreamResponse = {
   composerRunsSwitch: false;
   agentAccessSelector: "future-only";
   requestValidation: DisabledHermesRunsRequestValidationPosture;
+  lifecycleDryRun: HermesRunsBffLifecycleDryRun;
   execution: DisabledHermesRunsExecutionPosture;
 };
 
@@ -68,9 +73,9 @@ type DisabledHermesRunsExecutionPosture = {
 };
 
 export async function POST(request: Request) {
-  const validation = await readRequestValidationPosture(request);
+  const posture = await readRequestValidationPosture(request);
 
-  return NextResponse.json(createDisabledRunsRouteResponse(validation), {
+  return NextResponse.json(createDisabledRunsRouteResponse(posture), {
     headers: {
       "Cache-Control": "no-store"
     },
@@ -78,14 +83,19 @@ export async function POST(request: Request) {
   });
 }
 
-async function readRequestValidationPosture(request: Request): Promise<DisabledHermesRunsRequestValidationPosture> {
+type DisabledHermesRunsRoutePosture = {
+  lifecycleDryRun: HermesRunsBffLifecycleDryRun;
+  requestValidation: DisabledHermesRunsRequestValidationPosture;
+};
+
+async function readRequestValidationPosture(request: Request): Promise<DisabledHermesRunsRoutePosture> {
   const raw = await request.text();
 
   let parsed: unknown;
   try {
     parsed = raw ? JSON.parse(raw) : null;
   } catch {
-    return buildValidationPosture({
+    const invalidJsonValidation: HermesRunsBffRequestValidationResult = {
       errors: [
         {
           kind: INVALID_JSON_ERROR_KIND,
@@ -95,15 +105,27 @@ async function readRequestValidationPosture(request: Request): Promise<DisabledH
       ],
       ok: false,
       schemaVersion: "hermes-runs-bff-request.v1"
+    };
+
+    return buildValidationPosture({
+      lifecycleDryRun: createHermesRunsBffLifecycleDryRun(null),
+      validation: invalidJsonValidation
     });
   }
 
-  return buildValidationPosture(validateHermesRunsBffRequest(parsed));
+  return buildValidationPosture({
+    lifecycleDryRun: createHermesRunsBffLifecycleDryRun(parsed),
+    validation: validateHermesRunsBffRequest(parsed)
+  });
 }
 
-function buildValidationPosture(
-  validation: HermesRunsBffRequestValidationResult
-): DisabledHermesRunsRequestValidationPosture {
+function buildValidationPosture({
+  lifecycleDryRun,
+  validation
+}: {
+  lifecycleDryRun: HermesRunsBffLifecycleDryRun;
+  validation: HermesRunsBffRequestValidationResult;
+}): DisabledHermesRunsRoutePosture {
   const errors = validation.ok
     ? []
     : validation.errors.map((item) => ({
@@ -112,21 +134,24 @@ function buildValidationPosture(
       }));
 
   return {
-    attempted: true,
-    errorKinds: Array.from(new Set(errors.map((item) => item.kind))),
-    errors,
-    futureFields: {
-      agentAccessMode: "metadata_only",
-      model: "inert_until_client_selectable",
-      provider: "inert_until_supported"
-    },
-    ok: validation.ok,
-    rawRequestEchoed: false
+    lifecycleDryRun,
+    requestValidation: {
+      attempted: true,
+      errorKinds: Array.from(new Set(errors.map((item) => item.kind))),
+      errors,
+      futureFields: {
+        agentAccessMode: "metadata_only",
+        model: "inert_until_client_selectable",
+        provider: "inert_until_supported"
+      },
+      ok: validation.ok,
+      rawRequestEchoed: false
+    }
   };
 }
 
 function createDisabledRunsRouteResponse(
-  requestValidation: DisabledHermesRunsRequestValidationPosture
+  posture: DisabledHermesRunsRoutePosture
 ): DisabledHermesRunsChatStreamResponse {
   const execution: DisabledHermesRunsExecutionPosture = {
     approvalCalled: false,
@@ -160,6 +185,7 @@ function createDisabledRunsRouteResponse(
     composerRunsSwitch: false,
     agentAccessSelector: "future-only",
     execution,
-    requestValidation
+    lifecycleDryRun: posture.lifecycleDryRun,
+    requestValidation: posture.requestValidation
   };
 }

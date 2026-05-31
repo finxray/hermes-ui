@@ -1150,6 +1150,28 @@ See `docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md`. The next
 recommended slice is Slice 16T: production Runs BFF lifecycle dry-run contract
 and no-runtime source guard.
 
+## Checkpoint: Slice 16T Hermes Runs lifecycle dry run
+
+Slice 16T defines the future production Runs BFF lifecycle as a no-runtime
+dry-run contract. `HermesRunsBffLifecycleStage` covers `validate_request`,
+`validate_scope`, `validate_agent_access_policy`, `prepare_context`,
+`create_run`, `stream_or_poll_events`, `normalize_event`,
+`update_run_record`, `update_activity_replay`, `handle_approval_request`,
+`submit_approval_response`, `handle_stop_request`, `finalize_run`,
+`emit_done`, and `emit_error`. `createHermesRunsBffLifecycleDryRun` and
+fixture coverage produce disabled lifecycle plans with runtime execution flags
+false and no raw request echo or service secret reads. The disabled
+`POST /api/hermes/runs/chat/stream` route still returns HTTP 501 with
+`reason=production_runs_route_not_enabled`, now including `lifecycleDryRun`,
+and still does not call Hermes, Brain Memory Gateway, storage, service env,
+fetch, or the memory scope bridge. Production chat still uses
+`/api/hermes/chat/stream`; no production Runs composer switch, composer Agent
+access selector UI, approval buttons, direct browser-to-Hermes/Gateway path,
+stable-key change, or Brain Memory mutation/admin UI was added. See
+`docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md`. The next
+recommended slice is Slice 16U: disabled Runs lifecycle route-response fixture
+and migration gate checklist.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

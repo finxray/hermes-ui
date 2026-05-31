@@ -38,13 +38,16 @@ const requiredFiles = [
   "apps/web/src/types/hermesRunsBffRequest.ts",
   "apps/web/src/types/hermesRunsBffEvents.ts",
   "apps/web/src/data/agentAccessPolicyFixtures.ts",
+  "apps/web/src/data/hermesRunsBffLifecycleFixtures.ts",
   "apps/web/src/data/hermesRunsBffRequestFixtures.ts",
   "apps/web/src/data/hermesRunsBffEventFixtures.ts",
+  "apps/web/src/lib/hermesRunsBffLifecycleDryRun.ts",
   "apps/web/src/lib/hermesRunsBffRequestValidation.ts",
   "apps/web/src/lib/hermesRunsBffEventReducer.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
   "scripts/check-hermes-runs-bff-request.mjs",
   "scripts/check-agent-access-policy.mjs",
+  "scripts/check-hermes-runs-lifecycle-dry-run.mjs",
   "scripts/check-hermes-runs-bff-events.mjs",
   "scripts/hermes-runs-production-route-guard.mjs",
   "scripts/hermes-runs-replay-ui-smoke.mjs",
@@ -64,6 +67,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_REQUEST_VALIDATION_16Q.md",
   "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md",
   "docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md",
+  "docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md",
   "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
@@ -302,6 +306,11 @@ const agentAccessPolicyMatrixCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/AGENT_ACCESS_POLICY_MATRIX_16S.md"), "utf8")
   : "";
+const hermesRunsLifecycleDryRunCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -343,8 +352,16 @@ const agentAccessPolicyFixturesSource = readFileSync(
   join(root, "apps/web/src/data/agentAccessPolicyFixtures.ts"),
   "utf8"
 );
+const hermesRunsLifecycleFixturesSource = readFileSync(
+  join(root, "apps/web/src/data/hermesRunsBffLifecycleFixtures.ts"),
+  "utf8"
+);
 const hermesRunsBffRequestValidationSource = readFileSync(
   join(root, "apps/web/src/lib/hermesRunsBffRequestValidation.ts"),
+  "utf8"
+);
+const hermesRunsLifecycleDryRunSource = readFileSync(
+  join(root, "apps/web/src/lib/hermesRunsBffLifecycleDryRun.ts"),
   "utf8"
 );
 const hermesRunsBffEventTypesSource = readFileSync(
@@ -373,6 +390,10 @@ const hermesRunsBffRequestCheckScript = readFileSync(
 );
 const agentAccessPolicyCheckScript = readFileSync(
   join(root, "scripts/check-agent-access-policy.mjs"),
+  "utf8"
+);
+const hermesRunsLifecycleCheckScript = readFileSync(
+  join(root, "scripts/check-hermes-runs-lifecycle-dry-run.mjs"),
   "utf8"
 );
 const hermesRunsReplayPreviewSource = readFileSync(
@@ -1526,6 +1547,39 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs BFF Lifecycle Dry Run 16T",
+  "HermesRunsBffLifecycleStage",
+  "validate_request",
+  "validate_scope",
+  "validate_agent_access_policy",
+  "prepare_context",
+  "create_run",
+  "stream_or_poll_events",
+  "normalize_event",
+  "update_run_record",
+  "update_activity_replay",
+  "handle_approval_request",
+  "submit_approval_response",
+  "handle_stop_request",
+  "finalize_run",
+  "emit_done",
+  "emit_error",
+  "createHermesRunsBffLifecycleDryRun",
+  "lifecycleDryRun",
+  "production_runs_route_not_enabled",
+  "runtime execution flags all false",
+  "No production Runs execution",
+  "No composer Agent access selector UI",
+  "No approval buttons",
+  "npm run check:hermes-runs-lifecycle",
+  "Slice 16U"
+]) {
+  if (!hermesRunsLifecycleDryRunCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs lifecycle dry-run checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "AgentAccessPolicyFixture",
   "agentAccessPolicyFixtures",
   "agentAccessPolicyFixtureModes",
@@ -1547,6 +1601,79 @@ for (const token of [
 ]) {
   if (!agentAccessPolicyFixturesSource.includes(token)) {
     failures.push(`Agent access policy fixtures source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_SCHEMA_VERSION",
+  "HERMES_RUNS_BFF_LIFECYCLE_DISABLED_REASON",
+  "HERMES_RUNS_BFF_LIFECYCLE_STAGES",
+  "HermesRunsBffLifecycleStage",
+  "HermesRunsBffLifecycleDryRun",
+  "createHermesRunsBffLifecycleDryRun",
+  "validate_request",
+  "validate_scope",
+  "validate_agent_access_policy",
+  "prepare_context",
+  "create_run",
+  "stream_or_poll_events",
+  "normalize_event",
+  "update_run_record",
+  "update_activity_replay",
+  "handle_approval_request",
+  "submit_approval_response",
+  "handle_stop_request",
+  "finalize_run",
+  "emit_done",
+  "emit_error",
+  "disabled_http_501",
+  "production_runs_route_not_enabled",
+  "rawRequestEchoed: false",
+  "serviceSecretsRead: false",
+  "hermesRunCreated: false",
+  "brainMemoryCalled: false",
+  "storageAccess: false"
+]) {
+  if (!hermesRunsLifecycleDryRunSource.includes(token)) {
+    failures.push(`Hermes Runs lifecycle dry-run helper is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "hermesRunsBffValidChatOnlyLifecycleDryRun",
+  "hermesRunsBffValidAskBeforeToolsLifecycleDryRun",
+  "hermesRunsBffInvalidMissingScopeLifecycleDryRun",
+  "hermesRunsBffInvalidAgentAccessLifecycleDryRun",
+  "hermesRunsBffStopLifecycleFutureFixture",
+  "hermesRunsBffApprovalLifecycleFutureFixture",
+  "hermesRunsBffErrorLifecycleFixture",
+  "hermesRunsBffLifecycleDryRunFixtures",
+  "hermesRunsBffRequiredLifecycleStages",
+  "expectedRuntimeExecuted: false",
+  "missing_memory_scope",
+  "invalid_agent_access_mode"
+]) {
+  if (!hermesRunsLifecycleFixturesSource.includes(token)) {
+    failures.push(`Hermes Runs lifecycle fixtures source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "checkAllLifecycleStagesDefined",
+  "checkFixtureMatrix",
+  "checkRuntimeStagesNotExecuted",
+  "checkDisabledReasonAndNoSecrets",
+  "checkSourcePurity",
+  "checkDisabledRouteLifecyclePosture",
+  "checkProductionSessionStreamStillPresent",
+  "checkNoAgentAccessSelector",
+  "checkPackageScript",
+  "createHermesRunsBffLifecycleDryRun",
+  "runtime-stages-not-executed",
+  "production_runs_route_not_enabled"
+]) {
+  if (!hermesRunsLifecycleCheckScript.includes(token)) {
+    failures.push(`Hermes Runs lifecycle check script is missing token: ${token}`);
   }
 }
 
@@ -1672,6 +1799,10 @@ if (!packageJson.includes("\"check:hermes-runs-bff-request\"")) {
   failures.push("package.json is missing check:hermes-runs-bff-request script.");
 }
 
+if (!packageJson.includes("\"check:hermes-runs-lifecycle\"")) {
+  failures.push("package.json is missing check:hermes-runs-lifecycle script.");
+}
+
 if (!packageJson.includes("\"check:agent-access-policy\"")) {
   failures.push("package.json is missing check:agent-access-policy script.");
 }
@@ -1691,8 +1822,10 @@ for (const token of [
   "production_runs_route_not_enabled",
   "DisabledHermesRunsChatStreamResponse",
   "validateHermesRunsBffRequest",
+  "createHermesRunsBffLifecycleDryRun",
   "readRequestValidationPosture",
   "requestValidation",
+  "lifecycleDryRun",
   "attempted: true",
   "rawRequestEchoed: false",
   "errorKinds",
@@ -1755,6 +1888,7 @@ for (const token of [
   "invalidDisabledRequestBody",
   "credentialDisabledRequestBody",
   "requestValidation",
+  "lifecycleDryRun",
   "assertNoEnabledAgentAccess",
   "agentAccessMode: \"chat_only\"",
   "agentAccessMode: \"full_access\"",

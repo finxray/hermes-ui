@@ -665,15 +665,47 @@ Boundaries:
 - no direct browser-to-Hermes/Gateway/storage path;
 - no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
 
+### 16T - Production Runs BFF Lifecycle Dry-Run Contract And No-Runtime Source Guard
+
+Goal: define the full future production Runs BFF lifecycle as a no-runtime
+dry-run contract while keeping the production route disabled.
+
+Status: completed in Slice 16T. See
+`docs/checkpoints/HERMES_RUNS_BFF_LIFECYCLE_DRY_RUN_16T.md`.
+
+Deliver:
+
+- `HermesRunsBffLifecycleStage` for validation, scope, Agent access policy,
+  context, run creation, event streaming/polling, normalization, RunRecord,
+  replay, approvals, stop, finalization, done, and error handling;
+- pure `createHermesRunsBffLifecycleDryRun` helper;
+- lifecycle dry-run fixtures for valid chat-only, valid ask-before-tools,
+  missing scope, invalid Agent access, stop, approval, and error cases;
+- disabled-route `lifecycleDryRun` response posture;
+- `npm run check:hermes-runs-lifecycle`;
+- route guard coverage that `lifecycleDryRun` stays disabled and runtime
+  stages remain not executed.
+
+Boundaries:
+
+- no production Runs execution runtime;
+- no Hermes run creation;
+- no Hermes or Brain Memory Gateway call from the disabled route;
+- no memory scope bridge import from the disabled route;
+- no service env secret read from the disabled route;
+- no change to `/api/hermes/chat/stream`;
+- no production composer switch;
+- no composer Agent access selector UI;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path.
+
 ## Recommended Next Slice
 
-Slice 16T - production Runs BFF lifecycle dry-run contract and no-runtime
-source guard.
+Slice 16U - disabled Runs lifecycle route-response fixture and migration gate
+checklist.
 
 Reason:
 
-- Slice 16S added deterministic policy fixtures and source-only UI guards
-  without runtime execution or selector exposure.
-- The next safe step is to specify a disabled production Runs lifecycle dry run
-  for submit, event stream, terminal reconciliation, stop, and approval without
-  calling Hermes from the production route.
+- Slice 16T adds a no-runtime lifecycle dry-run posture to the disabled route.
+- The next safe step is to pin representative route-response fixtures and a
+  migration gate checklist before any experimental-to-production bridge.

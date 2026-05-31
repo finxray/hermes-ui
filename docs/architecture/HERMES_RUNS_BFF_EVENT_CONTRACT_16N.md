@@ -520,9 +520,24 @@ approval buttons, production Runs execution, or composer switch was added.
 
 ## Next Recommended Slice
 
-Slice 16S: disabled Runs policy fixture matrix and source-only Agent access
-rendering guard.
+Slice 16U: disabled Runs lifecycle route-response fixture and migration gate
+checklist.
 
-Reason: 16R adds route validation echo and the Agent access policy contract
-without runtime execution or UI selector work. The next safe step is a pure
-policy fixture matrix before any composer UI appears.
+Reason: Slice 16T adds a no-runtime lifecycle dry-run posture to the disabled
+production route. The next safe step is to pin route-response fixtures and a
+migration gate checklist before any experimental-to-production bridge.
+
+## Slice 16T Lifecycle Dry-Run Update
+
+Slice 16T defines the production Runs BFF lifecycle as a dry-run contract
+without runtime execution. `createHermesRunsBffLifecycleDryRun` plans request
+validation, scope validation, Agent access policy validation, context
+preparation, run creation, event streaming/polling, event normalization,
+RunRecord updates, activity replay updates, approval request/response, stop,
+finalization, done, and error stages.
+
+`POST /api/hermes/runs/chat/stream` remains HTTP 501 with
+`reason: "production_runs_route_not_enabled"`, but now includes
+`lifecycleDryRun`. The dry-run output marks runtime stages as not executed,
+sets all runtime execution flags false, and keeps production session stream as
+the default.

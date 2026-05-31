@@ -140,12 +140,12 @@ policy access, not unrestricted system access.
 
 ## Next Recommended Slice
 
-Slice 16T: production Runs BFF lifecycle dry-run contract and no-runtime
-source guard.
+Slice 16U: disabled Runs lifecycle route-response fixture and migration gate
+checklist.
 
-Reason: Slice 16S added deterministic policy fixtures and source-only guards
-without UI exposure. The next safe step is to define the disabled production
-Runs lifecycle dry run before any route can execute.
+Reason: Slice 16T defines and checks the no-runtime lifecycle dry run. The
+next safe step is to pin route-response fixtures and migration gates before
+any experimental-to-production bridge.
 
 ## Slice 16S Policy Matrix Update
 
@@ -160,3 +160,11 @@ and unenforced; `Full access` is not unrestricted OS/system access;
 external actions; `ask_before_tools` requires `approval.request` plus BFF
 approval enforcement; `custom` remains future-only; and production UI still
 has no composer Agent access selector UI or enabled `Full access` copy.
+
+## Slice 16T Lifecycle Dry-Run Update
+
+Slice 16T adds a production Runs BFF lifecycle dry-run plan. Agent access is
+represented only as lifecycle metadata: `validate_agent_access_policy` is
+planned but not enforced, and the disabled route returns
+`lifecycleDryRun.agentAccessMode.posture` as `metadata_only`, `invalid`, or
+`omitted`. No composer Agent access selector UI or approval buttons were added.

@@ -76,6 +76,8 @@ function checkSourceGuard() {
     "DisabledHermesRunsChatStreamResponse",
     "validateHermesRunsBffRequest",
     "requestValidation",
+    "lifecycleDryRun",
+    "createHermesRunsBffLifecycleDryRun",
     "rawRequestEchoed: false",
     "execution",
     "storageAccess: false",
@@ -245,6 +247,21 @@ function assertDisabledEnvelope(body) {
   assert.equal("runId" in body, false, "Disabled route must not return runId.");
   assert.equal("hermesRunId" in body, false, "Disabled route must not return hermesRunId.");
   assert.equal(body.requestValidation?.rawRequestEchoed, false, "Disabled route must not echo raw request data.");
+  assert.equal(body.lifecycleDryRun?.disabledReason, "production_runs_route_not_enabled", "Lifecycle dry run must stay disabled.");
+  assert.equal(body.lifecycleDryRun?.routeStatus, "disabled_http_501", "Lifecycle dry run must report disabled HTTP 501.");
+  assert.equal(body.lifecycleDryRun?.rawRequestEchoed, false, "Lifecycle dry run must not echo raw request data.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.hermesRunCreated, false, "Lifecycle dry run must not create runs.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.hermesCalled, false, "Lifecycle dry run must not call Hermes.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.brainMemoryCalled, false, "Lifecycle dry run must not call Brain Memory.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.eventStreamStarted, false, "Lifecycle dry run must not start streams.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.approvalCalled, false, "Lifecycle dry run must not call approvals.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.stopCalled, false, "Lifecycle dry run must not call stop.");
+  assert.equal(body.lifecycleDryRun?.runtimeExecution?.storageAccess, false, "Lifecycle dry run must not touch storage.");
+  assert.equal(
+    body.lifecycleDryRun?.stages?.some((stage) => stage.stage === "create_run" && stage.executed === false),
+    true,
+    "Lifecycle dry run must mark create_run as not executed."
+  );
 }
 
 function assertNoEnabledAgentAccess(body) {

@@ -362,9 +362,26 @@ approval buttons were added.
 
 ## Next Recommended Slices
 
-Slice 16S: disabled Runs policy fixture matrix and source-only Agent access
-rendering guard.
+Slice 16U: disabled Runs lifecycle route-response fixture and migration gate
+checklist.
 
-Reason: validation echo and policy semantics now exist without runtime
-execution. The next safe step is pure policy fixtures and source-only guards
-before any composer exposure.
+Reason: Slice 16T adds a no-runtime lifecycle dry-run posture to the disabled
+production route. The next safe step is to pin route-response fixtures and a
+migration gate checklist before any experimental-to-production bridge.
+
+## Slice 16T Lifecycle Dry-Run Update
+
+Slice 16T adds `apps/web/src/lib/hermesRunsBffLifecycleDryRun.ts` and
+`apps/web/src/data/hermesRunsBffLifecycleFixtures.ts`. The dry-run contract
+maps the future production Runs BFF lifecycle across `validate_request`,
+`validate_scope`, `validate_agent_access_policy`, `prepare_context`,
+`create_run`, `stream_or_poll_events`, `normalize_event`,
+`update_run_record`, `update_activity_replay`, `handle_approval_request`,
+`submit_approval_response`, `handle_stop_request`, `finalize_run`,
+`emit_done`, and `emit_error`.
+
+The disabled `POST /api/hermes/runs/chat/stream` route now returns a compact
+`lifecycleDryRun` posture in its HTTP 501 JSON response. Runtime stages are
+marked `executed: false`; runtime execution flags remain false; and no Hermes,
+Brain Memory Gateway, memory scope bridge, service env, storage, or event
+stream path was added.

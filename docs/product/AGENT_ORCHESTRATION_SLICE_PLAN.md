@@ -349,15 +349,34 @@ Deliver:
 - no production chat switch, composer approval buttons, approval selector, or
   Agent access selector.
 
+### 16G - Experimental Runs Mode Feature Flag
+
+Goal: add a disabled-by-default Runs execution gate without changing the
+production composer default.
+
+Status: completed in Slice 16G. See
+`docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md`.
+
+Deliver:
+
+- feature flag `HERMES_UI_EXPERIMENTAL_RUNS_MODE=true`, default off;
+- BFF-only `POST /api/hermes/runs/experimental-chat` route;
+- `npm run smoke:hermes:runs:experimental-chat`;
+- disabled-state HTTP 403 check when the flag is off;
+- enabled basic live run check with `HERMES_RUNS_EXPERIMENTAL_CHAT_OK`;
+- project/session stable key and memory-scope bridge preservation;
+- no production chat switch, composer Agent access selector, approval buttons,
+  provider/model switching, direct browser-to-Hermes path, or memory admin UI.
+
 ## Recommended Next Slice
 
-Slice 16G - Experimental Runs Mode Feature Flag.
+Slice 16H - Runs Default Migration Decision.
 
 Reason:
 
-- Slice 16F proved Hermes `/v1/runs/{run_id}/approval` rejection through a
-  BFF-only diagnostic route and observed `approval.request`,
-  `approval.responded`, and final `completed` reconciliation.
-- The next safe step is defining a feature-flagged experimental Runs execution
-  mode contract and guardrails, still without switching production chat to
-  Runs by default.
+- Slice 16G proves a disabled-by-default BFF-only experimental Runs execution
+  path for a basic chat turn while keeping session streaming as the production
+  default.
+- The next safe step is deciding whether to keep Runs experimental, extend it
+  toward streaming/replay parity, or define prerequisites for a guarded default
+  migration.

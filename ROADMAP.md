@@ -933,6 +933,21 @@ selector, auth classification, or export/import behavior was added. See
 `docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md`. The next recommended
 slice is Slice 16G: experimental Runs mode feature flag.
 
+## Checkpoint: Slice 16G Hermes Runs experimental mode gate
+
+Slice 16G added a disabled-by-default experimental Runs execution gate on
+2026-05-31. `HERMES_UI_EXPERIMENTAL_RUNS_MODE=true` enables the BFF-only
+`POST /api/hermes/runs/experimental-chat` route and
+`npm run smoke:hermes:runs:experimental-chat`; with the flag off, the route
+returns a normalized HTTP 403 disabled response and creates no run. The live
+basic prompt passed with run `run_6a1dd54df8574373be1d7d19b09b48b4`, final
+status `completed`, and event types `message.delta`, `reasoning.available`,
+and `run.completed`. Production chat still uses `/api/hermes/chat/stream`; no
+composer Agent access selector, approval buttons, provider/model switching,
+direct browser-to-Hermes/Gateway path, storage path, or memory admin UI was
+added. See `docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md`. The next
+recommended slice is Slice 16H: Runs default migration decision.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

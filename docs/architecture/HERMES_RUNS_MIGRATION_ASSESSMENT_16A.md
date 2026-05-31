@@ -609,3 +609,32 @@ approval buttons were added.
 
 Approval approve-and-execute behavior, reconnect/replay correlation, and an
 experimental Runs UI mode remain unproven.
+
+## Slice 16G Experimental Mode Update
+
+Slice 16G added a disabled-by-default experimental Runs execution gate:
+`HERMES_UI_EXPERIMENTAL_RUNS_MODE=true`.
+
+When the flag is off, `POST /api/hermes/runs/experimental-chat` returns a
+normalized HTTP 403 disabled response and creates no run. When the flag is on,
+the route remains BFF-only, validates structured project/session context,
+preserves the memory-scope bridge, passes the project stable key as the Runs
+scope key, creates one Hermes Run, reads `/v1/runs/{run_id}/events`, polls
+status, and returns a JSON summary for script testing.
+
+The live basic prompt `Reply exactly: HERMES_RUNS_EXPERIMENTAL_CHAT_OK`
+passed with run `run_6a1dd54df8574373be1d7d19b09b48b4`, final status
+`completed`, and event types `message.delta`, `reasoning.available`, and
+`run.completed`. No tool, Brain Memory tool, or approval events were involved
+for that basic prompt.
+
+This still does not switch the production default. Production chat remains on
+`/api/hermes/chat/stream`; no composer Agent access selector, approval buttons,
+provider/model switching, direct browser-to-Hermes path, direct Gateway path,
+storage path, or memory admin UI was added.
+
+The next migration decision should account for one local caveat: the existing
+Runs Brain Memory parity smoke reached Hermes and emitted Brain Memory tool
+events, but readback failed in this environment because Brain Memory BFF
+search/inspect returned an unauthorized normalized response without the
+required UI bearer.

@@ -292,6 +292,31 @@ export type HermesRunsProbeResult = {
   error: HermesChatError | null;
 };
 
+export type HermesRunsExperimentalChatResult = Omit<HermesRunsProbeResult, "mode" | "safety"> & {
+  mode: "success" | "disabled" | "skipped" | "failed";
+  context: {
+    projectId: string;
+    projectStableKey: string;
+    sessionId: string;
+    sessionStableKey: string;
+    hermesSessionId: string;
+    tenantId: string;
+  };
+  experimental: {
+    featureFlag: "HERMES_UI_EXPERIMENTAL_RUNS_MODE";
+    enabled: boolean;
+    defaultEnabled: false;
+    route: "bff-only";
+    productionChatUntouched: true;
+    memoryScopeBridgeEnabled: boolean;
+  };
+  safety: HermesRunsProbeResult["safety"] & {
+    browserDirectBrainMemory: false;
+    directStorageAccess: false;
+    productionChatUntouched: true;
+  };
+};
+
 export type HermesRunStopResult = {
   ok: boolean;
   statusCode: number | null;

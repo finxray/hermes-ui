@@ -32,12 +32,14 @@ const requiredFiles = [
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
+  "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
   "apps/web/src/app/api/hermes/runs/stop-probe/route.ts",
   "docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
+  "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
   "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
@@ -202,6 +204,11 @@ const hermesRunsStopExperimentCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md"), "utf8")
   : "";
+const hermesRunsExperimentalModeCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -219,6 +226,10 @@ const hermesRunsMemoryProbeRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/memory-probe/route.ts"),
   "utf8"
 );
+const hermesRunsExperimentalChatRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts"),
+  "utf8"
+);
 const hermesRunsStopProbeRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/stop-probe/route.ts"),
   "utf8"
@@ -228,6 +239,9 @@ const hermesRunsProbeScript = existsSync(join(root, "scripts/hermes-runs-probe.m
   : "";
 const hermesRunsApprovalProbeScript = existsSync(join(root, "scripts/hermes-runs-approval-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-approval-probe.mjs"), "utf8")
+  : "";
+const hermesRunsExperimentalChatScript = existsSync(join(root, "scripts/hermes-runs-experimental-chat.mjs"))
+  ? readFileSync(join(root, "scripts/hermes-runs-experimental-chat.mjs"), "utf8")
   : "";
 const hermesRunsStopProbeScript = existsSync(join(root, "scripts/hermes-runs-stop-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-stop-probe.mjs"), "utf8")
@@ -659,6 +673,26 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs Experimental Mode 16G",
+  "HERMES_UI_EXPERIMENTAL_RUNS_MODE",
+  "POST /api/hermes/runs/experimental-chat",
+  "smoke:hermes:runs:experimental-chat",
+  "HERMES_RUNS_EXPERIMENTAL_CHAT_OK",
+  "HTTP 403",
+  "run_6a1dd54df8574373be1d7d19b09b48b4",
+  "message.delta",
+  "reasoning.available",
+  "run.completed",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "composer Agent access selector was not implemented",
+  "Slice 16H: Runs default migration decision"
+]) {
+  if (!hermesRunsExperimentalModeCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs experimental mode checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "Hermes Runs Stop Experiment 16E",
   "POST /api/hermes/runs/stop-probe",
   "smoke:hermes:runs:stop",
@@ -746,6 +780,21 @@ for (const token of [
 }
 
 for (const token of [
+  "/api/hermes/runs/experimental-chat",
+  "--expect-disabled",
+  "--require-hermes",
+  "--base-url",
+  "HERMES_RUNS_EXPERIMENTAL_CHAT_OK",
+  "projectStableKey",
+  "brainMemoryToolEvents",
+  "productionChatUntouched"
+]) {
+  if (!hermesRunsExperimentalChatScript.includes(token)) {
+    failures.push(`Hermes Runs experimental chat script is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsProbe",
   "HERMES_RUNS_PROBE_PROMPT",
   "HERMES_RUNS_PROBE_EXPECTED_TEXT",
@@ -758,6 +807,21 @@ for (const token of [
 ]) {
   if (!hermesClientSource.includes(token)) {
     failures.push(`Hermes client Runs probe helper is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "runHermesRunsExperimentalChat",
+  "HERMES_RUNS_EXPERIMENTAL_CHAT_EXPECTED_TEXT",
+  "experimentalRunsMetadata",
+  "experimentalRunsSafety",
+  "conversation_history",
+  "productionChatUntouched: true",
+  "browserDirectBrainMemory: false",
+  "directStorageAccess: false"
+]) {
+  if (!hermesClientSource.includes(token)) {
+    failures.push(`Hermes client experimental Runs chat helper is missing token: ${token}`);
   }
 }
 
@@ -793,6 +857,23 @@ for (const token of [
 }
 
 for (const token of [
+  "runHermesRunsExperimentalChat",
+  "HERMES_UI_EXPERIMENTAL_RUNS_MODE",
+  "isExperimentalRunsModeEnabled",
+  "buildMemoryScopeBridgeInstruction",
+  "Cache-Control",
+  "no-store",
+  "productionChatUntouched: true",
+  "browserDirectHermes: false",
+  "browserDirectBrainMemory: false",
+  "directStorageAccess: false"
+]) {
+  if (!hermesRunsExperimentalChatRoute.includes(token)) {
+    failures.push(`Hermes Runs experimental chat route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsProbe",
   "searchBrainMemory",
   "inspectBrainMemory",
@@ -818,6 +899,10 @@ if (!packageJson.includes("\"smoke:hermes:runs:memory\"")) {
 
 if (!packageJson.includes("\"smoke:hermes:runs:approval\"")) {
   failures.push("package.json is missing smoke:hermes:runs:approval script.");
+}
+
+if (!packageJson.includes("\"smoke:hermes:runs:experimental-chat\"")) {
+  failures.push("package.json is missing smoke:hermes:runs:experimental-chat script.");
 }
 
 if (!packageJson.includes("\"smoke:hermes:runs:stop\"")) {

@@ -12,6 +12,7 @@ import type {
   HermesRunApprovalChoice,
   HermesRunApprovalResult,
   HermesRunStopResult,
+  HermesRunsExperimentalChatResult,
   HermesRunProbeEvent,
   HermesRunsApprovalProbeResult,
   HermesRunsProbeResult,
@@ -50,6 +51,7 @@ export type {
   HermesModelSelectionStatus,
   HermesRunApprovalChoice,
   HermesRunApprovalResult,
+  HermesRunsExperimentalChatResult,
   HermesRunProbeEvent,
   HermesRunsApprovalProbeResult,
   HermesRunsProbeResult,
@@ -62,6 +64,7 @@ export type {
 
 const HERMES_RUNS_PROBE_EXPECTED_TEXT = "HERMES_RUNS_PROBE_OK";
 const HERMES_RUNS_PROBE_PROMPT = `Reply exactly: ${HERMES_RUNS_PROBE_EXPECTED_TEXT}`;
+const HERMES_RUNS_EXPERIMENTAL_CHAT_EXPECTED_TEXT = "HERMES_RUNS_EXPERIMENTAL_CHAT_OK";
 const RUNS_PROBE_TIMEOUT_MS = 20_000;
 const RUNS_STOP_PROBE_TIMEOUT_MS = 45_000;
 const RUNS_STOP_PROBE_STOP_AFTER_MS = 650;
@@ -422,10 +425,12 @@ export async function streamHermesSessionChat(
 export async function runHermesRunsProbe(
   config: HermesClientConfig,
   options: {
+    conversationHistory?: HermesChatRequest["recentMessages"];
     expectedText?: string;
     instructions?: string;
     memoryMutationRequested?: boolean;
     memoryScopeKey?: string | null;
+    model?: string | null;
     prompt?: string;
     promptKind?: HermesRunsProbeResult["safety"]["promptKind"];
     sessionId?: string;
@@ -563,9 +568,11 @@ export async function runHermesRunsProbe(
   const createResult = await createHermesRun({
     apiKey: config.apiKey,
     base,
+    conversationHistory: options.conversationHistory,
     fetchImpl,
     instructions: options.instructions,
     memoryScopeKey: options.memoryScopeKey ?? "hermes-ui-runs-probe",
+    model: options.model,
     prompt,
     sessionId,
     signal: config.signal,
@@ -662,6 +669,75 @@ export async function runHermesRunsProbe(
         },
     timings: { eventStreamMs }
   });
+}
+
+export async function runHermesRunsExperimentalChat(
+  config: HermesClientConfig,
+  request: HermesChatRequest,
+  options: {
+    expectedText?: string;
+    experimentalEnabled: boolean;
+    memoryScopeBridgeEnabled?: boolean;
+    timeoutMs?: number;
+  }
+): Promise<HermesRunsExperimentalChatResult> {
+  const expectedText = options.expectedText ?? HERMES_RUNS_EXPERIMENTAL_CHAT_EXPECTED_TEXT;
+  const checkedAt = new Date().toISOString();
+  const context = publicExperimentalRunsContext(request);
+  const safety = experimentalRunsSafety(false);
+
+  if (!options.experimentalEnabled) {
+    return {
+      ok: false,
+      mode: "disabled",
+      checkedAt,
+      prompt: request.message,
+      expectedText,
+      runId: null,
+      sessionId: context.hermesSessionId,
+      status: null,
+      finalStatus: null,
+      eventTypes: [],
+      events: [],
+      assistantTextPreview: "",
+      outputPreview: "",
+      timings: {
+        durationMs: 0,
+        eventStreamMs: null
+      },
+      counts: emptyRunsProbeCounts(),
+      context,
+      experimental: experimentalRunsMetadata(false, options.memoryScopeBridgeEnabled !== false),
+      safety,
+      error: {
+        kind: "disabled",
+        message: "Set HERMES_UI_EXPERIMENTAL_RUNS_MODE=true to enable this BFF-only Runs path."
+      }
+    };
+  }
+
+  const result = await runHermesRunsProbe(
+    config,
+    {
+      conversationHistory: request.recentMessages,
+      expectedText,
+      instructions: request.instructions ?? undefined,
+      memoryMutationRequested: false,
+      memoryScopeKey: request.context.project.stableKey,
+      model: request.model,
+      prompt: request.message,
+      promptKind: "chat-only",
+      sessionId: request.context.session.hermesSessionId,
+      timeoutMs: options.timeoutMs
+    }
+  );
+
+  return {
+    ...result,
+    context,
+    experimental: experimentalRunsMetadata(true, options.memoryScopeBridgeEnabled !== false),
+    safety: experimentalRunsSafety(false)
+  };
 }
 
 export async function runHermesRunsStopProbe(
@@ -1259,9 +1335,11 @@ async function checkSessionStreamingCapability(args: {
 async function createHermesRun(args: {
   apiKey?: string | null;
   base: URL;
+  conversationHistory?: HermesChatRequest["recentMessages"];
   fetchImpl: typeof fetch;
   instructions?: string;
   memoryScopeKey?: string | null;
+  model?: string | null;
   prompt: string;
   sessionId: string;
   signal?: AbortSignal;
@@ -1284,9 +1362,11 @@ async function createHermesRun(args: {
   try {
     const response = await args.fetchImpl(buildEndpointUrl(args.base, "/v1/runs"), {
       body: JSON.stringify({
+        conversation_history: args.conversationHistory?.length ? args.conversationHistory : undefined,
         input: args.prompt,
         instructions: args.instructions ??
           "Do not use tools, memory, commands, files, web browsing, or external resources. Reply with the exact requested text only.",
+        model: args.model || undefined,
         session_id: args.sessionId
       }),
       cache: "no-store",
@@ -1503,6 +1583,45 @@ function countRunsProbeEvents(events: HermesRunProbeEvent[]) {
     toolEvents: toolEvents.length,
     brainMemoryToolEvents: brainMemoryToolEvents.length,
     approvalEvents: events.filter((event) => event.event.startsWith("approval.")).length
+  };
+}
+
+function publicExperimentalRunsContext(request: HermesChatRequest): HermesRunsExperimentalChatResult["context"] {
+  return {
+    projectId: request.context.project.id,
+    projectStableKey: request.context.project.stableKey,
+    sessionId: request.context.session.id,
+    sessionStableKey: request.context.session.stableKey,
+    hermesSessionId: request.context.session.hermesSessionId,
+    tenantId: request.context.project.tenantId
+  };
+}
+
+function experimentalRunsMetadata(
+  enabled: boolean,
+  memoryScopeBridgeEnabled: boolean
+): HermesRunsExperimentalChatResult["experimental"] {
+  return {
+    featureFlag: "HERMES_UI_EXPERIMENTAL_RUNS_MODE",
+    enabled,
+    defaultEnabled: false,
+    route: "bff-only",
+    productionChatUntouched: true,
+    memoryScopeBridgeEnabled
+  };
+}
+
+function experimentalRunsSafety(memoryMutationRequested: boolean): HermesRunsExperimentalChatResult["safety"] {
+  return {
+    route: "bff-only",
+    promptKind: "chat-only",
+    stopCalled: false,
+    approvalCalled: false,
+    browserDirectHermes: false,
+    browserDirectBrainMemory: false,
+    directStorageAccess: false,
+    memoryMutationRequested,
+    productionChatUntouched: true
   };
 }
 

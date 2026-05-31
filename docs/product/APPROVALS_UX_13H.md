@@ -94,6 +94,15 @@ Future approval actions should be added only after the BFF owns the
 `/v1/runs` lifecycle for chat turns or can otherwise prove that a current stream
 approval is backed by an active run approval session.
 
+Slice 16A update:
+
+`docs/architecture/HERMES_RUNS_MIGRATION_ASSESSMENT_16A.md` rechecked current
+Hermes Runs API behavior and confirmed that approval responses remain
+run-scoped through `POST /v1/runs/{run_id}/approval`. The recommendation is to
+keep approvals display-only on the current session-stream path and add approval
+actions only after an experimental BFF-owned Runs path proves event and Brain
+Memory scope parity.
+
 ## Safety Boundaries
 
 Unchanged boundaries:

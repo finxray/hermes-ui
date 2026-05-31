@@ -276,12 +276,12 @@ Deliver later:
 
 ## Recommended Next Slice
 
-Slice 16A - Hermes Runs API Migration Assessment.
+Slice 16B - Runs API Harmless Probe Via BFF.
 
 Reason:
 
-- Slice 15S closed the current scalable-loading measurement track without
-  justifying runtime Show More, pagination, or virtualization yet.
-- The next architecture risk is moving from the current session-stream path
-  toward a Hermes `/v1/runs` control plane for richer run events, approvals,
-  stop/cancel behavior, and future cross-channel discovery.
+- Slice 16A recommends keeping session stream as the default production path
+  until a BFF-owned Runs path proves parity.
+- The next safe step is a harmless BFF-mediated Runs capability/status probe
+  with no UI execution switch, no live run creation requirement, and no direct
+  browser-to-Hermes call.

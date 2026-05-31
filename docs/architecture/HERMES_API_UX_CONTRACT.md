@@ -636,6 +636,17 @@ Current MVP:
 - UI uses the memory-scope instruction bridge because current Hermes session
   chat ignores `metadata.context` for tool context.
 
+Slice 16A update:
+
+- Current upstream Hermes source was rechecked on 2026-05-31 at HEAD
+  `1fc7bdc5e64e052bc61d3ddb9e6f96cf6c7461dc`.
+- The live local Hermes API still advertises Runs, run events, run stop,
+  approval response, session chat streaming, and `X-Hermes-Session-Key`.
+- `docs/architecture/HERMES_RUNS_MIGRATION_ASSESSMENT_16A.md` recommends
+  keeping session stream as the default until a BFF-only experimental Runs path
+  proves parity for Brain Memory scope, activity events, stop, approvals, and
+  replay behavior.
+
 Future strategy:
 
 - Treat `/v1/capabilities` as the source of truth for available Hermes UX.

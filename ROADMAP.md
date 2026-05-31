@@ -830,6 +830,24 @@ browser-to-service path, direct storage access, or memory mutation/admin action
 was added. The next recommended slice is Slice 16A: Hermes Runs API migration
 assessment.
 
+## Checkpoint: Slice 16A Hermes Runs API migration assessment
+
+Slice 16A assessed whether Brain Memory Studio should migrate from the current
+Hermes session chat stream path to the Hermes Runs API. Current upstream Hermes
+source was inspected at HEAD `1fc7bdc5e64e052bc61d3ddb9e6f96cf6c7461dc`, live
+Hermes health/capability probes were checked without creating a run, and the
+assessment in `docs/architecture/HERMES_RUNS_MIGRATION_ASSESSMENT_16A.md`
+compares session stream with Runs across streaming UX, event richness, Brain
+Memory scope, approvals, stop, reconnect, run history, replay, provider/model
+handling, files/artifacts, BFF complexity, test complexity, migration risk, and
+backwards compatibility. Recommendation: keep session stream as the production
+default, then add a BFF-only experimental Runs path later after parity is
+proven. No production runtime path, Hermes BFF streaming logic, Brain Memory
+BFF logic, memory scope bridge, stable project/session keys, direct
+browser-to-service path, storage path, or memory mutation/admin behavior was
+changed. The next recommended slice is Slice 16B: Runs API harmless probe via
+BFF, no UI execution switch.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

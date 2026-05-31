@@ -155,6 +155,16 @@ A future run-backed slice should:
 5. reconcile final `run.cancelled`, `run.failed`, or terminal status events;
 6. update the UI marker from client abort to server-confirmed stop.
 
+Slice 16A update:
+
+`docs/architecture/HERMES_RUNS_MIGRATION_ASSESSMENT_16A.md` confirms that
+Hermes Runs API exposes `POST /v1/runs/{run_id}/stop`, but recommends not
+switching the production chat path yet. Server-side stop should be introduced
+only after a BFF-owned Runs path proves send, event, Brain Memory scope, and
+status reconciliation parity. Until then, the current Studio stop behavior
+remains client/BFF stream abort and must keep reporting
+`serverSideRunStop: false`.
+
 ## Boundaries Confirmed
 
 No Brain Memory BFF logic changed.

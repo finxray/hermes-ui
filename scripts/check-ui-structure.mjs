@@ -165,6 +165,10 @@ const scalableLoadingDecision = readFileSync(
   join(root, "docs/performance/SCALABLE_LOADING_DECISION_15S.md"),
   "utf8"
 );
+const hermesRunsMigrationAssessment = readFileSync(
+  join(root, "docs/architecture/HERMES_RUNS_MIGRATION_ASSESSMENT_16A.md"),
+  "utf8"
+);
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -504,6 +508,48 @@ for (const token of [
 ]) {
   if (!scalableLoadingDecision.includes(token)) {
     failures.push(`Scalable loading decision is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Migration Assessment 16A",
+  "Session stream remains default until proven otherwise",
+  "Recommendation: **do not migrate immediately.**",
+  "Browser UI -> Next.js BFF -> Hermes API server",
+  "No live run was created in this assessment.",
+  "X-Hermes-Session-Key",
+  "serverSideRunStop: false",
+  "Option B, hybrid experimental Runs path",
+  "Slice 16B: Runs API harmless probe via BFF",
+  "no direct browser-to-Hermes calls"
+]) {
+  if (!hermesRunsMigrationAssessment.includes(token)) {
+    failures.push(`Hermes Runs migration assessment is missing token: ${token}`);
+  }
+}
+
+const forbiddenRunRoutePaths = [
+  "apps/web/src/app/api/hermes/runs",
+  "apps/web/src/app/api/hermes/run"
+];
+
+for (const path of forbiddenRunRoutePaths) {
+  if (existsSync(join(root, path))) {
+    failures.push(`Unexpected production Hermes Runs BFF route exists: ${path}`);
+  }
+}
+
+const browserHermesFetchPattern = /fetch\(\s*["'`]https?:\/\/[^"'`]*8642|fetch\(\s*["'`]\/v1\/runs|fetch\(\s*["'`]\/api\/sessions/;
+const browserFilesToCheck = [
+  "apps/web/src/lib/hermesChatClient.ts",
+  "apps/web/src/components/chat/ChatView.tsx",
+  "apps/web/src/components/shell/ContextRail.tsx"
+];
+
+for (const file of browserFilesToCheck) {
+  const source = readFileSync(join(root, file), "utf8");
+  if (browserHermesFetchPattern.test(source)) {
+    failures.push(`Browser source appears to call Hermes directly: ${file}`);
   }
 }
 

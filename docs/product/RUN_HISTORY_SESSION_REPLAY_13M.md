@@ -215,3 +215,17 @@ Slice 13N adds `RunRecord.activityReplay[]`, a bounded redacted
 enough compact activity metadata to inspect a selected run after refresh while
 still excluding full raw payloads, full stdout/stderr/output, secrets, binary
 data, command execution handles, rerun behavior, and backend persistence.
+
+## Slice 16J Runs Reconciliation Update
+
+Slice 16J defines how future Hermes Runs execution should map into this model.
+The compatibility decision is to keep `RunRecord.id` as a Web UI-generated
+local id and store Hermes Runs `run_id` only in `RunRecord.hermesRunId`.
+
+This keeps existing session-stream records compatible, avoids id collisions
+with future cross-channel records, and preserves rollback to
+`/api/hermes/chat/stream`. Runs-derived activity should flow through
+`AgentActivityEvent` and then into bounded `activityReplay[]`; raw Runs event
+payloads and per-token `message.delta` rows should not be persisted.
+
+See `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`.

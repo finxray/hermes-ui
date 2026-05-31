@@ -676,3 +676,21 @@ remains flag-gated.
 
 See `docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md`. The next
 recommended slice is Slice 16J: Runs replay/history reconciliation plan.
+
+## Slice 16J Replay Reconciliation Update
+
+Slice 16J defines the contract for mapping future Hermes Runs execution into
+the existing Web UI `RunRecord` and persisted activity replay model.
+
+The decision is to keep `RunRecord.id` as a Web UI-generated local id, store
+Hermes Runs `run_id` in `RunRecord.hermesRunId`, and build
+`RunRecord.activityReplay[]` from normalized `AgentActivityEvent` objects
+rather than persisting raw Runs events. Runs `message.delta` remains transcript
+text buffer data, not persisted replay rows.
+
+This keeps session-stream records compatible and preserves rollback to
+`/api/hermes/chat/stream`. Production chat still uses the session stream, and
+experimental Runs remains flag-gated.
+
+See `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`. The next
+recommended slice is Slice 16K: experimental Runs RunRecord/replay prototype.

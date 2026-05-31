@@ -402,12 +402,33 @@ Deliver:
 - no production chat switch, composer Agent access selector, approval buttons,
   provider/model switching, direct browser-to-Hermes path, or memory admin UI.
 
+### 16J - Runs Replay/History Reconciliation Plan
+
+Goal: define how future Hermes Runs execution maps into existing Web UI
+`RunRecord` and persisted activity replay without implementing production Runs
+replay yet.
+
+Status: completed in Slice 16J. See
+`docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`.
+
+Deliver:
+
+- Runs-to-RunRecord mapping;
+- Runs-to-AgentActivityEvent mapping;
+- Runs-to-persisted replay mapping;
+- backward compatibility and migration blocker list;
+- future Agent access selector contract;
+- no production chat switch, composer Agent access selector, approval buttons,
+  provider/model switching, direct browser-to-Hermes path, or memory admin UI.
+
 ## Recommended Next Slice
 
-Slice 16J - Runs replay/history reconciliation plan.
+Slice 16K - Experimental Runs RunRecord/replay prototype.
 
 Reason:
 
-- Slice 16I improves live env diagnostics for Runs + Brain Memory.
-- The next default-migration blocker is reconciling Hermes Runs history,
-  replay, reconnect, and existing persisted activity snapshots.
+- Slice 16J establishes that the existing local run history and persisted
+  replay schema can carry Runs-derived records.
+- The next safe step is a disabled-by-default prototype that creates and
+  replays a local Runs-backed `RunRecord` without replacing the session stream
+  default.

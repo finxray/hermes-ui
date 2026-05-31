@@ -240,6 +240,24 @@ Full check results are recorded in the final Slice 13N response.
 - Export remains a local preview shape only; no copy/download/import behavior is
   added.
 
+## Slice 16J Runs Reconciliation Update
+
+Slice 16J confirms that Hermes Runs events can use the existing persisted
+replay shape after they are normalized into `AgentActivityEvent`.
+
+Rules for future Runs replay:
+
+- `message.delta` belongs in the assistant transcript buffer, not one persisted
+  replay row per delta.
+- `reasoning.available` may persist only as a generic public signal with raw
+  reasoning-like text omitted.
+- tool, memory, command, approval, run status, and error events may persist as
+  compact redacted replay entries.
+- raw Runs event payloads, full stdout/stderr/output, secrets, and action
+  handles must not be persisted.
+
+See `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`.
+
 ## Next Recommended Slice
 
 Slice 13P - Local Export Download And Import Validation Contract.

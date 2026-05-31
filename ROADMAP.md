@@ -977,6 +977,21 @@ Agent access selector was added. See
 `docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md`. The next
 recommended slice is Slice 16J: Runs replay/history reconciliation plan.
 
+## Checkpoint: Slice 16J Hermes Runs replay/history reconciliation
+
+Slice 16J defined how future Hermes Runs execution maps into the existing Web
+UI run history and persisted replay model. `RunRecord.id` remains a Web
+UI-generated local id, Hermes `run_id` is stored in `RunRecord.hermesRunId`,
+and `RunRecord.activityReplay[]` should be built from normalized
+`AgentActivityEvent` objects rather than raw Runs event payloads. Runs
+`message.delta` remains assistant transcript buffer data, not one persisted
+replay row per delta. Production chat still uses `/api/hermes/chat/stream`;
+experimental Runs remains flag-gated; no direct browser-to-Hermes/Gateway path,
+storage path, memory admin UI, approval buttons, provider/model switching, or
+composer Agent access selector was added. See
+`docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`. The next
+recommended slice is Slice 16K: experimental Runs RunRecord/replay prototype.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -40,6 +40,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md",
+  "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
   "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md",
@@ -220,6 +221,11 @@ const hermesRunsBrainMemoryEnvCheckpoint = existsSync(
   join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md")
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md"), "utf8")
+  : "";
+const hermesRunsReplayReconciliation = existsSync(
+  join(root, "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md")
+)
+  ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md"), "utf8")
   : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
@@ -981,6 +987,22 @@ for (const token of [
 ]) {
   if (!hermesRunsBrainMemoryEnvCheckpoint.includes(token)) {
     failures.push(`Hermes Runs Brain Memory env checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Replay Reconciliation 16J",
+  "Keep `RunRecord.id` as a Web UI-generated id.",
+  "Store Hermes `run_id` only in `RunRecord.hermesRunId`.",
+  "`message.delta` should be represented by the persisted assistant transcript",
+  "Do not persist:",
+  "The composer Agent access selector remains a future idea",
+  "Production chat still uses `/api/hermes/chat/stream`.",
+  "No direct browser-to-Hermes path was added.",
+  "Slice 16K: experimental Runs RunRecord/replay prototype"
+]) {
+  if (!hermesRunsReplayReconciliation.includes(token)) {
+    failures.push(`Hermes Runs replay reconciliation doc is missing token: ${token}`);
   }
 }
 

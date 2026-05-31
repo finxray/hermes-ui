@@ -297,11 +297,23 @@ Before Runs becomes the default:
 - No Brain Memory mutation/admin UI.
 - No Hermes or Brain Memory source changes.
 
+## Slice 16N BFF Event Contract Update
+
+Slice 16N adds `docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md`.
+That document turns this state machine into a future BFF route and event
+envelope contract for `POST /api/hermes/runs/chat/stream`.
+
+The 16N contract keeps the same boundaries: production session stream remains
+the default, `/api/hermes/chat/stream` is unchanged, no production Runs route is
+implemented, no composer selector is added, No direct browser-to-Hermes path is
+allowed, and the Agent access selector remains future-only.
+
 ## Next Recommended Slices
 
-Slice 16N: design the BFF production Runs route contract and event envelope,
-without wiring it to the composer.
+Slice 16O: typed Runs BFF event envelope fixtures and reducer checks without
+runtime execution.
 
-Reason: 16M defines the state machine. The next safe step is a BFF contract for
-request/response/event envelope shapes, validation, redaction, stop/approval
-subroutes, and rollback behavior before any browser composer option exists.
+Reason: 16M defines the state machine and 16N defines the future BFF route and
+event envelope. The next safe step is fixture coverage for assistant text,
+activity, `RunRecord`, replay, stop, approval, errors, and reconnect without
+switching production chat to Runs.

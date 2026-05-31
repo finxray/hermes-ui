@@ -162,6 +162,19 @@ The Agent access selector is documented as future-only and must not appear
 enabled until enforcement exists. See
 `docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`.
 
+## Slice 16N Approval Envelope Update
+
+Slice 16N defines the future BFF approval envelope for a route such as
+`POST /api/hermes/runs/{localRunId}/approval`. The browser would send
+`projectId`, `sessionId`, `localRunId`, `hermesRunId`, `approvalId`, and one
+of `once`, `session`, `always`, or `deny`; the BFF would validate ownership,
+active waiting state, allowed choices, and Agent access policy before calling
+Hermes.
+
+This remains contract-only. No production approval action route, approval
+buttons, composer Runs route, or Agent access selector was implemented. See
+`docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md`.
+
 ## Next Recommended Slice
 
 Slice 13I - Files/Artifacts Panel.

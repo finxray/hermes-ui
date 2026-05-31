@@ -190,6 +190,18 @@ BFF with local run correlation, the BFF should validate ownership and call
 marking the `RunRecord` terminal. This remains future contract work and does
 not change the current session-stream stop behavior.
 
+Slice 16N update:
+
+`docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md` defines the future
+BFF stop envelope for a route such as `POST /api/hermes/runs/{localRunId}/stop`.
+The browser would send only local/Hermes run correlation and project/session
+scope to the Web UI BFF. The BFF would validate ownership, call
+`POST /v1/runs/{run_id}/stop`, emit `run.stopping`, and reconcile
+`run.stopped`, `run.cancelled`, `run.completed`, or `error`.
+
+This remains contract-only. The production composer still uses the Slice 13G
+session-stream abort behavior, and no production Runs route was implemented.
+
 ## Boundaries Confirmed
 
 No Brain Memory BFF logic changed.

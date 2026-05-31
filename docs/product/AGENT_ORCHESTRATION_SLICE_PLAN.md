@@ -480,13 +480,42 @@ Deliver:
 - no production chat switch, production Runs composer selector, approval
   buttons, direct browser-to-Hermes path, or memory admin UI.
 
+### 16N - BFF Production Runs Route Contract And Event Envelope
+
+Goal: define the future production Runs BFF route and browser-facing event
+envelope before any route implementation or composer switch.
+
+Status: completed in Slice 16N. See
+`docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md`.
+
+Deliver:
+
+- future `POST /api/hermes/runs/chat/stream` request contract;
+- `HermesRunsBffEvent` envelope for assistant deltas, activity, approvals,
+  stop, terminal status, errors, replay snapshots, and reconnect;
+- mapping into assistant text, `AgentActivityEvent`, `RunRecord`, and
+  `activityReplay`;
+- future stop and approval request/response envelopes;
+- error taxonomy and replay/reconnect semantics;
+- source checks that keep production session stream as the default and prevent
+  accidental direct browser-to-Hermes paths.
+
+Boundaries:
+
+- no production chat switch;
+- no production Runs route implementation;
+- no composer Agent access selector;
+- no approval buttons;
+- no Brain Memory BFF, memory bridge, stable-key, or tenant-check change.
+
 ## Recommended Next Slice
 
-Slice 16N - BFF production Runs route contract and event envelope.
+Slice 16O - typed Runs BFF event envelope fixtures and reducer checks.
 
 Reason:
 
-- Slice 16M defines the lifecycle states and responsibility split.
-- The next safe step is to specify future BFF request, response, stream event,
-  stop, approval, validation, and rollback envelopes before any browser
-  composer option exists.
+- Slice 16N defines the future BFF route and event envelope without
+  implementing runtime execution.
+- The next safe step is representative fixture/reducer coverage for assistant
+  text, activity, `RunRecord`, replay, stop, approval, errors, and reconnect
+  while production chat still uses `/api/hermes/chat/stream`.

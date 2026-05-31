@@ -352,3 +352,21 @@ local, Hermes `run_id` stays in `hermesRunId`, `message.delta` belongs in the
 assistant transcript buffer, and `activityReplay[]` stores only bounded
 redacted non-delta activity. See
 `docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md`.
+
+## Slice 16N BFF Event Envelope Update
+
+Slice 16N defines the browser-facing `HermesRunsBffEvent` envelope for the
+future production BFF route contract. The envelope preserves the replay
+decision from this document:
+
+- `message.delta` appends to assistant text and is not persisted as replay rows;
+- `activity.event`, `approval.request`, `approval.responded`, `run.stopped`,
+  `run.completed`, `run.failed`, and normalized errors can update
+  `AgentActivityEvent`, `RunRecord`, and bounded `activityReplay`;
+- `replay.snapshot` can hydrate or reconcile local state from a safe
+  `RunRecord` plus `PersistedActivityEvent[]`;
+- No raw Runs payload is included in replay snapshots.
+
+Production chat still uses `/api/hermes/chat/stream`; no production
+`POST /api/hermes/runs/chat/stream` route is implemented in Slice 16N. See
+`docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md`.

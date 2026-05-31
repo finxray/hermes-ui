@@ -33,6 +33,7 @@ const requiredFiles = [
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts",
+  "apps/web/src/app/api/hermes/chat/stream/route.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
   "scripts/hermes-runs-replay-ui-smoke.mjs",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
@@ -45,6 +46,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md",
   "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md",
   "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md",
+  "docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -247,6 +249,11 @@ const hermesRunsExecutionStateMachine = existsSync(
 )
   ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md"), "utf8")
   : "";
+const hermesRunsBffEventContract = existsSync(
+  join(root, "docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md")
+)
+  ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -266,6 +273,10 @@ const hermesRunsMemoryProbeRoute = readFileSync(
 );
 const hermesRunsExperimentalChatRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts"),
+  "utf8"
+);
+const productionHermesChatStreamRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/chat/stream/route.ts"),
   "utf8"
 );
 const hermesRunsReplayPreviewSource = readFileSync(
@@ -1166,6 +1177,48 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs BFF Event Contract 16N",
+  "POST /api/hermes/runs/chat/stream",
+  "production session stream remains the default",
+  "No runtime route is implemented in this slice.",
+  "No direct browser-to-Hermes",
+  "Agent access selector remains future-only",
+  "HermesRunsBffEvent",
+  "run.started",
+  "message.delta",
+  "activity.event",
+  "approval.request",
+  "approval.responded",
+  "run.stopping",
+  "run.stopped",
+  "run.reconnecting",
+  "replay.snapshot",
+  "error",
+  "done",
+  "RunRecord",
+  "activityReplay",
+  "run_create_failed",
+  "approval_invalid_choice",
+  "tenant_scope_mismatch",
+  "No raw Runs payload",
+  "Slice 16O"
+]) {
+  if (!hermesRunsBffEventContract.includes(token)) {
+    failures.push(`Hermes Runs BFF event contract doc is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "streamHermesSessionChat",
+  "request.signal",
+  "text/event-stream"
+]) {
+  if (!productionHermesChatStreamRoute.includes(token)) {
+    failures.push(`Production Hermes session stream route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "createActivityEventFromHermesRunsEvent",
   "normalizeHermesRunsEventType",
   "summarizeHermesRunsEvent",
@@ -1186,6 +1239,7 @@ if (!packageJson.includes("\"smoke:hermes:runs\"")) {
 }
 
 const forbiddenRunRoutePaths = [
+  "apps/web/src/app/api/hermes/runs/chat",
   "apps/web/src/app/api/hermes/runs/stop",
   "apps/web/src/app/api/hermes/runs/approval",
   "apps/web/src/app/api/hermes/runs/stream",

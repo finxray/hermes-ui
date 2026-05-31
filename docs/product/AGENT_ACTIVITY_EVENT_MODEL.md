@@ -179,6 +179,15 @@ because it belongs in the assistant text buffer, not the activity timeline.
 Runs `reasoning.available` becomes a generic public reasoning signal and omits
 raw reasoning-like text from details.
 
+Slice 16N defines `HermesRunsBffEvent` as the future browser-facing BFF
+envelope around Runs execution. The envelope uses `activity.event` for
+normalized `AgentActivityEvent` rows, keeps `message.delta` as assistant text
+only, and maps `approval.request`, `approval.responded`, terminal run events,
+and normalized errors into the existing activity/replay model. The contract is
+future-only: production chat still uses `/api/hermes/chat/stream`, no
+production Runs composer route was implemented, and the Agent access selector
+remains future-only.
+
 Approval fields:
 
 ```ts

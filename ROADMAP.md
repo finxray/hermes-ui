@@ -1043,6 +1043,22 @@ browser-to-Hermes/Gateway path, storage path, memory admin UI, provider/model
 switching, or composer Agent access selector was added. The next recommended
 slice is Slice 16N: BFF production Runs route contract and event envelope.
 
+## Checkpoint: Slice 16N Hermes Runs BFF event contract
+
+Slice 16N defined the future production Runs BFF route contract in
+`docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md` without implementing
+runtime execution. The contract specifies the future
+`POST /api/hermes/runs/chat/stream` request shape, `HermesRunsBffEvent`
+browser-facing stream envelope, assistant text handling, `AgentActivityEvent`
+mapping, `RunRecord` and `activityReplay` reconciliation, stop and approval
+envelopes, error taxonomy, replay/reconnect semantics, and source guards.
+Production chat still uses `/api/hermes/chat/stream`; no production Runs route,
+composer Runs selector, approval buttons, direct browser-to-Hermes/Gateway
+path, storage path, Brain Memory BFF change, memory scope bridge change,
+stable-key change, provider/model switching, memory mutation/admin UI, or Agent
+access selector was added. The next recommended slice is Slice 16O: typed Runs
+BFF event envelope fixtures and reducer checks.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

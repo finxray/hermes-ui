@@ -592,6 +592,22 @@ Brain Memory mutation/admin UI, direct browser-to-Gateway/storage path, direct
 browser-to-Hermes path, or secret commit was added. The next recommended slice
 is Slice 15G: broaden read-only multi-session scope-isolation regression.
 
+## Checkpoint: Slice 15G Brain Memory scope isolation regression
+
+Slice 15G added an opt-in live multi-session scope isolation smoke on
+2026-05-31 and recorded the result in
+`docs/checkpoints/BRAIN_MEMORY_SCOPE_ISOLATION_15G.md`.
+`npm run smoke:ui:memory-scope` seeds Project A/A1/A2 and Project B/B1 in an
+isolated browser context, stores a marker through the real composer in A1, then
+verifies through BFF search/inspect that A1 finds it, A2 does not, and Project
+B does not. Inspect detail reported `scope=matching-session` with tenant
+`local-dev`. Project-only no-session search is documented as current
+project-broad read behavior, not a Web UI project-level write path. No tenant
+checks were loosened, no Brain Memory mutation/admin UI, direct
+browser-to-Gateway/storage path, direct browser-to-Hermes path, or secret commit
+was added. The next recommended slice is Slice 15H: document and contract-test
+project-only read semantics separately from future project-level writes.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

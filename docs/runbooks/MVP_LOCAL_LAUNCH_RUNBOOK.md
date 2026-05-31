@@ -39,6 +39,8 @@ the deferred production one-command CLI.
 | `npm run smoke:ui:send:headed` | Visible live composer send smoke for debugging. |
 | `npm run smoke:ui:memory-live` | Opt-in live Brain Memory timeline smoke. Requires real Hermes and Brain Memory Gateway. |
 | `npm run smoke:ui:memory-live:headed` | Visible live Brain Memory timeline smoke for debugging. |
+| `npm run smoke:ui:memory-scope` | Opt-in live multi-session Brain Memory scope isolation smoke. Requires real Hermes and Brain Memory Gateway. |
+| `npm run smoke:ui:memory-scope:headed` | Visible live multi-session scope isolation smoke for debugging. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Requires Hermes BFF status and stream to be live. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Requires live Brain Memory Gateway search/inspect through the BFF. |
 
@@ -286,6 +288,8 @@ Do not add direct browser-to-Gateway calls or direct storage access.
 | `npm run smoke:ui:send:headed` | Visible optional live composer send smoke. |
 | `npm run smoke:ui:memory-live` | Optional live Brain Memory timeline smoke. Requires real Hermes and Brain Memory Gateway. |
 | `npm run smoke:ui:memory-live:headed` | Visible optional live Brain Memory timeline smoke. |
+| `npm run smoke:ui:memory-scope` | Optional live multi-session Brain Memory scope isolation smoke. Requires real Hermes and Brain Memory Gateway. |
+| `npm run smoke:ui:memory-scope:headed` | Visible optional live multi-session scope isolation smoke. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Live Hermes gate. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Live Brain Memory Gateway gate. |
 | `npm run check:tenant-scope` | Verifies local MVP tenant/scope diagnostics, redaction, and strict same-tenant smoke boundaries. |
@@ -398,6 +402,7 @@ All smoke commands accept the same explicit base URL form:
 ```powershell
 npm run smoke:mvp -- --base-url http://127.0.0.1:3000
 npm run smoke:ui -- --base-url http://127.0.0.1:3000
+npm run smoke:ui:memory-scope -- --base-url http://127.0.0.1:3000
 npm run smoke:markdown -- --base-url http://127.0.0.1:3000
 npm run smoke:markdown:long -- --base-url http://127.0.0.1:3000
 ```

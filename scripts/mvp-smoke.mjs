@@ -134,6 +134,7 @@ async function checkSourceSmokeTargets() {
   const memoryConsole = readFile("apps/web/src/components/memory/BrainMemoryConsole.tsx");
   const memoryTimeline = readFile("apps/web/src/lib/memoryTimeline.ts");
   const composer = readFile("apps/web/src/components/chat/Composer.tsx");
+  const uiSmoke = readFile("scripts/ui-interaction-smoke.mjs");
 
   checkSource("ui:left-rail-toggle-label", topBar.includes("Collapse left sidebar"), "Top bar exposes left rail toggle labels.");
   checkSource(
@@ -182,6 +183,15 @@ async function checkSourceSmokeTargets() {
       tenantDiagnostics.includes("redactTenantScopePosture") &&
       !tenantDiagnostics.includes("fetch("),
     "Context tab exposes read-only tenant/scope diagnostics without direct service calls."
+  );
+  checkSource(
+    "ui:memory-scope-isolation-smoke",
+    uiSmoke.includes("--memory-scope-test") &&
+      uiSmoke.includes("memory-scope-same-session") &&
+      uiSmoke.includes("memory-scope-different-session") &&
+      uiSmoke.includes("memory-scope-different-project") &&
+      uiSmoke.includes("memory-scope-project-only-query"),
+    "Opt-in live memory smoke covers same-session, different-session, different-project, and project-only scope checks."
   );
   checkSource(
     "ui:memory-activity-timeline",

@@ -14,6 +14,7 @@ const report = {
   mode: {
     headed: args.headed,
     memoryLiveTest: args.memoryLiveTest,
+    memoryScopeTest: args.memoryScopeTest,
     requireBrainMemory: args.requireBrainMemory,
     requireHermes: args.requireHermes,
     replayTest: args.replayTest,
@@ -62,7 +63,7 @@ async function main() {
 
   const hermesStatus = await checkHermesRequirement();
   const brainMemoryStatus = await checkBrainMemoryRequirement();
-  if ((args.sendTest || args.stopTest || args.replayTest || args.memoryLiveTest) && !canUseLiveHermes(hermesStatus)) {
+  if ((args.sendTest || args.stopTest || args.replayTest || args.memoryLiveTest || args.memoryScopeTest) && !canUseLiveHermes(hermesStatus)) {
     addResult(
       "hermes-send-precondition",
       "fail",
@@ -71,7 +72,7 @@ async function main() {
     finalize();
     return;
   }
-  if (args.memoryLiveTest && !canUseLiveBrainMemory(brainMemoryStatus)) {
+  if ((args.memoryLiveTest || args.memoryScopeTest) && !canUseLiveBrainMemory(brainMemoryStatus)) {
     addResult(
       "brain-memory-live-precondition",
       "fail",
@@ -137,6 +138,7 @@ function parseArgs(values) {
     headed: false,
     json: false,
     memoryLiveTest: false,
+    memoryScopeTest: false,
     requireBrainMemory: false,
     requireHermes: false,
     replayTest: false,
@@ -153,6 +155,11 @@ function parseArgs(values) {
       parsed.json = true;
     } else if (arg === "--memory-live-test") {
       parsed.memoryLiveTest = true;
+      parsed.requireBrainMemory = true;
+      parsed.requireHermes = true;
+      parsed.sendTest = true;
+    } else if (arg === "--memory-scope-test") {
+      parsed.memoryScopeTest = true;
       parsed.requireBrainMemory = true;
       parsed.requireHermes = true;
       parsed.sendTest = true;
@@ -504,6 +511,11 @@ async function checkRightRailTabs() {
 }
 
 async function checkComposer() {
+  if (args.memoryScopeTest) {
+    await runLiveMemoryScopeIsolationSmoke();
+    return;
+  }
+
   const textarea = page.getByLabel("Message", { exact: true });
   const sendButton = page.getByRole("button", { name: "Send message", exact: true });
   const message = args.sendTest
@@ -600,6 +612,142 @@ async function runLiveMemoryTimelineSmoke({ sendButton }) {
   await checkBrainMemoryMarkerSearch(marker);
   await checkNoVisibleSecrets("memory-live-visible-secrets");
   await checkNoHorizontalOverflow("memory-live-overflow");
+}
+
+async function runLiveMemoryScopeIsolationSmoke() {
+  const workspace = await seedMemoryScopeIsolationWorkspace();
+  addResult(
+    "memory-scope-workspace-seeded",
+    "pass",
+    `Seeded isolated workspace tenant=${workspace.tenantId}, A1=${workspace.sessionA1StableKey}, A2=${workspace.sessionA2StableKey}, B1=${workspace.sessionB1StableKey}.`
+  );
+
+  await page.reload({ waitUntil: "domcontentloaded", timeout: timeoutMs });
+  await page.waitForLoadState("load", { timeout: timeoutMs });
+  await expectVisible(
+    "memory-scope-active-session",
+    page.getByText("Scope isolation A1", { exact: true }).first(),
+    "Session A1 is active in the isolated browser workspace."
+  );
+
+  const contexts = await scopeIsolationContexts();
+  if (!contexts) {
+    addResult("memory-scope-contexts", "fail", "Could not derive A1/A2/B1 contexts from isolated browser workspace state.");
+    return;
+  }
+  check(
+    "memory-scope-tenant",
+    contexts.a1.project.tenantId === "local-dev" &&
+      contexts.a2.project.tenantId === "local-dev" &&
+      contexts.b1.project.tenantId === "local-dev",
+    "All scope-isolation contexts use tenant local-dev."
+  );
+  check(
+    "memory-scope-stable-keys",
+    contexts.a1.project.stableKey === workspace.projectAStableKey &&
+      contexts.a1.session?.stableKey === workspace.sessionA1StableKey &&
+      contexts.a2.session?.stableKey === workspace.sessionA2StableKey &&
+      contexts.b1.project.stableKey === workspace.projectBStableKey &&
+      contexts.b1.session?.stableKey === workspace.sessionB1StableKey,
+    "Project/session stable keys remained deterministic after hydration."
+  );
+
+  const marker = `BM_SCOPE_A1_${timestampMarker()}_${randomMarker()}`;
+  const ackMarker = "BM_SCOPE_A1_STORED";
+  const message =
+    `Store this harmless Brain Memory scope-isolation marker exactly in the current Studio session memory: ${marker}. ` +
+    `Use the active project/session scope from this request. Then reply ${ackMarker}.`;
+  const textarea = page.getByLabel("Message", { exact: true });
+  const sendButton = page.getByRole("button", { name: "Send message", exact: true });
+  const initialAssistantCount = await page.locator('article[data-role="assistant"]').count();
+
+  await textarea.fill(message, { timeout: timeoutMs });
+  addResult("memory-scope-marker-generated", "pass", `Generated marker ${marker}.`);
+  await page.waitForFunction(() => {
+    const button = document.querySelector('button[aria-label="Send message"]');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  }, null, { timeout: timeoutMs });
+
+  await sendButton.click({ timeout: timeoutMs });
+  addResult("memory-scope-send-click", "pass", "Clicked Send for opt-in multi-session Brain Memory scope smoke.");
+
+  await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("memory-scope-user-message", "pass", "Unique scope-isolation user message rendered in Session A1.");
+
+  await page.waitForFunction(
+    ({ initialCount }) => document.querySelectorAll('article[data-role="assistant"]').length > initialCount,
+    { initialCount: initialAssistantCount },
+    { timeout: liveSendTimeoutMs }
+  );
+  addResult("memory-scope-assistant-created", "pass", "A new assistant message was created for scope-isolation smoke.");
+
+  const assistantResult = await waitForAssistantResponse(initialAssistantCount, ackMarker);
+  if (!assistantResult.ok) {
+    addResult("memory-scope-assistant-response", "fail", assistantResult.message);
+    return;
+  }
+  addResult(
+    "memory-scope-assistant-response",
+    "pass",
+    `Observed non-empty assistant response: ${assistantResult.preview}`
+  );
+  addResult(
+    "memory-scope-assistant-ack",
+    assistantResult.hasMarker ? "pass" : "warn",
+    assistantResult.hasMarker
+      ? `Assistant response included ${ackMarker}.`
+      : `Assistant response did not include ${ackMarker}; BFF scope search remains authoritative.`
+  );
+
+  const streamStatus = streamResponses.at(-1);
+  addResult(
+    "memory-scope-stream-response",
+    streamStatus && streamStatus < 400 ? "pass" : "fail",
+    streamStatus
+      ? `/api/hermes/chat/stream returned HTTP ${streamStatus}.`
+      : "No /api/hermes/chat/stream response was observed."
+  );
+
+  await checkMemoryActivityBlock();
+  await checkMemoryTimelineRail();
+  await checkTenantScopeDiagnostics();
+
+  const sameSession = await checkMarkerSearch({
+    context: contexts.a1,
+    expectFound: true,
+    marker,
+    name: "memory-scope-same-session",
+    successMessage: "Same project + same session found the session-scoped marker."
+  });
+  await checkMarkerInspect({
+    context: contexts.a1,
+    marker,
+    memoryId: sameSession.first?.id,
+    name: "memory-scope-inspect",
+    expectedProjectKey: contexts.a1.project.stableKey,
+    expectedSessionKey: contexts.a1.session?.stableKey
+  });
+  await checkMarkerSearch({
+    context: contexts.a2,
+    expectFound: false,
+    marker,
+    name: "memory-scope-different-session",
+    successMessage: "Same project + different session returned 0 marker results."
+  });
+  await checkMarkerSearch({
+    context: contexts.b1,
+    expectFound: false,
+    marker,
+    name: "memory-scope-different-project",
+    successMessage: "Different project returned 0 marker results."
+  });
+  await checkProjectOnlyMarkerSearch({
+    context: contexts.projectOnlyA,
+    marker
+  });
+
+  await checkNoVisibleSecrets("memory-scope-visible-secrets");
+  await checkNoHorizontalOverflow("memory-scope-overflow");
 }
 
 async function checkTenantScopeDiagnostics() {
@@ -781,6 +929,113 @@ async function checkBrainMemoryMarkerSearch(marker) {
       ? "Different project search returned 0 results for marker."
       : `Different project search returned ${differentProjectResults.length} result(s).`
   );
+}
+
+async function checkMarkerSearch({ context, expectFound, marker, name, successMessage }) {
+  const search = await postJson("/api/brain-memory/search", {
+    context,
+    limit: 10,
+    query: marker
+  });
+  const markerResults = Array.isArray(search.body?.results)
+    ? search.body.results.filter((result) => JSON.stringify(result).includes(marker))
+    : [];
+  const found = search.ok && search.body?.mode === "real" && markerResults.length > 0;
+  const passed = expectFound ? found : search.ok && search.body?.mode === "real" && markerResults.length === 0;
+  addResult(
+    name,
+    passed ? "pass" : "fail",
+    passed
+      ? successMessage
+      : `Expected marker ${expectFound ? "to be found" : "to be absent"}; mode=${search.body?.mode || "unknown"}, markerResults=${markerResults.length}, status=${search.status || search.error || "unknown"}.`
+  );
+
+  const searchTenant = search.body?.scope?.tenantId;
+  if (search.ok && search.body?.mode === "real") {
+    check(
+      `${name}-tenant`,
+      !searchTenant || searchTenant === context.project.tenantId,
+      searchTenant
+        ? `BFF search tenant matched ${context.project.tenantId}.`
+        : "BFF search response did not expose tenant; scope is still verified through strict same-context/different-context results."
+    );
+  }
+
+  return {
+    first: markerResults[0] ?? null,
+    markerResults,
+    search
+  };
+}
+
+async function checkMarkerInspect({ context, expectedProjectKey, expectedSessionKey, marker, memoryId, name }) {
+  if (!memoryId) {
+    addResult(name, "fail", "Cannot inspect scope because same-session search did not return a memory id.");
+    return;
+  }
+
+  const inspect = await postJson("/api/brain-memory/memory/inspect", {
+    context,
+    memoryId
+  });
+  const detail = inspect.body?.detail;
+  const inspectOk = inspect.ok && inspect.body?.mode === "real" && detail;
+  if (!inspectOk) {
+    addResult(
+      name,
+      "fail",
+      `BFF inspect did not return detail; mode=${inspect.body?.mode || "unknown"}, status=${inspect.status || inspect.error || "unknown"}.`
+    );
+    return;
+  }
+
+  const detailTenant = detail.scope?.tenantId;
+  const tenantOk = !detailTenant || detailTenant === context.project.tenantId;
+  const projectOk = detail.projectKey === expectedProjectKey;
+  const sessionOk = detail.sessionKey === expectedSessionKey;
+  const scopeOk = detail.scopeStatus === "matching-session";
+  const contentOk = JSON.stringify(detail).includes(marker);
+
+  addResult(
+    name,
+    tenantOk && projectOk && sessionOk && scopeOk && contentOk ? "pass" : "fail",
+    `Inspect detail project=${detail.projectKey || "unknown"}, session=${detail.sessionKey || "none"}, scope=${detail.scopeStatus || "unknown"}${detailTenant ? `, tenant=${detailTenant}` : ""}.`
+  );
+}
+
+async function checkProjectOnlyMarkerSearch({ context, marker }) {
+  const search = await postJson("/api/brain-memory/search", {
+    context,
+    limit: 10,
+    query: marker
+  });
+  const markerResults = Array.isArray(search.body?.results)
+    ? search.body.results.filter((result) => JSON.stringify(result).includes(marker))
+    : [];
+  const ok = search.ok && search.body?.mode === "real";
+  const first = markerResults[0] ?? null;
+  const searchTenant = search.body?.scope?.tenantId;
+  const firstScope = first
+    ? `project=${first.projectKey || "unknown"}, session=${first.sessionKey || "none"}, status=${first.scopeStatus || "unknown"}`
+    : "no marker result";
+
+  addResult(
+    "memory-scope-project-only-query",
+    ok ? "pass" : "fail",
+    ok
+      ? `Project-only search is currently project-broad and returned ${markerResults.length} marker result(s); ${firstScope}. Project-level marker creation was not attempted.`
+      : `Project-only search failed; mode=${search.body?.mode || "unknown"}, status=${search.status || search.error || "unknown"}.`
+  );
+
+  if (ok) {
+    check(
+      "memory-scope-project-only-query-tenant",
+      !searchTenant || searchTenant === context.project.tenantId,
+      searchTenant
+        ? `BFF project-only search tenant matched ${context.project.tenantId}.`
+        : "BFF project-only search response did not expose tenant."
+    );
+  }
 }
 
 async function runLiveStopSmoke({ message, sendButton }) {
@@ -1319,6 +1574,147 @@ async function currentBrainMemoryContext() {
         workspaceVersion: 1
       }
     };
+  });
+}
+
+async function seedMemoryScopeIsolationWorkspace() {
+  return page.evaluate(() => {
+    const now = new Date().toISOString();
+    const tenantId = "local-dev";
+    const projectAId = "project-scope-a";
+    const projectBId = "project-scope-b";
+    const sessionA1Id = "session-scope-a1";
+    const sessionA2Id = "session-scope-a2";
+    const sessionB1Id = "session-scope-b1";
+    const projectStableKey = (projectId) => `studio:${tenantId}:project:${projectId}`;
+    const sessionStableKey = (projectId, sessionId) => `studio:${tenantId}:project:${projectId}:session:${sessionId}`;
+    const makeProject = (id, name) => ({
+      createdAt: now,
+      description: "Isolated smoke project for live Brain Memory scope regression.",
+      icon: id === projectAId ? "SA" : "SB",
+      id,
+      memoryScope: {
+        contextPolicy: "balanced",
+        pinnedMemoryIds: [],
+        projectId: id,
+        retrievalProfile: "balanced",
+        stableProjectKey: projectStableKey(id),
+        tenantId,
+        userVisibleSummary: `${name} scope-isolation project.`
+      },
+      memoryScopeKey: projectStableKey(id),
+      name,
+      updatedAt: now
+    });
+    const makeSession = (projectId, id, title) => ({
+      archivedAt: undefined,
+      artifacts: [],
+      createdAt: now,
+      hermesSessionId: `hermes-${id}`,
+      id,
+      memoryEvidence: [],
+      memoryScope: {
+        includeProjectContext: true,
+        includeSessionContext: true,
+        projectId,
+        sessionId: id,
+        stableSessionKey: sessionStableKey(projectId, id),
+        tenantId,
+        userVisibleSummary: `${title} scope-isolation session.`
+      },
+      messages: [],
+      projectId,
+      runRecords: [],
+      summary: "Empty scope-isolation smoke session",
+      title,
+      titleSource: "manual",
+      toolEvents: [],
+      updatedAt: now
+    });
+
+    const state = {
+      activeProjectId: projectAId,
+      activeSessionId: sessionA1Id,
+      connectionStatus: {
+        brainMemory: "real",
+        hermes: "real"
+      },
+      modelChoices: [
+        {
+          id: "hermes-agent",
+          label: "Hermes Agent",
+          provider: "Hermes"
+        }
+      ],
+      projects: [
+        makeProject(projectAId, "Scope Isolation Project A"),
+        makeProject(projectBId, "Scope Isolation Project B")
+      ],
+      sessions: [
+        makeSession(projectAId, sessionA1Id, "Scope isolation A1"),
+        makeSession(projectAId, sessionA2Id, "Scope isolation A2"),
+        makeSession(projectBId, sessionB1Id, "Scope isolation B1")
+      ],
+      version: 1
+    };
+
+    window.localStorage.setItem("hermes-ui.workspace.v1", JSON.stringify(state));
+    return {
+      projectAStableKey: projectStableKey(projectAId),
+      projectBStableKey: projectStableKey(projectBId),
+      sessionA1StableKey: sessionStableKey(projectAId, sessionA1Id),
+      sessionA2StableKey: sessionStableKey(projectAId, sessionA2Id),
+      sessionB1StableKey: sessionStableKey(projectBId, sessionB1Id),
+      tenantId
+    };
+  });
+}
+
+async function scopeIsolationContexts() {
+  return page.evaluate(() => {
+    const raw = window.localStorage.getItem("hermes-ui.workspace.v1");
+    if (!raw) {
+      return null;
+    }
+    const state = JSON.parse(raw);
+    const toContext = (projectId, sessionId) => {
+      const project = state.projects?.find((item) => item.id === projectId);
+      const session = sessionId
+        ? state.sessions?.find((item) => item.id === sessionId)
+        : null;
+      if (!project || (sessionId && !session)) {
+        return null;
+      }
+      return {
+        project: {
+          contextPolicy: project.memoryScope?.contextPolicy || "balanced",
+          id: project.id,
+          retrievalProfile: project.memoryScope?.retrievalProfile || "balanced",
+          stableKey: project.memoryScope?.stableProjectKey || project.memoryScopeKey || project.id,
+          tenantId: project.memoryScope?.tenantId || "local-dev",
+          title: project.name
+        },
+        session: session
+          ? {
+              id: session.id,
+              includeProjectContext: session.memoryScope?.includeProjectContext !== false,
+              includeSessionContext: session.memoryScope?.includeSessionContext !== false,
+              stableKey: session.memoryScope?.stableSessionKey || session.id,
+              title: session.title
+            }
+          : null,
+        ui: {
+          source: "hermes-ui",
+          workspaceVersion: 1
+        }
+      };
+    };
+
+    const a1 = toContext("project-scope-a", "session-scope-a1");
+    const a2 = toContext("project-scope-a", "session-scope-a2");
+    const b1 = toContext("project-scope-b", "session-scope-b1");
+    const projectOnlyA = toContext("project-scope-a", null);
+    return a1 && a2 && b1 && projectOnlyA ? { a1, a2, b1, projectOnlyA } : null;
   });
 }
 

@@ -37,6 +37,8 @@
     "smoke:ui:send:headed": "node scripts/ui-interaction-smoke.mjs --send-test --require-hermes --headed",
     "smoke:ui:memory-live": "node scripts/ui-interaction-smoke.mjs --memory-live-test --require-hermes --require-brain-memory",
     "smoke:ui:memory-live:headed": "node scripts/ui-interaction-smoke.mjs --memory-live-test --require-hermes --require-brain-memory --headed",
+    "smoke:ui:memory-scope": "node scripts/ui-interaction-smoke.mjs --memory-scope-test --require-hermes --require-brain-memory",
+    "smoke:ui:memory-scope:headed": "node scripts/ui-interaction-smoke.mjs --memory-scope-test --require-hermes --require-brain-memory --headed",
     "smoke:ui:stop": "node scripts/ui-interaction-smoke.mjs --send-test --stop-test --require-hermes",
     "smoke:ui:stop:headed": "node scripts/ui-interaction-smoke.mjs --send-test --stop-test --require-hermes --headed",
     "smoke:ui:replay": "node scripts/ui-interaction-smoke.mjs --replay-test --require-hermes",

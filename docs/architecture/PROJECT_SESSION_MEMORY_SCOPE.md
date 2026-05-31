@@ -153,6 +153,25 @@ metadata to:
 - Hermes UI BFF memory-scope bridge through `instructions`.
 - Right-panel Active Context Contract preview.
 
+## Slice 15G Live Scope Regression
+
+Slice 15G verified the current live Brain Memory scope behavior across multiple
+local Studio projects and sessions:
+
+- same project + same session BFF search found a live session-scoped marker;
+- same project + different session BFF search returned 0 marker results;
+- different project BFF search returned 0 marker results;
+- inspect detail for the same-session marker reported the expected project key,
+  session key, tenant `local-dev`, and `scopeStatus=matching-session`;
+- project/session stable keys remained unchanged.
+
+When the BFF search context omits `session`, the current Gateway-mediated read
+behavior is project-broad: a project-only search can return a session-scoped
+memory from the same project, with the result still carrying its session key and
+reported as `matching-project`. This is read behavior only. The Web UI/Hermes
+write path still requires session context and the memory-scope bridge supplies a
+session key on chat turns.
+
 ## Not Implemented Yet
 
 - Brain Memory Gateway calls.

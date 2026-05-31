@@ -221,6 +221,11 @@ function checkSourceBoundaries() {
   assert(!source.diagnostics.includes("fetch("));
   assert(source.uiSmoke.includes("memory-live-bff-search-tenant"));
   assert(source.uiSmoke.includes("memory-live-bff-result-scope"));
+  assert(source.uiSmoke.includes("--memory-scope-test"));
+  assert(source.uiSmoke.includes("memory-scope-same-session"));
+  assert(source.uiSmoke.includes("memory-scope-different-session"));
+  assert(source.uiSmoke.includes("memory-scope-different-project"));
+  assert(source.uiSmoke.includes("memory-scope-project-only-query"));
   assert(!source.uiSmoke.includes("Hermes MCP stored it under local-dev"));
   assert(source.workspaceStore.includes('const LEGACY_LOCAL_TENANT_ID = "tenant-local"'));
 }

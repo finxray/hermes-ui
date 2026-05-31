@@ -9,8 +9,11 @@ import type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesModelDescriptor,
+  HermesRunApprovalChoice,
+  HermesRunApprovalResult,
   HermesRunStopResult,
   HermesRunProbeEvent,
+  HermesRunsApprovalProbeResult,
   HermesRunsProbeResult,
   HermesRunsStopProbeResult,
   HermesStatusError,
@@ -45,7 +48,10 @@ export type {
   HermesFastStreamProfile,
   HermesModelDescriptor,
   HermesModelSelectionStatus,
+  HermesRunApprovalChoice,
+  HermesRunApprovalResult,
   HermesRunProbeEvent,
+  HermesRunsApprovalProbeResult,
   HermesRunsProbeResult,
   HermesRunStopResult,
   HermesRunsStopProbeResult,
@@ -63,6 +69,16 @@ const HERMES_RUNS_STOP_PROBE_PROMPTS = [
   "Count from 1 to 2000, one number per line. Do not summarize, skip numbers, or use tools.",
   "Count from 1 to 10000, one number per line. Do not summarize, skip numbers, or use tools."
 ];
+const HERMES_RUNS_APPROVAL_PROBE_EXPECTED_TEXT = "HERMES_RUNS_APPROVAL_PROBE_DONE";
+const HERMES_RUNS_APPROVAL_PROBE_COMMAND = "rm -rf /tmp/hermes-ui-approval-probe-nonexistent";
+const HERMES_RUNS_APPROVAL_PROBE_PROMPT = [
+  "This is a controlled Hermes Runs approval diagnostic.",
+  `Use the terminal tool to attempt exactly this command: ${HERMES_RUNS_APPROVAL_PROBE_COMMAND}`,
+  "Do not use any other tool or command.",
+  "After the approval decision is resolved, reply exactly:",
+  HERMES_RUNS_APPROVAL_PROBE_EXPECTED_TEXT
+].join("\n");
+const RUNS_APPROVAL_PROBE_TIMEOUT_MS = 60_000;
 const PROBE_PREVIEW_LIMIT = 600;
 
 export async function getHermesStatus(
@@ -843,6 +859,293 @@ export async function runHermesRunsStopProbe(
   });
 }
 
+export async function runHermesRunsApprovalProbe(
+  config: HermesClientConfig,
+  options: {
+    choice?: HermesRunApprovalChoice;
+    sessionId?: string;
+    timeoutMs?: number;
+  } = {}
+): Promise<HermesRunsApprovalProbeResult> {
+  const checkedAt = new Date().toISOString();
+  const startedAt = Date.now();
+  const timeoutMs = options.timeoutMs ?? RUNS_APPROVAL_PROBE_TIMEOUT_MS;
+  const approvalChoice = sanitizeApprovalChoice(options.choice) ?? "deny";
+  const sessionId = sanitizeHermesId(
+    options.sessionId ?? `hermes-ui-runs-approval-probe-${Date.now().toString(36)}`
+  );
+  const baseResult = {
+    checkedAt,
+    prompt: HERMES_RUNS_APPROVAL_PROBE_PROMPT,
+    runId: null,
+    sessionId,
+    createStatus: null,
+    finalStatusName: null,
+    finalStatus: null,
+    approvalRequiredObserved: false,
+    approvalActionAttempted: "none" as const,
+    approvalChoice,
+    approval: null,
+    approvalRequestedAt: null,
+    approvalRespondedAt: null,
+    eventTypes: [],
+    approvalEventTypes: [],
+    events: [],
+    assistantTextPreview: "",
+    outputPreview: "",
+    counts: {
+      events: 0,
+      messageDeltaEvents: 0,
+      toolEvents: 0,
+      brainMemoryToolEvents: 0,
+      approvalEvents: 0
+    },
+    timings: {
+      durationMs: 0,
+      eventStreamMs: null
+    },
+    activity: {
+      approvalActivityEvents: 0,
+      waitingForApprovalEvents: 0,
+      completedApprovalEvents: 0,
+      cancelledApprovalEvents: 0,
+      rawSecretRendered: false
+    },
+    safety: runsApprovalSafety(false),
+    blocker: null
+  };
+
+  const finish = (
+    result: Omit<HermesRunsApprovalProbeResult, "timings"> & {
+      timings?: Partial<HermesRunsApprovalProbeResult["timings"]>;
+    }
+  ): HermesRunsApprovalProbeResult => ({
+    ...result,
+    timings: {
+      durationMs: Date.now() - startedAt,
+      eventStreamMs: result.timings?.eventStreamMs ?? null
+    }
+  });
+
+  if (config.enabled === false) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      outcome: "skipped",
+      error: {
+        kind: "disabled",
+        message: "Real Hermes is disabled for this UI process."
+      },
+      blocker: "Real Hermes is disabled for this UI process."
+    });
+  }
+
+  if (!config.baseUrl?.trim()) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      outcome: "skipped",
+      error: {
+        kind: "unconfigured",
+        message: "Set HERMES_API_BASE_URL to enable the Hermes Runs approval probe."
+      },
+      blocker: "HERMES_API_BASE_URL is not configured."
+    });
+  }
+
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "failed",
+      outcome: "failed",
+      error: {
+        kind: "invalid_config",
+        message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL."
+      },
+      blocker: "HERMES_API_BASE_URL is invalid."
+    });
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const capabilities = await fetchJsonEndpoint({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    path: "/v1/capabilities",
+    signal: config.signal,
+    timeoutMs
+  });
+
+  if (!capabilities.ok) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      outcome: "skipped",
+      error: capabilities.error,
+      blocker: capabilities.error.message
+    });
+  }
+
+  const features = objectRecord(capabilities.data?.features);
+  if (
+    features &&
+    (features.run_submission === false ||
+      features.run_status === false ||
+      features.run_events_sse === false ||
+      features.run_approval_response === false ||
+      features.approval_events === false)
+  ) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "skipped",
+      outcome: "skipped",
+      error: {
+        kind: "bad_response",
+        message: "Hermes does not advertise the required Runs approval capabilities."
+      },
+      blocker: "Hermes does not advertise run submission/status/events plus approval events/response."
+    });
+  }
+
+  const createResult = await createHermesRun({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    instructions: [
+      "This is an opt-in approval diagnostic for a local Web UI.",
+      "Use the terminal tool only for the exact command requested by the user.",
+      "Do not use Brain Memory, files, web browsing, external network resources, or any other tools.",
+      "If the approval is denied, do not retry and do not attempt a different command.",
+      `After the approval decision is resolved, reply exactly ${HERMES_RUNS_APPROVAL_PROBE_EXPECTED_TEXT}.`
+    ].join("\n"),
+    memoryScopeKey: "hermes-ui-runs-approval-probe",
+    prompt: HERMES_RUNS_APPROVAL_PROBE_PROMPT,
+    sessionId,
+    signal: config.signal,
+    timeoutMs
+  });
+
+  if (!createResult.ok) {
+    return finish({
+      ...baseResult,
+      ok: false,
+      mode: "failed",
+      outcome: "failed",
+      error: createResult.error,
+      blocker: createResult.error.message
+    });
+  }
+
+  const eventStartedAt = Date.now();
+  const eventsResult = await readHermesRunEventsWithApproval({
+    apiKey: config.apiKey,
+    approvalChoice,
+    base,
+    fetchImpl,
+    runId: createResult.runId,
+    signal: config.signal,
+    timeoutMs
+  });
+  const eventStreamMs = Date.now() - eventStartedAt;
+
+  const finalStatusResult = await pollHermesRunUntilStable({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    runId: createResult.runId,
+    signal: config.signal,
+    timeoutMs: Math.min(timeoutMs, 12_000)
+  });
+
+  if (!eventsResult.ok) {
+    return finish({
+      ...baseResult,
+      runId: createResult.runId,
+      createStatus: createResult.status,
+      ok: false,
+      mode: "failed",
+      outcome: "failed",
+      error: eventsResult.error,
+      blocker: eventsResult.error.message,
+      timings: { eventStreamMs }
+    });
+  }
+
+  const events = eventsResult.events;
+  const rawEvents = eventsResult.rawEvents;
+  const eventTypes = Array.from(new Set(events.map((event) => event.event))).sort();
+  const approvalEventTypes = eventTypes.filter((eventType) => eventType.startsWith("approval."));
+  const assistantText = rawEvents
+    .filter((event) => asString(event.event) === "message.delta")
+    .map((event) => asString(event.delta))
+    .join("");
+  const output = asString(finalStatusResult.ok ? finalStatusResult.data.output : null) ||
+    asString(rawEvents.find((event) => asString(event.event) === "run.completed")?.output);
+  const finalStatus = finalStatusResult.ok ? finalStatusResult.data : null;
+  const finalStatusName = asString(finalStatus?.status) || createResult.status;
+  const counts = countRunsProbeEvents(events);
+  const approvalRequiredObserved = approvalEventTypes.includes("approval.request");
+  const approval = eventsResult.approval;
+  const approvalCalled = Boolean(approval);
+  const actionAttempted = approvalCalled
+    ? approvalChoice === "deny"
+      ? "reject"
+      : "approve"
+    : "none";
+  const activity = summarizeApprovalActivity(rawEvents);
+  const actionSucceeded = approval?.ok === true && eventsResult.approvalRespondedAt !== null;
+  const reconciled = finalStatusName === "completed" || finalStatusName === "failed";
+  const success = approvalRequiredObserved && actionSucceeded && reconciled;
+  const outcome = approvalOutcome({
+    actionSucceeded,
+    approvalChoice,
+    approvalRequiredObserved,
+    reconciled
+  });
+  const blockerMessage = approvalRequiredObserved
+    ? approval?.error?.message ?? "Approval request was observed, but the BFF approval action did not reconcile."
+    : "Hermes run did not emit approval.request for the diagnostic command.";
+  const blocker = success ? null : blockerMessage;
+
+  return finish({
+    ...baseResult,
+    runId: createResult.runId,
+    createStatus: createResult.status,
+    finalStatusName,
+    finalStatus,
+    approvalRequiredObserved,
+    approvalActionAttempted: actionAttempted,
+    approval,
+    approvalRequestedAt: eventsResult.approvalRequestedAt,
+    approvalRespondedAt: eventsResult.approvalRespondedAt,
+    eventTypes,
+    approvalEventTypes,
+    events,
+    assistantTextPreview: truncatePreview(assistantText),
+    outputPreview: truncatePreview(output),
+    counts,
+    activity,
+    safety: runsApprovalSafety(approvalCalled),
+    ok: success,
+    mode: success ? "success" : "failed",
+    outcome,
+    error: success
+      ? null
+      : {
+          kind: "bad_response",
+          message: blockerMessage
+        },
+    blocker,
+    timings: { eventStreamMs }
+  });
+}
+
 export function normalizeHermesSseEvent(
   eventName: string,
   payload: Record<string, unknown> | null
@@ -1244,6 +1547,73 @@ function isRunStopTerminalStatus(status: string) {
   );
 }
 
+function sanitizeApprovalChoice(value?: HermesRunApprovalChoice): HermesRunApprovalChoice | null {
+  return value && ["once", "session", "always", "deny"].includes(value) ? value : null;
+}
+
+function runsApprovalSafety(approvalCalled: boolean): HermesRunsApprovalProbeResult["safety"] {
+  return {
+    route: "bff-only",
+    promptKind: "approval-deny-probe",
+    stopCalled: false,
+    approvalCalled,
+    browserDirectHermes: false,
+    memoryMutationRequested: false,
+    defaultChoice: "deny",
+    productionChatUntouched: true
+  };
+}
+
+function approvalOutcome(args: {
+  actionSucceeded: boolean;
+  approvalChoice: HermesRunApprovalChoice;
+  approvalRequiredObserved: boolean;
+  reconciled: boolean;
+}): HermesRunsApprovalProbeResult["outcome"] {
+  if (!args.approvalRequiredObserved) {
+    return "approval_not_observed";
+  }
+  if (!args.actionSucceeded || !args.reconciled) {
+    return "approval_observed_action_failed";
+  }
+  return args.approvalChoice === "deny"
+    ? "approval_denied_and_reconciled"
+    : "approval_approved_and_reconciled";
+}
+
+function summarizeApprovalActivity(rawEvents: Record<string, unknown>[]): HermesRunsApprovalProbeResult["activity"] {
+  let approvalActivityEvents = 0;
+  let waitingForApprovalEvents = 0;
+  let completedApprovalEvents = 0;
+  let cancelledApprovalEvents = 0;
+
+  for (const event of rawEvents) {
+    const eventType = asString(event.event);
+    if (!eventType.startsWith("approval.")) {
+      continue;
+    }
+    approvalActivityEvents += 1;
+    if (eventType === "approval.request") {
+      waitingForApprovalEvents += 1;
+    } else if (eventType === "approval.responded") {
+      const choice = asString(event.choice);
+      if (choice === "deny") {
+        cancelledApprovalEvents += 1;
+      } else {
+        completedApprovalEvents += 1;
+      }
+    }
+  }
+
+  return {
+    approvalActivityEvents,
+    waitingForApprovalEvents,
+    completedApprovalEvents,
+    cancelledApprovalEvents,
+    rawSecretRendered: false
+  };
+}
+
 async function getHermesRunStatus(args: {
   apiKey?: string | null;
   base: URL;
@@ -1309,6 +1679,63 @@ async function stopHermesRun(args: {
       ok: false,
       statusCode: null,
       status: null,
+      body: null,
+      error: normalizeChatFetchError(error)
+    };
+  } finally {
+    abort.cleanup();
+  }
+}
+
+async function respondHermesRunApproval(args: {
+  apiKey?: string | null;
+  base: URL;
+  choice: HermesRunApprovalChoice;
+  fetchImpl: typeof fetch;
+  runId: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<HermesRunApprovalResult> {
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
+  const headers = new Headers({
+    Accept: "application/json",
+    "Content-Type": "application/json"
+  });
+  applyHermesAuth(headers, args.apiKey);
+
+  try {
+    const response = await args.fetchImpl(
+      buildEndpointUrl(args.base, `/v1/runs/${encodeURIComponent(args.runId)}/approval`),
+      {
+        body: JSON.stringify({ choice: args.choice }),
+        cache: "no-store",
+        headers,
+        method: "POST",
+        signal: abort.signal
+      }
+    );
+    const body = await readJsonObject(response);
+    return {
+      ok: response.ok,
+      statusCode: response.status,
+      choice: sanitizeApprovalChoice(asString(body?.choice) as HermesRunApprovalChoice) ?? args.choice,
+      resolved: typeof body?.resolved === "number" && Number.isFinite(body.resolved)
+        ? body.resolved
+        : null,
+      body,
+      error: response.ok
+        ? null
+        : {
+            kind: "http_error",
+            message: await safeHermesErrorMessageFromData(response.status, body, "/v1/runs/{run_id}/approval")
+          }
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: null,
+      choice: null,
+      resolved: null,
       body: null,
       error: normalizeChatFetchError(error)
     };
@@ -1522,6 +1949,160 @@ async function readHermesRunEventsWithStop(args: {
     stop,
     stopRequestedAt,
     stopTrigger
+  };
+}
+
+async function readHermesRunEventsWithApproval(args: {
+  apiKey?: string | null;
+  approvalChoice: HermesRunApprovalChoice;
+  base: URL;
+  fetchImpl: typeof fetch;
+  runId: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<
+  | {
+      ok: true;
+      rawEvents: Record<string, unknown>[];
+      events: HermesRunProbeEvent[];
+      approval: HermesRunApprovalResult | null;
+      approvalRequestedAt: string | null;
+      approvalRespondedAt: string | null;
+    }
+  | { ok: false; error: HermesChatError }
+> {
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
+  const headers = new Headers({ Accept: "text/event-stream" });
+  applyHermesAuth(headers, args.apiKey);
+
+  let approval: HermesRunApprovalResult | null = null;
+  let approvalPromise: Promise<HermesRunApprovalResult> | null = null;
+  let approvalRequestedAt: string | null = null;
+  let approvalRespondedAt: string | null = null;
+  const triggerApproval = () => {
+    if (approvalPromise) {
+      return approvalPromise;
+    }
+    approvalRequestedAt = new Date().toISOString();
+    approvalPromise = respondHermesRunApproval({
+      apiKey: args.apiKey,
+      base: args.base,
+      choice: args.approvalChoice,
+      fetchImpl: args.fetchImpl,
+      runId: args.runId,
+      signal: args.signal,
+      timeoutMs: Math.min(args.timeoutMs, 8_000)
+    }).then((result) => {
+      approval = result;
+      if (result.ok) {
+        approvalRespondedAt = new Date().toISOString();
+      }
+      return result;
+    });
+    return approvalPromise;
+  };
+
+  let response: Response;
+  try {
+    response = await args.fetchImpl(
+      buildEndpointUrl(args.base, `/v1/runs/${encodeURIComponent(args.runId)}/events`),
+      {
+        cache: "no-store",
+        headers,
+        signal: abort.signal
+      }
+    );
+  } catch (error) {
+    abort.cleanup();
+    return { ok: false, error: normalizeChatFetchError(error) };
+  }
+
+  if (!response.ok) {
+    abort.cleanup();
+    const data = await readJsonObject(response);
+    return {
+      ok: false,
+      error: {
+        kind: "http_error",
+        message: await safeHermesErrorMessageFromData(response.status, data, "/v1/runs/{run_id}/events")
+      }
+    };
+  }
+
+  if (!response.body) {
+    abort.cleanup();
+    return {
+      ok: false,
+      error: {
+        kind: "bad_response",
+        message: "Hermes run events endpoint did not return a stream body."
+      }
+    };
+  }
+
+  const rawEvents: Record<string, unknown>[] = [];
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const parsed = parseRunEventFrame(frame);
+        if (parsed) {
+          rawEvents.push(parsed);
+          if (asString(parsed.event) === "approval.request") {
+            void triggerApproval();
+          }
+        }
+      }
+    }
+    if (buffer.trim()) {
+      const parsed = parseRunEventFrame(buffer);
+      if (parsed) {
+        rawEvents.push(parsed);
+      }
+    }
+  } catch (error) {
+    if (!abort.signal.aborted) {
+      return { ok: false, error: normalizeChatFetchError(error) };
+    }
+  } finally {
+    if (approvalPromise) {
+      try {
+        approval = await approvalPromise;
+      } catch {
+        approval = {
+          ok: false,
+          statusCode: null,
+          choice: null,
+          resolved: null,
+          body: null,
+          error: {
+            kind: "unknown",
+            message: "Hermes run approval request failed unexpectedly."
+          }
+        };
+      }
+    }
+    abort.cleanup();
+    reader.releaseLock();
+  }
+
+  return {
+    ok: true,
+    rawEvents,
+    events: rawEvents.map(normalizeRunProbeEvent),
+    approval,
+    approvalRequestedAt,
+    approvalRespondedAt
   };
 }
 

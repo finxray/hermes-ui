@@ -26,6 +26,7 @@ type CommandDetails = NonNullable<AgentActivityEvent["command"]>;
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|credential|password|secret|token/i;
 const BEARER_VALUE_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const URL_SECRET_QUERY_PATTERN = /([?&](?:api[_-]?key|access[_-]?token|auth[_-]?token|token|key|secret|password)=)[^&#\s]+/gi;
 const COMMAND_OUTPUT_PREVIEW_LIMIT = 1200;
 
 export function createActivityEventFromHermesStreamEvent(
@@ -932,19 +933,19 @@ function getApprovalData(
   status: AgentActivityStatus
 ): AgentActivityEvent["approval"] {
   return {
-    action: asString(payload.action) ||
+    action: redactText(asString(payload.action) ||
       asString(payload.requested_action) ||
       asString(payload.command) ||
-      asString(payload.tool_name) ||
+      asString(payload.tool_name)) ||
       undefined,
     actionAvailable: false,
     approvalId: asString(payload.approval_id) || asString(payload.approvalId) || asString(payload.id) || undefined,
     choices: getStringList(payload.choices),
-    decision: getApprovalDecision(payload, status),
-    prompt: asString(payload.prompt) || asString(payload.question) || undefined,
-    reason: asString(payload.reason) || undefined,
+    decision: redactText(getApprovalDecision(payload, status) ?? "") || undefined,
+    prompt: redactText(asString(payload.prompt) || asString(payload.question)) || undefined,
+    reason: redactText(asString(payload.reason)) || undefined,
     respondedAt: asString(payload.responded_at) || asString(payload.respondedAt) || undefined,
-    riskLevel: asString(payload.risk_level) || asString(payload.riskLevel) || asString(payload.risk) || undefined,
+    riskLevel: redactText(asString(payload.risk_level) || asString(payload.riskLevel) || asString(payload.risk)) || undefined,
     unavailableReason: "Approval action unavailable in current stream path"
   };
 }
@@ -1100,7 +1101,9 @@ function redactValue(value: unknown, depth: number): unknown {
 }
 
 function redactText(value: string) {
-  return value.replace(BEARER_VALUE_PATTERN, "Bearer [redacted]");
+  return value
+    .replace(BEARER_VALUE_PATTERN, "Bearer [redacted]")
+    .replace(URL_SECRET_QUERY_PATTERN, "$1[redacted]");
 }
 
 function normalizeName(value: string) {

@@ -330,13 +330,34 @@ Deliver:
 - no production chat switch, composer stop behavior change, approval action,
   or Agent access selector.
 
+### 16F - Approvals Action Probe
+
+Goal: prove Hermes `/v1/runs/{run_id}/approval` through a BFF-only experiment
+without changing the production composer.
+
+Status: completed in Slice 16F. See
+`docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md`.
+
+Deliver:
+
+- diagnostic `POST /api/hermes/runs/approval-probe` route;
+- `npm run smoke:hermes:runs:approval`;
+- controlled terminal approval prompt with default `deny` response;
+- event/status reconciliation for `approval.request` and `approval.responded`;
+- approval redaction coverage for bearer values and token-like URL query
+  values;
+- no production chat switch, composer approval buttons, approval selector, or
+  Agent access selector.
+
 ## Recommended Next Slice
 
-Slice 16F - Approvals Action Probe.
+Slice 16G - Experimental Runs Mode Feature Flag.
 
 Reason:
 
-- Slice 16E proved Hermes `/v1/runs/{run_id}/stop` through a BFF-only
-  diagnostic route and observed final `cancelled` reconciliation.
-- The next high-risk Runs control-plane gap is approval response behavior
-  through a BFF-only probe, still without switching production chat to Runs.
+- Slice 16F proved Hermes `/v1/runs/{run_id}/approval` rejection through a
+  BFF-only diagnostic route and observed `approval.request`,
+  `approval.responded`, and final `completed` reconciliation.
+- The next safe step is defining a feature-flagged experimental Runs execution
+  mode contract and guardrails, still without switching production chat to
+  Runs by default.

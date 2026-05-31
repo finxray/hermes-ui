@@ -40,6 +40,7 @@ checkRunsCompletedStatus();
 checkRunsStoppedStatus();
 checkRunsInterruptedStatus();
 checkRunsToolAndApprovalParity();
+checkRunsApprovalSecretRedaction();
 checkRunsCommandParity();
 checkRunsEventIdsUnique();
 checkRunsUnknownFallback();
@@ -438,6 +439,29 @@ function checkRunsToolAndApprovalParity() {
       approval.status === "waiting_for_approval" &&
       approval.approval?.actionAvailable === false,
     "Runs tool and approval events reuse existing AgentActivityEvent parity mappings."
+  );
+}
+
+function checkRunsApprovalSecretRedaction() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    Authorization: "Bearer bearer-private",
+    choices: ["once", "deny"],
+    event: "approval.request",
+    prompt: "Allow https://example.test/action?token=url-private&safe=1 with Bearer bearer-private?",
+    run_id: "run-runs-approval-redaction"
+  }, { id: "runs-approval-redaction" });
+  const serialized = JSON.stringify(event);
+
+  record(
+    "runs-approval-secret-redaction",
+      event.type === "approval" &&
+      event.status === "waiting_for_approval" &&
+      event.summary === "Allow https://example.test/action?token=[redacted]&safe=1 with Bearer [redacted]?" &&
+      event.details.Authorization === "[redacted]" &&
+      serialized.includes("[redacted]") &&
+      !serialized.includes("bearer-private") &&
+      !serialized.includes("url-private"),
+    "Runs approval details redact bearer values and token-like URL query values."
   );
 }
 

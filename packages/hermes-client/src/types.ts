@@ -350,3 +350,74 @@ export type HermesRunsStopProbeResult = {
   error: HermesChatError | null;
   blocker: string | null;
 };
+
+export type HermesRunApprovalChoice = "once" | "session" | "always" | "deny";
+
+export type HermesRunApprovalResult = {
+  ok: boolean;
+  statusCode: number | null;
+  choice: HermesRunApprovalChoice | null;
+  resolved: number | null;
+  body: Record<string, unknown> | null;
+  error: HermesChatError | null;
+};
+
+export type HermesRunsApprovalProbeResult = {
+  ok: boolean;
+  mode: "success" | "skipped" | "failed";
+  outcome:
+    | "approval_denied_and_reconciled"
+    | "approval_approved_and_reconciled"
+    | "approval_observed_action_failed"
+    | "approval_not_observed"
+    | "skipped"
+    | "failed";
+  checkedAt: string;
+  prompt: string;
+  runId: string | null;
+  sessionId: string | null;
+  createStatus: string | null;
+  finalStatusName: string | null;
+  finalStatus: Record<string, unknown> | null;
+  approvalRequiredObserved: boolean;
+  approvalActionAttempted: "approve" | "reject" | "none";
+  approvalChoice: HermesRunApprovalChoice;
+  approval: HermesRunApprovalResult | null;
+  approvalRequestedAt: string | null;
+  approvalRespondedAt: string | null;
+  eventTypes: string[];
+  approvalEventTypes: string[];
+  events: HermesRunProbeEvent[];
+  assistantTextPreview: string;
+  outputPreview: string;
+  counts: {
+    events: number;
+    messageDeltaEvents: number;
+    toolEvents: number;
+    brainMemoryToolEvents: number;
+    approvalEvents: number;
+  };
+  timings: {
+    durationMs: number;
+    eventStreamMs: number | null;
+  };
+  activity: {
+    approvalActivityEvents: number;
+    waitingForApprovalEvents: number;
+    completedApprovalEvents: number;
+    cancelledApprovalEvents: number;
+    rawSecretRendered: boolean;
+  };
+  safety: {
+    route: "bff-only";
+    promptKind: "approval-deny-probe";
+    stopCalled: false;
+    approvalCalled: boolean;
+    browserDirectHermes: false;
+    memoryMutationRequested: false;
+    defaultChoice: "deny";
+    productionChatUntouched: true;
+  };
+  error: HermesChatError | null;
+  blocker: string | null;
+};

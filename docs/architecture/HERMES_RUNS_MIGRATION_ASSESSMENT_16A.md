@@ -591,3 +591,21 @@ execution path exists.
 
 Approval actions, reconnect/replay correlation, and an experimental Runs UI
 mode remain unproven.
+
+## Slice 16F Approval Probe Update
+
+Slice 16F added the BFF-only diagnostic route
+`POST /api/hermes/runs/approval-probe` and
+`npm run smoke:hermes:runs:approval`. The live probe created run
+`run_e345b064a8a94067bfa611df280b134c`, observed `approval.request`, sent
+`choice=deny` through `POST /v1/runs/{run_id}/approval`, received HTTP 200
+with `resolved=1`, observed `approval.responded`, and reconciled the run to
+final status `completed` with output `HERMES_RUNS_APPROVAL_PROBE_DONE`.
+
+This proves approval rejection actions are viable through the BFF for a future
+run-backed execution path. It still does not switch the production default.
+Production chat remains on `/api/hermes/chat/stream`, and no production
+approval buttons were added.
+
+Approval approve-and-execute behavior, reconnect/replay correlation, and an
+experimental Runs UI mode remain unproven.

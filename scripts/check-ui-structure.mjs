@@ -31,9 +31,11 @@ const requiredFiles = [
   "apps/web/src/data/largeArtifactsToolsFixture.ts",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx",
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
+  "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
   "apps/web/src/app/api/hermes/runs/stop-probe/route.ts",
+  "docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md",
@@ -190,6 +192,11 @@ const hermesRunsBrainMemoryParityCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md"), "utf8")
   : "";
+const hermesRunsApprovalProbeCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md"), "utf8")
+  : "";
 const hermesRunsStopExperimentCheckpoint = existsSync(
   join(root, "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md")
 )
@@ -204,6 +211,10 @@ const hermesRunsProbeRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/probe/route.ts"),
   "utf8"
 );
+const hermesRunsApprovalProbeRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/runs/approval-probe/route.ts"),
+  "utf8"
+);
 const hermesRunsMemoryProbeRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/memory-probe/route.ts"),
   "utf8"
@@ -214,6 +225,9 @@ const hermesRunsStopProbeRoute = readFileSync(
 );
 const hermesRunsProbeScript = existsSync(join(root, "scripts/hermes-runs-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-probe.mjs"), "utf8")
+  : "";
+const hermesRunsApprovalProbeScript = existsSync(join(root, "scripts/hermes-runs-approval-probe.mjs"))
+  ? readFileSync(join(root, "scripts/hermes-runs-approval-probe.mjs"), "utf8")
   : "";
 const hermesRunsStopProbeScript = existsSync(join(root, "scripts/hermes-runs-stop-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-stop-probe.mjs"), "utf8")
@@ -628,6 +642,23 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs Approval Probe 16F",
+  "POST /api/hermes/runs/approval-probe",
+  "smoke:hermes:runs:approval",
+  "approval.request",
+  "approval.responded",
+  "approval_denied_and_reconciled",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "No direct browser-to-Hermes path",
+  "composer Agent access selector was not implemented",
+  "Slice 16G: experimental Runs mode feature flag"
+]) {
+  if (!hermesRunsApprovalProbeCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs approval probe checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "Hermes Runs Stop Experiment 16E",
   "POST /api/hermes/runs/stop-probe",
   "smoke:hermes:runs:stop",
@@ -653,6 +684,17 @@ for (const token of [
 }
 
 for (const token of [
+  "runHermesRunsApprovalProbe",
+  "sanitizeChoice",
+  "Cache-Control",
+  "no-store"
+]) {
+  if (!hermesRunsApprovalProbeRoute.includes(token)) {
+    failures.push(`Hermes Runs approval probe BFF route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsStopProbe",
   "Cache-Control",
   "no-store"
@@ -672,6 +714,21 @@ for (const token of [
 ]) {
   if (!hermesRunsProbeScript.includes(token)) {
     failures.push(`Hermes Runs probe script is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "/api/hermes/runs/approval-probe",
+  "--require-hermes",
+  "--base-url",
+  "--choice",
+  "approvalRequiredObserved",
+  "approvalActionAttempted",
+  "approvalEventTypes",
+  "rawSecretRendered"
+]) {
+  if (!hermesRunsApprovalProbeScript.includes(token)) {
+    failures.push(`Hermes Runs approval probe script is missing token: ${token}`);
   }
 }
 
@@ -701,6 +758,22 @@ for (const token of [
 ]) {
   if (!hermesClientSource.includes(token)) {
     failures.push(`Hermes client Runs probe helper is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "runHermesRunsApprovalProbe",
+  "respondHermesRunApproval",
+  "/v1/runs/${encodeURIComponent(args.runId)}/approval",
+  "readHermesRunEventsWithApproval",
+  "approvalRequiredObserved",
+  "approvalCalled",
+  "browserDirectHermes: false",
+  "memoryMutationRequested: false",
+  "productionChatUntouched: true"
+]) {
+  if (!hermesClientSource.includes(token)) {
+    failures.push(`Hermes client Runs approval helper is missing token: ${token}`);
   }
 }
 
@@ -741,6 +814,10 @@ for (const token of [
 
 if (!packageJson.includes("\"smoke:hermes:runs:memory\"")) {
   failures.push("package.json is missing smoke:hermes:runs:memory script.");
+}
+
+if (!packageJson.includes("\"smoke:hermes:runs:approval\"")) {
+  failures.push("package.json is missing smoke:hermes:runs:approval script.");
 }
 
 if (!packageJson.includes("\"smoke:hermes:runs:stop\"")) {

@@ -34,6 +34,7 @@
     "smoke:long-session": "node scripts/long-session-performance-smoke.mjs",
     "smoke:memory-detail": "node scripts/memory-detail-fixture-smoke.mjs",
     "smoke:hermes:runs": "node scripts/hermes-runs-probe.mjs",
+    "smoke:hermes:runs:approval": "node scripts/hermes-runs-approval-probe.mjs",
     "smoke:hermes:runs:memory": "node scripts/hermes-runs-memory-probe.mjs",
     "smoke:hermes:runs:stop": "node scripts/hermes-runs-stop-probe.mjs",
     "smoke:sidebar:large": "node scripts/sidebar-large-smoke.mjs",

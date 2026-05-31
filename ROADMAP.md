@@ -916,6 +916,23 @@ behavior was added. See
 `docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md`. The next recommended
 slice is Slice 16F: approvals action probe.
 
+## Checkpoint: Slice 16F Hermes Runs approvals action probe
+
+Slice 16F added an opt-in BFF-only Runs approval probe on 2026-05-31.
+`POST /api/hermes/runs/approval-probe` and
+`npm run smoke:hermes:runs:approval` create a controlled run that triggers a
+Hermes terminal approval request, then sends `choice=deny` through
+`POST /v1/runs/{run_id}/approval` from the server-side Hermes client. The live
+probe passed with run `run_e345b064a8a94067bfa611df280b134c`: observed
+`approval.request` and `approval.responded`, approval HTTP status `200`,
+`resolved=1`, final status `completed`, and output
+`HERMES_RUNS_APPROVAL_PROBE_DONE`. Production chat still uses
+`/api/hermes/chat/stream`; no production approval buttons, direct
+browser-to-Hermes/Gateway path, storage path, memory admin UI, Agent access
+selector, auth classification, or export/import behavior was added. See
+`docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md`. The next recommended
+slice is Slice 16G: experimental Runs mode feature flag.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -501,6 +501,20 @@ Memory logic change, UI behavior change, env mutation, or direct
 browser-to-service path was added. The next recommended functional slice is
 Slice 15A: live Brain Memory full E2E reconnect.
 
+## Checkpoint: Slice 15A live Brain Memory reconnect status
+
+Slice 15A attempted the live Brain Memory full E2E reconnect on 2026-05-31 and
+recorded the result in `docs/checkpoints/LIVE_BRAIN_MEMORY_E2E_15A.md`. The Web
+UI route and browser smokes passed on the selected recovery server
+`http://127.0.0.1:3002`, but live E2E remained blocked because Hermes was
+unreachable, Brain Memory Gateway was not configured/reachable, and no
+tenant-bound read key was available. The BFF correctly reported mock/disabled
+Brain Memory state and no live marker was created. No Brain Memory
+mutation/admin UI, direct browser-to-Gateway/storage path, Hermes streaming
+logic change, or Brain Memory BFF logic change was added. The next recommended
+slice is Slice 15B: bring up Brain Memory Gateway and a tenant-bound read key,
+then rerun live E2E reconnect.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

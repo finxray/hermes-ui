@@ -566,14 +566,46 @@ Boundaries:
 - no direct browser-to-Hermes/Gateway/storage path;
 - no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
 
+### 16Q - Disabled Runs BFF Request Validation Contract
+
+Goal: define and source-check the future request validation contract for the
+disabled production-shaped Runs route without changing route behavior.
+
+Status: completed in Slice 16Q. See
+`docs/checkpoints/HERMES_RUNS_REQUEST_VALIDATION_16Q.md`.
+
+Deliver:
+
+- `HermesRunsBffRequest` TypeScript request schema;
+- memory scope request shape with tenant id, stable project key, stable session
+  key, and explicit include-context booleans;
+- future metadata fields for Agent access mode, provider, model, and options;
+- pure `validateHermesRunsBffRequest` helper;
+- deterministic valid and invalid request fixtures;
+- `npm run check:hermes-runs-bff-request`;
+- route guard update that posts a valid future request body while still
+  expecting disabled HTTP 501 JSON.
+
+Boundaries:
+
+- no production Runs execution runtime;
+- no route-level validation echo yet;
+- no change to `/api/hermes/chat/stream`;
+- no production composer switch;
+- no composer Agent access selector;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path;
+- no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
+
 ## Recommended Next Slice
 
-Slice 16Q - disabled Runs BFF request validation contract and dry-run source
-checks.
+Slice 16R - disabled route validation echo contract, still HTTP 501 and no
+execution.
 
 Reason:
 
-- Slice 16P adds the final route path as a disabled skeleton.
-- The next safe step is bounded request-shape validation and dry-run-only
-  diagnostics while preserving HTTP 501, no Hermes/Gateway calls, no run
-  creation, and no composer switch.
+- Slice 16Q added the pure request schema, fixtures, validator, and source
+  checks without changing route behavior.
+- The next safe step is a disabled-route validation echo that returns redacted
+  validation metadata while preserving HTTP 501, no Hermes/Gateway calls, no
+  run creation, and no composer switch.

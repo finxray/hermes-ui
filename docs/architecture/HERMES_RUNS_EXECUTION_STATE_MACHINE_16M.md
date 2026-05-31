@@ -332,11 +332,23 @@ This still does not implement production Runs execution, change
 buttons, call Hermes, call Brain Memory Gateway, or add a direct
 browser-to-Hermes path.
 
+## Slice 16Q Request Validation Update
+
+Slice 16Q adds the future disabled-route request schema and a pure
+`validateHermesRunsBffRequest` helper. The helper validates project/session
+ids, message length, required memory scope, memory scope booleans, future
+Agent access metadata, bounded timeout, and forbidden credential-like fields.
+
+The disabled route does not call the validator yet; it still returns HTTP 501,
+creates no run, calls no Hermes or Brain Memory Gateway service, reads no
+service env values, starts no event stream, and keeps session stream as the
+production default.
+
 ## Next Recommended Slices
 
-Slice 16Q: disabled Runs BFF request validation contract and dry-run source
-checks.
+Slice 16R: disabled route validation echo contract, still HTTP 501 and no
+execution.
 
-Reason: the final route path now exists as a disabled skeleton. The next safe
-step is request-shape validation and dry-run diagnostics that preserve HTTP
-501, no runtime execution, and no composer exposure.
+Reason: the pure request validator is now covered by fixtures and source
+checks. The next safe step is to expose a redacted disabled-route validation
+echo while preserving HTTP 501, no runtime execution, and no composer exposure.

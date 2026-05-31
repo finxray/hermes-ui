@@ -10,6 +10,29 @@ const routePath = "apps/web/src/app/api/hermes/runs/chat/stream/route.ts";
 const sessionRoutePath = "apps/web/src/app/api/hermes/chat/stream/route.ts";
 const experimentalRoutePath = "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts";
 const routeUrlPath = "/api/hermes/runs/chat/stream";
+const validDisabledRequestBody = {
+  agentAccessMode: "ask_before_tools",
+  clientRunId: "client-run-route-guard-16q",
+  hermesSessionId: "hermes-session-route-guard-16q",
+  memoryScope: {
+    includeProjectContext: true,
+    includeSessionContext: true,
+    stableProjectKey: "project-stable-route-guard-16q",
+    stableSessionKey: "session-stable-route-guard-16q",
+    tenantId: "local-dev"
+  },
+  message: "Validate that the disabled route stays disabled for a valid future Runs request.",
+  model: "future-model-disabled",
+  options: {
+    includeActivity: true,
+    includeReplayPreview: true,
+    stream: true,
+    timeoutMs: 30_000
+  },
+  projectId: "project-route-guard-16q",
+  provider: "future-provider-disabled",
+  sessionId: "session-route-guard-16q"
+};
 
 const sourceResult = checkSourceGuard();
 console.log(`[ok] source guard: ${sourceResult}`);
@@ -83,7 +106,7 @@ function checkSourceGuard() {
 async function checkLiveGuard(baseUrl) {
   const url = new URL(routeUrlPath, normalizeBaseUrl(baseUrl));
   const response = await fetch(url, {
-    body: JSON.stringify({ message: "source guard live smoke" }),
+    body: JSON.stringify(validDisabledRequestBody),
     headers: {
       "Content-Type": "application/json"
     },
@@ -143,6 +166,8 @@ async function checkLiveGuard(baseUrl) {
   );
   assert.equal("runId" in body, false, "Disabled route must not return runId.");
   assert.equal("hermesRunId" in body, false, "Disabled route must not return hermesRunId.");
+  assert.equal("validation" in body, false, "Disabled route must not report enabled validation state.");
+  assert.equal("validationErrors" in body, false, "Disabled route must not expose validation details while disabled.");
 
   return `${url.toString()} returned disabled HTTP 501 JSON.`;
 }

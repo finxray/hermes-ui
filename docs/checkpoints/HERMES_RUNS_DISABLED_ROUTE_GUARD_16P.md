@@ -119,11 +119,19 @@ script.
 
 ## Next Recommended Slice
 
-Slice 16Q: disabled Runs BFF request validation contract and dry-run source
-checks.
+Slice 16R: disabled route validation echo contract, still HTTP 501 and no
+execution.
 
-Reason: the final production-shaped route now exists but deliberately returns
-before reading request data or touching services. The next safe slice is to add
-bounded request-shape validation and dry-run-only diagnostics while preserving
-HTTP 501, no run creation, no Hermes/Gateway calls, no composer switch, and no
-direct browser service path.
+Reason: Slice 16Q added pure request schema, fixtures, and validation checks
+without changing route behavior. The next safe slice is to optionally connect
+that validator to the disabled route as a redacted validation echo while still
+returning HTTP 501, creating no run, calling no services, and preserving the
+session stream default.
+
+## Slice 16Q Update
+
+Slice 16Q added the future `HermesRunsBffRequest` schema,
+`validateHermesRunsBffRequest`, deterministic valid/invalid request fixtures,
+and `npm run check:hermes-runs-bff-request`. The disabled route remains HTTP
+501 with `reason: "production_runs_route_not_enabled"` and still does not call
+Hermes, Brain Memory Gateway, storage, env, or the memory scope bridge.

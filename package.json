@@ -22,6 +22,7 @@
     "check:brain-memory-client": "node scripts/check-brain-memory-client-shapes.mjs",
     "check:brain-memory-regression-index": "node scripts/check-brain-memory-regression-index.mjs",
     "check:hermes-runs-bff-events": "node --no-warnings scripts/check-hermes-runs-bff-events.mjs",
+    "check:hermes-runs-bff-request": "node --no-warnings scripts/check-hermes-runs-bff-request.mjs",
     "check-message-rendering": "node scripts/check-message-rendering.mjs",
     "check:packaging": "node scripts/check-packaging-readiness.mjs",
     "check:studio-launch": "node scripts/check-studio-launch-contract.mjs",

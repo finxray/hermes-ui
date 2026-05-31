@@ -1095,6 +1095,23 @@ provider/model switching, memory mutation/admin UI, or Agent access selector
 was added. The next recommended slice is Slice 16Q: disabled Runs BFF request
 validation contract and dry-run source checks.
 
+## Checkpoint: Slice 16Q Hermes Runs request validation contract
+
+Slice 16Q added a pure future request contract for the disabled
+`POST /api/hermes/runs/chat/stream` route. `HermesRunsBffRequest` now captures
+project id, session id, message, required memory scope with tenant/stable
+project/stable session keys, future Agent access metadata, inert provider/model
+fields, and bounded options. `validateHermesRunsBffRequest` and
+`npm run check:hermes-runs-bff-request` verify valid/invalid fixtures,
+credential-field rejection, inert provider/model behavior, source purity, the
+disabled route guard, and absence of a production Runs composer switch. The
+disabled route still returns HTTP 501
+`reason=production_runs_route_not_enabled`; it does not parse/validate at
+runtime yet, call Hermes or Brain Memory Gateway, read service env values,
+stream events, create runs, or import the memory scope bridge. Production chat
+still uses `/api/hermes/chat/stream`. The next recommended slice is Slice 16R:
+disabled route validation echo contract, still HTTP 501 and no execution.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

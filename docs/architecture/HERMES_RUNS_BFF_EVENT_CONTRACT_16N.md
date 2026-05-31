@@ -472,11 +472,37 @@ The skeleton does not call Hermes or Brain Memory Gateway, does not import the
 memory scope bridge, does not start SSE, does not change
 `/api/hermes/chat/stream`, and does not add a production composer Runs switch.
 
+## Slice 16Q Request Validation Update
+
+Slice 16Q adds a pure future request contract for
+`POST /api/hermes/runs/chat/stream`:
+
+- `apps/web/src/types/hermesRunsBffRequest.ts` defines
+  `HermesRunsBffRequest`, `HermesRunsBffMemoryScope`,
+  `HermesRunsBffRequestOptions`, `HermesRunsBffAgentAccessMode`, and safe
+  validation result/error types.
+- `apps/web/src/lib/hermesRunsBffRequestValidation.ts` adds
+  `validateHermesRunsBffRequest` for shape-only validation of project/session
+  ids, message, required memory scope, booleans, known future agent access
+  modes, bounded timeout, and forbidden credential-like fields.
+- `apps/web/src/data/hermesRunsBffRequestFixtures.ts` covers valid minimal,
+  future agent access, provider/model future fields, missing scope/id,
+  invalid agent access, oversized message, forbidden credential field,
+  invalid timeout, and invalid memory scope flags.
+- `npm run check:hermes-runs-bff-request` verifies the contract and source
+  purity.
+
+The disabled route does not call the validator in Slice 16Q. It still returns
+HTTP 501 with `reason: "production_runs_route_not_enabled"`, creates no run,
+calls no Hermes/Gateway service, reads no service env values, starts no event
+stream, and leaves `/api/hermes/chat/stream` as the production default.
+
 ## Next Recommended Slice
 
-Slice 16Q: disabled Runs BFF request validation contract and dry-run source
-checks.
+Slice 16R: disabled route validation echo contract, still HTTP 501 and no
+execution.
 
-Reason: 16P adds the final route path as a disabled skeleton. The next safe
-step is bounded request-shape validation and dry-run-only checks while keeping
-HTTP 501, no run creation, no Hermes/Gateway call, and no composer switch.
+Reason: 16Q adds the pure validator and fixtures without changing route
+behavior. The next safe step is a disabled-route validation echo that returns
+only redacted validation metadata while preserving HTTP 501, no run creation,
+no Hermes/Gateway call, and no composer switch.

@@ -28,6 +28,9 @@ const requiredFiles = [
   "apps/web/src/data/largeSidebarFixture.ts",
   "apps/web/src/app/design/sidebar-large-fixture/page.tsx",
   "apps/web/src/app/design/sidebar-large-fixture/page.module.css",
+  "apps/web/src/data/largeArtifactsToolsFixture.ts",
+  "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx",
+  "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 
@@ -125,6 +128,18 @@ const largeSidebarFixturePage = readFileSync(
   "utf8"
 );
 const largeSidebarSmoke = readFileSync(join(root, "scripts/sidebar-large-smoke.mjs"), "utf8");
+const largeArtifactsToolsFixture = readFileSync(
+  join(root, "apps/web/src/data/largeArtifactsToolsFixture.ts"),
+  "utf8"
+);
+const largeArtifactsToolsFixturePage = readFileSync(
+  join(root, "apps/web/src/app/design/artifacts-tools-large-fixture/page.tsx"),
+  "utf8"
+);
+const largeArtifactsToolsSmoke = readFileSync(
+  join(root, "scripts/artifacts-tools-large-smoke.mjs"),
+  "utf8"
+);
 const longSessionSmoke = readFileSync(join(root, "scripts/long-session-performance-smoke.mjs"), "utf8");
 const longSessionPlan = readFileSync(
   join(root, "docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md"),
@@ -140,6 +155,10 @@ const lazyExportPreviewMeasurement = readFileSync(
 );
 const largeSidebarMeasurement = readFileSync(
   join(root, "docs/performance/SIDEBAR_LARGE_MEASUREMENT_15Q.md"),
+  "utf8"
+);
+const largeArtifactsToolsMeasurement = readFileSync(
+  join(root, "docs/performance/ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md"),
   "utf8"
 );
 const scalableLoadingRoadmap = readFileSync(
@@ -266,6 +285,33 @@ for (const token of [
 }
 
 for (const token of [
+  "LARGE_ARTIFACTS_COUNT = 500",
+  "LARGE_LEGACY_TOOL_EVENT_COUNT = 500",
+  "LARGE_ACTIVITY_EVENT_COUNT = 500",
+  "largeArtifacts",
+  "largeLegacyToolEvents",
+  "largeActivityEvents",
+  "largeArtifactsToolsSession"
+]) {
+  if (!largeArtifactsToolsFixture.includes(token)) {
+    failures.push(`Large artifacts/tools fixture data is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "Large artifacts and tools fixture",
+  "ContextRail",
+  "AgentActivityBlock",
+  "largeArtifactsToolsProject",
+  "largeArtifactsToolsSession",
+  "largeActivityEvents"
+]) {
+  if (!largeArtifactsToolsFixturePage.includes(token)) {
+    failures.push(`Large artifacts/tools fixture page is missing ${token}`);
+  }
+}
+
+for (const token of [
   "fixture-no-service-calls",
   "fixture-export-preview-lazy-before-open",
   "exportPreviewBuiltBeforeOpen",
@@ -301,6 +347,25 @@ for (const token of [
 ]) {
   if (!largeSidebarSmoke.includes(token)) {
     failures.push(`Large sidebar smoke is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "/design/artifacts-tools-large-fixture",
+  "fixture-rendered-artifact-count",
+  "fixture-rendered-tool-event-count",
+  "fixture-rendered-command-count",
+  "fixture-details-collapsed-by-default",
+  "filesTabSwitchMs",
+  "toolsTabSwitchMs",
+  "rightRailScroll",
+  "renderedArtifactCount",
+  "renderedToolEventCount",
+  "--budget-strict",
+  "--verbose"
+]) {
+  if (!largeArtifactsToolsSmoke.includes(token)) {
+    failures.push(`Large artifacts/tools smoke is missing ${token}`);
   }
 }
 
@@ -379,9 +444,27 @@ for (const token of [
 }
 
 for (const token of [
+  "Artifacts Tools Large Measurement 15R",
+  "500 artifacts",
+  "500 legacy tool-event rows",
+  "500 normalized",
+  "Files tab switch",
+  "Tools tab switch",
+  "Lazy collapsed activity JSON details",
+  "no runtime Show More",
+  "no pagination",
+  "no virtualization"
+]) {
+  if (!largeArtifactsToolsMeasurement.includes(token)) {
+    failures.push(`Large artifacts/tools measurement report is missing ${token}`);
+  }
+}
+
+for (const token of [
   "LONG_SESSION_MEASUREMENT_15O.md",
   "LAZY_EXPORT_PREVIEW_15P.md",
   "SIDEBAR_LARGE_MEASUREMENT_15Q.md",
+  "ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md",
   "lazy construction of export preview JSON",
   "not transcript virtualization"
 ]) {
@@ -398,6 +481,10 @@ if (!packageJson.includes("\"smoke:sidebar:large\"")) {
   failures.push("package.json is missing smoke:sidebar:large script.");
 }
 
+if (!packageJson.includes("\"smoke:artifacts-tools:large\"")) {
+  failures.push("package.json is missing smoke:artifacts-tools:large script.");
+}
+
 const runtimeLoadingForbiddenTokens = [
   "showMoreSessions",
   "visibleSessionLimit",
@@ -410,6 +497,9 @@ const runtimeLoadingForbiddenTokens = [
 for (const token of runtimeLoadingForbiddenTokens) {
   if (largeSidebarFixturePage.includes(token) || largeSidebarFixture.includes(token)) {
     failures.push(`Large sidebar fixture includes runtime loading token: ${token}`);
+  }
+  if (largeArtifactsToolsFixturePage.includes(token) || largeArtifactsToolsFixture.includes(token)) {
+    failures.push(`Large artifacts/tools fixture includes runtime loading token: ${token}`);
   }
 }
 

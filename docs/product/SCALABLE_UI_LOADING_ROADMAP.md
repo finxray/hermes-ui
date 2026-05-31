@@ -41,6 +41,15 @@ active-row selection, 0 service calls, and 0 px overflow. Based on that
 evidence, Sidebar Show More and transcript virtualization are both deferred for
 now.
 
+Slice 15R added the large Files/artifacts and legacy tool-event measurement in
+`docs/performance/ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md`. The
+`/design/artifacts-tools-large-fixture` route renders 500 artifacts, 500 legacy
+tool rows, and 500 collapsed activity detail groups through existing
+components. The smoke recorded acceptable Files/Tools tab switches, right-rail
+scroll timing, 0 service calls, and 0 px overflow. Based on that evidence,
+Files/artifacts Show More, legacy tool-event pagination, and command-detail
+lazy rendering are deferred for now.
+
 ## Why It Matters
 
 Brain Memory Studio is expected to accumulate:
@@ -145,7 +154,7 @@ boundaries.
 
 ## Not Implemented
 
-Slices 15M through 15Q do not implement:
+Slices 15M through 15R do not implement:
 
 - infinite scroll;
 - virtualization/windowing;
@@ -159,6 +168,7 @@ Slices 15M through 15Q do not implement:
 
 ## Next Recommended Slice
 
-After the Slice 15Q sidebar measurement, measure large Files/artifacts and
-legacy tool-event panels before choosing the next scalable-loading runtime
-implementation.
+After the Slice 15R Files/artifacts and legacy tool-event measurement, create a
+scalable-loading decision checkpoint that consolidates 15N through 15R
+measurements and chooses the first runtime implementation only if the evidence
+now justifies one.

@@ -1,0 +1,107 @@
+.page {
+  --rail-width-right: 420px;
+  display: grid;
+  height: 100dvh;
+  min-height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+.fixtureHeader {
+  display: grid;
+  gap: 10px;
+  padding: 18px clamp(18px, 3vw, 36px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: #101114;
+}
+
+.fixtureHeader p {
+  margin: 0;
+  color: var(--accent);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.fixtureHeader h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.metrics span {
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+}
+
+.shell {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) var(--rail-width-right);
+  grid-template-areas: "center right";
+  overflow: hidden;
+}
+
+.activityPanel {
+  grid-area: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: clamp(24px, 3vw, 42px);
+  background: #101114;
+}
+
+.panelIntro {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.panelIntro p,
+.panelIntro h2,
+.panelIntro span {
+  margin: 0;
+}
+
+.panelIntro p {
+  color: var(--accent);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.panelIntro h2 {
+  color: var(--text-primary);
+  font-size: clamp(1.2rem, 2vw, 1.7rem);
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.panelIntro span {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .page {
+    overflow: auto;
+  }
+
+  .shell {
+    min-height: 880px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "center";
+  }
+}

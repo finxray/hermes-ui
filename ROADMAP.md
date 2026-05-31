@@ -791,6 +791,29 @@ storage access, export/import, or memory mutation/admin action was added. See
 slice is Slice 15R: measure large Files/artifacts and legacy tool-event panels
 before choosing the next scalable-loading runtime implementation.
 
+## Checkpoint: Slice 15R large artifacts/tools measurement
+
+Slice 15R added a deterministic large Files/artifacts and legacy tool-event
+fixture on 2026-05-31. The `/design/artifacts-tools-large-fixture` route renders
+the real Context rail with 500 local artifacts and 500 legacy tool-event rows,
+plus the production `AgentActivityBlock` with 500 collapsed activity detail
+groups. `npm run smoke:artifacts-tools:large` measures route load, rendered
+artifact/tool/command/detail counts, Files and Tools tab switch timing,
+right-rail scroll timing, horizontal overflow, service-call count, and
+browser/network errors. The local measurement recorded 500 artifact rows, 500
+legacy tool rows, 8 recent command rows, 500 collapsed activity details, 0 open
+details by default, 280 ms Files tab switch, 288 ms Tools tab switch, 6 ms /
+13 ms right-rail scroll, 0 px overflow, and 0 service calls. Based on this
+evidence, Files/artifacts Show More, legacy tool-event pagination, and
+command-detail lazy rendering are deferred for now. No runtime Show More,
+pagination, infinite scroll, virtualization, context compaction, production
+Files/Tools behavior change, Hermes streaming change, Brain Memory BFF change,
+direct storage access, export/import, or memory mutation/admin action was
+added. See `docs/performance/ARTIFACTS_TOOLS_LARGE_MEASUREMENT_15R.md`. The
+next recommended slice is Slice 15S: create a scalable-loading decision
+checkpoint that consolidates 15N through 15R measurements and chooses the first
+runtime implementation only if the evidence now justifies one.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -368,15 +368,30 @@ Deliver:
 - no production chat switch, composer Agent access selector, approval buttons,
   provider/model switching, direct browser-to-Hermes path, or memory admin UI.
 
+### 16H - Runs Default Migration Decision
+
+Goal: decide whether the Studio should switch production chat to Hermes Runs
+after the 16B-16G evidence.
+
+Status: completed in Slice 16H. See
+`docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md`.
+
+Decision:
+
+- keep session stream as the production default;
+- keep Runs behind `HERMES_UI_EXPERIMENTAL_RUNS_MODE=true`;
+- treat the 16G Brain Memory readback failure as an env/runbook gap after the
+  16H full-env memory probe passed;
+- do not add a composer Agent access selector yet.
+
 ## Recommended Next Slice
 
-Slice 16H - Runs Default Migration Decision.
+Slice 16I - Runs Brain Memory live env/runbook hardening.
 
 Reason:
 
-- Slice 16G proves a disabled-by-default BFF-only experimental Runs execution
-  path for a basic chat turn while keeping session streaming as the production
-  default.
-- The next safe step is deciding whether to keep Runs experimental, extend it
-  toward streaming/replay parity, or define prerequisites for a guarded default
-  migration.
+- Slice 16H proves Runs has useful diagnostic coverage, but the live Brain
+  Memory readback env needs a repeatable runbook and guardrail before any
+  production default migration is safe.
+- The next safe step is documenting and checking the exact Web UI BFF env
+  required for Runs + Brain Memory readback.

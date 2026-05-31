@@ -38,6 +38,7 @@ const requiredFiles = [
   "apps/web/src/app/api/hermes/runs/stop-probe/route.ts",
   "docs/checkpoints/HERMES_RUNS_APPROVAL_PROBE_16F.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
+  "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
   "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md",
@@ -208,6 +209,11 @@ const hermesRunsExperimentalModeCheckpoint = existsSync(
   join(root, "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md")
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md"), "utf8")
+  : "";
+const hermesRunsDefaultDecisionCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md"), "utf8")
   : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
@@ -907,6 +913,21 @@ if (!packageJson.includes("\"smoke:hermes:runs:experimental-chat\"")) {
 
 if (!packageJson.includes("\"smoke:hermes:runs:stop\"")) {
   failures.push("package.json is missing smoke:hermes:runs:stop script.");
+}
+
+for (const token of [
+  "Hermes Runs Default Decision 16H",
+  "Decision: keep session stream as production default",
+  "HERMES_UI_EXPERIMENTAL_RUNS_MODE",
+  "BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY",
+  "POST /api/hermes/runs/experimental-chat",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "composer Agent access selector was not implemented",
+  "Slice 16I: Runs Brain Memory live env/runbook hardening"
+]) {
+  if (!hermesRunsDefaultDecisionCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs default decision checkpoint is missing token: ${token}`);
+  }
 }
 
 for (const token of [

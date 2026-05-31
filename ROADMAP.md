@@ -948,6 +948,19 @@ direct browser-to-Hermes/Gateway path, storage path, or memory admin UI was
 added. See `docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md`. The next
 recommended slice is Slice 16H: Runs default migration decision.
 
+## Checkpoint: Slice 16H Hermes Runs default migration decision
+
+Slice 16H decided to keep session stream as the production default and keep
+Hermes Runs behind `HERMES_UI_EXPERIMENTAL_RUNS_MODE=true`. The 16H rerun of
+the Runs Brain Memory parity smoke passed under a temporary Web UI child process
+with the full Brain Memory Gateway readback env, clarifying the 16G readback
+failure as an env/runbook gap rather than a Runs memory failure. Production
+chat still uses `/api/hermes/chat/stream`; no composer Agent access selector,
+approval buttons, direct browser-to-Hermes/Gateway path, storage path, or
+memory mutation/admin UI was added. See
+`docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md`. The next recommended
+slice is Slice 16I: Runs Brain Memory live env/runbook hardening.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -638,3 +638,21 @@ Runs Brain Memory parity smoke reached Hermes and emitted Brain Memory tool
 events, but readback failed in this environment because Brain Memory BFF
 search/inspect returned an unauthorized normalized response without the
 required UI bearer.
+
+## Slice 16H Default Decision Update
+
+Slice 16H keeps session stream as the production default and keeps Hermes Runs
+behind `HERMES_UI_EXPERIMENTAL_RUNS_MODE=true`.
+
+The 16H rerun of the Brain Memory parity probe passed once the temporary Web UI
+child process had the full Brain Memory Gateway readback env, including
+`BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`. This clarifies the 16G memory smoke
+failure as an env/runbook gap rather than evidence that Runs cannot reach Brain
+Memory.
+
+Production chat still uses `/api/hermes/chat/stream`. No composer Agent access
+selector, production approval buttons, direct browser-to-Hermes path, direct
+Gateway path, direct storage path, or memory mutation/admin UI was added.
+
+See `docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md`. The next
+recommended slice is Slice 16I: Runs Brain Memory live env/runbook hardening.

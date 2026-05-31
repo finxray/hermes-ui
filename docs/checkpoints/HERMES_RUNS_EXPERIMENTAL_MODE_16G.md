@@ -196,6 +196,19 @@ No approval buttons were added to the production composer.
 - No Hermes source or Brain Memory source was modified.
 - No secrets were committed.
 
+## Slice 16H Clarification
+
+Slice 16H reran the existing Runs Brain Memory parity smoke with a temporary
+Web UI child process configured with the real Gateway URL, real-Gateway flag,
+and `BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`. Under that complete env the memory
+probe passed, including marker search/inspect readback and wrong-scope negative
+checks.
+
+The 16G memory smoke failure should therefore be treated as an env/runbook gap
+for the Web UI BFF readback, not as a failure of
+`POST /api/hermes/runs/experimental-chat` and not as proof that Runs cannot use
+Brain Memory.
+
 ## Next Recommended Slice
 
 Slice 16H: Runs default migration decision.

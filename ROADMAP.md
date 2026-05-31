@@ -530,6 +530,23 @@ streaming logic change, Brain Memory BFF logic change, or env secret commit was
 added. The next recommended slice is Slice 15C: start or attach Hermes Agent
 API, then rerun the full marker E2E.
 
+## Checkpoint: Slice 15C live Hermes to Brain Memory E2E
+
+Slice 15C passed the full live Hermes to Brain Memory marker E2E on 2026-05-31
+and recorded the result in
+`docs/checkpoints/LIVE_BRAIN_MEMORY_E2E_15C.md`. Hermes was live at
+`http://127.0.0.1:8642`, Brain Memory Gateway was live at
+`http://127.0.0.1:8080`, the Hermes `brain_memory_mcp` child pointed at the
+Gateway with a redacted key set, and the Web UI BFF reported real/reachable for
+both Hermes and Brain Memory. A unique marker sent through
+`/api/hermes/chat/stream` emitted `mcp_brain_memory_memory_store` events,
+returned `BM_LIVE_E2E_STORED`, was found through BFF search, inspected with
+matching project/session scope, and was absent from different project/session
+searches. No Brain Memory mutation/admin UI, direct browser-to-Gateway/storage
+path, Hermes streaming logic change, Brain Memory BFF change, or env secret
+commit was added. The next recommended slice is Slice 15D: add an opt-in
+UI-driven Brain Memory timeline smoke for live store/search events.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -33,6 +33,14 @@ const validDisabledRequestBody = {
   provider: "future-provider-disabled",
   sessionId: "session-route-guard-16q"
 };
+const invalidDisabledRequestBody = {
+  ...validDisabledRequestBody,
+  agentAccessMode: "unbounded_runtime_access"
+};
+const credentialDisabledRequestBody = {
+  ...validDisabledRequestBody,
+  apiKey: "fixture-credential-value"
+};
 
 const sourceResult = checkSourceGuard();
 console.log(`[ok] source guard: ${sourceResult}`);
@@ -58,6 +66,11 @@ function checkSourceGuard() {
     "PRODUCTION_RUNS_ROUTE_DISABLED_REASON",
     "production_runs_route_not_enabled",
     "DisabledHermesRunsChatStreamResponse",
+    "validateHermesRunsBffRequest",
+    "requestValidation",
+    "rawRequestEchoed: false",
+    "execution",
+    "storageAccess: false",
     "sessionStreamDefault: true",
     "hermesRunCreated: false",
     "hermesCalled: false",
@@ -105,8 +118,37 @@ function checkSourceGuard() {
 
 async function checkLiveGuard(baseUrl) {
   const url = new URL(routeUrlPath, normalizeBaseUrl(baseUrl));
+  const validBody = await postDisabledRoute(url, validDisabledRequestBody);
+  assertDisabledEnvelope(validBody);
+  assert.equal(validBody.requestValidation?.attempted, true, "Valid request should be validation-checked.");
+  assert.equal(validBody.requestValidation?.ok, true, "Valid request should have validation ok posture.");
+  assert.deepEqual(validBody.requestValidation?.errorKinds, [], "Valid request should not report validation errors.");
+
+  const invalidBody = await postDisabledRoute(url, invalidDisabledRequestBody);
+  assertDisabledEnvelope(invalidBody);
+  assert.equal(invalidBody.requestValidation?.attempted, true, "Invalid request should be validation-checked.");
+  assert.equal(invalidBody.requestValidation?.ok, false, "Invalid request should have validation failure posture.");
+  assert.equal(
+    invalidBody.requestValidation?.errorKinds?.includes("invalid_agent_access_mode"),
+    true,
+    "Invalid request should report invalid_agent_access_mode."
+  );
+
+  const credentialBody = await postDisabledRoute(url, credentialDisabledRequestBody);
+  assertDisabledEnvelope(credentialBody);
+  assert.equal(credentialBody.requestValidation?.ok, false, "Credential request should have validation failure posture.");
+  assert.equal(
+    credentialBody.requestValidation?.errorKinds?.includes("forbidden_credential_field"),
+    true,
+    "Credential request should report forbidden_credential_field."
+  );
+
+  return `${url.toString()} returned disabled HTTP 501 JSON.`;
+}
+
+async function postDisabledRoute(url, body) {
   const response = await fetch(url, {
-    body: JSON.stringify(validDisabledRequestBody),
+    body: JSON.stringify(body),
     headers: {
       "Content-Type": "application/json"
     },
@@ -116,8 +158,10 @@ async function checkLiveGuard(baseUrl) {
   assert.equal(response.status, 501, `${url.toString()} should return HTTP 501 while disabled.`);
   assert.equal(contentType.includes("application/json"), true, "Disabled route should return JSON, not SSE.");
   assert.equal(contentType.includes("text/event-stream"), false, "Disabled route must not start an event stream.");
+  return response.json();
+}
 
-  const body = await response.json();
+function assertDisabledEnvelope(body) {
   assert.deepEqual(
     {
       ok: body.ok,
@@ -139,7 +183,8 @@ async function checkLiveGuard(baseUrl) {
       approvalCalled: body.approvalCalled,
       stopCalled: body.stopCalled,
       composerRunsSwitch: body.composerRunsSwitch,
-      agentAccessSelector: body.agentAccessSelector
+      agentAccessSelector: body.agentAccessSelector,
+      execution: body.execution
     },
     {
       ok: false,
@@ -161,15 +206,21 @@ async function checkLiveGuard(baseUrl) {
       approvalCalled: false,
       stopCalled: false,
       composerRunsSwitch: false,
-      agentAccessSelector: "future-only"
+      agentAccessSelector: "future-only",
+      execution: {
+        hermesRunCreated: false,
+        hermesCalled: false,
+        brainMemoryCalled: false,
+        eventStreamStarted: false,
+        approvalCalled: false,
+        stopCalled: false,
+        storageAccess: false
+      }
     }
   );
   assert.equal("runId" in body, false, "Disabled route must not return runId.");
   assert.equal("hermesRunId" in body, false, "Disabled route must not return hermesRunId.");
-  assert.equal("validation" in body, false, "Disabled route must not report enabled validation state.");
-  assert.equal("validationErrors" in body, false, "Disabled route must not expose validation details while disabled.");
-
-  return `${url.toString()} returned disabled HTTP 501 JSON.`;
+  assert.equal(body.requestValidation?.rawRequestEchoed, false, "Disabled route must not echo raw request data.");
 }
 
 function parseArgs(argv) {

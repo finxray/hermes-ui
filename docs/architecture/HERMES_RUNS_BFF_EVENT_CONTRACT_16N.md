@@ -497,12 +497,32 @@ HTTP 501 with `reason: "production_runs_route_not_enabled"`, creates no run,
 calls no Hermes/Gateway service, reads no service env values, starts no event
 stream, and leaves `/api/hermes/chat/stream` as the production default.
 
+## Slice 16R Validation Echo And Access Policy Update
+
+Slice 16R connects `POST /api/hermes/runs/chat/stream` to the pure
+`validateHermesRunsBffRequest` helper while keeping the route disabled. The
+route still returns HTTP 501 and `reason: "production_runs_route_not_enabled"`
+for both valid and invalid requests. It now includes a redacted
+`requestValidation` posture with `attempted: true`, `ok`, `errorKinds`,
+safe `{ kind, path }` errors, inert future-field labels, and
+`rawRequestEchoed: false`.
+
+The same response includes `execution` flags proving no Hermes run was
+created, no Hermes or Brain Memory Gateway call occurred, no event stream was
+started, no approval or stop action was called, and no storage access occurred.
+
+Slice 16R also adds
+`docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md`, which defines the
+future `agentAccessMode` policy values `chat_only`, `read_only_tools`,
+`ask_before_tools`, `full_access`, and `custom`. These remain future metadata
+only until BFF/Hermes enforcement exists. No composer Agent access selector,
+approval buttons, production Runs execution, or composer switch was added.
+
 ## Next Recommended Slice
 
-Slice 16R: disabled route validation echo contract, still HTTP 501 and no
-execution.
+Slice 16S: disabled Runs policy fixture matrix and source-only Agent access
+rendering guard.
 
-Reason: 16Q adds the pure validator and fixtures without changing route
-behavior. The next safe step is a disabled-route validation echo that returns
-only redacted validation metadata while preserving HTTP 501, no run creation,
-no Hermes/Gateway call, and no composer switch.
+Reason: 16R adds route validation echo and the Agent access policy contract
+without runtime execution or UI selector work. The next safe step is a pure
+policy fixture matrix before any composer UI appears.

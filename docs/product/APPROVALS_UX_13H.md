@@ -175,11 +175,27 @@ This remains contract-only. No production approval action route, approval
 buttons, composer Runs route, or Agent access selector was implemented. See
 `docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md`.
 
+## Slice 16R Agent Access Policy Update
+
+Slice 16R adds
+`docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md` as the future approval
+and access-mode policy contract. The documented request values are
+`chat_only`, `read_only_tools`, `ask_before_tools`, `full_access`, and
+`custom`. These are policy metadata only until the BFF can validate the mode,
+Hermes Runs can enforce tool/approval behavior, and source checks prove the UI
+selector is not decorative.
+
+The disabled production-shaped Runs route now echoes redacted validation
+posture for `agentAccessMode` while still returning HTTP 501. No approval
+buttons, BFF approval action route, production Runs execution, composer Runs
+switch, or composer Agent access selector UI was implemented.
+
 ## Next Recommended Slice
 
-Slice 13I - Files/Artifacts Panel.
+Slice 16S - disabled Runs policy fixture matrix and source-only Agent access
+rendering guard.
 
-Reason: approvals are now safely represented as display-only events, while
-actionable approvals should wait for a future run-backed chat path. The next
-roadmap slice can add artifact visibility without changing Hermes streaming,
-Brain Memory mutation, or approval control-plane behavior.
+Reason: approval display and future access semantics are documented, but still
+not enforceable from the composer. The next safe step is a pure fixture matrix
+that proves each future mode maps to allowed, blocked, and approval-required
+behavior before any selector UI appears.

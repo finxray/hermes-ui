@@ -94,8 +94,9 @@ scope bridge import, and no side effects.
 - forbidden credential-like fields are rejected;
 - provider/model are accepted as inert future metadata;
 - validation source has no network/service/env/storage/route/bridge code;
-- the disabled route still returns HTTP 501 and does not call the validator,
-  Hermes, Gateway, env, storage, or memory scope bridge;
+- the disabled route returns HTTP 501, uses only the pure validator for a
+  redacted validation echo after Slice 16R, and still does not call Hermes,
+  Gateway, env, storage, or memory scope bridge;
 - production session stream remains present;
 - no production Runs composer switch exists;
 - composer Agent access selector was not implemented yet.
@@ -121,17 +122,17 @@ contract response:
 - direct browser service paths remain false
 - direct storage access remains false
 
-The route does not parse, validate, or execute the request in this slice. That
-keeps disabled behavior stable while the validator is tested separately.
+Slice 16R later connects the route to the pure validator as a redacted
+validation echo. The route still does not execute the request.
 
 ## Route Guard Behavior
 
-`npm run smoke:hermes:runs:route-guard` now sends a valid future request body
-when a `--base-url` is supplied, including `memoryScope`, future
-`agentAccessMode`, provider/model, and options. The expected result remains the
-same disabled HTTP 501 JSON. The guard also verifies no run id, Hermes run id,
-event stream, validation result, or validation errors are returned by the
-disabled route.
+`npm run smoke:hermes:runs:route-guard` now sends valid, invalid, and
+credential-like future request bodies when a `--base-url` is supplied,
+including `memoryScope`, future `agentAccessMode`, provider/model, and
+options. The expected result remains disabled HTTP 501 JSON. The guard also
+verifies no run id, Hermes run id, event stream, or raw request echo is
+returned by the disabled route.
 
 Without a base URL, the route guard remains source-only and does not fake a
 live Web UI result.
@@ -179,10 +180,21 @@ live Web UI result.
 
 ## Next Recommended Slice
 
-Slice 16R: disabled route validation echo contract, still HTTP 501 and no
-execution.
+Slice 16S: disabled Runs policy fixture matrix and source-only Agent access
+rendering guard.
 
-Reason: the pure validator is now covered without changing disabled route
-behavior. The next safe step is to let the disabled route parse the body and
-return a redacted validation summary while still returning HTTP 501, creating
-no run, calling no services, and preserving the session stream default.
+Reason: Slice 16R connects the disabled route to the pure validator and adds
+the Agent access policy contract. The next safe step is a pure policy fixture
+matrix that maps each future mode to allowed, blocked, and approval-required
+capabilities before any composer UI appears.
+
+## Slice 16R Update
+
+Slice 16R adds a route-level validation echo. The disabled route now returns
+`requestValidation.attempted: true`, `requestValidation.ok`,
+`requestValidation.errorKinds`, redacted validation error paths, and
+`rawRequestEchoed: false` while preserving HTTP 501 and
+`reason: "production_runs_route_not_enabled"`. It also adds
+`docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md` for the future
+`chat_only`, `read_only_tools`, `ask_before_tools`, `full_access`, and
+`custom` policy modes. The composer Agent access selector was not implemented.

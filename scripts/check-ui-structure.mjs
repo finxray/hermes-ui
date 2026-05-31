@@ -60,6 +60,8 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md",
   "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_GUARD_16P.md",
   "docs/checkpoints/HERMES_RUNS_REQUEST_VALIDATION_16Q.md",
+  "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md",
+  "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -281,6 +283,16 @@ const hermesRunsRequestValidationCheckpoint = existsSync(
   join(root, "docs/checkpoints/HERMES_RUNS_REQUEST_VALIDATION_16Q.md")
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_REQUEST_VALIDATION_16Q.md"), "utf8")
+  : "";
+const hermesRunsDisabledRouteValidationCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md"), "utf8")
+  : "";
+const agentAccessApprovalPolicy = existsSync(
+  join(root, "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md")
+)
+  ? readFileSync(join(root, "docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md"), "utf8")
   : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
@@ -1413,10 +1425,63 @@ for (const token of [
   "No production Runs composer switch",
   "composer Agent access selector was not implemented",
   "npm run check:hermes-runs-bff-request",
-  "Slice 16R"
+  "Slice 16S"
 ]) {
   if (!hermesRunsRequestValidationCheckpoint.includes(token)) {
     failures.push(`Hermes Runs request validation checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Disabled Route Validation And Agent Access 16R",
+  "requestValidation",
+  "attempted: true",
+  "rawRequestEchoed: false",
+  "execution",
+  "storageAccess: false",
+  "HTTP 501",
+  "production_runs_route_not_enabled",
+  "invalid_agent_access_mode",
+  "forbidden_credential_field",
+  "Agent Access Policy Summary",
+  "Chat only",
+  "Read-only tools",
+  "Ask before tools",
+  "Full access",
+  "Custom",
+  "Enforcement Ownership",
+  "No production Runs composer switch",
+  "No composer Agent access selector UI",
+  "Slice 16S"
+]) {
+  if (!hermesRunsDisabledRouteValidationCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs disabled route validation checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Agent Access Approval Policy 16R",
+  "chat_only",
+  "read_only_tools",
+  "ask_before_tools",
+  "full_access",
+  "custom",
+  "Chat Only",
+  "Read-Only Tools",
+  "Ask Before Tools",
+  "Full Access",
+  "Custom",
+  "Enforcement Ownership",
+  "Browser",
+  "Web UI BFF",
+  "Hermes Runs",
+  "Brain Memory Gateway",
+  "There must be no fake `Full access` control",
+  "No composer Agent access selector UI",
+  "Slice 16S"
+]) {
+  if (!agentAccessApprovalPolicy.includes(token)) {
+    failures.push(`Agent access approval policy doc is missing token: ${token}`);
   }
 }
 
@@ -1505,7 +1570,7 @@ for (const token of [
   "checkProviderModelFutureFieldsRemainInert",
   "checkForbiddenCredentialFieldRejected",
   "checkValidationSourceIsPure",
-  "checkDisabledRouteStillSafe",
+  "checkDisabledRouteValidationEcho",
   "checkProductionSessionStreamStillPresent",
   "checkNoComposerRunsSelector"
 ]) {
@@ -1536,6 +1601,14 @@ for (const token of [
   "PRODUCTION_RUNS_ROUTE_DISABLED_REASON",
   "production_runs_route_not_enabled",
   "DisabledHermesRunsChatStreamResponse",
+  "validateHermesRunsBffRequest",
+  "readRequestValidationPosture",
+  "requestValidation",
+  "attempted: true",
+  "rawRequestEchoed: false",
+  "errorKinds",
+  "execution",
+  "storageAccess: false",
   "sessionStreamDefault: true",
   "hermesRunCreated: false",
   "hermesCalled: false",
@@ -1588,10 +1661,13 @@ for (const token of [
   "production_runs_route_not_enabled",
   "status: 501",
   "validDisabledRequestBody",
+  "invalidDisabledRequestBody",
+  "credentialDisabledRequestBody",
+  "requestValidation",
   "hermesCalled: false",
   "brainMemoryCalled: false",
   "eventStreamStarted: false",
-  "validationErrors",
+  "forbidden_credential_field",
   "HERMES_RUNS_PRODUCTION_ROUTE_GUARD_OK",
   "--base-url",
   "--source-only"

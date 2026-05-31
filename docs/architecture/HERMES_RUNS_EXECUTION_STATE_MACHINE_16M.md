@@ -344,11 +344,27 @@ creates no run, calls no Hermes or Brain Memory Gateway service, reads no
 service env values, starts no event stream, and keeps session stream as the
 production default.
 
+## Slice 16R Validation Echo And Access Policy Update
+
+Slice 16R updates the disabled production-shaped route so it parses the request
+body and calls only the pure `validateHermesRunsBffRequest` helper. The route
+still returns HTTP 501 for every request and reports
+`reason: "production_runs_route_not_enabled"`. The validation echo includes
+safe posture only: `attempted`, `ok`, `errorKinds`, redacted error paths,
+future-field inertness, and `rawRequestEchoed: false`.
+
+Slice 16R also moves the Agent access selector future contract into
+`docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md`. The documented modes
+are `chat_only`, `read_only_tools`, `ask_before_tools`, `full_access`, and
+`custom`. All remain unenforceable until the BFF can validate policy and
+Hermes Runs can enforce tool and approval behavior. No composer selector or
+approval buttons were added.
+
 ## Next Recommended Slices
 
-Slice 16R: disabled route validation echo contract, still HTTP 501 and no
-execution.
+Slice 16S: disabled Runs policy fixture matrix and source-only Agent access
+rendering guard.
 
-Reason: the pure request validator is now covered by fixtures and source
-checks. The next safe step is to expose a redacted disabled-route validation
-echo while preserving HTTP 501, no runtime execution, and no composer exposure.
+Reason: validation echo and policy semantics now exist without runtime
+execution. The next safe step is pure policy fixtures and source-only guards
+before any composer exposure.

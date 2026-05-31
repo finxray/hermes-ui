@@ -1112,6 +1112,25 @@ stream events, create runs, or import the memory scope bridge. Production chat
 still uses `/api/hermes/chat/stream`. The next recommended slice is Slice 16R:
 disabled route validation echo contract, still HTTP 501 and no execution.
 
+## Checkpoint: Slice 16R Hermes Runs disabled validation echo and access policy
+
+Slice 16R connects the disabled production-shaped
+`POST /api/hermes/runs/chat/stream` route to the pure request validator while
+keeping HTTP 501 and `reason=production_runs_route_not_enabled` for valid and
+invalid bodies. The response now includes redacted `requestValidation` posture
+and explicit `execution` flags proving no Hermes run creation, no Hermes or
+Brain Memory Gateway call, no approval/stop action, no event stream, and no
+storage access. Slice 16R also documents future Agent access policy modes
+`chat_only`, `read_only_tools`, `ask_before_tools`, `full_access`, and
+`custom` in `docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md`.
+Production chat still uses `/api/hermes/chat/stream`; no production Runs
+composer switch, composer Agent access selector UI, approval buttons, direct
+browser-to-Hermes/Gateway path, storage path, memory bridge change, stable-key
+change, or Brain Memory mutation/admin UI was added. See
+`docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md`.
+The next recommended slice is Slice 16S: disabled Runs policy fixture matrix
+and source-only Agent access rendering guard.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

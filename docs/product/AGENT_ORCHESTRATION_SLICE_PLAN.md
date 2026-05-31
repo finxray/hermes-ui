@@ -597,15 +597,49 @@ Boundaries:
 - no direct browser-to-Hermes/Gateway/storage path;
 - no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
 
+### 16R - Disabled Runs Validation Echo And Agent Access Policy
+
+Goal: let the disabled production-shaped Runs route report safe validation
+posture while documenting the future Agent access approval mode contract.
+
+Status: completed in Slice 16R. See
+`docs/checkpoints/HERMES_RUNS_DISABLED_ROUTE_VALIDATION_AND_AGENT_ACCESS_16R.md`
+and `docs/architecture/AGENT_ACCESS_APPROVAL_POLICY_16R.md`.
+
+Deliver:
+
+- route-level validation echo using the pure `validateHermesRunsBffRequest`
+  helper;
+- HTTP 501 remains the response for valid and invalid request bodies;
+- redacted `requestValidation` posture with `attempted: true`, `ok`,
+  `errorKinds`, safe error paths, inert future-field labels, and
+  `rawRequestEchoed: false`;
+- explicit `execution` posture proving no Hermes run creation, no Hermes call,
+  no Brain Memory Gateway call, no approval/stop call, no event stream, and no
+  storage access;
+- future Agent access policy modes for `chat_only`, `read_only_tools`,
+  `ask_before_tools`, `full_access`, and `custom`;
+- route guard and source checks for valid, invalid, and credential-like
+  disabled requests.
+
+Boundaries:
+
+- no production Runs execution runtime;
+- no change to `/api/hermes/chat/stream`;
+- no production composer switch;
+- no composer Agent access selector UI;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path;
+- no Hermes, Brain Memory, memory bridge, stable-key, or tenant-check change.
+
 ## Recommended Next Slice
 
-Slice 16R - disabled route validation echo contract, still HTTP 501 and no
-execution.
+Slice 16S - disabled Runs policy fixture matrix and source-only Agent access
+rendering guard.
 
 Reason:
 
-- Slice 16Q added the pure request schema, fixtures, validator, and source
-  checks without changing route behavior.
-- The next safe step is a disabled-route validation echo that returns redacted
-  validation metadata while preserving HTTP 501, no Hermes/Gateway calls, no
-  run creation, and no composer switch.
+- Slice 16R added disabled route validation echo and the Agent access approval
+  policy contract without runtime execution or UI selector work.
+- The next safe step is a pure policy fixture matrix and source-only rendering
+  guard before any composer exposure.

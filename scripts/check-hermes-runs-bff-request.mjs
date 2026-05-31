@@ -40,7 +40,7 @@ checkInvalidFixturesFail();
 checkProviderModelFutureFieldsRemainInert();
 checkForbiddenCredentialFieldRejected();
 checkValidationSourceIsPure();
-checkDisabledRouteStillSafe();
+checkDisabledRouteValidationEcho();
 checkProductionSessionStreamStillPresent();
 checkNoComposerRunsSelector();
 checkPackageScript();
@@ -147,10 +147,19 @@ function checkValidationSourceIsPure() {
   );
 }
 
-function checkDisabledRouteStillSafe() {
+function checkDisabledRouteValidationEcho() {
   const routePath = resolve(root, "apps/web/src/app/api/hermes/runs/chat/stream/route.ts");
   const routeSource = existsSync(routePath) ? readFileSync(routePath, "utf8") : "";
   const requiredTokens = [
+    "validateHermesRunsBffRequest",
+    "readRequestValidationPosture",
+    "requestValidation",
+    "attempted: true",
+    "rawRequestEchoed: false",
+    "errorKinds",
+    "errors",
+    "execution",
+    "storageAccess: false",
     "production_runs_route_not_enabled",
     "status: 501",
     "hermesRunCreated: false",
@@ -164,7 +173,6 @@ function checkDisabledRouteStillSafe() {
   const forbiddenTokens = [
     "@hermes-ui/hermes-client",
     "@hermes-ui/brain-memory-client",
-    "validateHermesRunsBffRequest",
     "buildMemoryScopeBridgeInstruction",
     "process.env.HERMES",
     "process.env.BRAIN_MEMORY",
@@ -180,11 +188,11 @@ function checkDisabledRouteStillSafe() {
   ];
 
   record(
-    "disabled-route-safe",
+    "disabled-route-validation-echo",
     existsSync(routePath) &&
       requiredTokens.every((token) => routeSource.includes(token)) &&
       forbiddenTokens.every((token) => !routeSource.includes(token)),
-    "production Runs route remains a disabled 501 response and does not call validator, Hermes, Gateway, env, bridge, or storage."
+    "production Runs route validates through the pure helper, echoes safe posture, and still avoids Hermes, Gateway, env, bridge, fetch, and storage."
   );
 }
 

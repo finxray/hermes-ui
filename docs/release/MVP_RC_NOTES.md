@@ -189,6 +189,17 @@ node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url ht
 
 ## Recommended Release Decision
 
+Slice 17C records the comprehensive MVP E2E verification run:
+
+- `docs/release/MVP_COMPREHENSIVE_E2E_17C.md`
+
+The 17C result is **MVP complete with known limitations** for the local/demo
+RC. The selected Web UI server was `http://127.0.0.1:3002`; release checks,
+browser smokes, live Hermes send/stop, and optional disabled-Runs guard/probe
+checks passed. Live Brain Memory Gateway health/ready was reachable directly,
+but live Brain Memory search/detail remained unclaimed because the Web UI BFF
+was mock/unconfigured for Brain Memory.
+
 Slice 17B records the final RC browser/live smoke decision:
 
 - `docs/release/RELEASE_DECISION_17B.md`

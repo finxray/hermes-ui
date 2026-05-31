@@ -1226,7 +1226,23 @@ Production chat still uses `/api/hermes/chat/stream`; production Runs remains
 deferred/post-MVP; no Agent access selector UI, approval buttons, memory
 mutation/admin UI, export/import runtime, direct browser-to-Hermes/Gateway
 path, or direct storage path was added. The next recommended slice is Slice
-17C: publish-ready release notes and local handoff package manifest.
+17C: comprehensive MVP E2E verification run.
+
+## Checkpoint: Slice 17C comprehensive MVP E2E verification
+
+Slice 17C ran the comprehensive MVP E2E verification pass against
+`http://127.0.0.1:3002` and records the result in
+`docs/release/MVP_COMPREHENSIVE_E2E_17C.md`. The recommendation remains MVP
+complete with known limitations for the local/demo RC: release checks passed,
+browser smokes passed, live Hermes send/stop passed, optional disabled-Runs
+guard/probe checks passed, and live Brain Memory search/detail remained
+unclaimed because the Web UI BFF was mock/unconfigured for Brain Memory.
+
+Production chat still uses `/api/hermes/chat/stream`; production Runs remains
+deferred/post-MVP; no Agent access selector UI, approval buttons, memory
+mutation/admin UI, export/import runtime, direct browser-to-Hermes/Gateway
+path, or direct storage path was added. The next recommended slice is Slice
+17D: publish-ready release notes and local handoff package manifest.
 
 ## 5. Recommended technical direction
 

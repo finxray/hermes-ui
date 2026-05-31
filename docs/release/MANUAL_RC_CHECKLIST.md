@@ -13,6 +13,8 @@ Hermes, Brain Memory, Docker, systemd, `~/.hermes`, or local secrets.
   or a copied decision record.
 - [ ] For the Slice 17B MVP RC pass, review
   `docs/release/RELEASE_DECISION_17B.md`.
+- [ ] For the Slice 17C comprehensive E2E pass, review
+  `docs/release/MVP_COMPREHENSIVE_E2E_17C.md`.
 
 ## 2. Install / Build Gate
 
@@ -154,4 +156,6 @@ Deferred features that must remain named when relevant:
 Record the final decision in `docs/release/RELEASE_DECISION_RECORD.md` or a
 candidate-specific copy. Slice 17A records the audit posture in
 `docs/release/RELEASE_DECISION_17A.md`; Slice 17B records the final MVP RC
-browser/live smoke decision in `docs/release/RELEASE_DECISION_17B.md`.
+browser/live smoke decision in `docs/release/RELEASE_DECISION_17B.md`; Slice
+17C records the comprehensive MVP E2E verification in
+`docs/release/MVP_COMPREHENSIVE_E2E_17C.md`.

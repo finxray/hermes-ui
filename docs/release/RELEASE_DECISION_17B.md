@@ -4,6 +4,7 @@ Candidate: Hermes UI / Brain Memory Studio local MVP/demo RC
 Decision date/time: 2026-05-31T20:56:32+04:00
 Decision commit: `95d0bdb docs: audit MVP completion readiness`
 Selected Web UI base URL: `http://127.0.0.1:3002`
+Follow-up verification: `docs/release/MVP_COMPREHENSIVE_E2E_17C.md`
 
 ## Decision
 
@@ -209,9 +210,15 @@ tree was force-stopped; `http://127.0.0.1:3002/` was then unreachable. Temporary
 smoke logs created by this slice were removed from the workspace. Hermes and
 Brain Memory services were not started or stopped by this slice.
 
+## Follow-Up Verification
+
+Slice 17C records the comprehensive MVP E2E verification run in
+`docs/release/MVP_COMPREHENSIVE_E2E_17C.md`. It keeps the 17B decision
+unchanged: MVP complete with known limitations for the local/demo RC.
+
 ## Next Recommended Slice
 
-Slice 17C: publish-ready release notes and local handoff package manifest.
+Slice 17D: publish-ready release notes and local handoff package manifest.
 
 Reason: 17B establishes the final RC decision. The next useful slice should
 package the human-facing release notes and handoff manifest without adding

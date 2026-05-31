@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 const root = resolve(process.cwd());
+const webRoot = join(root, "apps", "web");
+const nextCliPath = join(root, "node_modules", "next", "dist", "bin", "next");
 const args = parseArgs(process.argv.slice(2));
 const timeoutMs = 1800;
 const startupTimeoutMs = 45_000;
@@ -12,6 +14,7 @@ const host = args.host || "127.0.0.1";
 const port = Number(args.port || 3000);
 const baseUrl = `http://${host}:${port}`;
 let startedChild = null;
+let childStartProblem = null;
 let shuttingDown = false;
 
 await main();
@@ -185,25 +188,22 @@ async function handleAlreadyHealthy(selectedSummary) {
 }
 
 async function startDevServer() {
+  const commandSpec = buildDevCommand();
   printText([
     "Brain Memory Studio Web UI dev server",
     "=====================================",
     `Selected URL: ${baseUrl}`,
-    `Starting: ${startCommandDisplay()}`,
+    `Starting: ${commandSpec.display}`,
+    args.verbose ? `Spawn command: ${commandSpec.command} ${commandSpec.args.join(" ")}` : "",
+    args.verbose ? `Spawn cwd: ${commandSpec.cwd}` : "",
+    args.verbose ? `Platform: ${process.platform}${isWsl() ? " (WSL)" : ""}` : "",
     "This starts only the Web UI dev server.",
     "Ctrl+C stops only the child process started by this wrapper.",
     ""
-  ].join("\n"));
+  ].filter(Boolean).join("\n"));
 
   registerShutdownHandlers();
-  const command = npmCommand();
-  const commandArgs = ["run", "dev", "--", "--hostname", host, "--port", String(port)];
-  startedChild = spawn(command, commandArgs, {
-    cwd: root,
-    env: process.env,
-    shell: false,
-    stdio: "inherit"
-  });
+  startedChild = spawnWebDevServer(commandSpec);
 
   startedChild.on("exit", (code, signal) => {
     if (!shuttingDown) {
@@ -232,16 +232,22 @@ async function waitForHealthyServer() {
   const started = Date.now();
   let last = null;
   while (Date.now() - started < startupTimeoutMs) {
+    if (childStartProblem) {
+      return { ok: false, reason: childStartProblem };
+    }
+    if (startedChild?.exitCode !== null) {
+      return { ok: false, reason: `child exited with ${startedChild.exitCode}` };
+    }
     last = await inspectBaseUrl(baseUrl);
     if (last.classification === "likely-studio") {
       return { ok: true };
     }
     if (args.verbose) {
-      printText(`Waiting for ${baseUrl}: ${last.classification}`);
+      printText(`Waiting for ${baseUrl}: ${describeInspection(last)}`);
     }
     await sleep(1000);
   }
-  return { ok: false, reason: last ? last.classification : "timeout" };
+  return { ok: false, reason: last ? describeInspection(last) : "timeout" };
 }
 
 async function runRequestedSmokes() {
@@ -256,12 +262,16 @@ async function runRequestedSmokes() {
 async function runOneShot(label, command, commandArgs) {
   printText(`Running ${label}: ${[command, ...commandArgs].join(" ")}`);
   const result = await new Promise((resolveResult) => {
-    const child = spawn(command, commandArgs, {
+    const spawnSpec = buildPortableSpawn(command, commandArgs);
+    const child = spawn(spawnSpec.command, spawnSpec.args, {
       cwd: root,
       env: process.env,
-      shell: false,
-      stdio: "inherit"
+      shell: spawnSpec.shell,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
     });
+    child.stdout?.on("data", (chunk) => process.stdout.write(chunk));
+    child.stderr?.on("data", (chunk) => process.stderr.write(chunk));
     child.on("exit", (code, signal) => {
       resolveResult({ code, signal });
     });
@@ -461,7 +471,7 @@ function refusalReason(classification) {
 }
 
 function startCommandDisplay() {
-  return `npm run dev -- --hostname ${host} --port ${port}`;
+  return buildDevCommand().display;
 }
 
 function smokeCommands() {
@@ -476,7 +486,76 @@ function smokeCommands() {
 }
 
 function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+  return isWindows() ? "npm.cmd" : "npm";
+}
+
+function isWindows() {
+  return process.platform === "win32";
+}
+
+function isWsl() {
+  if (process.platform !== "linux") {
+    return false;
+  }
+  return Boolean(process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP);
+}
+
+function buildDevCommand() {
+  return {
+    args: [nextCliPath, "dev", "--hostname", host, "--port", String(port)],
+    command: process.execPath,
+    cwd: webRoot,
+    display: `cd apps/web && node ${relativeNextCliDisplay()} dev --hostname ${host} --port ${port}`,
+    shell: false
+  };
+}
+
+function spawnWebDevServer(commandSpec) {
+  const child = spawn(commandSpec.command, commandSpec.args, {
+    cwd: commandSpec.cwd,
+    env: process.env,
+    shell: commandSpec.shell,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true
+  });
+  child.stdout?.on("data", (chunk) => process.stdout.write(chunk));
+  child.stderr?.on("data", (chunk) => process.stderr.write(chunk));
+  child.on("error", (error) => {
+    childStartProblem = `${error.code || "spawn-error"}: ${error.message}`;
+    printText(`Web UI dev server failed to start: ${childStartProblem}`);
+  });
+  return child;
+}
+
+function buildPortableSpawn(command, commandArgs) {
+  if (isWindows() && isCmdShim(command)) {
+    return {
+      args: [],
+      command: commandLine(command, commandArgs),
+      shell: true
+    };
+  }
+  return {
+    args: commandArgs,
+    command,
+    shell: false
+  };
+}
+
+function isCmdShim(command) {
+  return command.toLowerCase().endsWith(".cmd");
+}
+
+function commandLine(command, commandArgs) {
+  return [command, ...commandArgs].map((value) => (
+    /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value
+  )).join(" ");
+}
+
+function relativeNextCliDisplay() {
+  return isWindows()
+    ? "..\\..\\node_modules\\next\\dist\\bin\\next"
+    : "../../node_modules/next/dist/bin/next";
 }
 
 function registerShutdownHandlers() {
@@ -493,9 +572,35 @@ function registerShutdownHandlers() {
 }
 
 function stopStartedChild() {
-  if (startedChild && !startedChild.killed) {
-    startedChild.kill("SIGINT");
+  if (!startedChild || startedChild.killed) {
+    return;
   }
+  if (isWindows() && startedChild.pid) {
+    const killer = spawn("taskkill.exe", ["/PID", String(startedChild.pid), "/T"], {
+      stdio: "ignore",
+      windowsHide: true
+    });
+    killer.on("error", () => {
+      startedChild.kill("SIGINT");
+    });
+    return;
+  }
+  startedChild.kill("SIGINT");
+}
+
+function describeInspection(inspection) {
+  const details = [inspection.classification];
+  if (inspection.root?.status) {
+    details.push(`root HTTP ${inspection.root.status}`);
+  } else if (inspection.root?.error) {
+    details.push(`root ${inspection.root.error}`);
+  }
+  const failures = inspection.staticAssets?.failures || [];
+  if (failures.length > 0) {
+    const first = failures[0];
+    details.push(`static chunk failed: ${first.path} -> ${first.status || first.error || "unknown"}`);
+  }
+  return details.join("; ");
 }
 
 function sleep(ms) {
@@ -550,6 +655,9 @@ Behavior:
   - does not delete .next;
   - does not edit env files;
   - does not manage Hermes, Brain Memory, or system services;
-  - starts only the Web UI dev server with npm run dev;
+  - starts only the Web UI workspace Next CLI from apps/web;
+  - uses npm.cmd on Windows Node and npm on Linux/WSL/macOS for optional smokes;
+  - avoids npm.cmd for the long-running dev server to avoid spawn EINVAL;
+  - pipes child logs instead of inheriting hidden automation handles;
   - Ctrl+C stops only the child process started by this wrapper.`);
 }

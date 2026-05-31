@@ -44,8 +44,17 @@ dev server is long-running and streams Next.js logs directly.
 - refuses selected stale/broken Studio ports;
 - refuses occupied non-Studio ports;
 - suggests a free local port in `3000` through `3007` when possible;
-- starts the root `npm run dev` command with explicit `--hostname` and
+- starts the `apps/web` workspace Next CLI with explicit `--hostname` and
   `--port`;
+- avoids `npm.cmd` for the long-running dev-server child because direct
+  `spawn("npm.cmd", ...)` can fail with `EINVAL` in this automation
+  environment;
+- still uses `npm.cmd` when running one-shot npm smoke commands under Windows
+  Node and `npm` under Linux, WSL, and macOS;
+- pipes child stdout/stderr to the wrapper console instead of inheriting hidden
+  automation handles;
+- waits for the selected root route and sampled `/_next/static/**` chunks to
+  become healthy;
 - optionally opens the selected base URL after it is healthy;
 - optionally runs `smoke:mvp` and/or `smoke:ui` against the selected base URL;
 - forwards Ctrl+C to only the Web UI child process it started.
@@ -112,6 +121,38 @@ When `studio:web` starts a dev server, it keeps that child process attached to
 the terminal. Pressing `Ctrl+C` sends `SIGINT` only to the child process started
 by this wrapper, then exits the wrapper. Existing servers on other ports are
 left alone.
+
+Slice 14N hardened this path for Windows and WSL. The wrapper no longer relies
+on inherited stdio handles, which can be invalid in hidden or redirected
+automation on Windows. It still streams child logs to the console by piping
+stdout/stderr, and it handles child spawn errors such as `EINVAL` with an
+explicit startup failure instead of crashing. On Windows, Ctrl+C cleanup is
+limited to the process tree rooted at the wrapper's own child PID so nested
+`cmd.exe`/npm/Next processes do not remain orphaned.
+
+## Windows / WSL Behavior
+
+On Windows Node, the wrapper starts the long-running dev server as:
+
+```powershell
+cd apps/web && node ..\..\node_modules\next\dist\bin\next dev --hostname 127.0.0.1 --port <port>
+```
+
+On WSL/Linux/macOS, the command shape is the same with the platform's Node
+binary:
+
+```bash
+cd apps/web && node ../../node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port <port>
+```
+
+This avoids both the Windows/npm argument-forwarding caveat seen when the root
+workspace script was used during the Slice 14M RC dry run and the reproduced
+direct `spawn("npm.cmd", ...)` `EINVAL` under hidden automation. It still keeps
+service ownership simple: the wrapper starts one Web UI child process and only
+signals that child on shutdown.
+
+Dry-run output prints the exact command shape for the current platform, and
+`--json` exposes the same redacted command string for dry-run/refusal checks.
 
 ## Relationship To Existing Launcher
 

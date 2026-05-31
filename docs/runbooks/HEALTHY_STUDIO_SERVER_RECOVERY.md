@@ -93,9 +93,14 @@ existing processes. If you only want to preview the decision:
 npm run studio:web -- --port 3002 --dry-run
 ```
 
-The wrapper ultimately runs the root `dev` script because it delegates to
-`@hermes-ui/web`, whose `dev` script is `next dev`. You can still run
-`npm run dev` manually, but `studio:web` is the safer recovery entry point.
+The wrapper runs the Web UI workspace Next CLI from `apps/web` with explicit
+host and port flags. It intentionally avoids `npm.cmd` for the long-running
+dev-server child because direct `spawn("npm.cmd", ...)` reproduced `EINVAL` in
+hidden automation. One-shot smoke commands still use `npm.cmd` on Windows Node
+and `npm` on WSL/Linux/macOS. This avoids the root workspace
+argument-forwarding and hidden automation spawn caveats observed during the
+Slice 14M RC dry run. You can still run `npm run dev` manually, but
+`studio:web` is the safer recovery entry point.
 
 There is currently no committed root or web `start` script for `next start`, so
 production-server recovery is not documented as a runnable command in this
@@ -165,6 +170,12 @@ The launcher never runs cache cleanup automatically.
 
 The Web UI wrapper also never runs cache cleanup. When the wrapper starts a dev
 server, pressing `Ctrl+C` stops only the child process that wrapper started.
+The wrapper pipes child logs to the current console instead of inheriting hidden
+Windows automation handles, and startup failure messages include the selected
+root/static chunk health state when available. On Windows, that shutdown is
+bounded to the process tree rooted at the wrapper's own child PID so nested
+`cmd.exe`/npm/Next processes are cleaned up without touching unrelated
+listeners.
 
 ## Safety Boundary
 

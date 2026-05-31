@@ -151,10 +151,12 @@ When you explicitly want tooling to start only the Web UI, use:
 npm run studio:web -- --port 3002 --open --ui-smoke
 ```
 
-`studio:web` refuses stale/broken or occupied selected ports, never kills
-existing processes, never deletes `.next`, never modifies env files, and does
-not manage Hermes, Brain Memory, Docker, or systemd services. See
-`docs/packaging/STUDIO_WEB_DEV_14J.md`.
+`studio:web` refuses stale/broken or occupied selected ports, starts the Web UI
+workspace Next CLI from `apps/web`, avoids `npm.cmd` for the long-running
+dev-server child, never kills existing processes, never deletes `.next`, never
+modifies env files, and does not manage Hermes, Brain Memory, Docker, or systemd
+services. See `docs/packaging/STUDIO_WEB_DEV_14J.md` and
+`docs/packaging/STUDIO_WEB_DEV_WINDOWS_HARDENING_14N.md`.
 
 ## Web UI Standalone / Mock Mode
 
@@ -424,6 +426,11 @@ with `Ctrl+0` before judging layout.
   to reach them.
 - `npm run studio:open` tries the appropriate OS browser opener, including a
   Windows browser from WSL when available.
+- `npm run studio:web -- --dry-run` prints the exact Web UI dev command.
+- `studio:web` invokes the long-running Next CLI with Node to avoid Windows
+  `npm.cmd` `spawn EINVAL`, pipes child logs instead of inheriting hidden
+  Windows automation stdio handles, then forwards `Ctrl+C` only to the child
+  process it started.
 - On Windows the launcher uses PowerShell `Get-NetTCPConnection` to parse
   listeners on ports `3000` through `3007`.
 - On Linux the launcher suggests `ss -ltnp` and parses it when available.

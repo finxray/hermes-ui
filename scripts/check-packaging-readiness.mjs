@@ -306,15 +306,16 @@ function checkLauncherSafety() {
     /execFileAsync\([^)]*systemctl/s
   ];
   passIf("launcher:no-destructive-exec", destructiveExec.every((pattern) => !pattern.test(launcher)), "studio:launch does not execute destructive/service commands.");
+  const webHasOnlyOwnTaskkill = !web.includes("taskkill") ||
+    (web.includes("taskkill.exe") && web.includes("startedChild.pid"));
   passIf("studio-web:no-destructive-text", [
     "Stop-Process",
-    "taskkill",
     "Remove-Item",
     "rm -rf",
     "docker",
     "systemctl",
     ".hermes"
-  ].every((value) => !web.includes(value)), "studio:web does not contain service-management/destructive command text.");
+  ].every((value) => !web.includes(value)) && webHasOnlyOwnTaskkill, "studio:web does not contain unrelated service-management/destructive command text.");
   passIf("studio-web:own-child-only", web.includes("startedChild") && web.includes('startedChild.kill("SIGINT")'), "studio:web only signals the child process it starts.");
 }
 

@@ -87,7 +87,8 @@ For the launcher details, flags, safety boundaries, and relationship to the
 future one-command CLI, see `docs/packaging/STUDIO_LAUNCHER_14A.md` and
 `docs/packaging/STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md`. For stale-server
 recovery, see `docs/runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md`. For the
-optional Web UI-only start wrapper, see `docs/packaging/STUDIO_WEB_DEV_14J.md`.
+optional Web UI-only start wrapper, see `docs/packaging/STUDIO_WEB_DEV_14J.md`
+and `docs/packaging/STUDIO_WEB_DEV_WINDOWS_HARDENING_14N.md`.
 
 ## Packaging Readiness
 

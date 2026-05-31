@@ -13,6 +13,7 @@ const smokeBaseUrlPath = join(root, "scripts", "smoke-base-url.mjs");
 const packagePath = join(root, "package.json");
 const healthyServerRunbookPath = join(root, "docs", "runbooks", "HEALTHY_STUDIO_SERVER_RECOVERY.md");
 const studioWebDocPath = join(root, "docs", "packaging", "STUDIO_WEB_DEV_14J.md");
+const studioWebWindowsHardeningPath = join(root, "docs", "packaging", "STUDIO_WEB_DEV_WINDOWS_HARDENING_14N.md");
 
 const launcher = readFileSync(launcherPath, "utf8");
 const studioWeb = existsSync(studioWebPath) ? readFileSync(studioWebPath, "utf8") : "";
@@ -23,6 +24,9 @@ const healthyServerRunbook = existsSync(healthyServerRunbookPath)
   : "";
 const studioWebDoc = existsSync(studioWebDocPath)
   ? readFileSync(studioWebDocPath, "utf8")
+  : "";
+const studioWebWindowsHardeningDoc = existsSync(studioWebWindowsHardeningPath)
+  ? readFileSync(studioWebWindowsHardeningPath, "utf8")
   : "";
 
 const results = [];
@@ -170,7 +174,22 @@ function checkStudioWebContract() {
   passIf("studio-web-script-exists", existsSync(studioWebPath), "Optional Web UI dev wrapper script exists.");
   passIf("studio-web-uses-spawn", studioWeb.includes("import { spawn }") && studioWeb.includes("spawn(command"), "Wrapper starts child processes with spawn.");
   passIf("studio-web-own-child", studioWeb.includes("startedChild") && studioWeb.includes('startedChild.kill("SIGINT")'), "Wrapper only signals the child process it started.");
-  passIf("studio-web-start-command", studioWeb.includes('"run", "dev"') && studioWeb.includes("--hostname") && studioWeb.includes("--port"), "Wrapper starts the root npm dev script with host and port.");
+  passIf("studio-web-windows-own-tree", studioWeb.includes("taskkill.exe") && studioWeb.includes('"/PID", String(startedChild.pid), "/T"'), "Wrapper can stop only its own Windows child process tree.");
+  passIf("studio-web-start-command", studioWeb.includes("nextCliPath") && studioWeb.includes('"dev", "--hostname"') && studioWeb.includes("--port"), "Wrapper starts the Next CLI with host and port.");
+  passIf("studio-web-web-cwd", studioWeb.includes('join(root, "apps", "web")') && studioWeb.includes("cwd: webRoot"), "Wrapper starts the dev server from apps/web.");
+  passIf("studio-web-next-cli-direct", studioWeb.includes('join(root, "node_modules", "next", "dist", "bin", "next")') && studioWeb.includes("process.execPath"), "Wrapper invokes the long-running Next CLI through node.");
+  passIf("studio-web-npm-command-helper", studioWeb.includes("function npmCommand()") && studioWeb.includes('"npm.cmd"') && studioWeb.includes('"npm"'), "Wrapper chooses npm.cmd on Windows and npm elsewhere for one-shot commands.");
+  passIf("studio-web-windows-helper", studioWeb.includes("function isWindows()") && studioWeb.includes('process.platform === "win32"'), "Wrapper has explicit Windows detection.");
+  passIf("studio-web-wsl-helper", studioWeb.includes("function isWsl()") && studioWeb.includes("WSL_DISTRO_NAME"), "Wrapper has explicit WSL detection for diagnostics.");
+  passIf("studio-web-build-command-helper", studioWeb.includes("function buildDevCommand()") && studioWeb.includes("display:"), "Wrapper builds a reusable dev command spec.");
+  passIf("studio-web-spawn-helper", studioWeb.includes("function spawnWebDevServer("), "Wrapper has a dedicated spawn helper.");
+  passIf("studio-web-portable-spawn-helper", studioWeb.includes("function buildPortableSpawn(") && studioWeb.includes("isCmdShim"), "Wrapper has Windows npm.cmd spawn handling.");
+  passIf("studio-web-windows-shell-only", studioWeb.includes("shell: true") && studioWeb.includes("shell: false") && studioWeb.includes("isWindows() && isCmdShim(command)"), "Wrapper uses shell only for Windows cmd shims.");
+  passIf("studio-web-no-inherit-stdio", !studioWeb.includes('stdio: "inherit"'), "Wrapper avoids inherited stdio handles for hidden Windows automation.");
+  passIf("studio-web-pipes-logs", studioWeb.includes('stdio: ["ignore", "pipe", "pipe"]') && studioWeb.includes("process.stdout.write") && studioWeb.includes("process.stderr.write"), "Wrapper pipes child logs to the console.");
+  passIf("studio-web-windows-hide", studioWeb.includes("windowsHide: true"), "Wrapper avoids visible helper windows on Windows.");
+  passIf("studio-web-child-error", studioWeb.includes('child.on("error"') && studioWeb.includes("childStartProblem"), "Wrapper handles child spawn errors explicitly.");
+  passIf("studio-web-static-health-detail", studioWeb.includes("describeInspection") && studioWeb.includes("static chunk failed"), "Wrapper reports root/static-chunk health wait details.");
   passIf("studio-web-refuses-stale", studioWeb.includes("stale-or-broken-studio") && studioWeb.includes("Refusing to start Web UI"), "Wrapper refuses stale/broken selected servers.");
   passIf("studio-web-dry-run", studioWeb.includes("--dry-run") && studioWeb.includes('action: "dry-run"'), "Wrapper supports dry-run mode.");
   passIf("studio-web-json-limited", studioWeb.includes("--json is supported with --dry-run"), "Wrapper documents JSON limitation for long-running logs.");
@@ -180,6 +199,8 @@ function checkStudioWebContract() {
   }
   passIf("studio-web-doc-exists", existsSync(studioWebDocPath), "Studio Web 14J documentation exists.");
   passIf("studio-web-doc-boundary", studioWebDoc.includes("does not manage Hermes") && studioWebDoc.includes("does not implement export/import"), "Studio Web docs state service and export/import boundaries.");
+  passIf("studio-web-windows-doc-exists", existsSync(studioWebWindowsHardeningPath), "Studio Web Windows hardening documentation exists.");
+  passIf("studio-web-windows-doc-boundary", studioWebWindowsHardeningDoc.includes("npm.cmd") && studioWebWindowsHardeningDoc.includes("hidden automation") && studioWebWindowsHardeningDoc.includes("does not manage Hermes"), "Windows hardening doc states process behavior and safety boundaries.");
 }
 
 function checkSafetyContract() {
@@ -204,15 +225,16 @@ function checkSafetyContract() {
     /execFileAsync\([^)]*hermes\s+(?:start|serve|run)/s
   ];
   passIf("safety-no-destructive-exec", destructiveExecPatterns.every((pattern) => !pattern.test(launcher)), "Launcher does not execute destructive recovery/service commands.");
-  passIf("safety-studio-web-no-destructive-text", [
+  const webHasOnlyOwnTaskkill = !studioWeb.includes("taskkill") ||
+    (studioWeb.includes("taskkill.exe") && studioWeb.includes("startedChild.pid"));
+  passIf("safety-studio-web-no-unrelated-destructive-text", [
     "Stop-Process",
-    "taskkill",
     "Remove-Item",
     "rm -rf",
     "docker",
     "systemctl",
     ".hermes"
-  ].every((value) => !studioWeb.includes(value)), "Web wrapper does not contain destructive/service-management command text.");
+  ].every((value) => !studioWeb.includes(value)) && webHasOnlyOwnTaskkill, "Web wrapper does not contain unrelated destructive/service-management command text.");
   passIf("safety-no-env-write", !launcher.includes(".env.local") || !/writeFile|appendFile/.test(launcher), "Launcher does not write apps/web/.env.local.");
   passIf("safety-studio-web-no-env-write", !/\.env\.local|writeFile|appendFile/.test(studioWeb), "Web wrapper does not write env files.");
   passIf("safety-no-hermes-home-write", !/join\([^)]*\.hermes|homedir\(\)|process\.env\.HOME/.test(launcher), "Launcher does not modify ~/.hermes.");

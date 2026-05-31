@@ -413,9 +413,9 @@ was added. See
 
 Slice 14J added an explicit optional wrapper for starting only the Web UI dev
 server on 2026-05-31. `npm run studio:web` checks the selected port, refuses
-stale/broken or occupied targets, starts the root Next.js dev command only when
-safe, supports `--port`, `--host`, `--open`, `--smoke`, `--ui-smoke`,
-`--dry-run`, and forwards Ctrl+C only to the child process it started.
+stale/broken or occupied targets, starts only the Web UI dev command when safe,
+supports `--port`, `--host`, `--open`, `--smoke`, `--ui-smoke`, `--dry-run`,
+and forwards Ctrl+C only to the child process it started.
 `npm run studio:web:3002` provides the common recovery-port shortcut. The
 wrapper does not kill existing processes, delete `.next`, modify env files,
 manage Hermes/Brain Memory/Docker/systemd, change backend/Hermes/Brain Memory
@@ -456,6 +456,22 @@ Brain Memory Gateway live mode was mock/unconfigured, stale non-selected
 servers remained on `3000` and `3005`, and production installer,
 one-command distribution, service automation, export/import, and memory
 admin/mutation features remain deferred.
+
+## Checkpoint: Slice 14N Windows/WSL Web UI dev wrapper hardening
+
+Slice 14N hardened the optional `studio:web` wrapper on 2026-05-31. The wrapper
+now starts the Web UI workspace Next CLI from `apps/web` with Node, avoids the
+reproduced direct `spawn("npm.cmd", ...)` `EINVAL` for the long-running child,
+keeps `npm.cmd`/`npm` selection for optional one-shot smoke commands, avoids
+inherited stdio handles, pipes child logs to the console, handles child spawn
+errors explicitly, stops only the Windows process tree rooted at its own child
+PID, and reports root/static chunk health wait details. Dry-run and JSON output
+now show the exact command. Root npm workspace argument forwarding was a
+separate portability caveat. Contract checks and docs now cover these
+behaviors. No product runtime logic, Hermes logic, Brain Memory BFF logic,
+unrelated process killing, service management, `.next` deletion, env mutation,
+Docker/systemd automation, or export/import was added. See
+`docs/packaging/STUDIO_WEB_DEV_WINDOWS_HARDENING_14N.md`.
 
 ## 5. Recommended technical direction
 

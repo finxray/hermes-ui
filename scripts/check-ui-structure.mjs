@@ -25,6 +25,9 @@ const requiredFiles = [
   "apps/web/src/data/longSessionFixture.ts",
   "apps/web/src/app/design/long-session-fixture/page.tsx",
   "apps/web/src/app/design/long-session-fixture/page.module.css",
+  "apps/web/src/data/largeSidebarFixture.ts",
+  "apps/web/src/app/design/sidebar-large-fixture/page.tsx",
+  "apps/web/src/app/design/sidebar-large-fixture/page.module.css",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 
@@ -116,6 +119,12 @@ const longSessionFixturePage = readFileSync(
   join(root, "apps/web/src/app/design/long-session-fixture/page.tsx"),
   "utf8"
 );
+const largeSidebarFixture = readFileSync(join(root, "apps/web/src/data/largeSidebarFixture.ts"), "utf8");
+const largeSidebarFixturePage = readFileSync(
+  join(root, "apps/web/src/app/design/sidebar-large-fixture/page.tsx"),
+  "utf8"
+);
+const largeSidebarSmoke = readFileSync(join(root, "scripts/sidebar-large-smoke.mjs"), "utf8");
 const longSessionSmoke = readFileSync(join(root, "scripts/long-session-performance-smoke.mjs"), "utf8");
 const longSessionPlan = readFileSync(
   join(root, "docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md"),
@@ -127,6 +136,10 @@ const longSessionMeasurement = readFileSync(
 );
 const lazyExportPreviewMeasurement = readFileSync(
   join(root, "docs/performance/LAZY_EXPORT_PREVIEW_15P.md"),
+  "utf8"
+);
+const largeSidebarMeasurement = readFileSync(
+  join(root, "docs/performance/SIDEBAR_LARGE_MEASUREMENT_15Q.md"),
   "utf8"
 );
 const scalableLoadingRoadmap = readFileSync(
@@ -228,6 +241,31 @@ for (const token of [
 }
 
 for (const token of [
+  "LARGE_SIDEBAR_PROJECT_COUNT = 25",
+  "LARGE_SIDEBAR_SESSIONS_PER_PROJECT = 40",
+  "LARGE_SIDEBAR_SESSION_COUNT",
+  "largeSidebarProjects",
+  "largeSidebarSessions",
+  "largeSidebarWorkspaceState"
+]) {
+  if (!largeSidebarFixture.includes(token)) {
+    failures.push(`Large sidebar fixture data is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "Large sidebar measurement fixture",
+  "Sidebar",
+  "largeSidebarProjects",
+  "largeSidebarSessions",
+  "setActiveSessionId"
+]) {
+  if (!largeSidebarFixturePage.includes(token)) {
+    failures.push(`Large sidebar fixture page is missing ${token}`);
+  }
+}
+
+for (const token of [
   "fixture-no-service-calls",
   "fixture-export-preview-lazy-before-open",
   "exportPreviewBuiltBeforeOpen",
@@ -246,6 +284,23 @@ for (const token of [
 ]) {
   if (!longSessionSmoke.includes(token)) {
     failures.push(`Long-session smoke is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "/design/sidebar-large-fixture",
+  "fixture-sidebar-project-count",
+  "fixture-sidebar-session-count",
+  "fixture-sidebar-scroll-responsive",
+  "fixture-active-row-selection",
+  "renderedSidebarRowCount",
+  "sidebarScroll",
+  "activeRowSelectionMs",
+  "--budget-strict",
+  "--verbose"
+]) {
+  if (!largeSidebarSmoke.includes(token)) {
+    failures.push(`Large sidebar smoke is missing ${token}`);
   }
 }
 
@@ -307,8 +362,26 @@ for (const token of [
 }
 
 for (const token of [
+  "Sidebar Large Measurement 15Q",
+  "25 projects",
+  "1,000 sessions",
+  "routeLoadMs",
+  "active row selection",
+  "Show More",
+  "virtualization is premature",
+  "no runtime Show More",
+  "no pagination",
+  "no virtualization"
+]) {
+  if (!largeSidebarMeasurement.includes(token)) {
+    failures.push(`Large sidebar measurement report is missing ${token}`);
+  }
+}
+
+for (const token of [
   "LONG_SESSION_MEASUREMENT_15O.md",
   "LAZY_EXPORT_PREVIEW_15P.md",
+  "SIDEBAR_LARGE_MEASUREMENT_15Q.md",
   "lazy construction of export preview JSON",
   "not transcript virtualization"
 ]) {
@@ -319,6 +392,25 @@ for (const token of [
 
 if (!packageJson.includes("\"smoke:long-session\"")) {
   failures.push("package.json is missing smoke:long-session script.");
+}
+
+if (!packageJson.includes("\"smoke:sidebar:large\"")) {
+  failures.push("package.json is missing smoke:sidebar:large script.");
+}
+
+const runtimeLoadingForbiddenTokens = [
+  "showMoreSessions",
+  "visibleSessionLimit",
+  "virtualizer",
+  "react-window",
+  "IntersectionObserver",
+  "loadMoreSessions"
+];
+
+for (const token of runtimeLoadingForbiddenTokens) {
+  if (largeSidebarFixturePage.includes(token) || largeSidebarFixture.includes(token)) {
+    failures.push(`Large sidebar fixture includes runtime loading token: ${token}`);
+  }
 }
 
 if (failures.length > 0) {

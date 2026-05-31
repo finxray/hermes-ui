@@ -33,6 +33,7 @@
     "smoke:markdown:long": "node scripts/markdown-long-fixture-smoke.mjs",
     "smoke:long-session": "node scripts/long-session-performance-smoke.mjs",
     "smoke:memory-detail": "node scripts/memory-detail-fixture-smoke.mjs",
+    "smoke:sidebar:large": "node scripts/sidebar-large-smoke.mjs",
     "smoke:mvp:live": "node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory",
     "smoke:ui": "node scripts/ui-interaction-smoke.mjs",
     "smoke:ui:headed": "node scripts/ui-interaction-smoke.mjs --headed",

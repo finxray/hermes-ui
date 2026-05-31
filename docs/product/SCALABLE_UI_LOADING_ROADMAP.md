@@ -33,6 +33,14 @@ local export summary visible while constructing the large preview JSON only
 after the `Preview JSON` disclosure opens. The slice stayed local-only and did
 not add backend export, import, pagination, infinite scroll, or virtualization.
 
+Slice 15Q added the larger sidebar measurement in
+`docs/performance/SIDEBAR_LARGE_MEASUREMENT_15Q.md`. The
+`/design/sidebar-large-fixture` route renders 25 projects and 1,000 sessions
+through the real Sidebar and the smoke recorded acceptable route load, scroll,
+active-row selection, 0 service calls, and 0 px overflow. Based on that
+evidence, Sidebar Show More and transcript virtualization are both deferred for
+now.
+
 ## Why It Matters
 
 Brain Memory Studio is expected to accumulate:
@@ -137,7 +145,7 @@ boundaries.
 
 ## Not Implemented
 
-Slices 15M through 15P do not implement:
+Slices 15M through 15Q do not implement:
 
 - infinite scroll;
 - virtualization/windowing;
@@ -151,6 +159,6 @@ Slices 15M through 15P do not implement:
 
 ## Next Recommended Slice
 
-After the Slice 15P lazy export preview fix, add a larger sidebar/session-list
-measurement variant and decide whether sidebar `Show more` is needed before
-transcript virtualization.
+After the Slice 15Q sidebar measurement, measure large Files/artifacts and
+legacy tool-event panels before choosing the next scalable-loading runtime
+implementation.

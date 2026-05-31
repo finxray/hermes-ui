@@ -772,6 +772,25 @@ mutation/admin action was added. See
 Slice 15Q: add a larger sidebar/session-list measurement variant and decide
 whether sidebar `Show more` is needed before transcript virtualization.
 
+## Checkpoint: Slice 15Q large sidebar measurement
+
+Slice 15Q added a deterministic large-sidebar fixture on 2026-05-31. The
+`/design/sidebar-large-fixture` route renders the real production Sidebar with
+25 projects and 1,000 visible sessions, plus a local-only measurement panel.
+`npm run smoke:sidebar:large` measures route load, rendered project/session row
+counts, sidebar scroll dimensions and timing, active row selection timing,
+horizontal overflow, service-call count, and browser/network errors. The local
+measurement recorded 1,027 project/session/recent rows, 0 px overflow, 0
+service calls, 1 ms / 7 ms sidebar scroll timing, and 73 ms active row
+selection. Based on this evidence, Sidebar Show More and transcript
+virtualization are both deferred for now. No runtime Show More, pagination,
+infinite scroll, virtualization, context compaction, production sidebar/chat
+behavior change, Hermes streaming change, Brain Memory BFF change, direct
+storage access, export/import, or memory mutation/admin action was added. See
+`docs/performance/SIDEBAR_LARGE_MEASUREMENT_15Q.md`. The next recommended
+slice is Slice 15R: measure large Files/artifacts and legacy tool-event panels
+before choosing the next scalable-loading runtime implementation.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

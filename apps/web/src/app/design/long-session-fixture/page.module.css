@@ -1,0 +1,92 @@
+.page {
+  --rail-width-left: 284px;
+  --rail-width-right: 360px;
+  display: grid;
+  height: 100dvh;
+  min-height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
+.fixtureHeader {
+  display: grid;
+  gap: 10px;
+  padding: 18px clamp(18px, 3vw, 36px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: #101114;
+}
+
+.fixtureHeader p {
+  margin: 0;
+  color: var(--accent);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.fixtureHeader h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+.metrics span {
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+}
+
+.shell {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: var(--rail-width-left) minmax(0, 1fr) var(--rail-width-right);
+  grid-template-areas: "left center right";
+  overflow: hidden;
+}
+
+.transcriptWrap {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-area: center;
+}
+
+.transcriptWrap > :global([aria-label="Chat transcript"]) {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 1180px) {
+  .page {
+    overflow: auto;
+  }
+
+  .shell {
+    min-height: 900px;
+    grid-template-columns: var(--rail-width-left) minmax(0, 1fr);
+    grid-template-areas: "left center";
+  }
+}
+
+@media (max-width: 780px) {
+  .shell {
+    min-height: 820px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "center";
+  }
+
+  .shell :global([data-shell-rail="left"]) {
+    display: none;
+  }
+}

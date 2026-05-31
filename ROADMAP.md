@@ -723,6 +723,21 @@ Hermes streaming change, Brain Memory BFF change, or secret commit was added.
 The next recommended slice is Slice 15N: create a long-session performance
 measurement plan before implementing scalable loading.
 
+## Checkpoint: Slice 15N long-session performance measurement baseline
+
+Slice 15N added a non-runtime long-session measurement baseline on 2026-05-31.
+`docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md` audits current
+transcript, sidebar, run history, replay, memory, tool, files, and export
+preview rendering posture. The static `/design/long-session-fixture` route and
+`npm run smoke:long-session` exercise 120 transcript messages, 100 sidebar
+sessions, 80 activity events, 24 run records, memory evidence, tool events, and
+artifacts without calling Hermes, Brain Memory, BFF routes, localStorage, or
+storage backends. No infinite scroll, virtualization, runtime pagination,
+context compaction runtime, direct browser-to-service path, Hermes streaming
+change, Brain Memory BFF change, or secret commit was added. The next
+recommended slice is Slice 15O: add non-invasive long-session measurement
+reporting, then choose the first scalable-loading runtime slice.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

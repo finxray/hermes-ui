@@ -14,6 +14,12 @@ This is a roadmap note only. Slice 15M does not implement infinite scroll,
 virtualization, pagination, progressive loading, runtime list limits, or UI
 behavior changes.
 
+Slice 15N adds the first measurement baseline in
+`docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md`, plus the static
+`/design/long-session-fixture` route and `npm run smoke:long-session`. That
+fixture measures current long-session behavior before this roadmap changes any
+runtime loading behavior.
+
 ## Why It Matters
 
 Brain Memory Studio is expected to accumulate:
@@ -131,6 +137,6 @@ Slice 15M does not implement:
 
 ## Next Recommended Slice
 
-When this work begins, start with a measurement slice that records current
-transcript, sidebar, activity, and memory timeline behavior before adding
-runtime limits or virtualization.
+After the Slice 15N measurement baseline, add non-invasive measurement
+reporting for the long-session fixture and then choose the first runtime
+scalable-loading slice based on the measured bottleneck.

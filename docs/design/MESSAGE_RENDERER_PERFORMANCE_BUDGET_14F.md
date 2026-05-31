@@ -112,6 +112,12 @@ The deterministic smoke targets are:
 - Raw HTML sentinels do not create DOM elements.
 - Partial streaming markdown renders without crashing.
 
+Slice 15N adds broader long-session coverage at
+`docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md`. The
+`/design/long-session-fixture` route and `npm run smoke:long-session` exercise
+the existing transcript, sidebar, and right rail with deterministic local data
+before any runtime pagination, infinite scroll, or virtualization work begins.
+
 ## Changes In This Slice
 
 - `MessageMarkdown` and `CodeBlock` are memoized.

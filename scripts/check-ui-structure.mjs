@@ -22,6 +22,9 @@ const requiredFiles = [
   "apps/web/src/data/memoryDetailFixture.ts",
   "apps/web/src/app/design/memory-detail-fixture/page.tsx",
   "apps/web/src/app/design/memory-detail-fixture/page.module.css",
+  "apps/web/src/data/longSessionFixture.ts",
+  "apps/web/src/app/design/long-session-fixture/page.tsx",
+  "apps/web/src/app/design/long-session-fixture/page.module.css",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 
@@ -107,6 +110,16 @@ const memoryDetailFixturePage = readFileSync(
   "utf8"
 );
 const memoryDetailSmoke = readFileSync(join(root, "scripts/memory-detail-fixture-smoke.mjs"), "utf8");
+const longSessionFixture = readFileSync(join(root, "apps/web/src/data/longSessionFixture.ts"), "utf8");
+const longSessionFixturePage = readFileSync(
+  join(root, "apps/web/src/app/design/long-session-fixture/page.tsx"),
+  "utf8"
+);
+const longSessionSmoke = readFileSync(join(root, "scripts/long-session-performance-smoke.mjs"), "utf8");
+const longSessionPlan = readFileSync(
+  join(root, "docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md"),
+  "utf8"
+);
 const packageJson = readFileSync(join(root, "package.json"), "utf8");
 
 for (const token of [
@@ -173,6 +186,60 @@ for (const token of [
 
 if (!packageJson.includes("\"smoke:memory-detail\"")) {
   failures.push("package.json is missing smoke:memory-detail script.");
+}
+
+for (const token of [
+  "LONG_SESSION_MESSAGE_COUNT = 120",
+  "LONG_SESSION_ACTIVITY_EVENT_COUNT = 80",
+  "LONG_SESSION_RUN_RECORD_COUNT = 24",
+  "longSessionMessages",
+  "longSessionActivityEvents",
+  "longSessionWorkspaceState"
+]) {
+  if (!longSessionFixture.includes(token)) {
+    failures.push(`Long-session fixture data is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "Long-session performance fixture",
+  "Sidebar",
+  "ChatTranscript",
+  "ContextRail",
+  "longSessionActivityEvents",
+  "longSessionActiveSession"
+]) {
+  if (!longSessionFixturePage.includes(token)) {
+    failures.push(`Long-session fixture page is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "fixture-no-service-calls",
+  "fixture-details-collapsed-by-default",
+  "fixture-message-count",
+  "fixture-sidebar-session-count",
+  "/design/long-session-fixture"
+]) {
+  if (!longSessionSmoke.includes(token)) {
+    failures.push(`Long-session smoke is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "Chat transcript",
+  "Sidebar projects/sessions",
+  "Export preview",
+  "Measurement Targets For Future Slices",
+  "does not implement infinite scroll, virtualization, runtime pagination"
+]) {
+  if (!longSessionPlan.includes(token)) {
+    failures.push(`Long-session performance plan is missing ${token}`);
+  }
+}
+
+if (!packageJson.includes("\"smoke:long-session\"")) {
+  failures.push("package.json is missing smoke:long-session script.");
 }
 
 if (failures.length > 0) {

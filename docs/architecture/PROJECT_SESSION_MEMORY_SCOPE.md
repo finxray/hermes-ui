@@ -172,11 +172,77 @@ reported as `matching-project`. This is read behavior only. The Web UI/Hermes
 write path still requires session context and the memory-scope bridge supplies a
 session key on chat turns.
 
+## Current Read/Write Semantics
+
+These semantics are the MVP contract after Slice 15H. They name the difference
+between session-scoped writes, project-only reads, and future project-level
+writes so later work does not accidentally treat one as another.
+
+### Session-scoped write
+
+Current Web UI chat sends require an active session. The browser posts to the
+local BFF with both project and session context. The BFF calls Hermes, and the
+temporary memory-scope bridge supplies both:
+
+- `projectKey`, for example `studio:local-dev:project:project-scope-a`;
+- `sessionKey`, for example
+  `studio:local-dev:project:project-scope-a:session:session-scope-a1`.
+
+If Hermes stores memory through Brain Memory MCP/skill, the expected MVP result
+is a session-scoped memory under the active project and active session. A
+same-project, same-session BFF search should find it. A same-project,
+different-session BFF search should not find it when the read request includes
+session context. A different-project BFF search should not find it.
+
+### Session-scoped read
+
+A read with both project and session context is session-specific for the current
+live Gateway behavior. Matching results report the same project key and session
+key that were used on write, and detail inspect reports
+`scopeStatus=matching-session`.
+
+### Project-only read
+
+A project-only read is a Gateway-mediated read where the BFF search context has
+project context but omits session context (`session=null`, so no `session_id` is
+sent by the current Brain Memory client). This is project-broad read behavior.
+
+Current project-only reads may return session-scoped memories from the same
+project. When that happens, the result must still preserve the original stored
+session key and report `scopeStatus=matching-project`. This is not a
+project-level write, and it does not mean the memory was stored without a
+session key.
+
+The Slice 15H live contract smoke asserts:
+
+- project-only Project A read can find a marker written in Project A / Session
+  A1;
+- the returned result still carries the original A1 session key;
+- the returned result reports `scopeStatus=matching-project`;
+- tenant remains `local-dev`.
+
+### Future project-level write
+
+Future project-level writes are a separate capability and are not implemented
+in the current Web UI. A real project-level write would need an explicit product
+and API contract that intentionally stores memory at project scope rather than
+session scope. It must not be inferred from the current project-only read path.
+
+Before adding future project-level writes, the project must define:
+
+- the exact UI affordance and confirmation/copy;
+- the BFF route and typed client shape;
+- the Gateway-approved write endpoint and audit behavior;
+- how project-level memories are distinguished from session-scoped memories in
+  search, inspect, supersession, and timeline views;
+- tenant authorization and regression checks.
+
 ## Not Implemented Yet
 
-- Brain Memory Gateway calls.
-- Memory search, retrieval evidence, supersession chains, or audit queries.
-- Gateway-backed project/session persistence.
+- Brain Memory mutation/admin Gateway calls.
+- Project-level memory write behavior.
+- Durable Gateway-backed Studio project/session persistence.
+- Full retrieval evidence, supersession chain, or audit trail storage.
 - Server-side Studio auth or multi-user tenancy.
 - Real enforcement of retrieval profiles or context policies.
 - `/v1/runs` approval/stop/reconnect behavior.

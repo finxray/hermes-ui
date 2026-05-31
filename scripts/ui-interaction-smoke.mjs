@@ -743,6 +743,8 @@ async function runLiveMemoryScopeIsolationSmoke() {
   });
   await checkProjectOnlyMarkerSearch({
     context: contexts.projectOnlyA,
+    expectedProjectKey: contexts.a1.project.stableKey,
+    expectedSessionKey: contexts.a1.session?.stableKey,
     marker
   });
 
@@ -1003,7 +1005,7 @@ async function checkMarkerInspect({ context, expectedProjectKey, expectedSession
   );
 }
 
-async function checkProjectOnlyMarkerSearch({ context, marker }) {
+async function checkProjectOnlyMarkerSearch({ context, expectedProjectKey, expectedSessionKey, marker }) {
   const search = await postJson("/api/brain-memory/search", {
     context,
     limit: 10,
@@ -1014,6 +1016,7 @@ async function checkProjectOnlyMarkerSearch({ context, marker }) {
     : [];
   const ok = search.ok && search.body?.mode === "real";
   const first = markerResults[0] ?? null;
+  const found = ok && first;
   const searchTenant = search.body?.scope?.tenantId;
   const firstScope = first
     ? `project=${first.projectKey || "unknown"}, session=${first.sessionKey || "none"}, status=${first.scopeStatus || "unknown"}`
@@ -1021,21 +1024,38 @@ async function checkProjectOnlyMarkerSearch({ context, marker }) {
 
   addResult(
     "memory-scope-project-only-query",
-    ok ? "pass" : "fail",
+    found ? "pass" : "fail",
     ok
       ? `Project-only search is currently project-broad and returned ${markerResults.length} marker result(s); ${firstScope}. Project-level marker creation was not attempted.`
       : `Project-only search failed; mode=${search.body?.mode || "unknown"}, status=${search.status || search.error || "unknown"}.`
   );
 
-  if (ok) {
-    check(
-      "memory-scope-project-only-query-tenant",
-      !searchTenant || searchTenant === context.project.tenantId,
-      searchTenant
-        ? `BFF project-only search tenant matched ${context.project.tenantId}.`
-        : "BFF project-only search response did not expose tenant."
-    );
+  if (!found) {
+    return;
   }
+
+  check(
+    "memory-scope-project-only-original-session-key",
+    first.sessionKey === expectedSessionKey,
+    `Project-only read preserved original sessionKey ${first.sessionKey || "none"}.`
+  );
+  check(
+    "memory-scope-project-only-scope-status",
+    first.scopeStatus === "matching-project",
+    `Project-only read reports scopeStatus ${first.scopeStatus || "unknown"}.`
+  );
+  check(
+    "memory-scope-project-only-project-key",
+    first.projectKey === expectedProjectKey,
+    `Project-only read stayed in project ${first.projectKey || "unknown"}.`
+  );
+  check(
+    "memory-scope-project-only-query-tenant",
+    !searchTenant || searchTenant === context.project.tenantId,
+    searchTenant
+      ? `BFF project-only search tenant matched ${context.project.tenantId}.`
+      : "BFF project-only search response did not expose tenant."
+  );
 }
 
 async function runLiveStopSmoke({ message, sendButton }) {

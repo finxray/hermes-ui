@@ -608,6 +608,21 @@ browser-to-Gateway/storage path, direct browser-to-Hermes path, or secret commit
 was added. The next recommended slice is Slice 15H: document and contract-test
 project-only read semantics separately from future project-level writes.
 
+## Checkpoint: Slice 15H project-only read semantics
+
+Slice 15H documented and contract-tested the MVP distinction between
+session-scoped writes, project-only reads, and future project-level writes on
+2026-05-31. The opt-in live memory-scope smoke now requires project-only
+no-session reads to find the Project A / Session A1 marker while preserving the
+original A1 session key and reporting `scopeStatus=matching-project`. This is
+explicitly project-broad read behavior, not a project-level write path. No
+tenant checks were loosened, no Brain Memory mutation/admin UI, direct
+browser-to-Gateway/storage path, direct browser-to-Hermes path, or secret commit
+was added. See
+`docs/checkpoints/PROJECT_ONLY_READ_SEMANTICS_15H.md`. The next recommended
+slice is Slice 15I: define the read-only Memory detail/evidence/supersession/audit
+contract for Gateway-backed results, keeping mutation/admin controls deferred.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

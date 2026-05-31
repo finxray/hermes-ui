@@ -41,6 +41,8 @@ const source = {
   contextRail: readFile("apps/web/src/components/shell/ContextRail.tsx"),
   diagnostics: readFile("apps/web/src/lib/tenantScopeDiagnostics.ts"),
   diagnosticsRoute: readFile("apps/web/src/app/api/tenant-scope/diagnostics/route.ts"),
+  memoryConsole: readFile("apps/web/src/components/memory/BrainMemoryConsole.tsx"),
+  scopeContract: readFile("docs/architecture/PROJECT_SESSION_MEMORY_SCOPE.md"),
   uiSmoke: readFile("scripts/ui-interaction-smoke.mjs"),
   workspaceStore: readFile("apps/web/src/lib/workspaceStore.ts")
 };
@@ -226,7 +228,18 @@ function checkSourceBoundaries() {
   assert(source.uiSmoke.includes("memory-scope-different-session"));
   assert(source.uiSmoke.includes("memory-scope-different-project"));
   assert(source.uiSmoke.includes("memory-scope-project-only-query"));
+  assert(source.uiSmoke.includes("memory-scope-project-only-original-session-key"));
+  assert(source.uiSmoke.includes("memory-scope-project-only-scope-status"));
   assert(!source.uiSmoke.includes("Hermes MCP stored it under local-dev"));
+  assert(source.scopeContract.includes("Session-scoped write"));
+  assert(source.scopeContract.includes("Project-only read"));
+  assert(source.scopeContract.includes("Future project-level write"));
+  assert(source.scopeContract.includes("project-broad"));
+  assert(source.scopeContract.includes("This is not a"));
+  assert(source.scopeContract.includes("project-level write"));
+  assert(!source.memoryConsole.includes("Delete memory"));
+  assert(!source.memoryConsole.includes("Mark stale"));
+  assert(!source.memoryConsole.includes("Supersede memory"));
   assert(source.workspaceStore.includes('const LEGACY_LOCAL_TENANT_ID = "tenant-local"'));
 }
 

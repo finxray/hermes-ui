@@ -190,8 +190,10 @@ async function checkSourceSmokeTargets() {
       uiSmoke.includes("memory-scope-same-session") &&
       uiSmoke.includes("memory-scope-different-session") &&
       uiSmoke.includes("memory-scope-different-project") &&
-      uiSmoke.includes("memory-scope-project-only-query"),
-    "Opt-in live memory smoke covers same-session, different-session, different-project, and project-only scope checks."
+      uiSmoke.includes("memory-scope-project-only-query") &&
+      uiSmoke.includes("memory-scope-project-only-original-session-key") &&
+      uiSmoke.includes("memory-scope-project-only-scope-status"),
+    "Opt-in live memory smoke covers same-session, different-session, different-project, and project-only read semantics."
   );
   checkSource(
     "ui:memory-activity-timeline",

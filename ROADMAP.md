@@ -656,6 +656,19 @@ secret commit was added. See
 `docs/product/MEMORY_DETAIL_FIXTURE_SMOKE_15J.md`. The next recommended slice is
 Slice 15K: add an MVP read-only memory search/detail regression index.
 
+## Checkpoint: Slice 15K Brain Memory regression index
+
+Slice 15K added the MVP read-only Brain Memory regression index on 2026-05-31.
+`docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md` maps each current
+Gateway-mediated Brain Memory read surface to source checks, browser smokes,
+opt-in live smokes, fixture coverage, deferred production capabilities, and
+known limitations. `npm run check:brain-memory-regression-index` guards the
+index itself. No Brain Memory mutation/admin UI, direct browser-to-Gateway
+path, direct browser-to-Hermes path, direct storage access, Hermes streaming
+change, Brain Memory BFF change, memory-scope bridge change, or secret commit
+was added. The next recommended slice is Slice 15L: create a launch-gate README
+for Brain Memory MVP read-only QA modes.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

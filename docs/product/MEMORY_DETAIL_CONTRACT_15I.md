@@ -276,3 +276,8 @@ for deterministic non-live coverage of this contract. The fixture renders the
 existing `MemoryDetailPanel` with static full-detail, not implemented evidence,
 not implemented supersession-chain, metadata-only audit, wrong-scope error, and
 metadata redaction sentinel cases. The production BFF contract is unchanged.
+
+## Slice 15K Follow-Up
+
+The MVP read-only Brain Memory regression coverage map is indexed in
+`docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md`.

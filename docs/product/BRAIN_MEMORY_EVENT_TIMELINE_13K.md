@@ -154,6 +154,11 @@ Slice 15J follow-up:
   redaction, and absence of mutation controls without requiring live Hermes or
   Brain Memory Gateway.
 
+Slice 15K follow-up:
+
+- The MVP Brain Memory read-only regression coverage map is indexed in
+  `docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md`.
+
 ## Redaction
 
 Timeline details are collapsed by default and redacted before display. The

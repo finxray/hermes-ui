@@ -158,3 +158,9 @@ The new `smoke:memory-detail` fixture is intentionally non-live:
 Slice 15K: add an MVP read-only memory search/detail regression index that maps
 each Brain Memory UI surface to its source check, browser smoke, live smoke,
 and deferred production capability.
+
+## Slice 15K Follow-Up
+
+The regression index now lives at
+`docs/product/BRAIN_MEMORY_REGRESSION_INDEX_15K.md` and maps the fixture to
+source, browser, live, and deferred-capability coverage.

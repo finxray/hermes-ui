@@ -445,6 +445,18 @@ and deferred/not-claimable items. No production installer, final one-command
 distribution, service automation, backend/Hermes/Brain Memory logic, UI
 behavior, memory mutation/admin action, or export/import was added.
 
+## Checkpoint: Slice 14M manual RC dry run
+
+Slice 14M recorded a concrete manual RC dry run on 2026-05-31 in
+`docs/release/RELEASE_DECISION_14M.md`. The run established a healthy selected
+Web UI server at `http://127.0.0.1:3002`, passed the safe release gate, browser
+smokes, markdown fixture smokes, live Hermes send/stop checks, and manual
+in-app browser evidence. The decision is pass with known limitations because
+Brain Memory Gateway live mode was mock/unconfigured, stale non-selected
+servers remained on `3000` and `3005`, and production installer,
+one-command distribution, service automation, export/import, and memory
+admin/mutation features remain deferred.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

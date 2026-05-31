@@ -508,14 +508,43 @@ Boundaries:
 - no approval buttons;
 - no Brain Memory BFF, memory bridge, stable-key, or tenant-check change.
 
+### 16O - Typed Runs BFF Event Envelope Fixtures And Reducer Checks
+
+Goal: encode the future Runs BFF event envelope as typed browser fixtures and
+pure reducer checks without implementing runtime execution.
+
+Status: completed in Slice 16O. See
+`docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md`.
+
+Deliver:
+
+- `HermesRunsBffEvent` TypeScript types;
+- deterministic success, activity/tool, approval, stop, error,
+  reconnect/replay, and `done` fixture sequences;
+- pure local reducer helper for assistant text, `AgentActivityEvent`,
+  `RunRecord`, `activityReplay`, approvals, errors, replay snapshot, and done
+  state;
+- `npm run check:hermes-runs-bff-events`;
+- source checks proving the session stream remains present and the production
+  Runs chat route remains absent.
+
+Boundaries:
+
+- no production Runs route implementation;
+- no production composer switch;
+- no composer Agent access selector;
+- no approval buttons;
+- no direct browser-to-Hermes/Gateway/storage path.
+
 ## Recommended Next Slice
 
-Slice 16O - typed Runs BFF event envelope fixtures and reducer checks.
+Slice 16P - disabled production-shaped Runs BFF route skeleton and contract
+response guard.
 
 Reason:
 
-- Slice 16N defines the future BFF route and event envelope without
-  implementing runtime execution.
-- The next safe step is representative fixture/reducer coverage for assistant
-  text, activity, `RunRecord`, replay, stop, approval, errors, and reconnect
-  while production chat still uses `/api/hermes/chat/stream`.
+- Slice 16N defines the future route/event contract and Slice 16O encodes the
+  browser-side envelope fixtures.
+- The next safe step is a server-side route skeleton that is explicitly
+  disabled by default and proves route shape without executing Runs or becoming
+  the composer default.

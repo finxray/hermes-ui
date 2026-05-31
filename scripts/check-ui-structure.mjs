@@ -34,7 +34,11 @@ const requiredFiles = [
   "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts",
   "apps/web/src/app/api/hermes/chat/stream/route.ts",
+  "apps/web/src/types/hermesRunsBffEvents.ts",
+  "apps/web/src/data/hermesRunsBffEventFixtures.ts",
+  "apps/web/src/lib/hermesRunsBffEventReducer.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
+  "scripts/check-hermes-runs-bff-events.mjs",
   "scripts/hermes-runs-replay-ui-smoke.mjs",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
@@ -47,6 +51,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md",
   "docs/architecture/HERMES_RUNS_EXECUTION_STATE_MACHINE_16M.md",
   "docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md",
+  "docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -254,6 +259,11 @@ const hermesRunsBffEventContract = existsSync(
 )
   ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_BFF_EVENT_CONTRACT_16N.md"), "utf8")
   : "";
+const hermesRunsBffEventFixturesCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -277,6 +287,22 @@ const hermesRunsExperimentalChatRoute = readFileSync(
 );
 const productionHermesChatStreamRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/chat/stream/route.ts"),
+  "utf8"
+);
+const hermesRunsBffEventTypesSource = readFileSync(
+  join(root, "apps/web/src/types/hermesRunsBffEvents.ts"),
+  "utf8"
+);
+const hermesRunsBffEventFixturesSource = readFileSync(
+  join(root, "apps/web/src/data/hermesRunsBffEventFixtures.ts"),
+  "utf8"
+);
+const hermesRunsBffEventReducerSource = readFileSync(
+  join(root, "apps/web/src/lib/hermesRunsBffEventReducer.ts"),
+  "utf8"
+);
+const hermesRunsBffEventCheckScript = readFileSync(
+  join(root, "scripts/check-hermes-runs-bff-events.mjs"),
   "utf8"
 );
 const hermesRunsReplayPreviewSource = readFileSync(
@@ -1201,11 +1227,110 @@ for (const token of [
   "approval_invalid_choice",
   "tenant_scope_mismatch",
   "No raw Runs payload",
-  "Slice 16O"
+  "Slice 16O",
+  "apps/web/src/types/hermesRunsBffEvents.ts",
+  "npm run check:hermes-runs-bff-events",
+  "Slice 16P"
 ]) {
   if (!hermesRunsBffEventContract.includes(token)) {
     failures.push(`Hermes Runs BFF event contract doc is missing token: ${token}`);
   }
+}
+
+for (const token of [
+  "Hermes Runs BFF Event Fixtures 16O",
+  "HermesRunsBffEvent",
+  "hermesRunsBffBasicSuccessEvents",
+  "hermesRunsBffActivityToolEvents",
+  "hermesRunsBffApprovalDenyEvents",
+  "hermesRunsBffStopEvents",
+  "hermesRunsBffErrorEvents",
+  "hermesRunsBffReconnectReplayEvents",
+  "message.delta",
+  "activityReplay",
+  "npm run check:hermes-runs-bff-events",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "No production `POST /api/hermes/runs/chat/stream` runtime",
+  "No composer Agent access selector",
+  "No direct browser-to-Hermes path",
+  "Slice 16P"
+]) {
+  if (!hermesRunsBffEventFixturesCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs BFF event fixtures checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "HERMES_RUNS_BFF_EVENT_SCHEMA_VERSION",
+  "HermesRunsBffEvent",
+  "HermesRunsBffRunRef",
+  "HermesRunsBffMessagePayload",
+  "HermesRunsBffApprovalPayload",
+  "HermesRunsBffReplayPayload",
+  "HermesRunsBffErrorPayload",
+  "HermesRunsStopRequest",
+  "HermesRunsApprovalRequest",
+  "run.reconnecting",
+  "replay.snapshot"
+]) {
+  if (!hermesRunsBffEventTypesSource.includes(token)) {
+    failures.push(`Hermes Runs BFF event types source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "hermesRunsBffBasicSuccessEvents",
+  "hermesRunsBffActivityToolEvents",
+  "hermesRunsBffApprovalDenyEvents",
+  "hermesRunsBffStopEvents",
+  "hermesRunsBffErrorEvents",
+  "hermesRunsBffReconnectReplayEvents",
+  "hermesRunsBffRequiredEventTypes",
+  "full raw Hermes Runs event payloads",
+  "per-token message.delta replay rows",
+  "rawRunsPayloadPersisted: false"
+]) {
+  if (!hermesRunsBffEventFixturesSource.includes(token)) {
+    failures.push(`Hermes Runs BFF event fixtures source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "createEmptyHermesRunsBffDraftState",
+  "reduceHermesRunsBffEvents",
+  "applyHermesRunsBffEvent",
+  "assistantText",
+  "activityReplay",
+  "approvals",
+  "replaySnapshot",
+  "message.delta",
+  "createPersistedActivityEvent",
+  "limitPersistedActivityEvents"
+]) {
+  if (!hermesRunsBffEventReducerSource.includes(token)) {
+    failures.push(`Hermes Runs BFF event reducer source is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "checkRequiredEventTypes",
+  "checkBasicSuccessfulRun",
+  "checkMessageDeltaNoReplayRows",
+  "checkActivityEventCreatesReplayState",
+  "checkApprovalLifecycle",
+  "checkStopSequence",
+  "checkErrorSequence",
+  "checkReplaySnapshotHydrates",
+  "checkProductionRunsRouteAbsent",
+  "checkNoDirectBrowserHermesPath"
+]) {
+  if (!hermesRunsBffEventCheckScript.includes(token)) {
+    failures.push(`Hermes Runs BFF event check script is missing token: ${token}`);
+  }
+}
+
+if (!packageJson.includes("\"check:hermes-runs-bff-events\"")) {
+  failures.push("package.json is missing check:hermes-runs-bff-events script.");
 }
 
 for (const token of [

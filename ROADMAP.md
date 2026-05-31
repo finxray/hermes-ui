@@ -1059,6 +1059,26 @@ stable-key change, provider/model switching, memory mutation/admin UI, or Agent
 access selector was added. The next recommended slice is Slice 16O: typed Runs
 BFF event envelope fixtures and reducer checks.
 
+## Checkpoint: Slice 16O Hermes Runs BFF event fixtures
+
+Slice 16O added typed fixture-only coverage for the future Runs BFF event
+contract in `docs/checkpoints/HERMES_RUNS_BFF_EVENT_FIXTURES_16O.md`.
+`apps/web/src/types/hermesRunsBffEvents.ts` defines `HermesRunsBffEvent` and
+supporting run, message, approval, replay, error, stop, and approval envelope
+types. `apps/web/src/data/hermesRunsBffEventFixtures.ts` adds deterministic
+success, activity/tool, approval deny, stop, error, reconnect/replay, and
+`done` sequences. `apps/web/src/lib/hermesRunsBffEventReducer.ts` applies those
+events to a pure local draft state for assistant text, `AgentActivityEvent`,
+`RunRecord`, `activityReplay`, approvals, errors, replay snapshot, and done
+state. `npm run check:hermes-runs-bff-events` verifies the contract and source
+guards. Production chat still uses `/api/hermes/chat/stream`; no production
+Runs route, composer Runs selector, approval buttons, direct
+browser-to-Hermes/Gateway path, storage path, Brain Memory BFF change, memory
+scope bridge change, stable-key change, provider/model switching,
+memory mutation/admin UI, or Agent access selector was added. The next
+recommended slice is Slice 16P: disabled production-shaped Runs BFF route
+skeleton and contract response guard.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

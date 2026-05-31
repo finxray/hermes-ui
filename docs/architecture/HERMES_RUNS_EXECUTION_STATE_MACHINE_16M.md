@@ -308,12 +308,22 @@ the default, `/api/hermes/chat/stream` is unchanged, no production Runs route is
 implemented, no composer selector is added, No direct browser-to-Hermes path is
 allowed, and the Agent access selector remains future-only.
 
+## Slice 16O Fixture Update
+
+Slice 16O adds typed fixture coverage for the browser-facing
+`HermesRunsBffEvent` state transitions in this state machine. The pure reducer
+checks success, activity, approval, stop, error, reconnect, replay snapshot,
+and `done` behavior against local `RunRecord` and `activityReplay` state.
+
+No production Runs execution route, composer selector, approval buttons, direct
+browser-to-Hermes path, or Agent access selector was implemented.
+
 ## Next Recommended Slices
 
-Slice 16O: typed Runs BFF event envelope fixtures and reducer checks without
-runtime execution.
+Slice 16P: disabled production-shaped Runs BFF route skeleton and contract
+response guard.
 
-Reason: 16M defines the state machine and 16N defines the future BFF route and
-event envelope. The next safe step is fixture coverage for assistant text,
-activity, `RunRecord`, replay, stop, approval, errors, and reconnect without
-switching production chat to Runs.
+Reason: 16M defines the state machine, 16N defines the future BFF route and
+event envelope, and 16O adds browser-side fixture/reducer coverage. The next
+safe step is a disabled server-side skeleton that proves route shape without
+runtime execution or composer exposure.

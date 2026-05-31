@@ -436,13 +436,32 @@ enabled composer control until:
 - No memory mutation/admin action.
 - No Hermes or Brain Memory source change.
 
+## Slice 16O Fixture Update
+
+Slice 16O adds typed, fixture-only coverage for this contract:
+
+- `apps/web/src/types/hermesRunsBffEvents.ts` defines `HermesRunsBffEvent` and
+  the supporting run, message, approval, replay, error, stop, and approval
+  envelope types.
+- `apps/web/src/data/hermesRunsBffEventFixtures.ts` provides deterministic
+  secret-free sequences for success, activity/tool, approvals, stop, error,
+  reconnect, replay snapshot, and `done`.
+- `apps/web/src/lib/hermesRunsBffEventReducer.ts` applies those events to a
+  local in-memory draft state for assistant text, `RunRecord`,
+  `AgentActivityEvent`, `activityReplay`, approvals, errors, replay snapshot,
+  and done state.
+- `npm run check:hermes-runs-bff-events` verifies the fixture contract.
+
+This does not implement `POST /api/hermes/runs/chat/stream`. Production chat
+still uses `/api/hermes/chat/stream`, and the Agent access selector remains
+future-only.
+
 ## Next Recommended Slice
 
-Slice 16O: typed Runs BFF event envelope fixtures and reducer checks without
-runtime execution.
+Slice 16P: disabled production-shaped Runs BFF route skeleton and contract
+response guard.
 
-Reason: 16N defines the future route and envelope contract. The next safe step
-is to encode representative `HermesRunsBffEvent` fixtures and local reducer
-expectations for assistant text, activity, `RunRecord`, replay, stop, approval,
-errors, and reconnect without adding the production Runs route or switching the
-composer.
+Reason: 16N defines the future route and envelope contract, and 16O adds typed
+fixtures plus reducer checks. The next safe step is an explicitly disabled
+server-side route skeleton that cannot execute a run or become the composer
+default.

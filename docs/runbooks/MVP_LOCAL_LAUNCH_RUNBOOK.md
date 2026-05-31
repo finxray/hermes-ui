@@ -235,6 +235,22 @@ Verify Gateway directly:
 curl http://127.0.0.1:8080/health
 ```
 
+For the sibling Brain Memory repository used during local development, the
+documented Compose Gateway recovery command is:
+
+```powershell
+cd <brain-memory-repo>
+powershell -ExecutionPolicy Bypass -File .\scripts\start-brain-memory.ps1
+Invoke-RestMethod http://127.0.0.1:8080/health
+Invoke-RestMethod http://127.0.0.1:8080/ready
+```
+
+If the Gateway key lives in Brain Memory's `GATEWAY_MEMORY_API_KEYS`, map a
+tenant-authorized read key into the Web UI server process as
+`BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY`. Do not print the key, commit it, or send
+it to browser JavaScript. Prefer a temporary process env when verifying a live
+reconnect so `apps/web/.env.local` does not need to change.
+
 Verify through the Web UI BFF:
 
 ```powershell

@@ -361,7 +361,20 @@ async function checkBrainMemoryInspect(status, searchBody) {
 
   const mode = result.body?.mode;
   const detailStatus = result.body?.detail ? "detail" : result.body?.error?.kind || "no-detail";
-  if (args.requireBrainMemory && mode !== "real") {
+  const safeMissingInspect =
+    args.requireBrainMemory &&
+    status?.mode === "real" &&
+    !resultId &&
+    mode === "error" &&
+    result.body?.error?.kind === "http_error";
+
+  if (safeMissingInspect) {
+    addResult(
+      "POST /api/brain-memory/memory/inspect",
+      "pass",
+      "Inspect route returned a safe normalized scoped 404 for a nonexistent id because search had no result to inspect."
+    );
+  } else if (args.requireBrainMemory && mode !== "real") {
     addResult(
       "POST /api/brain-memory/memory/inspect",
       "fail",

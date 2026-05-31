@@ -515,6 +515,21 @@ logic change, or Brain Memory BFF logic change was added. The next recommended
 slice is Slice 15B: bring up Brain Memory Gateway and a tenant-bound read key,
 then rerun live E2E reconnect.
 
+## Checkpoint: Slice 15B live Brain Memory prerequisite recovery
+
+Slice 15B restored the live Brain Memory Gateway prerequisite on 2026-05-31 and
+recorded the result in `docs/checkpoints/LIVE_BRAIN_MEMORY_E2E_15B.md`.
+Brain Memory Gateway was started through its documented sibling-repo script on
+`http://127.0.0.1:8080`, a tenant-bound key was located and used only as a
+redacted temporary Web UI process env, and the Web UI BFF reported
+`mode=real`, `reachable=true` for status/search/inspect. Full Hermes -> Brain
+Memory marker E2E remains blocked because Hermes is not reachable at
+`http://127.0.0.1:8642` and no `hermes` command is available in PATH. No
+Brain Memory mutation/admin UI, direct browser-to-Gateway/storage path, Hermes
+streaming logic change, Brain Memory BFF logic change, or env secret commit was
+added. The next recommended slice is Slice 15C: start or attach Hermes Agent
+API, then rerun the full marker E2E.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

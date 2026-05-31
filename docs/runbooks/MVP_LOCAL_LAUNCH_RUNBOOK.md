@@ -37,6 +37,8 @@ the deferred production one-command CLI.
 | `npm run smoke:ui:headed` | Runs the browser smoke visibly for debugging. |
 | `npm run smoke:ui:send` | Opt-in live composer send smoke. Requires real, reachable Hermes. |
 | `npm run smoke:ui:send:headed` | Visible live composer send smoke for debugging. |
+| `npm run smoke:ui:memory-live` | Opt-in live Brain Memory timeline smoke. Requires real Hermes and Brain Memory Gateway. |
+| `npm run smoke:ui:memory-live:headed` | Visible live Brain Memory timeline smoke for debugging. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Requires Hermes BFF status and stream to be live. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Requires live Brain Memory Gateway search/inspect through the BFF. |
 
@@ -276,6 +278,8 @@ Do not add direct browser-to-Gateway calls or direct storage access.
 | `npm run smoke:ui:headed` | Visible browser smoke for debugging layout or click issues. |
 | `npm run smoke:ui:send` | Optional live composer send smoke. Requires real Hermes and sends one message. |
 | `npm run smoke:ui:send:headed` | Visible optional live composer send smoke. |
+| `npm run smoke:ui:memory-live` | Optional live Brain Memory timeline smoke. Requires real Hermes and Brain Memory Gateway. |
+| `npm run smoke:ui:memory-live:headed` | Visible optional live Brain Memory timeline smoke. |
 | `node scripts/mvp-smoke.mjs --require-hermes` | Live Hermes gate. |
 | `node scripts/mvp-smoke.mjs --require-brain-memory` | Live Brain Memory Gateway gate. |
 | `npm run check:workspace-state` | Project/session reducer and local state contract. |

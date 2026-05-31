@@ -13,6 +13,8 @@ const report = {
   checks: [],
   mode: {
     headed: args.headed,
+    memoryLiveTest: args.memoryLiveTest,
+    requireBrainMemory: args.requireBrainMemory,
     requireHermes: args.requireHermes,
     replayTest: args.replayTest,
     sendTest: args.sendTest,
@@ -59,11 +61,21 @@ async function main() {
   }
 
   const hermesStatus = await checkHermesRequirement();
-  if ((args.sendTest || args.stopTest || args.replayTest) && !canUseLiveHermes(hermesStatus)) {
+  const brainMemoryStatus = await checkBrainMemoryRequirement();
+  if ((args.sendTest || args.stopTest || args.replayTest || args.memoryLiveTest) && !canUseLiveHermes(hermesStatus)) {
     addResult(
       "hermes-send-precondition",
       "fail",
       "Live send requires /api/hermes/status to report mode=real and reachable=true."
+    );
+    finalize();
+    return;
+  }
+  if (args.memoryLiveTest && !canUseLiveBrainMemory(brainMemoryStatus)) {
+    addResult(
+      "brain-memory-live-precondition",
+      "fail",
+      "Live memory timeline smoke requires /api/brain-memory/status to report mode=real and reachable=true."
     );
     finalize();
     return;
@@ -124,6 +136,8 @@ function parseArgs(values) {
     baseUrl: "",
     headed: false,
     json: false,
+    memoryLiveTest: false,
+    requireBrainMemory: false,
     requireHermes: false,
     replayTest: false,
     sendTest: false,
@@ -137,6 +151,13 @@ function parseArgs(values) {
       parsed.headed = true;
     } else if (arg === "--json") {
       parsed.json = true;
+    } else if (arg === "--memory-live-test") {
+      parsed.memoryLiveTest = true;
+      parsed.requireBrainMemory = true;
+      parsed.requireHermes = true;
+      parsed.sendTest = true;
+    } else if (arg === "--require-brain-memory") {
+      parsed.requireBrainMemory = true;
     } else if (arg === "--require-hermes") {
       parsed.requireHermes = true;
     } else if (arg === "--send-test") {
@@ -162,7 +183,7 @@ function parseArgs(values) {
 }
 
 async function checkHermesRequirement() {
-  if (!args.requireHermes && !args.sendTest) {
+  if (!args.requireHermes && !args.sendTest && !args.memoryLiveTest) {
     return null;
   }
 
@@ -183,6 +204,32 @@ async function checkHermesRequirement() {
     "GET /api/hermes/status",
     ok ? "pass" : "fail",
     `Hermes status mode=${mode}, reachable=${String(reachable)}.`
+  );
+  return result.body;
+}
+
+async function checkBrainMemoryRequirement() {
+  if (!args.requireBrainMemory && !args.memoryLiveTest) {
+    return null;
+  }
+
+  const result = await fetchJsonWithTimeout(`${baseUrl}/api/brain-memory/status`);
+  if (!result.ok) {
+    addResult(
+      "GET /api/brain-memory/status",
+      "fail",
+      `Brain Memory status was required but returned ${result.status || result.error}.`
+    );
+    return null;
+  }
+
+  const mode = result.body?.mode || "unknown";
+  const reachable = result.body?.reachable === true;
+  const ok = mode === "real" && reachable;
+  addResult(
+    "GET /api/brain-memory/status",
+    ok ? "pass" : "fail",
+    `Brain Memory status mode=${mode}, reachable=${String(reachable)}.`
   );
   return result.body;
 }
@@ -477,7 +524,9 @@ async function checkComposer() {
   check("composer-send-enabled", enabled, "Typing into the composer enables Send message.");
 
   if (args.sendTest) {
-    if (args.stopTest) {
+    if (args.memoryLiveTest) {
+      await runLiveMemoryTimelineSmoke({ sendButton });
+    } else if (args.stopTest) {
       await runLiveStopSmoke({ message, sendButton });
     } else if (args.replayTest) {
       await runLiveReplaySmoke({ message, sendButton });
@@ -488,6 +537,223 @@ async function checkComposer() {
     await textarea.fill("", { timeout: timeoutMs });
     addResult("composer-send-click", "warn", "Optional send click skipped; pass --send-test to exercise Hermes.");
   }
+}
+
+async function runLiveMemoryTimelineSmoke({ sendButton }) {
+  const marker = `BM_UI_MEMORY_TIMELINE_15D_${timestampMarker()}_${randomMarker()}`;
+  const ackMarker = "BM_UI_MEMORY_TIMELINE_STORED";
+  const message = `Store this harmless UI timeline marker in Brain Memory exactly: ${marker}. Then reply ${ackMarker}.`;
+  const textarea = page.getByLabel("Message", { exact: true });
+  const initialAssistantCount = await page.locator('article[data-role="assistant"]').count();
+
+  await textarea.fill(message, { timeout: timeoutMs });
+  addResult("memory-live-marker-generated", "pass", `Generated marker ${marker}.`);
+  await page.waitForFunction(() => {
+    const button = document.querySelector('button[aria-label="Send message"]');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  }, null, { timeout: timeoutMs });
+
+  await sendButton.click({ timeout: timeoutMs });
+  addResult("memory-live-send-click", "pass", "Clicked Send for opt-in live Brain Memory timeline smoke.");
+
+  await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+  addResult("memory-live-user-message", "pass", "Unique memory-live user message rendered in the transcript.");
+
+  await page.waitForFunction(
+    ({ initialCount }) => document.querySelectorAll('article[data-role="assistant"]').length > initialCount,
+    { initialCount: initialAssistantCount },
+    { timeout: liveSendTimeoutMs }
+  );
+  addResult("memory-live-assistant-created", "pass", "A new assistant message was created for memory-live smoke.");
+
+  const assistantResult = await waitForAssistantResponse(initialAssistantCount, ackMarker);
+  if (!assistantResult.ok) {
+    addResult("memory-live-assistant-response", "fail", assistantResult.message);
+    return;
+  }
+  addResult(
+    "memory-live-assistant-response",
+    "pass",
+    `Observed non-empty assistant response: ${assistantResult.preview}`
+  );
+  addResult(
+    "memory-live-assistant-ack",
+    assistantResult.hasMarker ? "pass" : "warn",
+    assistantResult.hasMarker
+      ? `Assistant response included ${ackMarker}.`
+      : `Assistant response did not include ${ackMarker}; BFF marker search remains authoritative.`
+  );
+
+  const streamStatus = streamResponses.at(-1);
+  addResult(
+    "memory-live-stream-response",
+    streamStatus && streamStatus < 400 ? "pass" : "fail",
+    streamStatus
+      ? `/api/hermes/chat/stream returned HTTP ${streamStatus}.`
+      : "No /api/hermes/chat/stream response was observed."
+  );
+
+  await checkMemoryActivityBlock();
+  await checkMemoryTimelineRail();
+  await checkBrainMemoryMarkerSearch(marker);
+  await checkNoVisibleSecrets("memory-live-visible-secrets");
+  await checkNoHorizontalOverflow("memory-live-overflow");
+}
+
+async function checkMemoryActivityBlock() {
+  const memoryBlock = page.locator('section[aria-label="Agent activity"] details[data-type="memory"]').last();
+  await memoryBlock.waitFor({ state: "visible", timeout: liveSendTimeoutMs });
+  const summaryText = await compactText(memoryBlock.locator("summary"));
+  const hasExpectedLabel = /Stored memory|Searched memory|Checked memory health|Brain Memory|mcp_brain_memory_memory_store/i.test(summaryText);
+  check(
+    "memory-live-activity-block",
+    hasExpectedLabel,
+    `Chat activity block shows Brain Memory activity: "${truncate(summaryText, 140)}".`
+  );
+  const collapsed = await memoryBlock.evaluate((node) => node instanceof HTMLDetailsElement && !node.open);
+  check("memory-live-activity-collapsed", collapsed, "Brain Memory activity details are collapsed by default.");
+}
+
+async function checkMemoryTimelineRail() {
+  const memoryTab = page.getByRole("button", { name: "Show memory panel", exact: true });
+  await memoryTab.click({ timeout: timeoutMs });
+  await expectAttribute(
+    "memory-live-rail-memory-active",
+    memoryTab,
+    "aria-pressed",
+    "true",
+    "Memory rail tab is active after live memory send."
+  );
+
+  const timeline = page.locator('section[aria-labelledby="memory-activity-heading"]');
+  await expectVisible(
+    "memory-live-rail-section",
+    timeline.getByText("Memory activity", { exact: true }).first(),
+    "Right-rail Memory activity section is visible."
+  );
+  await page.waitForFunction(
+    () => {
+      const section = document.querySelector('section[aria-labelledby="memory-activity-heading"]');
+      const text = section?.textContent || "";
+      return /Store|Stored memory|Brain Memory|memory/i.test(text) &&
+        section.querySelectorAll("li").length > 0;
+    },
+    null,
+    { timeout: liveSendTimeoutMs }
+  );
+  addResult("memory-live-rail-item", "pass", "Right-rail Memory timeline shows a memory activity item.");
+  const detail = timeline.locator("details").first();
+  await detail.waitFor({ state: "attached", timeout: timeoutMs });
+  const collapsed = await detail.evaluate((node) => node instanceof HTMLDetailsElement && !node.open);
+  check("memory-live-rail-details-collapsed", collapsed, "Memory timeline redacted details are collapsed by default.");
+}
+
+async function checkBrainMemoryMarkerSearch(marker) {
+  const context = await currentBrainMemoryContext();
+  if (!context) {
+    addResult("memory-live-context", "fail", "Could not derive current project/session scope from isolated browser workspace state.");
+    return;
+  }
+  addResult(
+    "memory-live-context",
+    "pass",
+    `Using current UI scope project=${context.project.stableKey}, session=${context.session?.stableKey || "none"}.`
+  );
+
+  let search = await postJson("/api/brain-memory/search", {
+    context,
+    limit: 10,
+    query: marker
+  });
+  let effectiveContext = context;
+  let markerResults = Array.isArray(search.body?.results)
+    ? search.body.results.filter((result) => JSON.stringify(result).includes(marker))
+    : [];
+  if (markerResults.length === 0 && context.project.tenantId !== "local-dev") {
+    const localDevContext = {
+      ...context,
+      project: {
+        ...context.project,
+        tenantId: "local-dev"
+      }
+    };
+    const localDevSearch = await postJson("/api/brain-memory/search", {
+      context: localDevContext,
+      limit: 10,
+      query: marker
+    });
+    const localDevMarkerResults = Array.isArray(localDevSearch.body?.results)
+      ? localDevSearch.body.results.filter((result) => JSON.stringify(result).includes(marker))
+      : [];
+    if (localDevMarkerResults.length > 0) {
+      addResult(
+        "memory-live-bff-search-ui-tenant",
+        "warn",
+        `UI tenant ${context.project.tenantId} did not return marker; Hermes MCP stored it under local-dev with the same project/session keys.`
+      );
+      search = localDevSearch;
+      effectiveContext = localDevContext;
+      markerResults = localDevMarkerResults;
+    }
+  }
+  const first = markerResults[0] ?? search.body?.results?.[0];
+  const searchOk = search.ok && search.body?.mode === "real" && markerResults.length > 0;
+  addResult(
+    "memory-live-bff-search",
+    searchOk ? "pass" : "fail",
+    searchOk
+      ? `BFF search found marker in ${markerResults.length} result(s).`
+      : `BFF search did not find marker; mode=${search.body?.mode || "unknown"}, status=${search.status || search.error || "unknown"}.`
+  );
+
+  if (!searchOk || !first?.id) {
+    return;
+  }
+
+  const inspect = await postJson("/api/brain-memory/memory/inspect", {
+    context: effectiveContext,
+    memoryId: first.id
+  });
+  const detail = inspect.body?.detail;
+  const inspectOk = inspect.ok && inspect.body?.mode === "real" && detail;
+  addResult(
+    "memory-live-bff-inspect",
+    inspectOk ? "pass" : "fail",
+    inspectOk
+      ? `BFF inspect returned detail for ${first.id}.`
+      : `BFF inspect did not return detail; mode=${inspect.body?.mode || "unknown"}, status=${inspect.status || inspect.error || "unknown"}.`
+  );
+  if (inspectOk) {
+    const scopeText = `project=${detail.projectKey || "unknown"}, session=${detail.sessionKey || "none"}, scope=${detail.scopeStatus || "unknown"}`;
+    addResult("memory-live-inspect-scope", "pass", `Inspect scope: ${scopeText}.`);
+  }
+
+  const differentProjectContext = {
+    ...effectiveContext,
+    project: {
+      ...effectiveContext.project,
+      id: `${effectiveContext.project.id}-different`,
+      stableKey: `${effectiveContext.project.stableKey}:different`
+    }
+  };
+  const differentProjectSearch = await postJson("/api/brain-memory/search", {
+    context: differentProjectContext,
+    limit: 10,
+    query: marker
+  });
+  const differentProjectResults = Array.isArray(differentProjectSearch.body?.results)
+    ? differentProjectSearch.body.results
+    : [];
+  const scopedOut = differentProjectSearch.ok &&
+    differentProjectSearch.body?.mode === "real" &&
+    differentProjectResults.length === 0;
+  addResult(
+    "memory-live-different-project-scope",
+    scopedOut ? "pass" : "fail",
+    scopedOut
+      ? "Different project search returned 0 results for marker."
+      : `Different project search returned ${differentProjectResults.length} result(s).`
+  );
 }
 
 async function runLiveStopSmoke({ message, sendButton }) {
@@ -670,7 +936,7 @@ async function checkRunHistoryStatus(expectedStatus, name) {
   return runHistory;
 }
 
-async function waitForAssistantResponse(initialAssistantCount) {
+async function waitForAssistantResponse(initialAssistantCount, expectedMarker = "UI_SMOKE_SEND_OK") {
   try {
     await page.waitForFunction(
       ({ initialCount }) => {
@@ -704,7 +970,7 @@ async function waitForAssistantResponse(initialAssistantCount) {
     }, { initialCount: initialAssistantCount });
 
     return {
-      hasMarker: text.includes("UI_SMOKE_SEND_OK"),
+      hasMarker: text.includes(expectedMarker),
       message: "Assistant response was observed.",
       ok: text.length > 0,
       preview: truncate(text, 160)
@@ -772,10 +1038,15 @@ async function checkNoHorizontalOverflow(name) {
 
 async function checkNoVisibleSecrets(name) {
   const bodyText = await page.locator("body").innerText({ timeout: timeoutMs }).catch(() => "");
-  check(
+  const match = bodyText.match(
+    /(Bearer\s+(?!\[redacted\]|token\b|strings?\b|value\b)(?=[A-Za-z0-9._~+/=-]{12,})[A-Za-z0-9._~+/=-]+|(?:api[_-]?key|apikey|token|password)\s*[:=]\s*(?!\[redacted\]|set\b|not set\b|true\b|false\b)[^,\s]+)/i
+  );
+  addResult(
     name,
-    !/(Bearer\s+[A-Za-z0-9._~+/=-]+|api[_-]?key\s*[:=]\s*[^,\s]+|token\s*[:=]\s*[^,\s]+|password\s*[:=]\s*[^,\s]+)/i.test(bodyText),
-    "No credential-like values are visible in replay/export smoke output."
+    match ? "fail" : "pass",
+    match
+      ? `Credential-like visible text matched ${truncate(match[0].replace(/(Bearer\s+).+/i, "$1[redacted]"), 80)}.`
+      : "No credential-like values are visible in replay/export smoke output."
   );
 }
 
@@ -943,6 +1214,35 @@ async function fetchJsonWithTimeout(url) {
   }
 }
 
+async function postJson(path, payload) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      body: JSON.stringify(payload),
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+      signal: controller.signal
+    });
+    const text = await response.text();
+    return {
+      body: parseJson(text),
+      ok: response.ok,
+      status: response.status
+    };
+  } catch (error) {
+    return {
+      body: null,
+      error: error instanceof Error && error.name === "AbortError" ? "timeout" : "unreachable",
+      ok: false,
+      status: 0
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function parseJson(text) {
   try {
     return JSON.parse(text);
@@ -953,6 +1253,56 @@ function parseJson(text) {
 
 function canUseLiveHermes(status) {
   return status?.mode === "real" && status.reachable === true;
+}
+
+function canUseLiveBrainMemory(status) {
+  return status?.mode === "real" && status.reachable === true;
+}
+
+async function currentBrainMemoryContext() {
+  return page.evaluate(() => {
+    const raw = window.localStorage.getItem("hermes-ui.workspace.v1");
+    if (!raw) {
+      return null;
+    }
+    const state = JSON.parse(raw);
+    const project = state.projects?.find((item) => item.id === state.activeProjectId);
+    const session = state.sessions?.find((item) => item.id === state.activeSessionId);
+    if (!project || !session) {
+      return null;
+    }
+    return {
+      project: {
+        contextPolicy: project.memoryScope?.contextPolicy || "balanced",
+        id: project.id,
+        retrievalProfile: project.memoryScope?.retrievalProfile || "balanced",
+        stableKey: project.memoryScope?.stableProjectKey || project.memoryScopeKey || project.id,
+        tenantId: project.memoryScope?.tenantId || "tenant-local",
+        title: project.name
+      },
+      session: {
+        id: session.id,
+        includeProjectContext: session.memoryScope?.includeProjectContext !== false,
+        includeSessionContext: session.memoryScope?.includeSessionContext !== false,
+        stableKey: session.memoryScope?.stableSessionKey || session.id,
+        title: session.title
+      },
+      ui: {
+        source: "hermes-ui",
+        workspaceVersion: 1
+      }
+    };
+  });
+}
+
+function timestampMarker() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}`;
+}
+
+function randomMarker() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
 function safeDisplayUrl(value) {

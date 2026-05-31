@@ -29,6 +29,7 @@ type AgentActivityBlockProps = {
 type ActivityGroup = {
   id: string;
   events: AgentActivityEvent[];
+  key: string;
   primary: AgentActivityEvent;
 };
 
@@ -175,13 +176,14 @@ function groupActivityEvents(events: AgentActivityEvent[]): ActivityGroup[] {
   for (const event of events) {
     const key = groupKey(event);
     const previous = groups.at(-1);
-    if (previous && previous.id === key) {
+    if (previous && previous.key === key) {
       previous.events.push(event);
       previous.primary = choosePrimary(previous.events);
     } else {
       groups.push({
         events: [event],
-        id: key,
+        id: `${key}:${groups.length}`,
+        key,
         primary: event
       });
     }

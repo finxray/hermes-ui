@@ -547,6 +547,23 @@ path, Hermes streaming logic change, Brain Memory BFF change, or env secret
 commit was added. The next recommended slice is Slice 15D: add an opt-in
 UI-driven Brain Memory timeline smoke for live store/search events.
 
+## Checkpoint: Slice 15D UI live Brain Memory timeline smoke
+
+Slice 15D passed an opt-in UI-driven live Brain Memory timeline smoke on
+2026-05-31 and recorded the result in
+`docs/checkpoints/UI_MEMORY_TIMELINE_LIVE_SMOKE_15D.md`. The smoke runs through
+the visible Web UI composer, verifies a Brain Memory activity block in chat,
+verifies the right-rail Memory timeline, and confirms the live marker through
+Gateway-mediated BFF search/inspect. The smoke currently records a tenant
+alignment warning: the UI workspace tenant is `tenant-local`, while Hermes MCP
+stores through the Gateway under `local-dev`; the same project/session stable
+keys are preserved and different-project search remains negative. No Brain
+Memory mutation/admin UI, direct browser-to-Gateway/storage path, direct
+browser-to-Hermes path, Hermes streaming logic change, Brain Memory BFF change,
+or env secret commit was added. The next recommended slice is Slice 15E: align
+the live Brain Memory tenant/scope contract between the Web UI workspace context
+and Hermes MCP, then make the 15D smoke a strict same-tenant assertion.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

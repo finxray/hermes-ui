@@ -88,7 +88,7 @@ export function createActivityEventFromHermesToolEvent(
   const artifact = getArtifactData(payload, status);
 
   return {
-    id: makeActivityId(classification.type, event.name, payload, options),
+    id: makeActivityId(classification.type, `${event.name}-${event.status}`, payload, options),
     type: classification.type,
     status,
     title,
@@ -134,7 +134,7 @@ export function createActivityEventFromHermesRunEvent(
   const artifact = getArtifactData(payload, status);
 
   return {
-    id: makeActivityId(type, eventType, payload, options),
+    id: makeActivityId(type, `${eventType}-${event.status}`, payload, options),
     type,
     status,
     title: titleFromEventType(eventType, type),
@@ -166,7 +166,7 @@ export function createActivityEventFromHermesApprovalEvent(
   const occurredAt = getPayloadTime(payload) ?? options.now;
 
   return {
-    id: makeActivityId("approval", eventType, payload, options),
+    id: makeActivityId("approval", `${eventType}-${event.status}`, payload, options),
     type: "approval",
     status,
     title: titleFromEventType(eventType, "approval"),
@@ -796,7 +796,7 @@ function makeActivityId(
     asString(payload.message_id) ||
     asString(payload.seq);
   if (stable) {
-    return `activity-${type}-${stable}`;
+    return `activity-${type}-${normalizeName(name) || "event"}-${stable}`;
   }
   const suffix = options.now ?? Date.now().toString(36);
   return `activity-${type}-${normalizeName(name) || "event"}-${suffix}`;

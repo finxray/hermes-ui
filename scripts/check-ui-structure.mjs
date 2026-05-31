@@ -33,6 +33,7 @@ const requiredFiles = [
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts",
+  "apps/web/src/lib/hermesRunsReplayPreview.ts",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
   "apps/web/src/app/api/hermes/runs/stop-probe/route.ts",
@@ -40,6 +41,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md",
+  "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -227,6 +229,11 @@ const hermesRunsReplayReconciliation = existsSync(
 )
   ? readFileSync(join(root, "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md"), "utf8")
   : "";
+const hermesRunsRunRecordReplayCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -246,6 +253,10 @@ const hermesRunsMemoryProbeRoute = readFileSync(
 );
 const hermesRunsExperimentalChatRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts"),
+  "utf8"
+);
+const hermesRunsReplayPreviewSource = readFileSync(
+  join(root, "apps/web/src/lib/hermesRunsReplayPreview.ts"),
   "utf8"
 );
 const hermesRunsStopProbeRoute = readFileSync(
@@ -1003,6 +1014,61 @@ for (const token of [
 ]) {
   if (!hermesRunsReplayReconciliation.includes(token)) {
     failures.push(`Hermes Runs replay reconciliation doc is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "createRunRecordFromHermesRunsResult",
+  "RUNS_REPLAY_EXCLUDED_FIELDS",
+  "createActivityEventFromHermesRunsEvent",
+  "createPersistedActivityEvent",
+  "limitPersistedActivityEvents",
+  "runRecordPreview",
+  "activityReplayPreview",
+  "per-token message.delta replay rows",
+  "rawRunsPayloadPersisted: false",
+  "replayGeneratedFrom: \"normalized-run-probe-events\""
+]) {
+  if (!hermesRunsReplayPreviewSource.includes(token)) {
+    failures.push(`Hermes Runs replay preview helper is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "createRunRecordFromHermesRunsResult",
+  "runRecordPreview",
+  "activityReplayPreview",
+  "replayExcludedFields"
+]) {
+  if (!hermesRunsExperimentalChatRoute.includes(token)) {
+    failures.push(`Experimental Runs chat route is missing replay preview token: ${token}`);
+  }
+}
+
+for (const token of [
+  "validateRunRecordReplayShape",
+  "runRecordPreview.hermesRunId",
+  "message.delta was persisted as a replay row",
+  "rawRunsPayloadPersisted",
+  "unredacted bearer value"
+]) {
+  if (!hermesRunsExperimentalChatScript.includes(token)) {
+    failures.push(`Experimental Runs chat smoke is missing replay validation token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs RunRecord Replay Prototype 16K",
+  "runRecordPreview",
+  "activityReplayPreview",
+  "per-token `message.delta` replay rows",
+  "Production chat still uses `/api/hermes/chat/stream`.",
+  "Experimental Runs remains flag-gated",
+  "No direct browser-to-Hermes path was added.",
+  "composer Agent access selector was not implemented"
+]) {
+  if (!hermesRunsRunRecordReplayCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs RunRecord replay checkpoint is missing token: ${token}`);
   }
 }
 

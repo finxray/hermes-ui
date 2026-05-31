@@ -6,6 +6,7 @@ import {
   type HermesChatRequest
 } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { createRunRecordFromHermesRunsResult } from "@/lib/hermesRunsReplayPreview";
 import { buildMemoryScopeBridgeInstruction } from "@/lib/memoryScopeBridge";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,15 @@ export async function POST(request: Request) {
     }
   );
 
-  return NextResponse.json(result, {
+  const replayPrototype = createRunRecordFromHermesRunsResult(result);
+
+  return NextResponse.json({
+    ...result,
+    activityReplayPreview: replayPrototype.activityReplayPreview,
+    activitySummary: replayPrototype.activitySummary,
+    replayExcludedFields: replayPrototype.replayExcludedFields,
+    runRecordPreview: replayPrototype.runRecordPreview
+  }, {
     headers: {
       "Cache-Control": "no-store"
     }

@@ -39,6 +39,12 @@ if (!result.ok) {
 const report = result.body;
 printReport(report);
 
+const shapeValidation = validateRunRecordReplayShape(report);
+if (!shapeValidation.ok) {
+  console.error(`Experimental Hermes Runs replay shape failed: ${shapeValidation.message}`);
+  process.exit(1);
+}
+
 if (report?.ok && report.mode === "success" && outputIncludesExpected(report)) {
   process.exit(0);
 }
@@ -166,6 +172,11 @@ function printReport(report) {
   console.log(`- approvalEvents: ${report.counts?.approvalEvents ?? 0}`);
   console.log(`- assistantTextPreview: ${report.assistantTextPreview || "none"}`);
   console.log(`- outputPreview: ${report.outputPreview || "none"}`);
+  console.log(`- runRecordPreview: ${report.runRecordPreview ? "present" : "none"}`);
+  console.log(`- runRecordPreview.id: ${report.runRecordPreview?.id ?? "none"}`);
+  console.log(`- runRecordPreview.hermesRunId: ${report.runRecordPreview?.hermesRunId ?? "none"}`);
+  console.log(`- activityReplayPreview: ${report.activityReplayPreview?.length ?? 0}`);
+  console.log(`- replayExcludedFields: ${report.replayExcludedFields?.length ?? 0}`);
   console.log(`- browserDirectHermes: ${String(report.safety?.browserDirectHermes ?? true)}`);
   console.log(`- browserDirectBrainMemory: ${String(report.safety?.browserDirectBrainMemory ?? true)}`);
   console.log(`- directStorageAccess: ${String(report.safety?.directStorageAccess ?? true)}`);
@@ -178,6 +189,75 @@ function printReport(report) {
 function outputIncludesExpected(report) {
   const text = `${report.assistantTextPreview || ""}\n${report.outputPreview || ""}`;
   return text.includes(EXPECTED_TEXT);
+}
+
+function validateRunRecordReplayShape(report) {
+  if (!report || report.mode !== "success") {
+    return { ok: true, message: "Shape validation skipped for non-success result." };
+  }
+  const record = report.runRecordPreview;
+  const replay = Array.isArray(report.activityReplayPreview) ? report.activityReplayPreview : [];
+  if (!record) {
+    return { ok: false, message: "runRecordPreview is missing." };
+  }
+  if (!record.id || record.id === report.runId) {
+    return { ok: false, message: "runRecordPreview.id must be a local id distinct from the Hermes run id." };
+  }
+  if (record.hermesRunId !== report.runId) {
+    return { ok: false, message: "runRecordPreview.hermesRunId does not match runId." };
+  }
+  if (record.hermesSessionId !== report.context?.hermesSessionId) {
+    return { ok: false, message: "runRecordPreview.hermesSessionId does not match context." };
+  }
+  if (record.projectId !== report.context?.projectId || record.sessionId !== report.context?.sessionId) {
+    return { ok: false, message: "runRecordPreview project/session ids do not match context." };
+  }
+  if (record.status !== "completed") {
+    return { ok: false, message: `runRecordPreview status should be completed, got ${record.status}.` };
+  }
+  if (record.sourceChannel !== "web-ui") {
+    return { ok: false, message: "runRecordPreview sourceChannel should be web-ui." };
+  }
+  if (!Array.isArray(record.activityReplay) || record.activityReplay.length !== replay.length) {
+    return { ok: false, message: "runRecordPreview.activityReplay must match activityReplayPreview." };
+  }
+  if (replay.length > 40) {
+    return { ok: false, message: "activityReplayPreview exceeds the persisted replay bound." };
+  }
+  if (replay.some((event) => event?.hermes?.eventType === "message.delta")) {
+    return { ok: false, message: "message.delta was persisted as a replay row." };
+  }
+  if (!Array.isArray(report.replayExcludedFields) || !report.replayExcludedFields.includes("per-token message.delta replay rows")) {
+    return { ok: false, message: "replayExcludedFields does not document message.delta exclusion." };
+  }
+  if (!activitySummaryMatches(record.activitySummary, report.activitySummary)) {
+    return { ok: false, message: "activitySummary does not match runRecordPreview.activitySummary." };
+  }
+  if (record.activitySummary.toolCount !== (report.activitySummary?.toolCount ?? 0)) {
+    return { ok: false, message: "tool activity count is incoherent." };
+  }
+  const serialized = JSON.stringify({ replay, record });
+  if (serialized.includes("message.delta")) {
+    return { ok: false, message: "message.delta appeared in persisted replay JSON." };
+  }
+  if (serialized.includes("rawReasoningTextRendered\":true")) {
+    return { ok: false, message: "hidden reasoning text render flag was persisted as true." };
+  }
+  if (/chain[_-]?of[_-]?thought|private reasoning|hidden reasoning/i.test(serialized)) {
+    return { ok: false, message: "reasoning-like private text appeared in persisted replay." };
+  }
+  if (/\bBearer\s+(?!\[redacted\])[A-Za-z0-9._~+/=-]+/i.test(serialized)) {
+    return { ok: false, message: "unredacted bearer value appeared in persisted replay." };
+  }
+  if (record.metadata?.rawRunsPayloadPersisted !== false) {
+    return { ok: false, message: "runRecordPreview metadata must state raw Runs payloads are not persisted." };
+  }
+  return { ok: true, message: "RunRecord/replay shape is valid." };
+}
+
+function activitySummaryMatches(left, right) {
+  const keys = ["toolCount", "memoryCount", "commandCount", "approvalCount", "errorCount"];
+  return keys.every((key) => Number(left?.[key] ?? 0) === Number(right?.[key] ?? 0));
 }
 
 function makeContext(parsed) {

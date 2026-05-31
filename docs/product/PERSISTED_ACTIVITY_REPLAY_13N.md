@@ -258,6 +258,25 @@ Rules for future Runs replay:
 
 See `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`.
 
+## Slice 16K Runs Prototype Update
+
+Slice 16K uses the existing persisted replay helpers for the experimental Runs
+preview:
+
+```text
+Runs observed event summary -> AgentActivityEvent -> PersistedActivityEvent
+```
+
+The experimental response includes `activityReplayPreview` and
+`replayExcludedFields`. The preview persists safe public activity rows such as
+`reasoning.available` and `run.completed`, but it excludes per-token
+`message.delta` replay rows, raw Runs payloads, full outputs, secrets, action
+handles, and hidden reasoning text.
+
+The replay preview is display-only response data. No backend persistence,
+localStorage write, export/import, rerun, or approval action behavior was
+added.
+
 ## Next Recommended Slice
 
 Slice 13P - Local Export Download And Import Validation Contract.

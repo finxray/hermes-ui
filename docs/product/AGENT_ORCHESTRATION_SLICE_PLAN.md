@@ -421,14 +421,32 @@ Deliver:
 - no production chat switch, composer Agent access selector, approval buttons,
   provider/model switching, direct browser-to-Hermes path, or memory admin UI.
 
+### 16K - Experimental Runs RunRecord/Replay Prototype
+
+Goal: produce a Web UI-compatible `RunRecord` and bounded replay preview from
+the existing experimental Runs BFF route without switching production chat to
+Runs.
+
+Status: completed in Slice 16K. See
+`docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md`.
+
+Deliver:
+
+- `runRecordPreview` on the feature-flagged experimental Runs response;
+- `activityReplayPreview` from normalized Runs activity;
+- `activitySummary` and `replayExcludedFields`;
+- smoke validation that `message.delta` is not persisted as replay rows;
+- no production chat switch, composer Agent access selector, approval buttons,
+  provider/model switching, direct browser-to-Hermes path, or memory admin UI.
+
 ## Recommended Next Slice
 
-Slice 16K - Experimental Runs RunRecord/replay prototype.
+Slice 16L - Gated Runs replay UI hydration experiment.
 
 Reason:
 
-- Slice 16J establishes that the existing local run history and persisted
-  replay schema can carry Runs-derived records.
-- The next safe step is a disabled-by-default prototype that creates and
-  replays a local Runs-backed `RunRecord` without replacing the session stream
-  default.
+- Slice 16K proves the experimental BFF can produce a Web UI-compatible
+  `RunRecord` and bounded replay preview.
+- The next safe step is a disabled experimental UI hydration path that inserts
+  this preview into local workspace state for inspection while preserving the
+  session stream default.

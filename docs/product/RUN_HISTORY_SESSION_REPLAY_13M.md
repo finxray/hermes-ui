@@ -229,3 +229,16 @@ with future cross-channel records, and preserves rollback to
 payloads and per-token `message.delta` rows should not be persisted.
 
 See `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`.
+
+## Slice 16K Runs Prototype Update
+
+Slice 16K adds a `runRecordPreview` to the experimental Runs BFF response
+without writing it to local workspace state. The preview uses a local
+`run-preview-*` id, stores Hermes `run_id` in `hermesRunId`, preserves
+structured project/session/Hermes session context, sets `sourceChannel:
+"web-ui"`, maps the final Hermes status to `RunRecord.status`, and attaches a
+bounded redacted `activityReplay[]` preview.
+
+This proves the existing `RunRecord` shape can carry a Runs-backed prototype,
+but production chat still uses `/api/hermes/chat/stream` and the production
+composer does not hydrate this preview yet.

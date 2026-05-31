@@ -307,3 +307,20 @@ Reason: 16J establishes that the current local history/replay schema can carry
 Runs-derived records. The next safe step is a disabled-by-default prototype
 that creates and replays a local Runs-backed `RunRecord` without replacing the
 session stream default.
+
+## Slice 16K Prototype Update
+
+Slice 16K added the first disabled-by-default data-shape prototype for this
+contract. `POST /api/hermes/runs/experimental-chat`, when
+`HERMES_UI_EXPERIMENTAL_RUNS_MODE=true`, now returns a `runRecordPreview`,
+`activityReplayPreview`, `activitySummary`, and `replayExcludedFields`.
+
+The preview keeps `RunRecord.id` local, stores Hermes `run_id` in
+`hermesRunId`, derives `activityReplay[]` through
+`createActivityEventFromHermesRunsEvent` and `createPersistedActivityEvent`,
+and excludes per-token `message.delta` replay rows, raw Runs payloads, secrets,
+action handles, full outputs, and hidden reasoning text.
+
+Production chat still uses `/api/hermes/chat/stream`, and no production
+composer switch was added. See
+`docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md`.

@@ -992,6 +992,23 @@ composer Agent access selector was added. See
 `docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md`. The next
 recommended slice is Slice 16K: experimental Runs RunRecord/replay prototype.
 
+## Checkpoint: Slice 16K Hermes Runs RunRecord/replay prototype
+
+Slice 16K extended the disabled-by-default experimental Runs BFF route so a
+successful `POST /api/hermes/runs/experimental-chat` response includes
+`runRecordPreview`, `activityReplayPreview`, `activitySummary`, and
+`replayExcludedFields`. The preview keeps a local Web UI `RunRecord.id`, stores
+Hermes `run_id` in `hermesRunId`, builds replay through normalized
+`AgentActivityEvent` and persisted replay helpers, and excludes per-token
+`message.delta` rows, raw Runs payloads, secrets, action handles, full outputs,
+and hidden reasoning text. Production chat still uses
+`/api/hermes/chat/stream`; experimental Runs remains flag-gated; no direct
+browser-to-Hermes/Gateway path, storage path, memory admin UI, approval
+buttons, provider/model switching, or composer Agent access selector was
+added. See
+`docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md`. The next
+recommended slice is Slice 16L: gated Runs replay UI hydration experiment.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

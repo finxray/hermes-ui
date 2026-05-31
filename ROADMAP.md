@@ -1244,6 +1244,22 @@ mutation/admin UI, export/import runtime, direct browser-to-Hermes/Gateway
 path, or direct storage path was added. The next recommended slice is Slice
 17D: publish-ready release notes and local handoff package manifest.
 
+## Checkpoint: Slice 17D local handoff release notes
+
+Slice 17D adds publish-ready local/demo RC handoff docs:
+`docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md`,
+`docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md`, and
+`docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md`. These docs summarize the
+suggested `v0.1.0-local-rc.1` release name, supported modes, verification
+commands, local handoff contents, private developer setup path, known
+limitations, deferred features, and non-claimable production features.
+
+This slice does not create a public release, archive, production installer,
+one-command package, export/import runtime, production Runs default, Agent
+access selector UI, approval buttons, memory mutation/admin UI, direct
+browser-to-service path, or direct storage path. The next recommended slice is
+Slice 17E: local handoff dry-run review and issue triage checklist.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -15,6 +15,10 @@ Hermes, Brain Memory, Docker, systemd, `~/.hermes`, or local secrets.
   `docs/release/RELEASE_DECISION_17B.md`.
 - [ ] For the Slice 17C comprehensive E2E pass, review
   `docs/release/MVP_COMPREHENSIVE_E2E_17C.md`.
+- [ ] For the Slice 17D local handoff pass, review
+  `docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md`,
+  `docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md`, and
+  `docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md`.
 
 ## 2. Install / Build Gate
 
@@ -158,4 +162,7 @@ candidate-specific copy. Slice 17A records the audit posture in
 `docs/release/RELEASE_DECISION_17A.md`; Slice 17B records the final MVP RC
 browser/live smoke decision in `docs/release/RELEASE_DECISION_17B.md`; Slice
 17C records the comprehensive MVP E2E verification in
-`docs/release/MVP_COMPREHENSIVE_E2E_17C.md`.
+`docs/release/MVP_COMPREHENSIVE_E2E_17C.md`; Slice 17D records the local RC
+release notes and handoff package manifest in
+`docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md` and
+`docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md`.

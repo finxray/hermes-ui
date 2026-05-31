@@ -24,7 +24,11 @@ const docs = {
   studioWeb14J: readText("docs/packaging/STUDIO_WEB_DEV_14J.md"),
   mvpCompletionAudit17A: readText("docs/release/MVP_COMPLETION_AUDIT_17A.md"),
   finalMvpLiveSmokeChecklist17A: readText("docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md"),
-  releaseDecision17A: readText("docs/release/RELEASE_DECISION_17A.md")
+  releaseDecision17A: readText("docs/release/RELEASE_DECISION_17A.md"),
+  mvpComprehensiveE2e17C: readText("docs/release/MVP_COMPREHENSIVE_E2E_17C.md"),
+  mvpLocalRcReleaseNotes17D: readText("docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md"),
+  localHandoffManifest17D: readText("docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md"),
+  privateDeveloperHandoff17D: readText("docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md")
 };
 
 const scripts = {
@@ -75,7 +79,11 @@ function checkRequiredDocs() {
     "docs/checkpoints/UI_INTERACTION_SMOKE_12E.md",
     "docs/release/MVP_COMPLETION_AUDIT_17A.md",
     "docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md",
-    "docs/release/RELEASE_DECISION_17A.md"
+    "docs/release/RELEASE_DECISION_17A.md",
+    "docs/release/MVP_COMPREHENSIVE_E2E_17C.md",
+    "docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md",
+    "docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md",
+    "docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md"
   ];
 
   for (const path of required) {
@@ -182,7 +190,11 @@ function checkReadmeLinks() {
     "docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md",
     "docs/packaging/PACKAGING_READINESS_14K.md",
     "docs/release/MVP_COMPLETION_AUDIT_17A.md",
-    "docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md"
+    "docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md",
+    "docs/release/MVP_COMPREHENSIVE_E2E_17C.md",
+    "docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md",
+    "docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md",
+    "docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md"
   ];
   for (const link of expected) {
     passIf(`readme-link:${link}`, docs.readme.includes(link), `README links ${link}.`);
@@ -226,6 +238,99 @@ function checkPackagingDocs() {
   passIf("runbook:release-check", docs.mvpRunbook.includes("npm run release:check"), "MVP runbook documents release:check.");
   passIf("startup:studio-web", docs.localStartupGuide.includes("npm run studio:web"), "Local startup guide uses studio:web.");
   checkMvpCompletionDocs();
+  checkLocalHandoffDocs();
+}
+
+function checkLocalHandoffDocs() {
+  const releaseNotes = docs.mvpLocalRcReleaseNotes17D;
+  const manifest = docs.localHandoffManifest17D;
+  const handoff = docs.privateDeveloperHandoff17D;
+
+  passIf(
+    "handoff-release-notes:release-name",
+    releaseNotes.includes("v0.1.0-local-rc.1") && releaseNotes.includes("local/demo RC"),
+    "17D release notes include local RC release name and posture."
+  );
+  passIf(
+    "handoff-release-notes:not-production",
+    /not\s+production-ready/i.test(releaseNotes) &&
+      /not\s+a\s+public\s+beta/i.test(releaseNotes) &&
+      /not\s+the\s+final\s+one-command/i.test(releaseNotes),
+    "17D release notes state this is not production/public/final one-command."
+  );
+  passIf(
+    "handoff-release-notes:supported-modes",
+    releaseNotes.includes("Web UI local/demo with mock Brain Memory") &&
+      releaseNotes.includes("Web UI + Hermes live") &&
+      releaseNotes.includes("Brain Memory attach-later") &&
+      releaseNotes.includes("Runs diagnostics/guarded experimental"),
+    "17D release notes list supported modes."
+  );
+  passIf(
+    "handoff-release-notes:deferred-boundaries",
+    releaseNotes.includes("export/import") &&
+      releaseNotes.includes("Production Runs remains deferred") &&
+      releaseNotes.includes("memory mutation/admin") &&
+      releaseNotes.includes("Browser code calls only the Web UI BFF"),
+    "17D release notes keep deferred features and BFF boundaries explicit."
+  );
+
+  passIf(
+    "handoff-manifest:commands",
+    manifest.includes("npm install") &&
+      manifest.includes("npm run studio:web -- --port 3002 --open") &&
+      manifest.includes("npm run studio:launch -- --check --base-url http://127.0.0.1:3002") &&
+      manifest.includes("npm run release:check") &&
+      manifest.includes("npm run smoke:ui:send") &&
+      manifest.includes("npm run smoke:ui:stop"),
+    "17D handoff manifest includes key commands."
+  );
+  passIf(
+    "handoff-manifest:do-not-commit",
+    manifest.includes("apps/web/.env.local") &&
+      manifest.includes("API keys") &&
+      manifest.includes(".codex-smoke-logs") &&
+      manifest.includes(".next"),
+    "17D handoff manifest lists files that must not be committed."
+  );
+  passIf(
+    "handoff-manifest:caveats",
+    manifest.includes("Stale Next servers") &&
+      manifest.includes("healthy selected base URL") &&
+      manifest.includes("Brain Memory live claims require") &&
+      manifest.includes("Runs is experimental/diagnostic only"),
+    "17D handoff manifest documents operational caveats."
+  );
+  passIf(
+    "handoff-manifest:not-release-artifact",
+    manifest.includes("does not create a package archive") &&
+      manifest.includes("implement export/import") &&
+      manifest.includes("change runtime behavior"),
+    "17D handoff manifest avoids archive/export/runtime claims."
+  );
+
+  passIf(
+    "private-handoff:setup-and-smoke",
+    handoff.includes("npm install") &&
+      handoff.includes("npm run studio:web -- --port 3002 --open") &&
+      handoff.includes("npm run smoke:ui -- --base-url http://127.0.0.1:3002"),
+    "17D private developer handoff includes setup and first smoke path."
+  );
+  passIf(
+    "private-handoff:attach-services",
+    handoff.includes("Attach Hermes") &&
+      handoff.includes("Attach Brain Memory Later") &&
+      handoff.includes("BFF env/key posture"),
+    "17D private developer handoff explains Hermes and Brain Memory attachment."
+  );
+  passIf(
+    "private-handoff:do-not-touch",
+    handoff.includes("direct browser-to-Hermes") &&
+      handoff.includes("memory mutation/admin controls") &&
+      handoff.includes("production Runs default") &&
+      handoff.includes("secrets or env files"),
+    "17D private developer handoff lists protected areas."
+  );
 }
 
 function checkMvpCompletionDocs() {
@@ -305,7 +410,10 @@ function checkSecretSafety() {
     "docs/packaging/PACKAGING_READINESS_14K.md": docs.readiness,
     "docs/packaging/PACKAGING_MODES.md": docs.packagingModes,
     "docs/packaging/ONE_COMMAND_CLI_PLAN.md": docs.oneCommandPlan,
+    "docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md": docs.localHandoffManifest17D,
     "docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md": docs.mvpRunbook,
+    "docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md": docs.mvpLocalRcReleaseNotes17D,
+    "docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md": docs.privateDeveloperHandoff17D,
     "scripts/studio-launch.mjs": scripts.studioLaunch,
     "scripts/studio-web-dev.mjs": scripts.studioWeb,
     "scripts/mvp-smoke.mjs": scripts.mvpSmoke,

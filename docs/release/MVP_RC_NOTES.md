@@ -189,6 +189,16 @@ node scripts/mvp-smoke.mjs --require-hermes --require-brain-memory --base-url ht
 
 ## Recommended Release Decision
 
+Slice 17D adds publish-ready local/demo RC handoff docs:
+
+- `docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md`
+- `docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md`
+- `docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md`
+
+These documents are for local/demo RC and private technical handoff only. They
+do not create a public GitHub release, production installer, release archive,
+export/import runtime, or final one-command package.
+
 Slice 17C records the comprehensive MVP E2E verification run:
 
 - `docs/release/MVP_COMPREHENSIVE_E2E_17C.md`

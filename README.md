@@ -75,7 +75,11 @@ Memory services.
 
 For release preparation, see `docs/release/MANUAL_RC_CHECKLIST.md` and
 `docs/release/RELEASE_NOTES_TEMPLATE.md`. Current MVP candidate notes live in
-`docs/release/MVP_RC_NOTES.md`. Slice 17A records the MVP completion audit and
+`docs/release/MVP_RC_NOTES.md`. Slice 17D adds the local RC release notes,
+handoff manifest, and private developer handoff guide:
+`docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md`,
+`docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md`, and
+`docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md`. Slice 17A records the MVP completion audit and
 final live smoke checklist in `docs/release/MVP_COMPLETION_AUDIT_17A.md` and
 `docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`. Slice 17B records the
 final MVP RC browser/live smoke decision in

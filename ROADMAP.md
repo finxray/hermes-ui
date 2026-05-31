@@ -738,6 +738,24 @@ change, Brain Memory BFF change, or secret commit was added. The next
 recommended slice is Slice 15O: add non-invasive long-session measurement
 reporting, then choose the first scalable-loading runtime slice.
 
+## Checkpoint: Slice 15O long-session measurement report
+
+Slice 15O added stable measurement reporting for the long-session fixture on
+2026-05-31. `npm run smoke:long-session` now supports `--json`, `--verbose`,
+and optional `--budget-strict`, and reports route load, navigation timings,
+rendered transcript/sidebar/detail counts, transcript scroll dimensions,
+scroll down/up timing, right-rail tab switch timing, horizontal overflow,
+service-call count, browser/network error counts, and total duration. The
+measurement report in `docs/performance/LONG_SESSION_MEASUREMENT_15O.md`
+recorded 120 transcript messages, 100 sidebar sessions, 0 px overflow, 0
+service calls, and acceptable scroll/tab timing, but also found the collapsed
+export preview builds about 494 KB of JSON on the default Context tab. No
+runtime infinite scroll, virtualization, pagination, context compaction,
+backend export/import, Hermes streaming change, Brain Memory BFF change, or
+secret commit was added. The next recommended slice is Slice 15P: lazily
+construct local export preview JSON only when the Preview JSON detail is
+opened.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

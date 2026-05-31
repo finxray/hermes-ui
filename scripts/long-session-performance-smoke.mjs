@@ -6,10 +6,27 @@ import { preflightStaticChunks, printSelectedBaseUrl, selectedBaseUrl } from "./
 const args = parseArgs(process.argv.slice(2));
 const baseUrl = selectedBaseUrl(args.baseUrl);
 const timeoutMs = 15_000;
+const runStartedAt = Date.now();
+const budget = {
+  routeLoadWarnMs: 5_000,
+  scrollActionWarnMs: 100,
+  tabSwitchWarnMs: 500
+};
 const report = {
   baseUrl,
+  budget,
   checks: [],
-  metrics: {},
+  metrics: {
+    browserErrorCount: 0,
+    networkErrorCount: 0,
+    serviceCallCount: 0,
+    totalDurationMs: 0
+  },
+  mode: {
+    budgetStrict: args.budgetStrict,
+    headed: args.headed,
+    verbose: args.verbose
+  },
   summary: {
     failed: 0,
     passed: 0,
@@ -39,6 +56,7 @@ async function main() {
       failName: "static-assets-preflight",
       timeoutMs
     });
+    report.metrics.staticChunkCount = staticPreflight.assets?.length ?? undefined;
     if (!staticPreflight.ok) {
       finalize();
       return;
@@ -84,15 +102,18 @@ async function main() {
       return;
     }
     await page.waitForLoadState("load", { timeout: timeoutMs });
-    const loadMs = Date.now() - startedAt;
-    report.metrics.loadMs = loadMs;
-    addResult("route-load", "pass", `Long-session fixture route loaded in ${loadMs}ms.`);
+    const routeLoadMs = Date.now() - startedAt;
+    report.metrics.routeLoadMs = routeLoadMs;
+    report.metrics.navigationTiming = await collectNavigationTiming();
+    addResult("route-load", "pass", `Long-session fixture route loaded in ${routeLoadMs}ms.`);
+    addTimingWarning("route-load-budget", routeLoadMs, budget.routeLoadWarnMs, "Route load");
 
     await checkFixtureChrome();
     await checkTranscriptScale();
     await checkRailAndDetails();
     await checkSidebarScale();
     await checkScrollResponsiveness();
+    await checkRightRailTabSwitching();
     await checkNoHorizontalOverflow("long-session-fixture-overflow");
     checkNoServiceCalls();
     checkBrowserIssues();
@@ -142,7 +163,19 @@ async function checkTranscriptScale() {
   const transcript = page.getByLabel("Chat transcript", { exact: true });
   await expectVisible("fixture-transcript-visible", transcript, "Existing chat transcript is visible.");
   const messageCount = await transcript.locator("article").count();
-  report.metrics.renderedMessages = messageCount;
+  const transcriptMetrics = await page.evaluate(() => {
+    const transcript = document.querySelector('[aria-label="Chat transcript"]');
+    if (!(transcript instanceof HTMLElement)) {
+      return null;
+    }
+    return {
+      clientHeight: transcript.clientHeight,
+      scrollHeight: transcript.scrollHeight,
+      scrollTop: transcript.scrollTop
+    };
+  });
+  report.metrics.renderedMessageCount = messageCount;
+  report.metrics.transcript = transcriptMetrics;
   check("fixture-message-count", messageCount === 120, `Rendered ${messageCount} transcript message articles.`);
   await expectVisible(
     "fixture-last-message-visible-after-scroll",
@@ -154,13 +187,18 @@ async function checkTranscriptScale() {
 async function checkRailAndDetails() {
   const detailsCount = await page.locator("details").count();
   const openDetailsCount = await page.locator("details[open]").count();
-  report.metrics.detailsCount = detailsCount;
+  report.metrics.renderedDetailsCount = detailsCount;
   report.metrics.openDetailsCount = openDetailsCount;
   check("fixture-details-present", detailsCount >= 2, `Found ${detailsCount} collapsible detail region(s).`);
   check(
     "fixture-details-collapsed-by-default",
     openDetailsCount === 0,
     `Open detail regions by default: ${openDetailsCount}.`
+  );
+  check(
+    "fixture-details-not-all-expanded",
+    detailsCount > 0 && openDetailsCount < detailsCount,
+    `Details open=${openDetailsCount}, total=${detailsCount}.`
   );
   await expectVisible(
     "fixture-run-history-visible",
@@ -172,13 +210,15 @@ async function checkRailAndDetails() {
     page.getByText("Export preview", { exact: true }),
     "Export preview section is visible and collapsed details remain closed."
   );
+  report.metrics.contextRail = await collectContextRailMetrics();
 }
 
 async function checkSidebarScale() {
   const projectRows = await page.locator('section[aria-labelledby="projects-heading"] > ul > li').count();
   const sessionRows = await page.locator('section[aria-labelledby="projects-heading"] ul ul li').count();
-  report.metrics.sidebarProjects = projectRows;
-  report.metrics.sidebarSessions = sessionRows;
+  report.metrics.renderedSidebarProjectCount = projectRows;
+  report.metrics.renderedSidebarSessionCount = sessionRows;
+  report.metrics.renderedSidebarRowCount = projectRows + sessionRows;
   check("fixture-sidebar-project-count", projectRows === 5, `Rendered ${projectRows} project group(s).`);
   check("fixture-sidebar-session-count", sessionRows === 100, `Rendered ${sessionRows} sidebar session row(s).`);
 }
@@ -189,38 +229,141 @@ async function checkScrollResponsiveness() {
     if (!(transcript instanceof HTMLElement)) {
       return { ok: false, reason: "missing transcript" };
     }
-    const startedAt = performance.now();
+
+    const before = {
+      clientHeight: transcript.clientHeight,
+      scrollHeight: transcript.scrollHeight,
+      scrollTop: transcript.scrollTop
+    };
+    const downStartedAt = performance.now();
     transcript.scrollTop = transcript.scrollHeight;
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const elapsedMs = performance.now() - startedAt;
+    const downMs = performance.now() - downStartedAt;
+    const downTop = transcript.scrollTop;
+
+    const upStartedAt = performance.now();
+    transcript.scrollTop = 0;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const upMs = performance.now() - upStartedAt;
+
     return {
-      elapsedMs,
-      ok: transcript.scrollTop > 0
+      before,
+      downMs,
+      downTop,
+      ok: downTop > 0 && transcript.scrollTop === 0,
+      upMs
     };
   });
-  report.metrics.scrollFrameMs = result.elapsedMs;
+  report.metrics.scroll = result;
+  const maxScrollMs = Math.max(result.downMs ?? 0, result.upMs ?? 0);
   check(
     "fixture-scroll-responsive",
-    result.ok && result.elapsedMs < 100,
+    result.ok === true,
     result.ok
-      ? `Transcript scroll responded in ${Math.round(result.elapsedMs)}ms.`
+      ? `Transcript scroll down/up responded in ${Math.round(result.downMs)}ms / ${Math.round(result.upMs)}ms.`
       : `Transcript scroll check failed: ${result.reason ?? "unknown"}.`
   );
+  addTimingWarning("fixture-scroll-budget", maxScrollMs, budget.scrollActionWarnMs, "Transcript scroll action");
+}
+
+async function checkRightRailTabSwitching() {
+  const tabs = [
+    { label: "Show memory panel", marker: "Memory search", name: "memory" },
+    { label: "Show tools panel", marker: "Recent commands", name: "tools" },
+    { label: "Show files panel", marker: "Files and artifacts", name: "files" },
+    { label: "Show context panel", marker: "Run history", name: "context" }
+  ];
+  const metrics = [];
+
+  for (const tab of tabs) {
+    const result = await switchRightRailTab(tab);
+    metrics.push({ name: tab.name, ...result });
+    if (!result.ok) {
+      addResult(`fixture-tab-${tab.name}`, "fail", result.reason);
+      continue;
+    }
+    addResult(
+      `fixture-tab-${tab.name}`,
+      "pass",
+      `${tab.name} tab switched in ${Math.round(result.elapsedMs)}ms.`
+    );
+    addTimingWarning(
+      `fixture-tab-${tab.name}-budget`,
+      result.elapsedMs,
+      budget.tabSwitchWarnMs,
+      `${tab.name} tab switch`
+    );
+  }
+
+  report.metrics.rightRailTabSwitches = metrics;
+}
+
+async function switchRightRailTab(tab) {
+  try {
+    const button = page.getByRole("button", { name: tab.label, exact: true });
+    const startedAt = Date.now();
+    await button.click({ timeout: timeoutMs });
+    await page.getByText(tab.marker, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
+    return {
+      elapsedMs: Date.now() - startedAt,
+      ok: true
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `${tab.name} tab did not become visible: ${safeErrorMessage(error)}`
+    };
+  }
 }
 
 async function checkNoHorizontalOverflow(name) {
   const sizes = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
+    overflowPx: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
     scrollWidth: document.documentElement.scrollWidth
   }));
+  report.metrics.horizontalOverflow = sizes;
   check(
     name,
-    sizes.scrollWidth <= sizes.clientWidth + 1,
+    sizes.overflowPx <= 1,
     `Document width ${sizes.scrollWidth}px fits viewport ${sizes.clientWidth}px.`
   );
 }
 
+async function collectNavigationTiming() {
+  return page.evaluate(() => {
+    const entry = performance.getEntriesByType("navigation")[0];
+    if (!entry) {
+      return null;
+    }
+    return {
+      domContentLoadedMs: Math.round(entry.domContentLoadedEventEnd),
+      loadEventMs: Math.round(entry.loadEventEnd),
+      responseEndMs: Math.round(entry.responseEnd),
+      transferSize: "transferSize" in entry ? entry.transferSize : undefined
+    };
+  });
+}
+
+async function collectContextRailMetrics() {
+  return page.evaluate(() => {
+    const runHistory = document.querySelector('[aria-labelledby="run-history-heading"]');
+    const replay = document.querySelector('[aria-label="Persisted activity replay"]');
+    const retrievedMemory = document.querySelector('[aria-labelledby="retrieved-memory-heading"]');
+    const exportPreview = document.querySelector('[aria-labelledby="export-preview-heading"]');
+    const exportJson = exportPreview?.querySelector("pre");
+    return {
+      exportJsonChars: exportJson?.textContent?.length ?? 0,
+      exportPreviewDetailsOpen: exportPreview?.querySelector("details")?.hasAttribute("open") ?? false,
+      persistedReplayRows: replay?.querySelectorAll("li").length ?? 0,
+      retrievedMemoryRows: retrievedMemory?.querySelectorAll("li").length ?? 0,
+      runRows: runHistory?.querySelectorAll("button").length ?? 0
+    };
+  });
+}
+
 function checkNoServiceCalls() {
+  report.metrics.serviceCallCount = serviceCalls.length;
   if (serviceCalls.length === 0) {
     addResult("fixture-no-service-calls", "pass", "Fixture route made no BFF, Hermes, Brain Memory, or direct storage service calls.");
     return;
@@ -229,6 +372,8 @@ function checkNoServiceCalls() {
 }
 
 function checkBrowserIssues() {
+  report.metrics.browserErrorCount = browserIssues.length;
+  report.metrics.networkErrorCount = networkIssues.length;
   const issues = [...browserIssues, ...networkIssues];
   if (issues.length === 0) {
     addResult("fixture-browser-errors", "pass", "No browser console, page, or network errors were captured.");
@@ -250,6 +395,23 @@ function check(name, ok, message) {
   addResult(name, ok ? "pass" : "fail", message);
 }
 
+function addTimingWarning(name, actualMs, thresholdMs, label) {
+  if (typeof actualMs !== "number" || !Number.isFinite(actualMs)) {
+    addResult(name, "warn", `${label} timing was unavailable.`);
+    return;
+  }
+  const ok = actualMs <= thresholdMs;
+  if (args.budgetStrict) {
+    addResult(name, ok ? "pass" : "fail", `${label} ${Math.round(actualMs)}ms; threshold ${thresholdMs}ms.`);
+    return;
+  }
+  addResult(
+    name,
+    ok ? "pass" : "warn",
+    `${label} ${Math.round(actualMs)}ms; warning threshold ${thresholdMs}ms.`
+  );
+}
+
 function addResult(name, status, message) {
   report.checks.push({ message, name, status });
   if (!args.json) {
@@ -258,6 +420,7 @@ function addResult(name, status, message) {
 }
 
 function finalize() {
+  report.metrics.totalDurationMs = Date.now() - runStartedAt;
   report.summary.passed = report.checks.filter((check) => check.status === "pass").length;
   report.summary.warned = report.checks.filter((check) => check.status === "warn").length;
   report.summary.failed = report.checks.filter((check) => check.status === "fail").length;
@@ -265,6 +428,7 @@ function finalize() {
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));
   } else {
+    printMetricSummary();
     console.log("");
     console.log(
       `Long-session performance smoke summary: ${report.summary.passed} passed, ${report.summary.warned} warnings, ${report.summary.failed} failed.`
@@ -274,12 +438,35 @@ function finalize() {
   process.exitCode = report.summary.failed > 0 ? 1 : 0;
 }
 
+function printMetricSummary() {
+  if (!args.verbose) {
+    return;
+  }
+  console.log("");
+  console.log("Long-session measurement metrics:");
+  for (const [key, value] of Object.entries(report.metrics)) {
+    console.log(`- ${key}: ${formatMetricValue(value)}`);
+  }
+}
+
+function formatMetricValue(value) {
+  if (value === undefined) {
+    return "unavailable";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
 function parseArgs(values) {
   const parsed = {
     baseUrl: "",
+    budgetStrict: false,
     headed: false,
     json: false,
-    unknown: []
+    unknown: [],
+    verbose: false
   };
 
   for (let index = 0; index < values.length; index += 1) {
@@ -289,10 +476,14 @@ function parseArgs(values) {
       index += 1;
     } else if (arg.startsWith("--base-url=")) {
       parsed.baseUrl = arg.slice("--base-url=".length);
+    } else if (arg === "--budget-strict") {
+      parsed.budgetStrict = true;
     } else if (arg === "--headed") {
       parsed.headed = true;
     } else if (arg === "--json") {
       parsed.json = true;
+    } else if (arg === "--verbose") {
+      parsed.verbose = true;
     } else {
       parsed.unknown.push(arg);
     }

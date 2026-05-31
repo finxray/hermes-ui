@@ -20,6 +20,13 @@ Slice 15N adds the first measurement baseline in
 fixture measures current long-session behavior before this roadmap changes any
 runtime loading behavior.
 
+Slice 15O adds the first measured report in
+`docs/performance/LONG_SESSION_MEASUREMENT_15O.md`. The fixture currently
+renders and scrolls 120 transcript messages and 100 sidebar sessions
+acceptably, while the collapsed export preview still constructs about 494 KB
+of JSON on the default Context tab. The first recommended runtime target is
+lazy construction of export preview JSON, not transcript virtualization.
+
 ## Why It Matters
 
 Brain Memory Studio is expected to accumulate:
@@ -137,6 +144,6 @@ Slice 15M does not implement:
 
 ## Next Recommended Slice
 
-After the Slice 15N measurement baseline, add non-invasive measurement
-reporting for the long-session fixture and then choose the first runtime
-scalable-loading slice based on the measured bottleneck.
+After the Slice 15O measurement report, start with lazy construction of the
+local export preview JSON. Keep it local-only and do not add backend export,
+import, runtime pagination, infinite scroll, or virtualization in that slice.

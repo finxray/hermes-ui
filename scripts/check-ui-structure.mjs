@@ -120,6 +120,14 @@ const longSessionPlan = readFileSync(
   join(root, "docs/performance/LONG_SESSION_PERFORMANCE_PLAN_15N.md"),
   "utf8"
 );
+const longSessionMeasurement = readFileSync(
+  join(root, "docs/performance/LONG_SESSION_MEASUREMENT_15O.md"),
+  "utf8"
+);
+const scalableLoadingRoadmap = readFileSync(
+  join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
+  "utf8"
+);
 const packageJson = readFileSync(join(root, "package.json"), "utf8");
 
 for (const token of [
@@ -219,7 +227,13 @@ for (const token of [
   "fixture-details-collapsed-by-default",
   "fixture-message-count",
   "fixture-sidebar-session-count",
-  "/design/long-session-fixture"
+  "/design/long-session-fixture",
+  "routeLoadMs",
+  "renderedMessageCount",
+  "renderedSidebarRowCount",
+  "rightRailTabSwitches",
+  "--budget-strict",
+  "--verbose"
 ]) {
   if (!longSessionSmoke.includes(token)) {
     failures.push(`Long-session smoke is missing ${token}`);
@@ -235,6 +249,29 @@ for (const token of [
 ]) {
   if (!longSessionPlan.includes(token)) {
     failures.push(`Long-session performance plan is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "Long-Session Measurement Report 15O",
+  "Export preview lazy construction",
+  "494,133 characters",
+  "--json",
+  "--budget-strict",
+  "Slice 15P"
+]) {
+  if (!longSessionMeasurement.includes(token)) {
+    failures.push(`Long-session measurement report is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "LONG_SESSION_MEASUREMENT_15O.md",
+  "lazy construction of export preview JSON",
+  "not transcript virtualization"
+]) {
+  if (!scalableLoadingRoadmap.includes(token)) {
+    failures.push(`Scalable UI loading roadmap is missing 15O measurement link token: ${token}`);
   }
 }
 

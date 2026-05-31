@@ -34,6 +34,7 @@ const requiredFiles = [
   "apps/web/src/app/api/hermes/runs/approval-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/experimental-chat/route.ts",
   "apps/web/src/lib/hermesRunsReplayPreview.ts",
+  "scripts/hermes-runs-replay-ui-smoke.mjs",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
   "apps/web/src/app/api/hermes/runs/stop-probe/route.ts",
@@ -42,6 +43,7 @@ const requiredFiles = [
   "docs/checkpoints/HERMES_RUNS_DEFAULT_DECISION_16H.md",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_ENV_HARDENING_16I.md",
   "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md",
+  "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md",
   "docs/architecture/HERMES_RUNS_REPLAY_RECONCILIATION_16J.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
   "docs/checkpoints/HERMES_RUNS_EXPERIMENTAL_MODE_16G.md",
@@ -234,6 +236,11 @@ const hermesRunsRunRecordReplayCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md"), "utf8")
   : "";
+const hermesRunsReplayUiHydrationCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -271,6 +278,9 @@ const hermesRunsApprovalProbeScript = existsSync(join(root, "scripts/hermes-runs
   : "";
 const hermesRunsExperimentalChatScript = existsSync(join(root, "scripts/hermes-runs-experimental-chat.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-experimental-chat.mjs"), "utf8")
+  : "";
+const hermesRunsReplayUiSmokeScript = existsSync(join(root, "scripts/hermes-runs-replay-ui-smoke.mjs"))
+  ? readFileSync(join(root, "scripts/hermes-runs-replay-ui-smoke.mjs"), "utf8")
   : "";
 const hermesRunsMemoryProbeScript = existsSync(join(root, "scripts/hermes-runs-memory-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-memory-probe.mjs"), "utf8")
@@ -966,6 +976,10 @@ if (!packageJson.includes("\"smoke:hermes:runs:experimental-chat\"")) {
   failures.push("package.json is missing smoke:hermes:runs:experimental-chat script.");
 }
 
+if (!packageJson.includes("\"smoke:hermes:runs:replay-ui\"")) {
+  failures.push("package.json is missing smoke:hermes:runs:replay-ui script.");
+}
+
 if (!packageJson.includes("\"smoke:hermes:runs:stop\"")) {
   failures.push("package.json is missing smoke:hermes:runs:stop script.");
 }
@@ -1058,6 +1072,28 @@ for (const token of [
 }
 
 for (const token of [
+  "/api/hermes/runs/experimental-chat",
+  "--expect-disabled",
+  "--require-hermes",
+  "--base-url",
+  "HERMES_RUNS_REPLAY_UI_OK",
+  "runRecordPreview",
+  "activityReplayPreview",
+  "localStorage.setItem",
+  "hermes-ui.workspace.v1",
+  "Run history",
+  "hermesRunId",
+  "Persisted replay",
+  "message.delta",
+  "No direct browser-to-Hermes",
+  "composer Agent access selector"
+]) {
+  if (!hermesRunsReplayUiSmokeScript.includes(token) && !hermesRunsReplayUiHydrationCheckpoint.includes(token)) {
+    failures.push(`Runs replay UI hydration coverage is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "Hermes Runs RunRecord Replay Prototype 16K",
   "runRecordPreview",
   "activityReplayPreview",
@@ -1069,6 +1105,27 @@ for (const token of [
 ]) {
   if (!hermesRunsRunRecordReplayCheckpoint.includes(token)) {
     failures.push(`Hermes Runs RunRecord replay checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "Hermes Runs Replay UI Hydration 16L",
+  "Option A",
+  "test-only browser smoke hydration",
+  "runRecordPreview",
+  "activityReplayPreview",
+  "localStorage",
+  "Run history",
+  "hermesRunId",
+  "Persisted replay",
+  "message.delta",
+  "Production chat still uses `/api/hermes/chat/stream`.",
+  "Experimental Runs remains flag-gated",
+  "No direct browser-to-Hermes path was added.",
+  "composer Agent access selector was not implemented"
+]) {
+  if (!hermesRunsReplayUiHydrationCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs replay UI hydration checkpoint is missing token: ${token}`);
   }
 }
 

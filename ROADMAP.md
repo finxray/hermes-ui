@@ -1009,6 +1009,25 @@ added. See
 `docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md`. The next
 recommended slice is Slice 16L: gated Runs replay UI hydration experiment.
 
+## Checkpoint: Slice 16L Hermes Runs replay UI hydration
+
+Slice 16L added an Option A, test-only Playwright hydration smoke for the
+experimental Runs preview shape. `npm run smoke:hermes:runs:replay-ui` calls
+the feature-flagged `/api/hermes/runs/experimental-chat` BFF route, validates
+`runRecordPreview` and `activityReplayPreview`, injects them into an isolated
+local workspace state, reloads `/`, and verifies the existing Run history and
+Persisted replay UI render the Runs-backed record with visible `hermesRunId`,
+`completed` status, activity summary metrics, bounded replay rows, no
+per-token `message.delta` replay rows, no hidden reasoning text, no secrets,
+and no horizontal overflow. Production chat still uses
+`/api/hermes/chat/stream`; experimental Runs remains flag-gated; no direct
+browser-to-Hermes/Gateway path, storage path, memory admin UI, approval
+buttons, provider/model switching, or composer Agent access selector was
+added. See
+`docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md`. The next
+recommended slice is Slice 16M: gated production Runs execution state machine
+contract.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

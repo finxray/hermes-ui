@@ -48,6 +48,7 @@ checkMemoryScopeBridgeTenant();
 checkNormalizationFillsMemoryScopes();
 checkNormalizationFillsTitleMetadata();
 checkRunRecordPersistence();
+checkRunsReplayPreviewHydrationPersistence();
 checkSessionExportPreview();
 checkArchiveRepairsActiveSession();
 checkResetReturnsValidState();
@@ -521,6 +522,98 @@ function checkRunRecordPersistence() {
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].status, "info");
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].sourceChannel, "telegram");
   assert(!JSON.stringify(normalizedMalformed.sessions[0].runRecords[0].activityReplay).includes("abc123"));
+}
+
+function checkRunsReplayPreviewHydrationPersistence() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const project = state.projects.find((item) => item.id === session.projectId);
+  assert(project, "Runs preview hydration check needs an active project");
+  const stableProjectKey = project.memoryScope.stableProjectKey;
+  const stableSessionKey = session.memoryScope.stableSessionKey;
+  const hermesSessionId = session.hermesSessionId;
+
+  state = workspaceReducer(state, {
+    type: "appendRunRecord",
+    sessionId: session.id,
+    run: {
+      id: "run-preview-check",
+      projectId: session.projectId,
+      sessionId: session.id,
+      hermesSessionId,
+      hermesRunId: "run_hermes_preview_check",
+      sourceChannel: "web-ui",
+      status: "completed",
+      startedAt: "2026-05-31T10:00:00.000Z",
+      completedAt: "2026-05-31T10:00:01.000Z",
+      durationMs: 1000,
+      summary: "Runs-backed replay preview",
+      metadata: {
+        rawRunsPayloadPersisted: false,
+        replayGeneratedFrom: "normalized-run-probe-events",
+        runsNonDeltaEventTypes: ["reasoning.available", "run.completed"]
+      },
+      activityEventIds: ["runs-preview-reasoning", "runs-preview-completed"],
+      activitySummary: {
+        approvalCount: 0,
+        commandCount: 0,
+        errorCount: 0,
+        memoryCount: 0,
+        toolCount: 0
+      },
+      activityReplay: [
+        {
+          id: "runs-preview-reasoning",
+          runId: "run-preview-check",
+          type: "reasoning",
+          status: "info",
+          title: "Thinking signal received",
+          summary: "[omitted: reasoning text not rendered]",
+          collapsedByDefault: true,
+          source: "hermes",
+          sourceChannel: "web-ui",
+          hermes: {
+            eventType: "reasoning.available",
+            runId: "run_hermes_preview_check",
+            sessionId: hermesSessionId
+          },
+          metadata: {
+            rawReasoningTextRendered: false
+          }
+        },
+        {
+          id: "runs-preview-completed",
+          runId: "run-preview-check",
+          type: "status",
+          status: "completed",
+          title: "Run completed",
+          collapsedByDefault: true,
+          source: "hermes",
+          sourceChannel: "web-ui",
+          hermes: {
+            eventType: "run.completed",
+            runId: "run_hermes_preview_check",
+            sessionId: hermesSessionId
+          }
+        }
+      ]
+    }
+  });
+
+  const updated = state.sessions.find((item) => item.id === session.id);
+  const record = updated?.runRecords[0];
+  assert.equal(record?.id, "run-preview-check");
+  assert.equal(record?.hermesRunId, "run_hermes_preview_check");
+  assert.equal(record?.sourceChannel, "web-ui");
+  assert.equal(record?.status, "completed");
+  assert.equal(record?.metadata?.rawRunsPayloadPersisted, false);
+  assert.equal(record?.activityReplay.length, 2);
+  assert(record?.activityReplay.every((event) => event.sourceChannel === "web-ui"));
+  assert(!JSON.stringify(record).includes("message.delta"));
+  assert(!JSON.stringify(record).includes("Authorization: Bearer"));
+  assert.equal(project.memoryScope.stableProjectKey, stableProjectKey);
+  assert.equal(updated?.memoryScope.stableSessionKey, stableSessionKey);
+  assert.equal(updated?.hermesSessionId, hermesSessionId);
 }
 
 function checkSessionExportPreview() {

@@ -324,3 +324,18 @@ action handles, full outputs, and hidden reasoning text.
 Production chat still uses `/api/hermes/chat/stream`, and no production
 composer switch was added. See
 `docs/checkpoints/HERMES_RUNS_RUNRECORD_REPLAY_PROTOTYPE_16K.md`.
+
+## Slice 16L Hydration Update
+
+Slice 16L added an Option A, test-only browser smoke hydration path for the
+16K preview shape. `npm run smoke:hermes:runs:replay-ui` calls the
+feature-flagged BFF route, validates `runRecordPreview` and
+`activityReplayPreview`, seeds an isolated Playwright `localStorage` workspace,
+reloads `/`, and verifies the existing Run history and Persisted replay UI
+render the Runs-backed record.
+
+This remains a smoke/test path only. Production chat still uses
+`/api/hermes/chat/stream`; experimental Runs remains flag-gated; no direct
+browser-to-Hermes or browser-to-Gateway path was added; and the composer Agent
+access selector was not implemented. See
+`docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md`.

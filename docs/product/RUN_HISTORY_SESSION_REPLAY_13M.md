@@ -242,3 +242,15 @@ bounded redacted `activityReplay[]` preview.
 This proves the existing `RunRecord` shape can carry a Runs-backed prototype,
 but production chat still uses `/api/hermes/chat/stream` and the production
 composer does not hydrate this preview yet.
+
+## Slice 16L Runs Replay UI Hydration Update
+
+Slice 16L adds a test-only Playwright hydration smoke for the Slice 16K preview
+shape. The smoke calls the feature-flagged experimental Runs BFF route, injects
+the returned `runRecordPreview` into an isolated local workspace state, reloads
+the normal production root, and verifies the existing Run history displays the
+Runs-backed record with visible `hermesRunId`, `completed` status, activity
+summary metrics, and persisted replay rows.
+
+This does not change the production composer. Production chat still uses
+`/api/hermes/chat/stream`, and experimental Runs remains flag-gated.

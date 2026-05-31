@@ -439,14 +439,34 @@ Deliver:
 - no production chat switch, composer Agent access selector, approval buttons,
   provider/model switching, direct browser-to-Hermes path, or memory admin UI.
 
+### 16L - Gated Runs Replay UI Hydration Experiment
+
+Goal: prove the experimental Runs preview can hydrate the existing Run history
+and Persisted replay UI through a test-only path.
+
+Status: completed in Slice 16L. See
+`docs/checkpoints/HERMES_RUNS_REPLAY_UI_HYDRATION_16L.md`.
+
+Deliver:
+
+- `npm run smoke:hermes:runs:replay-ui`;
+- disabled-state check for flag-off behavior with no run and no hydration;
+- enabled live smoke that calls `/api/hermes/runs/experimental-chat`;
+- isolated Playwright `localStorage` hydration of `runRecordPreview` and
+  `activityReplayPreview`;
+- Run history verification for visible `hermesRunId`, `completed` status,
+  activity summary, and persisted replay rows;
+- no production chat switch, composer Agent access selector, approval buttons,
+  provider/model switching, direct browser-to-Hermes path, or memory admin UI.
+
 ## Recommended Next Slice
 
-Slice 16L - Gated Runs replay UI hydration experiment.
+Slice 16M - gated production Runs execution state machine contract.
 
 Reason:
 
-- Slice 16K proves the experimental BFF can produce a Web UI-compatible
-  `RunRecord` and bounded replay preview.
-- The next safe step is a disabled experimental UI hydration path that inserts
-  this preview into local workspace state for inspection while preserving the
-  session stream default.
+- Slice 16L proves the existing UI can render a Runs-backed record after
+  isolated test hydration.
+- The next safe step is to define the future flag-gated production state
+  machine for create/update/complete/stop/reconcile behavior before wiring it
+  into the composer.

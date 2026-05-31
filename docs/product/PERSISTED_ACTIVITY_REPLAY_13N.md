@@ -277,6 +277,17 @@ The replay preview is display-only response data. No backend persistence,
 localStorage write, export/import, rerun, or approval action behavior was
 added.
 
+## Slice 16L Runs Replay UI Hydration Update
+
+Slice 16L verifies that `activityReplayPreview` can render through the existing
+Persisted replay UI after isolated test hydration. The new smoke checks that
+bounded replay rows are visible, `message.delta` is not shown as per-token
+replay rows, hidden/private reasoning text is not rendered, no secrets are
+visible, and no horizontal overflow appears.
+
+The localStorage write is owned by the Playwright smoke only. The production UI
+does not yet hydrate Runs previews from the composer path.
+
 ## Next Recommended Slice
 
 Slice 13P - Local Export Download And Import Validation Contract.

@@ -77,8 +77,10 @@ For release preparation, see `docs/release/MANUAL_RC_CHECKLIST.md` and
 `docs/release/RELEASE_NOTES_TEMPLATE.md`. Current MVP candidate notes live in
 `docs/release/MVP_RC_NOTES.md`. Slice 17A records the MVP completion audit and
 final live smoke checklist in `docs/release/MVP_COMPLETION_AUDIT_17A.md` and
-`docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`. Read-only Brain Memory
-release claims should also follow
+`docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`. Slice 17B records the
+final MVP RC browser/live smoke decision in
+`docs/release/RELEASE_DECISION_17B.md`. Read-only Brain Memory release claims
+should also follow
 `docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
 
 The MVP production execution path is still the Hermes session stream through

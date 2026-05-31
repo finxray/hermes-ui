@@ -1212,6 +1212,22 @@ cross-channel discovery, and production installer work remain deferred. The
 next recommended slice is Slice 17B: final RC browser/live smoke run and
 decision record.
 
+## Checkpoint: Slice 17B final MVP RC browser/live smoke decision
+
+Slice 17B ran the final MVP RC smoke pass against
+`http://127.0.0.1:3002` and records the decision in
+`docs/release/RELEASE_DECISION_17B.md`. The decision is MVP complete with
+known limitations for the local/demo RC: non-live checks passed, browser smokes
+passed, live Hermes send/stop passed, and Brain Memory live Gateway claims
+remain unavailable because the Web UI BFF was configured for mock/unconfigured
+Brain Memory mode.
+
+Production chat still uses `/api/hermes/chat/stream`; production Runs remains
+deferred/post-MVP; no Agent access selector UI, approval buttons, memory
+mutation/admin UI, export/import runtime, direct browser-to-Hermes/Gateway
+path, or direct storage path was added. The next recommended slice is Slice
+17C: publish-ready release notes and local handoff package manifest.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

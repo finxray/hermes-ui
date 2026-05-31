@@ -11,6 +11,8 @@ Hermes, Brain Memory, Docker, systemd, `~/.hermes`, or local secrets.
 - [ ] Run `git log --oneline -n 5`.
 - [ ] Record the candidate commit in `docs/release/RELEASE_DECISION_RECORD.md`
   or a copied decision record.
+- [ ] For the Slice 17B MVP RC pass, review
+  `docs/release/RELEASE_DECISION_17B.md`.
 
 ## 2. Install / Build Gate
 
@@ -150,5 +152,6 @@ Deferred features that must remain named when relevant:
 - scalable infinite/progressive loading runtime.
 
 Record the final decision in `docs/release/RELEASE_DECISION_RECORD.md` or a
-candidate-specific copy. Slice 17A records the current audit posture in
-`docs/release/RELEASE_DECISION_17A.md`.
+candidate-specific copy. Slice 17A records the audit posture in
+`docs/release/RELEASE_DECISION_17A.md`; Slice 17B records the final MVP RC
+browser/live smoke decision in `docs/release/RELEASE_DECISION_17B.md`.

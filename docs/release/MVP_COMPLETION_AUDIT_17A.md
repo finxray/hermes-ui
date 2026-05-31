@@ -171,6 +171,10 @@ is unavailable, record it as blocked or unconfigured.
 
 Recommendation: **conditionally complete**.
 
+Slice 17B resolved the 17A browser/live gap. See
+`docs/release/RELEASE_DECISION_17B.md` for the final RC smoke result and
+decision: MVP complete with known limitations.
+
 The MVP is complete for a local/demo RC when:
 
 1. the default non-live gate passes;

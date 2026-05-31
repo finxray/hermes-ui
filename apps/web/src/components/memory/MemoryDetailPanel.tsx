@@ -27,7 +27,7 @@ export function MemoryDetailPanel({
   return (
     <section className={styles.section} aria-labelledby="memory-detail-heading">
       <div className={styles.sectionLabel} id="memory-detail-heading">
-        <span>Memory detail</span>
+        <span>Read-only detail</span>
         <button
           aria-label="Close memory detail"
           className={styles.iconButton}
@@ -98,7 +98,7 @@ function GatewayMemoryDetail({
   return (
     <div className={styles.detailPanel}>
       <div className={styles.cardTitle}>
-        <span>{detail.id}</span>
+        <span>Scoped result</span>
         <span className={styles.pill}>{detail.scopeStatus ?? "scoped"}</span>
       </div>
       <div className={styles.detailContent}>{detail.content}</div>
@@ -113,23 +113,24 @@ function GatewayMemoryDetail({
         <ContextField label="Evidence count" value={String(detail.evidenceCount ?? 0)} />
         <ContextField label="Created" value={detail.createdAt ?? "unknown"} />
         <ContextField label="Updated" value={detail.updatedAt ?? "unknown"} />
+        <ContextField label="Audit" value="Metadata only" />
       </div>
       {detail.scope ? <ScopeSummary scope={detail.scope} /> : null}
       <ReadOnlyStatusSection
         label="Evidence"
         status={evidence?.status}
-        emptyText="Evidence storage is not implemented yet."
+        emptyText="Evidence: not implemented by Gateway yet."
         count={evidence?.evidence.length ?? 0}
       />
       <ReadOnlyStatusSection
         label="Supersession chain"
         status={supersession?.status}
-        emptyText="Supersession chain storage is not implemented yet."
+        emptyText="Supersession chain: not implemented by Gateway yet."
         count={supersession?.chain.length ?? 0}
       />
       {detail.metadata ? (
         <details className={styles.metadata}>
-          <summary>Metadata</summary>
+          <summary>Audit metadata</summary>
           <pre>{JSON.stringify(detail.metadata, null, 2)}</pre>
         </details>
       ) : null}

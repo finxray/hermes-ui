@@ -135,6 +135,16 @@ read-only BFF-backed memory inspect hook.
 If Gateway is mock/unconfigured or the timeline item has no `memoryId`, the
 detail action is hidden. No new backend route was added.
 
+Slice 15I follow-up:
+
+- Gateway-backed detail is labelled `Read-only detail` and `Scoped result`.
+- Evidence currently returns `status=not_implemented` with an empty evidence
+  array and the UI says `Evidence: not implemented by Gateway yet.`
+- Supersession-chain currently returns `status=not_implemented` with an empty
+  chain and the UI says `Supersession chain: not implemented by Gateway yet.`
+- Audit is metadata-only for now; there is no durable audit trail endpoint in
+  the current UI read contract.
+
 ## Redaction
 
 Timeline details are collapsed by default and redacted before display. The

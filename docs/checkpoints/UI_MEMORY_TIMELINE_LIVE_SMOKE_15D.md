@@ -121,6 +121,14 @@ Slice 15E follow-up:
 - `npm run smoke:ui:memory-live` is now strict same-tenant and no longer uses
   the 15D fallback.
 
+Slice 15I follow-up:
+
+- `npm run smoke:ui:memory-live` now also opens the Gateway-backed Memory
+  detail panel for the live marker.
+- The smoke verifies read-only detail wording, scoped-result wording,
+  `not_implemented` evidence copy, `not_implemented` supersession-chain copy,
+  metadata-only audit copy, and absence of mutation/admin action labels.
+
 ## Route Matrix
 
 | Route | Result |

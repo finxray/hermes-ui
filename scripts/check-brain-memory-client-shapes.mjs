@@ -28,6 +28,7 @@ const secretValues = ["ui-secret-for-test", "tenant-secret-for-test"];
 await checkUnconfiguredInspect();
 await checkHttpErrorMessages();
 await checkInspectNormalizationAndNoSecretLeakage();
+await checkMissingEvidenceSupersessionNormalization();
 await checkSearchScopeNormalization();
 
 console.log("Brain Memory client shape checks passed.");
@@ -138,13 +139,72 @@ async function checkInspectNormalizationAndNoSecretLeakage() {
   assert.equal(response.detail?.supersessionStatus, "active");
   assert.equal(response.detail?.scope?.legacyUnscopedExcluded, 2);
   assert.equal(response.evidence?.status, "not_implemented");
+  assert.deepEqual(response.evidence?.evidence, []);
   assert.equal(response.supersession?.status, "not_implemented");
+  assert.deepEqual(response.supersession?.chain, []);
   assert.equal(calls.length, 3);
   assert(calls[0].url.includes("tenantId=local-dev"));
   assert(calls[0].url.includes("projectKey=brain-memory"));
   assert(calls[0].url.includes("sessionKey=slice-08d-scope-bridge"));
   assert.equal(calls[0].headers.get("Authorization"), `Bearer ${secretValues[0]}`);
   assert.equal(calls[0].headers.get("X-Gateway-Memory-Api-Key"), secretValues[1]);
+  assertNoSecrets(response);
+}
+
+async function checkMissingEvidenceSupersessionNormalization() {
+  const response = await inspectBrainMemory(
+    {
+      baseUrl: "http://brain-memory.test",
+      enabled: true,
+      fetchImpl: async (url) => {
+        if (String(url).includes("/evidence")) {
+          return jsonResponse(200, {
+            memory_id: "memory-2",
+            status: "not_implemented"
+          });
+        }
+        if (String(url).includes("/supersession-chain")) {
+          return jsonResponse(200, {
+            memory_id: "memory-2",
+            status: "not_implemented"
+          });
+        }
+        return jsonResponse(200, {
+          memory: {
+            memory_id: "memory-2",
+            full_content: "Nested detail content",
+            layer: "semantic",
+            project_key: "brain-memory",
+            session_key: "slice-08d-scope-bridge",
+            scope_status: "matching-session",
+            supersession_status: "active",
+            evidence_count: 0,
+            created_at: "2026-05-31T00:00:00Z",
+            updated_at: "2026-05-31T00:00:00Z"
+          },
+          scope: {
+            tenant_id: "local-dev",
+            project_key: "brain-memory",
+            session_key: "slice-08d-scope-bridge",
+            mode: "project-and-session",
+            status: "enforced"
+          }
+        });
+      },
+      gatewayMemoryApiKey: secretValues[1],
+      uiApiKey: secretValues[0]
+    },
+    { context, memoryId: "memory-2" }
+  );
+
+  assert.equal(response.mode, "real");
+  assert.equal(response.detail?.id, "memory-2");
+  assert.equal(response.detail?.layer, "semantic");
+  assert.equal(response.detail?.scope?.tenantId, "local-dev");
+  assert.equal(response.evidence?.status, "not_implemented");
+  assert.deepEqual(response.evidence?.evidence, []);
+  assert.equal(response.supersession?.status, "not_implemented");
+  assert.deepEqual(response.supersession?.chain, []);
   assertNoSecrets(response);
 }
 

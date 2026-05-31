@@ -623,6 +623,23 @@ was added. See
 slice is Slice 15I: define the read-only Memory detail/evidence/supersession/audit
 contract for Gateway-backed results, keeping mutation/admin controls deferred.
 
+## Checkpoint: Slice 15I read-only memory detail contract
+
+Slice 15I defined the Gateway-backed read-only Memory detail contract on
+2026-05-31. Detail is implemented through the existing BFF inspect route and is
+labelled as read-only/scoped in the UI. Evidence and supersession-chain remain
+honest `not_implemented` Gateway states with empty arrays, and audit is
+metadata-only because there is no durable audit endpoint in the current UI read
+contract. Regression coverage now checks normalized not_implemented payloads,
+missing evidence/supersession arrays, wrong-scope safe detail errors, live
+detail UI wording, and absence of mutation/admin labels. No Brain Memory
+mutation/admin UI, direct browser-to-Gateway/storage path, direct
+browser-to-Hermes path, tenant loosening, Hermes streaming change, Brain
+Memory BFF logic change, or secret commit was added. See
+`docs/product/MEMORY_DETAIL_CONTRACT_15I.md`. The next recommended slice is
+Slice 15J: add a read-only Memory detail fixture and non-live browser smoke for
+detail/evidence/supersession/audit UI states.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

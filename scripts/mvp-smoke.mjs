@@ -114,6 +114,7 @@ async function checkSourceSmokeTargets() {
     "apps/web/src/components/chat/Composer.tsx",
     "apps/web/src/lib/memoryTimeline.ts",
     "docs/product/BRAIN_MEMORY_EVENT_TIMELINE_13K.md",
+    "docs/product/MEMORY_DETAIL_CONTRACT_15I.md",
     "docs/product/COMMAND_EXECUTION_DETAILS_13L.md",
     "docs/product/PROVIDER_MODEL_SELECTOR_13J.md"
   ];
@@ -132,6 +133,8 @@ async function checkSourceSmokeTargets() {
   const contextRail = readFile("apps/web/src/components/shell/ContextRail.tsx");
   const tenantDiagnostics = readFile("apps/web/src/lib/tenantScopeDiagnostics.ts");
   const memoryConsole = readFile("apps/web/src/components/memory/BrainMemoryConsole.tsx");
+  const memoryDetailPanel = readFile("apps/web/src/components/memory/MemoryDetailPanel.tsx");
+  const memoryDetailContract = readFile("docs/product/MEMORY_DETAIL_CONTRACT_15I.md");
   const memoryTimeline = readFile("apps/web/src/lib/memoryTimeline.ts");
   const composer = readFile("apps/web/src/components/chat/Composer.tsx");
   const uiSmoke = readFile("scripts/ui-interaction-smoke.mjs");
@@ -209,6 +212,33 @@ async function checkSourceSmokeTargets() {
       !memoryTimeline.includes("localStorage") &&
       !memoryConsole.includes("/api/brain-memory"),
     "Memory timeline derives from activity events without direct Gateway/storage calls."
+  );
+  checkSource(
+    "ui:memory-detail-contract",
+    memoryDetailContract.includes("Memory detail") &&
+      memoryDetailContract.includes("Evidence") &&
+      memoryDetailContract.includes("Supersession chain") &&
+      memoryDetailContract.includes("Audit") &&
+      memoryDetailContract.includes("not_implemented"),
+    "Read-only memory detail contract documents detail, evidence, supersession, and audit posture."
+  );
+  checkSource(
+    "ui:memory-detail-honest-placeholders",
+    memoryDetailPanel.includes("Read-only detail") &&
+      memoryDetailPanel.includes("Scoped result") &&
+      memoryDetailPanel.includes("Evidence: not implemented by Gateway yet.") &&
+      memoryDetailPanel.includes("Supersession chain: not implemented by Gateway yet.") &&
+      memoryDetailPanel.includes("Metadata only") &&
+      memoryDetailPanel.includes("Audit metadata"),
+    "Memory detail panel labels read-only detail, scoped result, not_implemented placeholders, and metadata-only audit."
+  );
+  checkSource(
+    "ui:memory-detail-no-admin-actions",
+    !memoryDetailPanel.includes("Delete memory") &&
+      !memoryDetailPanel.includes("Mark stale") &&
+      !memoryDetailPanel.includes("Supersede memory") &&
+      !memoryDetailPanel.includes("Pin memory"),
+    "Memory detail panel exposes no mutation/admin action labels."
   );
   checkSource(
     "ui:command-detail-rendering",

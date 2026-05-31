@@ -903,6 +903,21 @@ async function checkBrainMemoryMarkerSearch(marker) {
       tenantOk && projectOk && sessionOk && scopeOk ? "pass" : "fail",
       `${scopeText}${detailTenant ? `, tenant=${detailTenant}` : ""}.`
     );
+    check(
+      "memory-live-detail-evidence-placeholder",
+      inspect.body?.evidence?.status === "not_implemented" &&
+        Array.isArray(inspect.body?.evidence?.evidence) &&
+        inspect.body.evidence.evidence.length === 0,
+      `Evidence status is ${inspect.body?.evidence?.status || "unknown"} with ${inspect.body?.evidence?.evidence?.length ?? "unknown"} item(s).`
+    );
+    check(
+      "memory-live-detail-supersession-placeholder",
+      inspect.body?.supersession?.status === "not_implemented" &&
+        Array.isArray(inspect.body?.supersession?.chain) &&
+        inspect.body.supersession.chain.length === 0,
+      `Supersession status is ${inspect.body?.supersession?.status || "unknown"} with ${inspect.body?.supersession?.chain?.length ?? "unknown"} item(s).`
+    );
+    await checkMemoryDetailUiFromSearch({ marker, memoryId: first.id });
   }
 
   const differentProjectContext = {
@@ -930,6 +945,63 @@ async function checkBrainMemoryMarkerSearch(marker) {
     scopedOut
       ? "Different project search returned 0 results for marker."
       : `Different project search returned ${differentProjectResults.length} result(s).`
+  );
+}
+
+async function checkMemoryDetailUiFromSearch({ marker, memoryId }) {
+  const memoryTab = page.getByRole("button", { name: "Show memory panel", exact: true });
+  await memoryTab.click({ timeout: timeoutMs });
+  const searchInput = page.getByLabel("Search Brain Memory", { exact: true });
+  await searchInput.fill(marker, { timeout: timeoutMs });
+  await page.getByRole("button", { name: "Search", exact: true }).click({ timeout: timeoutMs });
+
+  const resultButton = page
+    .locator('section[aria-labelledby="memory-results-heading"] button')
+    .filter({ hasText: marker })
+    .first();
+  await resultButton.waitFor({ state: "visible", timeout: timeoutMs });
+  await resultButton.click({ timeout: timeoutMs });
+
+  const detailPanel = page.locator('section[aria-labelledby="memory-detail-heading"]');
+  await expectVisible(
+    "memory-live-detail-panel",
+    detailPanel.getByText("Read-only detail", { exact: true }).first(),
+    "Memory detail panel opens as read-only detail."
+  );
+  await expectVisible(
+    "memory-live-detail-scoped-result",
+    detailPanel.getByText("Scoped result", { exact: true }).first(),
+    "Memory detail panel labels the Gateway item as a scoped result."
+  );
+  await expectVisible(
+    "memory-live-detail-id",
+    detailPanel.getByText(memoryId, { exact: true }).first(),
+    "Memory detail panel shows the selected memory id."
+  );
+  await expectVisible(
+    "memory-live-detail-evidence-not-implemented",
+    detailPanel.getByText("Evidence: not implemented by Gateway yet.", { exact: true }).first(),
+    "Evidence section honestly reports Gateway not_implemented state."
+  );
+  await expectVisible(
+    "memory-live-detail-supersession-not-implemented",
+    detailPanel.getByText("Supersession chain: not implemented by Gateway yet.", { exact: true }).first(),
+    "Supersession section honestly reports Gateway not_implemented state."
+  );
+  await expectVisible(
+    "memory-live-detail-audit-metadata-only",
+    detailPanel.getByText("Metadata only", { exact: true }).first(),
+    "Audit section is labelled as metadata only."
+  );
+  await expectVisible(
+    "memory-live-detail-audit-metadata-collapsed",
+    detailPanel.getByText("Audit metadata", { exact: true }).first(),
+    "Audit metadata disclosure is present."
+  );
+  await expectHidden(
+    "memory-live-detail-no-delete",
+    detailPanel.getByText(/Delete memory|Mark stale|Supersede memory|Pin memory/i).first(),
+    "Memory detail panel exposes no mutation/admin actions."
   );
 }
 

@@ -900,6 +900,22 @@ classification, or export/import behavior was added. See
 `docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md`. The next
 recommended slice is Slice 16E: server-side run stop experiment.
 
+## Checkpoint: Slice 16E Hermes Runs server-side stop experiment
+
+Slice 16E added an opt-in BFF-only Runs stop probe on 2026-05-31.
+`POST /api/hermes/runs/stop-probe` and `npm run smoke:hermes:runs:stop`
+create a harmless counting run, call `POST /v1/runs/{run_id}/stop` through the
+server-side Hermes client, and reconcile final status/events. The live probe
+passed with run `run_ae63c23ca85a456d8ab455e3c3f40ba4`: the stop endpoint
+returned HTTP 200 with `status=stopping`, final status was `cancelled`, and
+`run.cancelled` was observed. Production chat still uses
+`/api/hermes/chat/stream`; composer stop still uses the Slice 13G client/BFF
+stream abort path; no direct browser-to-Hermes/Gateway path, approval action,
+memory admin UI, Agent access selector, auth classification, or export/import
+behavior was added. See
+`docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md`. The next recommended
+slice is Slice 16F: approvals action probe.
+
 ## 5. Recommended technical direction
 
 Codex should validate this in Slice 0 before writing app code.

@@ -291,3 +291,62 @@ export type HermesRunsProbeResult = {
   };
   error: HermesChatError | null;
 };
+
+export type HermesRunStopResult = {
+  ok: boolean;
+  statusCode: number | null;
+  status: string | null;
+  body: Record<string, unknown> | null;
+  error: HermesChatError | null;
+};
+
+export type HermesRunsStopProbeResult = {
+  ok: boolean;
+  mode: "success" | "skipped" | "failed";
+  outcome:
+    | "server_stop_effective"
+    | "stop_accepted_but_completed"
+    | "completed_before_stop"
+    | "stop_failed"
+    | "skipped"
+    | "failed";
+  checkedAt: string;
+  prompt: string;
+  promptAttempt: number;
+  runId: string | null;
+  sessionId: string | null;
+  createStatus: string | null;
+  finalStatusName: string | null;
+  finalStatus: Record<string, unknown> | null;
+  stop: HermesRunStopResult | null;
+  stopRequestedAt: string | null;
+  stopTrigger: "timer" | "first_message_delta" | null;
+  eventTypes: string[];
+  events: HermesRunProbeEvent[];
+  assistantTextPreview: string;
+  outputPreview: string;
+  counts: {
+    events: number;
+    messageDeltaEvents: number;
+    toolEvents: number;
+    brainMemoryToolEvents: number;
+    approvalEvents: number;
+  };
+  timings: {
+    durationMs: number;
+    eventStreamMs: number | null;
+    stopAfterMs: number;
+  };
+  completedBeforeStop: boolean;
+  serverSideStopEffective: boolean;
+  safety: {
+    route: "bff-only";
+    promptKind: "chat-only-stop-probe";
+    stopCalled: boolean;
+    approvalCalled: false;
+    browserDirectHermes: false;
+    memoryMutationRequested: false;
+  };
+  error: HermesChatError | null;
+  blocker: string | null;
+};

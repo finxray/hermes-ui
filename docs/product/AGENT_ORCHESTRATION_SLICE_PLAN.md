@@ -311,13 +311,32 @@ Deliver:
 - no production chat switch, run stop, approval action, or Agent access
   selector.
 
+### 16E - Server-Side Run Stop Experiment
+
+Goal: prove Hermes `/v1/runs/{run_id}/stop` through a BFF-only experiment
+without changing the production composer.
+
+Status: completed in Slice 16E. See
+`docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md`.
+
+Deliver:
+
+- diagnostic `POST /api/hermes/runs/stop-probe` route;
+- `npm run smoke:hermes:runs:stop`;
+- harmless long counting prompt with no tools, memory, commands, files,
+  browsing, external resources, or approvals;
+- server-side stop request through the Hermes client;
+- event/status reconciliation for stopped/cancelled/interrupted outcomes;
+- no production chat switch, composer stop behavior change, approval action,
+  or Agent access selector.
+
 ## Recommended Next Slice
 
-Slice 16E - Server-Side Run Stop Experiment.
+Slice 16F - Approvals Action Probe.
 
 Reason:
 
-- Slice 16D proved Runs can store a Brain Memory marker through Hermes MCP,
-  expose Brain Memory tool events, and preserve BFF search/inspect scope.
-- The next safe control-plane gap is proving Hermes `/v1/runs/{run_id}/stop`
-  through a BFF-only experiment without changing the production chat default.
+- Slice 16E proved Hermes `/v1/runs/{run_id}/stop` through a BFF-only
+  diagnostic route and observed final `cancelled` reconciliation.
+- The next high-risk Runs control-plane gap is approval response behavior
+  through a BFF-only probe, still without switching production chat to Runs.

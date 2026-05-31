@@ -165,6 +165,21 @@ status reconciliation parity. Until then, the current Studio stop behavior
 remains client/BFF stream abort and must keep reporting
 `serverSideRunStop: false`.
 
+Slice 16E update:
+
+`docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md` proves the Hermes Runs
+server-side stop endpoint through a BFF-only diagnostic route,
+`POST /api/hermes/runs/stop-probe`. The live run
+`run_ae63c23ca85a456d8ab455e3c3f40ba4` returned HTTP 200 from
+`POST /v1/runs/{run_id}/stop` with `status=stopping`, then reconciled to final
+status `cancelled` with `run.cancelled` observed. This makes server-side stop
+viable for a future run-backed path.
+
+This still does not change the current production composer stop. Until the
+composer itself runs through a durable `/v1/runs` execution path, Studio stop
+behavior remains client/BFF stream abort and must continue reporting
+`serverSideRunStop: false`.
+
 ## Boundaries Confirmed
 
 No Brain Memory BFF logic changed.

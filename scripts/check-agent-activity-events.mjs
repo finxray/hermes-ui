@@ -37,6 +37,8 @@ checkRunEvent();
 checkRunsMessageDeltaIgnored();
 checkRunsReasoningSafe();
 checkRunsCompletedStatus();
+checkRunsStoppedStatus();
+checkRunsInterruptedStatus();
 checkRunsToolAndApprovalParity();
 checkRunsCommandParity();
 checkRunsEventIdsUnique();
@@ -368,6 +370,46 @@ function checkRunsCompletedStatus() {
       event.durationMs === 1250 &&
       event.hermes?.runId === "run-runs-completed",
     "Runs run.completed maps to a completed status activity with stable correlation metadata."
+  );
+}
+
+function checkRunsStoppedStatus() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    Authorization: "Bearer stop-secret",
+    event: "run.stopping",
+    message: "Stop requested with Bearer stop-secret",
+    run_id: "run-runs-stopping",
+    status: "stopping",
+    timestamp: "2026-05-31T00:00:06.000Z"
+  }, { id: "runs-stopping" });
+  const serialized = JSON.stringify(event);
+
+  record(
+    "runs-stopped-status",
+    event.type === "status" &&
+      event.status === "cancelled" &&
+      event.title === "Run stopped" &&
+      event.summary === "Hermes run stop was requested." &&
+      event.completedAt === "2026-05-31T00:00:06.000Z" &&
+      event.details.Authorization === "[redacted]" &&
+      !serialized.includes("stop-secret"),
+    "Runs stopping/stopped events map to a redacted cancelled status activity."
+  );
+}
+
+function checkRunsInterruptedStatus() {
+  const event = activity.createActivityEventFromHermesRunsEvent({
+    event: "run.interrupted",
+    run_id: "run-runs-interrupted"
+  }, { id: "runs-interrupted" });
+
+  record(
+    "runs-interrupted-status",
+    event.type === "status" &&
+      event.status === "cancelled" &&
+      event.title === "Run interrupted" &&
+      event.summary === "Hermes run was interrupted.",
+    "Runs interrupted events map safely to cancelled status activity."
   );
 }
 

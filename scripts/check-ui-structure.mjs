@@ -33,8 +33,10 @@ const requiredFiles = [
   "apps/web/src/app/design/artifacts-tools-large-fixture/page.module.css",
   "apps/web/src/app/api/hermes/runs/memory-probe/route.ts",
   "apps/web/src/app/api/hermes/runs/probe/route.ts",
+  "apps/web/src/app/api/hermes/runs/stop-probe/route.ts",
   "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md",
   "docs/checkpoints/HERMES_RUNS_EVENT_NORMALIZATION_16C.md",
+  "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md",
   "apps/web/src/components/memory/BrainMemoryConsole.module.css"
 ];
 
@@ -188,6 +190,11 @@ const hermesRunsBrainMemoryParityCheckpoint = existsSync(
 )
   ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_BRAIN_MEMORY_PARITY_16D.md"), "utf8")
   : "";
+const hermesRunsStopExperimentCheckpoint = existsSync(
+  join(root, "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md")
+)
+  ? readFileSync(join(root, "docs/checkpoints/HERMES_RUNS_STOP_EXPERIMENT_16E.md"), "utf8")
+  : "";
 const scalableLoadingRoadmap = readFileSync(
   join(root, "docs/product/SCALABLE_UI_LOADING_ROADMAP.md"),
   "utf8"
@@ -201,8 +208,15 @@ const hermesRunsMemoryProbeRoute = readFileSync(
   join(root, "apps/web/src/app/api/hermes/runs/memory-probe/route.ts"),
   "utf8"
 );
+const hermesRunsStopProbeRoute = readFileSync(
+  join(root, "apps/web/src/app/api/hermes/runs/stop-probe/route.ts"),
+  "utf8"
+);
 const hermesRunsProbeScript = existsSync(join(root, "scripts/hermes-runs-probe.mjs"))
   ? readFileSync(join(root, "scripts/hermes-runs-probe.mjs"), "utf8")
+  : "";
+const hermesRunsStopProbeScript = existsSync(join(root, "scripts/hermes-runs-stop-probe.mjs"))
+  ? readFileSync(join(root, "scripts/hermes-runs-stop-probe.mjs"), "utf8")
   : "";
 const hermesClientSource = readFileSync(join(root, "packages/hermes-client/src/index.ts"), "utf8");
 const agentActivityEventsSource = readFileSync(
@@ -614,12 +628,37 @@ for (const token of [
 }
 
 for (const token of [
+  "Hermes Runs Stop Experiment 16E",
+  "POST /api/hermes/runs/stop-probe",
+  "smoke:hermes:runs:stop",
+  "server-side stop",
+  "Production chat still uses `/api/hermes/chat/stream`",
+  "No direct browser-to-Hermes path",
+  "composer Agent access selector was not implemented",
+  "Slice 16F: approvals action probe"
+]) {
+  if (!hermesRunsStopExperimentCheckpoint.includes(token)) {
+    failures.push(`Hermes Runs stop experiment checkpoint is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsProbe",
   "Cache-Control",
   "no-store"
 ]) {
   if (!hermesRunsProbeRoute.includes(token)) {
     failures.push(`Hermes Runs probe BFF route is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "runHermesRunsStopProbe",
+  "Cache-Control",
+  "no-store"
+]) {
+  if (!hermesRunsStopProbeRoute.includes(token)) {
+    failures.push(`Hermes Runs stop probe BFF route is missing token: ${token}`);
   }
 }
 
@@ -637,6 +676,19 @@ for (const token of [
 }
 
 for (const token of [
+  "/api/hermes/runs/stop-probe",
+  "--require-hermes",
+  "--base-url",
+  "stopHttpStatus",
+  "completedBeforeStop",
+  "serverSideStopEffective"
+]) {
+  if (!hermesRunsStopProbeScript.includes(token)) {
+    failures.push(`Hermes Runs stop probe script is missing token: ${token}`);
+  }
+}
+
+for (const token of [
   "runHermesRunsProbe",
   "HERMES_RUNS_PROBE_PROMPT",
   "HERMES_RUNS_PROBE_EXPECTED_TEXT",
@@ -649,6 +701,21 @@ for (const token of [
 ]) {
   if (!hermesClientSource.includes(token)) {
     failures.push(`Hermes client Runs probe helper is missing token: ${token}`);
+  }
+}
+
+for (const token of [
+  "runHermesRunsStopProbe",
+  "stopHermesRun",
+  "/v1/runs/${encodeURIComponent(args.runId)}/stop",
+  "pollHermesRunUntilStable",
+  "serverSideStopEffective",
+  "stopCalled",
+  "browserDirectHermes: false",
+  "memoryMutationRequested: false"
+]) {
+  if (!hermesClientSource.includes(token)) {
+    failures.push(`Hermes client Runs stop helper is missing token: ${token}`);
   }
 }
 
@@ -674,6 +741,10 @@ for (const token of [
 
 if (!packageJson.includes("\"smoke:hermes:runs:memory\"")) {
   failures.push("package.json is missing smoke:hermes:runs:memory script.");
+}
+
+if (!packageJson.includes("\"smoke:hermes:runs:stop\"")) {
+  failures.push("package.json is missing smoke:hermes:runs:stop script.");
 }
 
 for (const token of [

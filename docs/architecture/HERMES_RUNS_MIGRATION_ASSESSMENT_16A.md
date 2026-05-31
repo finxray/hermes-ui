@@ -573,3 +573,21 @@ verified different-project and different-session isolation.
 This improves the Runs parity evidence, but it still does not switch the
 production default. Server-side run stop, approval actions, reconnect/replay
 correlation, and feature-flagged experimental UI execution remain unproven.
+
+## Slice 16E Server-Side Stop Update
+
+Slice 16E added the BFF-only diagnostic route
+`POST /api/hermes/runs/stop-probe` and `npm run smoke:hermes:runs:stop`.
+The live probe created run `run_ae63c23ca85a456d8ab455e3c3f40ba4` with a
+harmless counting prompt, called `POST /v1/runs/{run_id}/stop` through the
+server-side Hermes client, received HTTP 200 with `status=stopping`, and then
+observed final status `cancelled` plus `run.cancelled`.
+
+This proves server-side stop is viable for a future run-backed execution path,
+but it still does not switch the production default. Production chat remains
+on `/api/hermes/chat/stream`, and the composer stop control remains the
+Slice 13G client/BFF stream abort behavior until a feature-flagged Runs
+execution path exists.
+
+Approval actions, reconnect/replay correlation, and an experimental Runs UI
+mode remain unproven.

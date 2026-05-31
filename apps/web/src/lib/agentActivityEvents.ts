@@ -494,6 +494,9 @@ export function normalizeActivityStatus(value: string): AgentActivityStatus {
   if (status.includes("cancelled") || status.includes("canceled")) {
     return "cancelled";
   }
+  if (status.includes("stop") || status.includes("interrupt")) {
+    return "cancelled";
+  }
   if (status.includes("fail") || status.includes("error")) {
     return "failed";
   }
@@ -582,7 +585,13 @@ function hermesRunsStatus(eventType: string, event: HermesRunsEvent): AgentActiv
   if (eventType === "run.failed") {
     return "failed";
   }
-  if (eventType === "run.cancelled" || eventType === "run.canceled") {
+  if (
+    eventType === "run.cancelled" ||
+    eventType === "run.canceled" ||
+    eventType === "run.stopped" ||
+    eventType === "run.stopping" ||
+    eventType === "run.interrupted"
+  ) {
     return "cancelled";
   }
   if (eventType === "run.started" || eventType === "run.running") {
@@ -603,6 +612,12 @@ function titleFromHermesRunsEvent(eventType: string, type: AgentActivityType) {
   }
   if (eventType === "run.cancelled" || eventType === "run.canceled") {
     return "Run cancelled";
+  }
+  if (eventType === "run.stopped" || eventType === "run.stopping") {
+    return "Run stopped";
+  }
+  if (eventType === "run.interrupted") {
+    return "Run interrupted";
   }
   if (eventType === "run.started") {
     return "Run started";
@@ -625,6 +640,12 @@ function summaryFromHermesRunsEvent(eventType: string, status: AgentActivityStat
   }
   if (eventType === "run.cancelled" || eventType === "run.canceled") {
     return "Hermes run was cancelled.";
+  }
+  if (eventType === "run.stopped" || eventType === "run.stopping") {
+    return "Hermes run stop was requested.";
+  }
+  if (eventType === "run.interrupted") {
+    return "Hermes run was interrupted.";
   }
   if (eventType.startsWith("run.") && status === "info") {
     return "Hermes emitted an informational run event.";

@@ -253,7 +253,22 @@ client-selectable model state, and the chat request no longer sends a fake
 placeholder model unless Hermes capabilities report verified client selection.
 Fast-stream constraints for future Cerebras/Kimi-like providers are documented
 without adding provider calls or credentials. See
-`docs/product/PROVIDER_MODEL_SELECTOR_13J.md`.
+`docs/product/PROVIDER_MODEL_SELECTOR_13J.md` and
+`docs/product/HERMES_MODEL_SELECTOR_13J.md`.
+
+## Checkpoint: Slice 13N Hermes model switching parity investigation
+
+Investigated Hermes model switching parity between Telegram `/model` and Web UI
+on 2026-06-01. Found that the Hermes gateway supports **session-level model
+overrides** internally (in `_session_model_overrides` dict in `gateway/run.py`),
+but this mechanism is **NOT exposed via the HTTP API** that the Web UI BFF uses.
+Telegram `/model` works because it calls internal gateway methods; the API server
+(`api_server.py`) always reads the model from `config.yaml` and does not honor
+request-body `model` fields for actual model selection (cosmetic only). The
+blocker is API-surface, not capability. Web UI model switching requires a new
+Hermes endpoint (e.g., `PATCH /api/sessions/{session_id}` with model field).
+The Web UI selector remains disabled/read-only with updated explanatory copy.
+See `docs/checkpoints/HERMES_MODEL_SWITCHING_PARITY_INVESTIGATION.md`.
 
 ## Checkpoint: Slice 13K Brain Memory event timeline
 

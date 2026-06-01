@@ -1,5 +1,5 @@
 .section {
-  margin-bottom: 44px;
+  margin-bottom: 38px;
 }
 
 .sectionLabel {
@@ -21,8 +21,8 @@
 }
 
 .detailPanel {
-  padding: 0 0 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  padding: 0 0 12px;
+  border-bottom: 0;
 }
 
 .cardTitle {
@@ -55,7 +55,7 @@
   gap: 4px;
   min-width: 0;
   padding: 4px 0 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 0;
 }
 
 .fieldLabel {
@@ -219,16 +219,16 @@
   display: grid;
   min-width: 0;
   gap: 5px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  padding-bottom: 10px;
+  border-bottom: 0;
 }
 
 .resultButton {
   display: block;
   width: 100%;
-  padding: 0 0 16px;
+  padding: 6px 0;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  border-radius: 10px;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -246,9 +246,9 @@
   max-height: 240px;
   overflow: auto;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.034);
-  border-radius: var(--radius-sm);
-  background: rgba(8, 9, 10, 0.3);
+  border: 0;
+  border-radius: 10px;
+  background: rgba(8, 9, 10, 0.34);
   color: var(--text-primary);
   font-size: var(--font-small);
   line-height: 1.55;
@@ -259,7 +259,7 @@
 .readonlySection,
 .metadata {
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.038);
+  border-top: 0;
 }
 
 .metadata {
@@ -278,8 +278,8 @@
   overflow: auto;
   margin: 10px 0 0;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.032);
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: 10px;
   background: rgba(8, 9, 10, 0.42);
   color: var(--text-secondary);
   font-family: var(--font-mono);
@@ -290,10 +290,10 @@
 }
 
 .error {
-  padding: 9px 10px;
-  border: 1px solid rgba(255, 107, 107, 0.24);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 107, 107, 0.08);
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #ffb4b4;
   font-size: var(--font-small);
   line-height: 1.45;

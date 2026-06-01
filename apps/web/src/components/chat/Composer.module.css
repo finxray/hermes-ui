@@ -1,7 +1,9 @@
 .wrap {
   position: relative;
   z-index: 3;
-  padding: 10px clamp(18px, 4vw, 58px) 21px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px clamp(18px, 4vw, 58px) 22px;
   background:
     linear-gradient(180deg, transparent, rgba(8, 9, 10, 0.58) 42%, rgba(8, 9, 10, 0.78)),
     transparent;
@@ -10,6 +12,7 @@
 
 .composer {
   display: grid;
+  min-width: 0;
   max-width: var(--composer-width);
   margin: 0 auto;
   gap: 10px;
@@ -17,10 +20,11 @@
 
 .box {
   display: grid;
+  min-width: 0;
   gap: 6px;
   padding: clamp(9px, calc(6px + 0.19vw), 14px);
   border: 0;
-  border-radius: 26px;
+  border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
     rgba(29, 30, 34, 0.98);
@@ -37,6 +41,7 @@
 
 .box textarea {
   width: 100%;
+  min-width: 0;
   min-height: clamp(35px, calc(29px + 0.46vw), 52px);
   max-height: clamp(140px, 13vh, 240px);
   resize: none;
@@ -54,6 +59,7 @@
 
 .controls {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -91,6 +97,7 @@
 
 .modelButton {
   max-width: min(42vw, 260px);
+  min-width: 0;
   padding: 0 10px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -144,7 +151,20 @@
 }
 
 .note {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: var(--font-small);
   line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .controls {
+    gap: 8px;
+  }
+
+  .modelButton {
+    max-width: min(52vw, 240px);
+  }
 }

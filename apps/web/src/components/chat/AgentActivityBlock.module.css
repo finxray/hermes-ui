@@ -1,6 +1,6 @@
 .wrap {
   display: grid;
-  gap: 0;
+  gap: 8px;
   min-width: 0;
   color: var(--text-secondary);
 }
@@ -9,21 +9,17 @@
 .thinking {
   position: relative;
   min-width: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.075);
-}
-
-.block:last-child,
-.thinking:last-child {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  border: 0;
 }
 
 .summary {
   display: grid;
-  grid-template-columns: 18px 22px minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: 16px 24px minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
   min-width: 0;
-  padding: 12px 0;
+  padding: 9px 0;
+  border-radius: 10px;
   color: var(--text-secondary);
   cursor: pointer;
   list-style: none;
@@ -38,6 +34,32 @@
   display: grid;
   place-items: center;
   color: var(--text-muted);
+}
+
+.icon {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.034);
+}
+
+.icon svg {
+  position: relative;
+  z-index: 1;
+}
+
+.summary:hover {
+  background: rgba(255, 255, 255, 0.026);
+}
+
+.summary:hover .title {
+  color: var(--text-primary);
+}
+
+.block[open] .summary {
+  margin-bottom: 6px;
 }
 
 .chevron {
@@ -59,7 +81,7 @@
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
   align-items: baseline;
 }
 
@@ -67,7 +89,7 @@
   overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--font-body);
-  font-weight: 500;
+  font-weight: 560;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -84,6 +106,9 @@
 }
 
 .status {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
   text-transform: lowercase;
 }
 
@@ -121,25 +146,21 @@
   color: #e2e6ee;
 }
 
-.block[data-status="running"] .summary,
-.thinking {
-  overflow: hidden;
-}
-
-.block[data-status="running"] .summary::after,
-.thinking::after {
+.block[data-status="running"] .icon::after,
+.thinking .icon::after {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
   animation: activityShimmer 1.35s linear infinite;
 }
 
 .details {
   display: grid;
   gap: 10px;
-  padding: 0 0 14px 49px;
+  padding: 0 0 12px 50px;
 }
 
 .metaGrid {
@@ -170,9 +191,9 @@
   margin: 0;
   overflow: auto;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
+  border: 0;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 11px;
@@ -208,9 +229,9 @@
   margin: 0;
   overflow: auto;
   padding: 9px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
+  border: 0;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 11px;
@@ -231,8 +252,8 @@
 .thinking {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 12px 0;
+  gap: 10px;
+  padding: 9px 0;
 }
 
 .thinkingText {
@@ -261,8 +282,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .block[data-status="running"] .summary::after,
-  .thinking::after {
+  .block[data-status="running"] .icon::after,
+  .thinking .icon::after {
     animation-duration: 1ms;
   }
 }

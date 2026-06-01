@@ -1,14 +1,14 @@
 :root {
   color-scheme: dark;
 
-  --bg-canvas: #08090a;
-  --bg-app: #0d0f11;
-  --bg-rail: #0f1012;
-  --bg-shell-glass: rgba(16, 15, 19, 0.76);
+  --bg-canvas: #08090b;
+  --bg-app: #0d0e10;
+  --bg-rail: #101113;
+  --bg-shell-glass: rgba(14, 15, 18, 0.78);
   --bg-surface: #15171a;
-  --bg-surface-2: #1b1e22;
-  --bg-elevated: #23272d;
-  --bg-workspace: #111216;
+  --bg-surface-2: #1a1d21;
+  --bg-elevated: #22262b;
+  --bg-workspace: #101114;
   --bg-control-hover: rgba(255, 255, 255, 0.055);
   --bg-control-active: rgba(255, 255, 255, 0.082);
 
@@ -16,8 +16,8 @@
   --border-strong: rgba(255, 255, 255, 0.14);
 
   --text-primary: #f4f4f5;
-  --text-secondary: #bbbfc7;
-  --text-muted: #7b818c;
+  --text-secondary: #c2c6ce;
+  --text-muted: #858b96;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   --accent: #8ee6c6;

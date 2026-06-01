@@ -6,6 +6,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 0;
   color: var(--text-muted);
   cursor: pointer;
   font-size: var(--font-body);
@@ -34,43 +35,48 @@
 
 .body {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-left: 23px;
+  gap: 7px;
+  margin-top: 8px;
+  padding-left: 24px;
 }
 
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
   min-width: 0;
-  padding: 9px 0;
+  padding: 6px 0;
   color: var(--text-secondary);
 }
 
-.row[data-status="started"],
-.row[data-status="pending"] {
-  overflow: hidden;
-}
-
-.row[data-status="started"]::after,
-.row[data-status="pending"]::after {
+.row[data-status="started"] .icon::after,
+.row[data-status="pending"] .icon::after {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.045), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
   animation: activityShimmer 1.4s linear infinite;
 }
 
 .icon {
+  position: relative;
   display: grid;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
   place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.034);
   color: var(--text-muted);
+}
+
+.icon svg {
+  position: relative;
+  z-index: 1;
 }
 
 .row[data-status="completed"] .icon,
@@ -104,7 +110,8 @@
 .name {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: var(--font-body);
+  font-size: var(--font-small);
+  font-weight: 560;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -136,8 +143,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .row[data-status="started"]::after,
-  .row[data-status="pending"]::after {
+  .row[data-status="started"] .icon::after,
+  .row[data-status="pending"] .icon::after {
     animation-duration: 1ms;
   }
 }

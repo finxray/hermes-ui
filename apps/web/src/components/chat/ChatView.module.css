@@ -8,8 +8,10 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   border: 0;
-  border-radius: 22px 0 0 22px;
-  background: #101114;
+  border-radius: 20px 0 0 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 220px),
+    var(--bg-workspace);
   box-shadow: none;
 }
 
@@ -19,7 +21,7 @@
   z-index: 4;
   pointer-events: none;
   content: "";
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.055);
   border-right: 0;
   border-bottom: 0;
   border-radius: inherit;
@@ -30,7 +32,7 @@
   min-width: 0;
   min-height: auto;
   margin:
-    clamp(19px, calc(14px + 0.36vw), 30px)
+    clamp(18px, calc(13px + 0.34vw), 28px)
     clamp(18px, 4vw, 58px)
     0
     clamp(19px, calc(14px + 0.36vw), 30px);
@@ -55,38 +57,38 @@
 .transcript {
   min-height: 0;
   overflow-y: auto;
-  padding: clamp(18px, calc(12px + 0.45vw), 30px) clamp(18px, 4vw, 58px) 10px;
+  overflow-x: hidden;
+  padding: clamp(16px, calc(11px + 0.42vw), 28px) clamp(18px, 4vw, 58px) 12px;
 }
 
 .transcriptInner {
   display: grid;
   max-width: var(--content-width);
   margin: 0 auto;
-  gap: 26px;
+  gap: 28px;
 }
 
 .mockBanner {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  gap: 18px;
-  padding: clamp(16px, calc(11px + 0.3vw), 24px) clamp(22px, calc(14px + 0.5vw), 34px);
-  border: 1px solid rgba(243, 201, 105, 0.22);
-  border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 155, 82, 0.025)),
-    rgba(36, 23, 19, 0.78);
-  color: #ff9b52;
-  font-size: var(--font-body);
-  box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(18px);
+  gap: 11px;
+  max-width: min(100%, 840px);
+  padding: 4px 2px;
+  color: #e7b866;
+  font-size: var(--font-small);
+  line-height: 1.55;
+}
+
+.mockBanner svg {
+  color: #d9a84e;
 }
 
 .referenceRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 12px;
+  padding: 2px 0 8px;
 }
 
 .referenceChip {

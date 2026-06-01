@@ -27,6 +27,8 @@ export function Composer({
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
+  const streamBatchingDetail =
+    "Streaming batches deltas with an animation-frame flush, not one React update per token.";
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -118,8 +120,12 @@ export function Composer({
         </div>
         <div className={styles.note}>
           {isGenerating
-            ? "Hermes is responding. Deltas are buffered and flushed on animation frames."
-            : "Streaming batches deltas with an animation-frame flush, not one React update per token."}
+            ? "Hermes is responding."
+            : (
+              <span title={streamBatchingDetail}>
+                BFF stream path. Server-configured model.
+              </span>
+            )}
         </div>
       </form>
     </div>

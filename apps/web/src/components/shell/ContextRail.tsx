@@ -23,6 +23,7 @@ type ContextRailProps = {
   hermesStatus: NormalizedHermesStatus | null;
   isBrainMemoryStatusLoading: boolean;
   isHermesStatusLoading: boolean;
+  isHermesStatusRefreshing?: boolean;
   refreshBrainMemoryStatus: () => void;
   refreshHermesStatus: () => void;
   tenantScopePosture: TenantScopeDiagnostics["redactedPosture"] | null;
@@ -52,6 +53,7 @@ export function ContextRail({
   hermesStatus,
   isBrainMemoryStatusLoading,
   isHermesStatusLoading,
+  isHermesStatusRefreshing = false,
   refreshBrainMemoryStatus,
   refreshHermesStatus,
   tenantScopePosture
@@ -88,6 +90,7 @@ export function ContextRail({
           <>
             <HermesStatusPanel
               isLoading={isHermesStatusLoading}
+              isRefreshing={isHermesStatusRefreshing}
               onRefresh={refreshHermesStatus}
               status={hermesStatus}
             />

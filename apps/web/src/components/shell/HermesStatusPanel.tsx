@@ -5,10 +5,11 @@ import styles from "./StatusPanel.module.css";
 type HermesStatusPanelProps = {
   status: NormalizedHermesStatus | null;
   isLoading: boolean;
+  isRefreshing?: boolean;
   onRefresh: () => void;
 };
 
-export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatusPanelProps) {
+export function HermesStatusPanel({ status, isLoading, isRefreshing = false, onRefresh }: HermesStatusPanelProps) {
   const capabilityRows = getCapabilityRows(status);
   const checkedAt = status?.checkedAt ? new Date(status.checkedAt).toLocaleTimeString() : "Never";
 
@@ -17,11 +18,11 @@ export function HermesStatusPanel({ status, isLoading, onRefresh }: HermesStatus
       <div className={styles.sectionLabel} id="hermes-status-heading">
         <span>Hermes status</span>
         <button
-          className={styles.iconButton}
+          className={`${styles.iconButton}${isRefreshing ? ` ${styles.iconButtonRefreshing}` : ""}`}
           type="button"
           aria-label="Refresh Hermes status"
           onClick={onRefresh}
-          disabled={isLoading}
+          disabled={isLoading || isRefreshing}
         >
           <RefreshCw size={13} aria-hidden="true" />
         </button>

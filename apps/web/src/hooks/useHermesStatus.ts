@@ -8,22 +8,32 @@ const POLL_INTERVAL_MS = 8_000;
 
 type HermesStatusState = {
   status: NormalizedHermesStatus | null;
-  isLoading: boolean;
+  isInitialLoading: boolean;
+  isRefreshing: boolean;
 };
 
 export function useHermesStatus() {
   const [state, setState] = useState<HermesStatusState>({
     status: null,
-    isLoading: true
+    isInitialLoading: true,
+    isRefreshing: false
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
-    setState((current) => ({ ...current, isLoading: true }));
-    const status = await fetchHermesStatus();
+    setState((current) => ({
+      ...current,
+      isRefreshing: true
+    }));
+    const newStatus = await fetchHermesStatus();
     if (mountedRef.current) {
-      setState({ status, isLoading: false });
+      setState((current) => {
+        if (!isMeaningfullyChanged(current.status, newStatus)) {
+          return { ...current, isInitialLoading: false, isRefreshing: false };
+        }
+        return { status: newStatus, isInitialLoading: false, isRefreshing: false };
+      });
     }
   }, []);
 
@@ -45,8 +55,27 @@ export function useHermesStatus() {
   }, [refresh]);
 
   return {
-    isLoading: state.isLoading,
+    isLoading: state.isInitialLoading,
+    isRefreshing: state.isRefreshing,
     refresh,
     status: state.status
   };
+}
+
+function isMeaningfullyChanged(
+  prev: NormalizedHermesStatus | null,
+  next: NormalizedHermesStatus
+): boolean {
+  if (!prev) {
+    return true;
+  }
+  return (
+    prev.mode !== next.mode ||
+    prev.reachable !== next.reachable ||
+    prev.configured !== next.configured ||
+    prev.baseUrl !== next.baseUrl ||
+    prev.uiCapabilities.models.currentModelLabel !== next.uiCapabilities.models.currentModelLabel ||
+    prev.uiCapabilities.models.selectionStatus !== next.uiCapabilities.models.selectionStatus ||
+    (prev.error?.message ?? null) !== (next.error?.message ?? null)
+  );
 }

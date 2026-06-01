@@ -194,6 +194,38 @@ check(
   statusClientFile?.includes('"no-store"') ?? false
 );
 
+// --- 9. Status polling stability: separate initial load from background refresh ---
+check(
+  "useHermesStatus separates isInitialLoading from isRefreshing",
+  Boolean(hookFile?.includes("isInitialLoading") && hookFile?.includes("isRefreshing")),
+  "Background refresh must not reset the displayed status to null/checking; use separate flags"
+);
+check(
+  "useHermesStatus preserves previous status during background refresh",
+  Boolean(hookFile?.includes("...current") && hookFile?.includes("isRefreshing: true")),
+  "Refresh must spread current state so status is preserved while isRefreshing=true"
+);
+check(
+  "useHermesStatus has meaningful equality gate to skip redundant setState",
+  Boolean(hookFile?.includes("isMeaningfullyChanged")),
+  "Equality check prevents unnecessary re-renders when Hermes state hasn't changed"
+);
+check(
+  "useHermesStatus returns isRefreshing for subtle indicator",
+  Boolean(hookFile?.includes("isRefreshing: state.isRefreshing")),
+  "isRefreshing must be exposed so consumers can show a subtle spinner without layout change"
+);
+check(
+  "Composer modelButton has min-width to prevent label-change layout shift",
+  Boolean(readFile("apps/web/src/components/chat/Composer.module.css")?.includes("min-width: 90px")),
+  "min-width prevents layout shift when label changes from 'Hermes default' to 'hermes-agent'"
+);
+check(
+  "HermesStatusPanel accepts isRefreshing prop",
+  Boolean(readFile("apps/web/src/components/shell/HermesStatusPanel.tsx")?.includes("isRefreshing")),
+  "Panel must accept isRefreshing to animate the refresh icon without resizing the card"
+);
+
 // --- Summary ---
 console.log("=".repeat(48));
 console.log(`Result: ${passed} passed, ${failed} failed`);

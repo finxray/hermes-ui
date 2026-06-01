@@ -90,6 +90,7 @@ export function AppShell() {
         hermesStatus={hermesStatus.status}
         isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
         isHermesStatusLoading={hermesStatus.isLoading}
+        isHermesStatusRefreshing={hermesStatus.isRefreshing}
         refreshBrainMemoryStatus={brainMemoryStatus.refresh}
         refreshHermesStatus={hermesStatus.refresh}
         tenantScopePosture={tenantScopePosture.posture}

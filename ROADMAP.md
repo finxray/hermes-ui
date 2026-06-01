@@ -1,6 +1,6 @@
 # Roadmap — Hermes UI + Brain Memory Studio
 
-Last updated: 2026-05-31
+Last updated: 2026-06-01
 Target local path: `C:\Users\Alexey\.cursor\projects\hermes-ui`
 
 ## 1. Goal
@@ -1575,6 +1575,17 @@ Acceptance:
 - UI does not call `setState` per token,
 - 1,000 token/sec streams do not freeze the page,
 - fast mode remains optional and provider-agnostic.
+
+### Hotfix — UI status flicker / layout stability (2026-06-01)
+
+Root cause: `useHermesStatus` set `isLoading: true` on every background poll (not just initial
+load), causing 2 full re-renders of AppShell every 8 seconds. Also: no equality gate meant every
+poll replaced the status object even when Hermes state was unchanged. Composer `modelButton` had
+`min-width: 0` so label change caused control-row shift.
+
+Fixes: separate `isInitialLoading` from `isRefreshing`; equality gate via `isMeaningfullyChanged`;
+`min-width: 90px` on model button; subtle refresh spinner on `HermesStatusPanel` refresh button.
+See `docs/checkpoints/UI_STATUS_FLICKER_STABILITY_FIX.md`.
 
 ### Slice 9 — Packaging Brain Memory + Web UI
 

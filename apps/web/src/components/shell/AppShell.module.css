@@ -1,21 +1,21 @@
 .shell {
-  --density-scale: clamp(1, calc(0.82 + 0.018vw), 1.42);
-  --content-width: clamp(590px, 33vw, 960px);
+  --density-scale: 1;
+  --content-width: clamp(640px, 56%, 860px);
   --composer-width: var(--content-width);
-  --font-xs: clamp(11px, calc(10px + 0.06vw), 13px);
-  --font-small: clamp(12px, calc(10.5px + 0.09vw), 14.5px);
-  --font-body: clamp(13.5px, calc(11.7px + 0.13vw), 18px);
-  --font-ui: clamp(14.5px, calc(12px + 0.14vw), 19px);
-  --font-title: clamp(18px, calc(14px + 0.18vw), 23.5px);
-  --font-section-title: clamp(14.5px, calc(12px + 0.13vw), 19px);
-  --icon-sm: clamp(13px, calc(11.2px + 0.1vw), 17px);
-  --icon-md: clamp(15px, calc(12.8px + 0.13vw), 20px);
-  --icon-lg: clamp(19px, calc(16px + 0.18vw), 26px);
-  --control-height: clamp(32px, calc(27px + 0.34vw), 42px);
-  --row-height: clamp(34px, calc(28px + 0.32vw), 44px);
-  --topbar-height: clamp(52px, calc(43px + 0.52vw), 70px);
-  --rail-width-left: clamp(232px, 12vw, 346px);
-  --rail-width-right: clamp(335px, 16.8vw, 492px);
+  --font-xs: 11.5px;
+  --font-small: 13px;
+  --font-body: 15px;
+  --font-ui: 15px;
+  --font-title: 19px;
+  --font-section-title: 13px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --control-height: 34px;
+  --row-height: 36px;
+  --topbar-height: 54px;
+  --rail-width-left: clamp(220px, 14vw, 280px);
+  --rail-width-right: clamp(300px, 20vw, 420px);
   position: relative;
   isolation: isolate;
   display: grid;
@@ -109,7 +109,7 @@
   flex: 0 0 auto;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1280px) {
   .shell {
     --rail-width-left: 240px;
     --rail-width-right: 0px;

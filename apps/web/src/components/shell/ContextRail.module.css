@@ -25,15 +25,15 @@
 
 .head {
   display: grid;
-  gap: 15px;
-  padding: clamp(22px, calc(14px + 0.52vw), 35px) clamp(22px, calc(14px + 0.52vw), 35px) 0;
+  gap: 12px;
+  padding: 20px 20px 0;
 }
 
 .head h2 {
   margin: 0;
   color: var(--text-primary);
-  font-size: var(--font-section-title);
-  font-weight: 650;
+  font-size: var(--font-body);
+  font-weight: 620;
   line-height: 1.2;
 }
 
@@ -74,7 +74,7 @@
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: clamp(22px, calc(14px + 0.52vw), 35px);
+  padding: 20px;
 }
 
 .section {
@@ -118,8 +118,8 @@
   display: block;
   overflow-wrap: anywhere;
   color: var(--text-muted);
-  font-size: var(--font-ui);
-  line-height: 1.35;
+  font-size: var(--font-small);
+  line-height: 1.45;
 }
 
 .metrics {

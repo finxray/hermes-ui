@@ -30,12 +30,9 @@ export function ChatTranscript({
   return (
     <div className={styles.transcript} aria-label="Chat transcript">
       <div className={styles.transcriptInner}>
-        <div className={styles.mockBanner} role="status">
+        <div className={styles.mockBanner} role="status" aria-label="Connection status">
           {bannerIcon}
-          <span>
-            Chat sends through the server-side BFF when Hermes is connected. If Hermes is
-            unavailable, this session stays local with a clear mock fallback.
-          </span>
+          <span>Connected through Hermes when available. Falls back to local mock when offline.</span>
         </div>
         {activeSession ? (
           activeSession.messages.length > 0 ? (

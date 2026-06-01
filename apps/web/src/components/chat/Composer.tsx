@@ -27,8 +27,7 @@ export function Composer({
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
-  const streamBatchingDetail =
-    "Streaming batches deltas with an animation-frame flush, not one React update per token.";
+  const streamBatchingDetail = "Streaming batches deltas with an animation-frame flush, not one React update per token.";
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,7 +56,7 @@ export function Composer({
             placeholder={
               disabled
                 ? "Create or select a chat to send a message."
-                : "Message Hermes through the local BFF..."
+                : "Message Hermes…"
             }
             value={draft}
             onChange={(event) => setDraft(event.currentTarget.value)}
@@ -120,10 +119,10 @@ export function Composer({
         </div>
         <div className={styles.note}>
           {isGenerating
-            ? "Hermes is responding."
+            ? "Generating response…"
             : (
               <span title={streamBatchingDetail}>
-                BFF stream path. Server-configured model.
+                Hermes can make mistakes. Verify important information.
               </span>
             )}
         </div>

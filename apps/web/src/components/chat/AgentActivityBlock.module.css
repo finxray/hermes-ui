@@ -1,6 +1,6 @@
 .wrap {
   display: grid;
-  gap: 8px;
+  gap: 2px;
   min-width: 0;
   color: var(--text-secondary);
 }
@@ -14,15 +14,16 @@
 
 .summary {
   display: grid;
-  grid-template-columns: 16px 24px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
+  grid-template-columns: 14px 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
   min-width: 0;
-  padding: 9px 0;
-  border-radius: 10px;
+  padding: 6px 4px;
+  border-radius: 8px;
   color: var(--text-secondary);
   cursor: pointer;
   list-style: none;
+  user-select: none;
 }
 
 .summary::-webkit-details-marker {
@@ -34,15 +35,16 @@
   display: grid;
   place-items: center;
   color: var(--text-muted);
+  flex: 0 0 auto;
 }
 
 .icon {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.034);
+  background: rgba(255, 255, 255, 0.032);
 }
 
 .icon svg {
@@ -51,7 +53,7 @@
 }
 
 .summary:hover {
-  background: rgba(255, 255, 255, 0.026);
+  background: rgba(255, 255, 255, 0.022);
 }
 
 .summary:hover .title {
@@ -59,12 +61,12 @@
 }
 
 .block[open] .summary {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .chevron {
-  height: 22px;
-  transition: transform 140ms ease;
+  height: 20px;
+  transition: transform 130ms ease;
 }
 
 .block[open] .chevron {
@@ -73,7 +75,7 @@
 
 .content {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -81,15 +83,15 @@
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 6px;
   align-items: baseline;
 }
 
 .title {
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: var(--font-body);
-  font-weight: 560;
+  font-size: var(--font-small);
+  font-weight: 540;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -101,78 +103,64 @@
 .metaItem dt,
 .metaItem dd {
   color: var(--text-muted);
-  font-size: var(--font-small);
+  font-size: var(--font-xs);
   line-height: 1.4;
 }
 
 .status {
-  padding: 0 6px;
+  padding: 0 5px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.032);
   text-transform: lowercase;
 }
 
 .subtitle {
   overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
-.block[data-status="completed"] .icon {
-  color: var(--accent);
-}
-
-.block[data-status="failed"] .icon {
-  color: var(--danger);
-}
-
+/* Status-based icon colors */
+.block[data-status="completed"] .icon { color: var(--accent); }
+.block[data-status="failed"] .icon { color: var(--danger); }
 .block[data-status="running"] .icon,
-.block[data-status="queued"] .icon {
-  color: var(--warning);
-}
-
+.block[data-status="queued"] .icon { color: var(--warning); }
 .block[data-status="waiting_for_approval"] .icon,
-.block[data-type="approval"] .title {
-  color: var(--warning);
-}
+.block[data-type="approval"] .title { color: var(--warning); }
+.block[data-status="cancelled"] .icon { color: var(--text-muted); }
+.block[data-type="memory"] .title { color: #d9efe3; }
+.block[data-type="command"] .title { color: #e2e6ee; }
 
-.block[data-status="cancelled"] .icon {
-  color: var(--text-muted);
-}
-
-.block[data-type="memory"] .title {
-  color: #d9efe3;
-}
-
-.block[data-type="command"] .title {
-  color: #e2e6ee;
-}
-
+/* Shimmer only on running/queued — icon ::after overlay */
 .block[data-status="running"] .icon::after,
-.thinking .icon::after {
+.block[data-status="queued"] .icon::after {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
   animation: activityShimmer 1.35s linear infinite;
 }
 
 .details {
   display: grid;
-  gap: 10px;
-  padding: 0 0 12px 50px;
+  gap: 8px;
+  padding: 0 0 10px 44px;
 }
 
 .metaGrid {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: 6px 14px;
   margin: 0;
 }
 
 .metaItem {
   display: inline-flex;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -186,39 +174,39 @@
 }
 
 .pre {
-  max-height: 240px;
+  max-height: 200px;
   min-width: 0;
   margin: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 10px;
   border: 0;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.22);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
   color: var(--text-muted);
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
-  line-height: 1.55;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .commandDetails {
   display: grid;
-  gap: 9px;
+  gap: 7px;
   min-width: 0;
 }
 
 .commandLine,
 .outputBlock {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
 .commandLabel {
   color: var(--text-muted);
   font-size: var(--font-xs);
-  font-weight: 650;
+  font-weight: 640;
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -228,52 +216,58 @@
   min-width: 0;
   margin: 0;
   overflow: auto;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 0;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.22);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .outputBlock pre {
-  max-height: 180px;
+  max-height: 160px;
 }
 
 .outputBlock[data-tone="error"] pre {
-  border-color: rgba(255, 107, 107, 0.18);
   color: #ffb4b4;
 }
 
+/* Thinking row — active only, no shimmer on completed */
 .thinking {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 0;
+  gap: 9px;
+  padding: 7px 4px;
 }
 
 .thinkingText {
   color: var(--text-muted);
-  font-size: var(--font-body);
+  font-size: var(--font-small);
+}
+
+/* Thinking icon — shimmer only while active */
+.thinking .icon::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  animation: activityShimmer 1.35s linear infinite;
 }
 
 @keyframes activityShimmer {
-  from {
-    transform: translateX(-100%);
-  }
-
-  to {
-    transform: translateX(100%);
-  }
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
 }
 
 @media (max-width: 760px) {
   .summary {
-    grid-template-columns: 18px 20px minmax(0, 1fr);
+    grid-template-columns: 14px 20px minmax(0, 1fr);
   }
 
   .details {
@@ -283,6 +277,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .block[data-status="running"] .icon::after,
+  .block[data-status="queued"] .icon::after,
   .thinking .icon::after {
     animation-duration: 1ms;
   }

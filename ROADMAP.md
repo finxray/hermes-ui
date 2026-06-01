@@ -1244,6 +1244,25 @@ mutation/admin UI, export/import runtime, direct browser-to-Hermes/Gateway
 path, or direct storage path was added. The next recommended slice is Slice
 17D: publish-ready release notes and local handoff package manifest.
 
+## Checkpoint: Visual system correction (UI polish pass)
+
+A comprehensive visual-system audit and correction pass was completed on
+2026-06-01. Changes: fixed global `font-size: 105%` to 100%, replaced fluid
+clamp font tokens with stable fixed sizes (`--font-body: 15px`,
+`--font-small: 13px`, `--font-xs: 11.5px`), tightened content-width to
+`clamp(640px,56%,860px)`, converted the mockBanner from alarming orange warning
+to a subtle muted inline notice, removed `overflow: hidden` from the composer
+wrapper (horizontal scroll fix), made assistant message copy actions
+hover-reveal only, constrained shimmer to running/queued activity icons only,
+updated Composer placeholder and footer copy to user-facing language, tightened
+ContextRail padding and heading sizes, reduced code block header height, and
+removed `min-width: 118px` from copy button. All checks pass: typecheck, build,
+`check:ui-structure`, `check:workspace-state`, `check:agent-activity` (36),
+`check:agent-activity-rendering` (35), `check:brain-memory-client`,
+`check:tenant-scope`, `npm audit`. No product features, backend logic, Hermes
+paths, Brain Memory paths, or production chat route changed. See
+`docs/checkpoints/UI_VISUAL_SYSTEM_CORRECTION.md`.
+
 ## Checkpoint: Slice 17D local handoff release notes
 
 Slice 17D adds publish-ready local/demo RC handoff docs:

@@ -11,6 +11,7 @@
   --bg-workspace: #101114;
   --bg-control-hover: rgba(255, 255, 255, 0.055);
   --bg-control-active: rgba(255, 255, 255, 0.082);
+  --bg-user-bubble: rgba(28, 30, 35, 0.9);
 
   --border-soft: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
@@ -25,6 +26,7 @@
   --accent-dim: rgba(142, 230, 198, 0.12);
   --danger: #ff6b6b;
   --warning: #f3c969;
+  --warning-dim: rgba(243, 201, 105, 0.1);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -33,4 +35,6 @@
 
   --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.35);
   --shadow-workspace: 0 30px 110px rgba(0, 0, 0, 0.56);
+
+  /* Activity shimmer keyframes are defined per-component */
 }

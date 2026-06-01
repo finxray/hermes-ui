@@ -191,7 +191,9 @@ for (const token of [
 }
 
 for (const token of [
-  "radial-gradient(circle at 54% 8%",
+  "--bg-workspace-solid",
+  "scroll-padding-bottom: var(--transcript-scroll-padding",
+  ".scrollAnchor",
   ".startStage",
   ".startHero",
   "color: var(--warning)"
@@ -199,6 +201,52 @@ for (const token of [
   if (!chatViewVisualCss.includes(token)) {
     failures.push(`ChatView visual CSS contract is missing ${token}`);
   }
+}
+
+const messageBubbleSource = readFileSync(join(root, "apps/web/src/components/chat/MessageBubble.tsx"), "utf8");
+const collapsibleUserMessageSource = existsSync(
+  join(root, "apps/web/src/components/chat/CollapsibleUserMessage.tsx")
+)
+  ? readFileSync(join(root, "apps/web/src/components/chat/CollapsibleUserMessage.tsx"), "utf8")
+  : "";
+const messageBubbleCss = readFileSync(join(root, "apps/web/src/components/chat/MessageBubble.module.css"), "utf8");
+const chatTranscriptSource = readFileSync(join(root, "apps/web/src/components/chat/ChatTranscript.tsx"), "utf8");
+const useHermesStatusSource = readFileSync(join(root, "apps/web/src/hooks/useHermesStatus.ts"), "utf8");
+
+for (const token of [
+  "CollapsibleUserMessage",
+  "Show more",
+  "Show less"
+]) {
+  if (!messageBubbleSource.includes(token) && !collapsibleUserMessageSource.includes(token)) {
+    failures.push(`Long user message collapse contract is missing ${token}`);
+  }
+}
+
+for (const token of [".userExpandButton", ".userContentWrap", "data-expanded"]) {
+  if (!messageBubbleCss.includes(token)) {
+    failures.push(`Long user message collapse CSS is missing ${token}`);
+  }
+}
+
+for (const token of ["composerInsetPx", "scrollIntoView", "--transcript-scroll-padding", "scrollAnchor"]) {
+  if (!chatTranscriptSource.includes(token)) {
+    failures.push(`Transcript scroll/composer inset contract is missing ${token}`);
+  }
+}
+
+for (const token of ["useComposerInset", "composerWrapRef", "preserveKnownModelOnTransientFailure"]) {
+  if (!chatViewVisualSource.includes(token) && !useHermesStatusSource.includes(token)) {
+    failures.push(`Chat layout/model stability contract is missing ${token}`);
+  }
+}
+
+if (appShellCss.includes("--composer-width: var(--content-width)")) {
+  failures.push("Composer width must be narrower than content width (~73% scale).");
+}
+
+if (chatViewVisualCss.includes("backdrop-filter: blur(18px)")) {
+  failures.push("Main chat workspace must not use glassy backdrop blur on the conversation surface.");
 }
 
 for (const token of [

@@ -130,7 +130,7 @@
 .codeBlock pre {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: min(52vh, 480px);
+  max-height: min(56vh, 520px);
   margin: 0;
   padding: 14px 16px;
   color: #d7dde8;

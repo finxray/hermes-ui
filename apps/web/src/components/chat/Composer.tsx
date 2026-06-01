@@ -166,7 +166,7 @@ function modelSelectorTitle(state?: HermesUiCapabilities["models"]) {
     return "Runtime model switching is available through the verified Hermes BFF path.";
   }
   if (state.selectionStatus === "server-configured") {
-    return "Model is server-configured in Hermes. Runtime switching is not supported by the current API (admin_config_rw is disabled).";
+    return "Model is server-configured in Hermes. Web UI-safe model switching is not exposed yet; the selector stays read-only.";
   }
   if (state.selectionStatus === "unavailable") {
     return "Hermes is not reachable. Model information is unavailable until Hermes connects.";

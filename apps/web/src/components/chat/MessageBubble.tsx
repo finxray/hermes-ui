@@ -1,6 +1,7 @@
 import { Link2 } from "lucide-react";
 import { memo, useMemo } from "react";
 import type { ChatMessage } from "@/data/types";
+import { CollapsibleUserMessage } from "@/components/chat/CollapsibleUserMessage";
 import { CopyTextButton, MessageMarkdown } from "./MessageMarkdown";
 import styles from "./MessageBubble.module.css";
 
@@ -35,7 +36,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             isAssistant ? (
               <MessageMarkdown content={message.content} isStreaming={isStreaming} />
             ) : (
-              userParagraphs.map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)
+              <CollapsibleUserMessage messageId={message.id} paragraphs={userParagraphs} />
             )
           ) : (
             <p className={styles.streamPlaceholder}>Waiting for Hermes...</p>

@@ -167,6 +167,18 @@ check(
   chatViewFile?.includes("unavailable") ?? false
 );
 check(
+  "useHermesStatus preserves known model during transient refresh failures",
+  Boolean(readFile("apps/web/src/hooks/useHermesStatus.ts")?.includes("preserveKnownModelOnTransientFailure")),
+  "Polling must not reset composer model to unknown when Hermes was previously connected"
+);
+check(
+  "ChatView prefers currentModelLabel when Hermes reports a server model",
+  Boolean(
+    chatViewFile?.includes('state.currentModelLabel !== "Hermes server model"') ||
+    chatViewFile?.includes("state.currentModelLabel &&")
+  )
+);
+check(
   "ChatView passes modelState to Composer",
   chatViewFile?.includes("modelState={providerModelState}") ?? false
 );

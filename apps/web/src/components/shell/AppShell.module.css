@@ -1,7 +1,7 @@
 .shell {
   --density-scale: 1;
   --content-width: clamp(640px, 56%, 860px);
-  --composer-width: var(--content-width);
+  --composer-width: clamp(467px, 40.9%, 628px);
   --font-xs: 11.5px;
   --font-small: 13px;
   --font-body: 15px;
@@ -47,18 +47,18 @@
 
 .shell::before {
   background:
-    radial-gradient(circle at 18% 8%, rgba(115, 84, 153, 0.2), transparent 32%),
-    radial-gradient(circle at 78% 0%, rgba(62, 93, 132, 0.18), transparent 34%),
-    radial-gradient(circle at 52% 88%, rgba(59, 118, 104, 0.1), transparent 42%),
-    linear-gradient(115deg, #121016 0%, #08090b 38%, #0d1013 100%);
+    radial-gradient(circle at 14% 6%, rgba(92, 76, 148, 0.1), transparent 34%),
+    radial-gradient(circle at 82% 0%, rgba(62, 93, 132, 0.12), transparent 36%),
+    radial-gradient(circle at 50% 92%, rgba(59, 118, 104, 0.06), transparent 44%),
+    linear-gradient(115deg, #0f1012 0%, #07080a 42%, #0b0d10 100%);
 }
 
 .shell::after {
-  opacity: 0.62;
+  opacity: 0.48;
   background:
-    radial-gradient(circle at 42% 18%, rgba(145, 184, 255, 0.1), transparent 34%),
-    radial-gradient(circle at 88% 72%, rgba(142, 230, 198, 0.075), transparent 36%);
-  animation: ambientCanvasShift 34s ease-in-out infinite alternate;
+    radial-gradient(circle at 42% 16%, rgba(145, 184, 255, 0.06), transparent 36%),
+    radial-gradient(circle at 86% 74%, rgba(142, 230, 198, 0.04), transparent 38%);
+  animation: ambientCanvasShift 40s ease-in-out infinite alternate;
 }
 
 .shell > * {
@@ -176,12 +176,12 @@
 
 @keyframes ambientCanvasShift {
   from {
-    opacity: 0.46;
-    transform: translate3d(-1.2%, -0.8%, 0) scale(1);
+    opacity: 0.34;
+    transform: translate3d(-0.8%, -0.5%, 0) scale(1);
   }
 
   to {
-    opacity: 0.72;
-    transform: translate3d(1%, 1.1%, 0) scale(1.025);
+    opacity: 0.52;
+    transform: translate3d(0.7%, 0.8%, 0) scale(1.012);
   }
 }

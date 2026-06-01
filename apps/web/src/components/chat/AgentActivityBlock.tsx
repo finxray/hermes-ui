@@ -64,7 +64,9 @@ function ThinkingRow() {
       <span className={styles.icon} aria-hidden="true">
         <CircleDashed size={15} />
       </span>
-      <span className={styles.thinkingText}>Thinking...</span>
+      <span className={styles.thinkingText} data-active="true">
+        Thinking...
+      </span>
     </div>
   );
 }

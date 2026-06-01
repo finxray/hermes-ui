@@ -50,6 +50,8 @@ See `docs/architecture/HERMES_DISCOVERY.md` and `docs/research/SOURCES.md` for s
 
 ## 3A. Latest visual architecture checkpoint
 
+On 2026-06-01, a layout/composer correction pass landed (`docs/checkpoints/UI_SCROLL_COMPOSER_MODEL_SURFACE_FIX.md`): solid main chat surface, darker Codex-like canvas gradient, composer width ~73% of content column, transcript scroll fills available height with composer-aware padding and send scroll, long user bubble Show more/less, Hermes model label stability during status refresh, and shimmer scoped to active thinking/running states only.
+
 On 2026-06-01, the Studio shell received a production visual architecture pass:
 
 - main canvas now uses a subtle dark gradient system with reduced-motion support,

@@ -64,7 +64,8 @@ function checkComponentSource() {
   record(
     "thinking-row",
     component.includes("Thinking...") && css.includes("activityShimmer"),
-    "Thinking/running row has a generic label and shimmer styling."
+    "Thinking/running row has a generic label and shimmer styling.",
+    "block[data-status=\"completed\"] .icon::after"
   );
   record(
     "no-private-reasoning-labels",

@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { AgentActivityBlock } from "@/components/chat/AgentActivityBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -11,6 +12,7 @@ type ChatTranscriptProps = {
   activeSession: Session | null;
   activityEvents: AgentActivityEvent[];
   bannerIcon: ReactNode;
+  composerInsetPx?: number;
   createSession: () => void;
   isStartState?: boolean;
   isThinking: boolean;
@@ -23,19 +25,56 @@ export function ChatTranscript({
   activeSession,
   activityEvents,
   bannerIcon,
+  composerInsetPx = 168,
   createSession,
   isStartState = false,
   isThinking,
   routeIcon,
   scopeIcon
 }: ChatTranscriptProps) {
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const scrollEndRef = useRef<HTMLDivElement>(null);
+  const previousMessageCountRef = useRef(0);
+  const lastMessage = activeSession?.messages.at(-1);
+  const messageCount = activeSession?.messages.length ?? 0;
+
+  useLayoutEffect(() => {
+    if (isStartState || !activeSession || messageCount === 0) {
+      previousMessageCountRef.current = messageCount;
+      return;
+    }
+
+    const addedMessages = messageCount > previousMessageCountRef.current;
+    previousMessageCountRef.current = messageCount;
+    if (!addedMessages) {
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollEndRef.current?.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "end"
+    });
+  }, [activeSession?.id, isStartState, lastMessage?.id, messageCount]);
+
   return (
     <div
+      ref={transcriptRef}
       className={styles.transcript}
       data-start-state={isStartState ? "true" : "false"}
       aria-label="Chat transcript"
+      style={
+        isStartState
+          ? undefined
+          : ({
+              "--transcript-scroll-padding": `${composerInsetPx}px`
+            } as CSSProperties)
+      }
     >
-      <div className={styles.transcriptInner}>
+      <div
+        className={styles.transcriptInner}
+        style={isStartState ? undefined : { paddingBottom: `${composerInsetPx}px` }}
+      >
         <div className={styles.mockBanner} role="status" aria-label="Connection status">
           {bannerIcon}
           <span>Hermes is reached through the BFF when available; offline turns stay local.</span>
@@ -83,6 +122,7 @@ export function ChatTranscript({
             </span>
           </div>
         ) : null}
+        {!isStartState ? <div ref={scrollEndRef} className={styles.scrollAnchor} aria-hidden="true" /> : null}
       </div>
     </div>
   );

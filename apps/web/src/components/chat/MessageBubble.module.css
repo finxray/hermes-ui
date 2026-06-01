@@ -72,6 +72,53 @@
   margin-bottom: 0;
 }
 
+.userContentWrap {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.userContent {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.userContentWrap[data-overflowing="true"][data-expanded="false"] .userContent::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 56px;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(180deg, transparent, var(--bg-user-bubble) 88%);
+}
+
+.userExpandButton {
+  justify-self: start;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-glass-soft);
+  border-radius: 999px;
+  background: var(--bg-glass-soft);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-xs);
+  line-height: 1;
+}
+
+.userExpandButton:hover,
+.userExpandButton:focus-visible {
+  border-color: var(--border-glass);
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+  outline: 0;
+}
+
+.userExpandButton:focus-visible {
+  outline: 2px solid rgba(145, 184, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .actionRow {
   display: flex;
   justify-content: flex-start;

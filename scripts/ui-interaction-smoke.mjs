@@ -1393,8 +1393,10 @@ async function checkDisabledPlaceholders() {
   });
   check(
     "composer-model-server-configured",
-    /Server-configured|unavailable|unknown/i.test(modelStateText),
-    `Composer shows non-client-selectable provider/model state: "${modelStateText || "missing"}".`
+    Boolean(modelStateText) &&
+      !/select model|switch model/i.test(modelStateText) &&
+      !/^(gpt-|claude-)/i.test(modelStateText),
+    `Composer shows grounded Hermes model label (read-only): "${modelStateText || "missing"}".`
   );
 }
 

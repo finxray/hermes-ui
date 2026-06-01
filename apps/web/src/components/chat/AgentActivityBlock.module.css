@@ -137,6 +137,13 @@
 .block[data-type="command"] .title { color: #e2e6ee; }
 
 /* Shimmer only on running/queued — icon ::after overlay */
+.block[data-status="completed"] .icon::after,
+.block[data-status="failed"] .icon::after,
+.block[data-status="cancelled"] .icon::after,
+.block[data-status="waiting_for_approval"] .icon::after {
+  display: none;
+}
+
 .block[data-status="running"] .icon::after,
 .block[data-status="queued"] .icon::after {
   position: absolute;
@@ -144,7 +151,7 @@
   border-radius: inherit;
   pointer-events: none;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
   animation: activityShimmer 1.35s linear infinite;
 }
 
@@ -259,8 +266,12 @@
   border-radius: inherit;
   pointer-events: none;
   content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
   animation: activityShimmer 1.35s linear infinite;
+}
+
+.thinkingText[data-active="true"] {
+  color: var(--text-secondary);
 }
 
 @keyframes activityShimmer {

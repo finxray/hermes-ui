@@ -29,10 +29,11 @@ export function useHermesStatus() {
     const newStatus = await fetchHermesStatus();
     if (mountedRef.current) {
       setState((current) => {
-        if (!isMeaningfullyChanged(current.status, newStatus)) {
+        const resolvedStatus = preserveKnownModelOnTransientFailure(current.status, newStatus);
+        if (!isMeaningfullyChanged(current.status, resolvedStatus)) {
           return { ...current, isInitialLoading: false, isRefreshing: false };
         }
-        return { status: newStatus, isInitialLoading: false, isRefreshing: false };
+        return { status: resolvedStatus, isInitialLoading: false, isRefreshing: false };
       });
     }
   }, []);
@@ -59,6 +60,48 @@ export function useHermesStatus() {
     isRefreshing: state.isRefreshing,
     refresh,
     status: state.status
+  };
+}
+
+function preserveKnownModelOnTransientFailure(
+  previous: NormalizedHermesStatus | null,
+  next: NormalizedHermesStatus
+): NormalizedHermesStatus {
+  if (!previous?.reachable || previous.mode !== "real") {
+    return next;
+  }
+
+  const previousModels = previous.uiCapabilities.models;
+  const shouldPreserveModel =
+    previousModels.selectionStatus === "server-configured" &&
+    Boolean(previousModels.currentModelLabel) &&
+    (next.mode === "error" ||
+      !next.reachable ||
+      next.uiCapabilities.models.selectionStatus === "unavailable" ||
+      next.uiCapabilities.models.selectionStatus === "unknown");
+
+  if (!shouldPreserveModel) {
+    return next;
+  }
+
+  return {
+    ...next,
+    uiCapabilities: {
+      ...next.uiCapabilities,
+      models: {
+        ...next.uiCapabilities.models,
+        availableModels:
+          next.uiCapabilities.models.availableModels.length > 0
+            ? next.uiCapabilities.models.availableModels
+            : previousModels.availableModels,
+        currentModelLabel: previousModels.currentModelLabel,
+        currentProviderLabel: previousModels.currentProviderLabel,
+        selectedModelId: previousModels.selectedModelId ?? next.uiCapabilities.models.selectedModelId,
+        selectionStatus: "server-configured",
+        serverAdvertisedModel:
+          previousModels.serverAdvertisedModel ?? next.uiCapabilities.models.serverAdvertisedModel
+      }
+    }
   };
 }
 

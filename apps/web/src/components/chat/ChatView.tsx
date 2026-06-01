@@ -1,5 +1,6 @@
 import { AlertTriangle, BookOpenText, SendHorizontal } from "lucide-react";
 import { useRef, useState } from "react";
+import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { Composer } from "@/components/chat/Composer";
@@ -62,9 +63,11 @@ export function ChatView({
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const stopRequestedRef = useRef(false);
+  const composerWrapRef = useRef<HTMLDivElement>(null);
+  const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
+  const composerInsetPx = useComposerInset(composerWrapRef, !isStartState);
   const providerModelState = getProviderModelState(hermesStatus, modelChoices);
   const modelLabel = modelLabelForState(providerModelState);
-  const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
   const composerContextItems = activeSession
     ? [
         { label: "Workspace", value: "hermes-ui" },
@@ -417,12 +420,14 @@ export function ChatView({
             activeSession={activeSession}
             activityEvents={activeActivityEvents}
             bannerIcon={<AlertTriangle size={15} />}
+            composerInsetPx={composerInsetPx}
             createSession={createSession}
             isStartState
             isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
             routeIcon={<SendHorizontal size={14} />}
             scopeIcon={<BookOpenText size={14} />}
           />
+          <div ref={composerWrapRef}>
           <Composer
             contextItems={composerContextItems}
             disabled={!activeSession}
@@ -436,6 +441,7 @@ export function ChatView({
             showContextPanel
             stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
           />
+          </div>
         </div>
       ) : (
         <>
@@ -444,11 +450,13 @@ export function ChatView({
             activeSession={activeSession}
             activityEvents={activeActivityEvents}
             bannerIcon={<AlertTriangle size={15} />}
+            composerInsetPx={composerInsetPx}
             createSession={createSession}
             isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
             routeIcon={<SendHorizontal size={14} />}
             scopeIcon={<BookOpenText size={14} />}
           />
+          <div ref={composerWrapRef}>
           <Composer
             contextItems={composerContextItems}
             disabled={!activeSession}
@@ -461,6 +469,7 @@ export function ChatView({
             showContextPanel={false}
             stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
           />
+          </div>
         </>
       )}
     </section>
@@ -493,11 +502,14 @@ function getProviderModelState(
 }
 
 function modelLabelForState(state: HermesUiCapabilities["models"]) {
-  if (state.selectionStatus === "server-configured" && state.currentModelLabel) {
-    return state.currentModelLabel;
-  }
   if (state.selectionStatus === "unavailable") {
     return "Hermes unavailable";
+  }
+  if (state.currentModelLabel && state.currentModelLabel !== "Hermes server model") {
+    return state.currentModelLabel;
+  }
+  if (state.selectionStatus === "server-configured" && state.currentModelLabel) {
+    return state.currentModelLabel;
   }
   if (state.selectionStatus === "unknown" || !state.currentModelLabel) {
     return "Hermes default";

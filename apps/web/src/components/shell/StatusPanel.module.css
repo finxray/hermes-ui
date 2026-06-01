@@ -75,9 +75,9 @@
 
 .metric {
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-glass-soft);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--bg-glass-soft);
 }
 
 .metricValue {
@@ -111,10 +111,10 @@
 }
 
 .error {
-  padding: 9px 10px;
-  border: 1px solid rgba(255, 107, 107, 0.24);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 107, 107, 0.08);
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #ffb4b4;
   font-size: var(--font-small);
   line-height: 1.45;

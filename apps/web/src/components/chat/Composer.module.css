@@ -2,7 +2,6 @@
   position: relative;
   z-index: 3;
   min-width: 0;
-  /* No overflow:hidden — prevents horizontal scrollbar from appearing above composer */
   padding: 8px clamp(20px, 4vw, 52px) 20px;
   background:
     linear-gradient(180deg, transparent, rgba(8, 9, 10, 0.62) 38%, rgba(8, 9, 10, 0.82)),
@@ -10,12 +9,18 @@
   backdrop-filter: blur(14px);
 }
 
+.wrap[data-start-state="true"] {
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
 .composer {
   display: grid;
   min-width: 0;
   max-width: var(--composer-width);
   margin: 0 auto;
-  gap: 10px;
+  gap: 9px;
 }
 
 .box {
@@ -23,20 +28,23 @@
   min-width: 0;
   gap: 6px;
   padding: clamp(9px, calc(6px + 0.19vw), 14px);
-  border: 0;
+  border: 1px solid var(--border-glass-soft);
   border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
-    rgba(29, 30, 34, 0.98);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.082), rgba(255, 255, 255, 0.024)),
+    var(--bg-glass-strong);
   box-shadow:
-    0 20px 64px rgba(0, 0, 0, 0.44),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    var(--shadow-glass),
+    var(--glass-highlight);
+  backdrop-filter: blur(24px) saturate(1.14);
 }
 
 .box:focus-within {
+  border-color: var(--border-glass);
   box-shadow:
-    0 24px 78px rgba(0, 0, 0, 0.52),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 28px 92px rgba(0, 0, 0, 0.54),
+    0 0 0 1px rgba(145, 184, 255, 0.08),
+    var(--glass-highlight);
 }
 
 .box textarea {
@@ -89,6 +97,7 @@
   background: transparent;
   color: var(--text-secondary);
   font-size: var(--font-body);
+  line-height: 1;
 }
 
 .toolButton {
@@ -109,7 +118,7 @@
 .toolButton:focus-visible,
 .modelButton:focus-visible {
   outline: 0;
-  background: var(--bg-control-hover);
+  background: var(--bg-glass-hover);
   color: var(--text-primary);
 }
 
@@ -150,6 +159,76 @@
   opacity: 1;
 }
 
+.contextPanel {
+  min-width: 0;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    max-height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.contextPanel[data-visible="true"] {
+  max-height: 128px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.contextPanelInner {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid var(--border-glass-soft);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
+    var(--bg-glass);
+  box-shadow:
+    0 18px 52px rgba(0, 0, 0, 0.28),
+    var(--glass-highlight);
+  backdrop-filter: blur(22px) saturate(1.1);
+}
+
+.contextItem {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1.35;
+}
+
+.contextItem:not(:last-child)::after {
+  width: 3px;
+  height: 3px;
+  flex: 0 0 auto;
+  margin-left: 1px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  content: "";
+}
+
+.contextLabel {
+  color: var(--text-muted);
+}
+
+.contextValue {
+  min-width: 0;
+  max-width: min(42vw, 240px);
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .note {
   min-width: 0;
   max-width: 100%;
@@ -168,5 +247,19 @@
 
   .modelButton {
     max-width: min(52vw, 240px);
+  }
+
+  .contextPanelInner {
+    display: grid;
+  }
+
+  .contextItem:not(:last-child)::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contextPanel {
+    transition-duration: 1ms;
   }
 }

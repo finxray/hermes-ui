@@ -5,24 +5,33 @@ import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/her
 import styles from "./Composer.module.css";
 
 type ComposerProps = {
+  contextItems?: Array<{
+    label: string;
+    value: string;
+  }>;
   disabled?: boolean;
   isGenerating?: boolean;
   isStopRequested?: boolean;
+  isStartState?: boolean;
   modelLabel?: string;
   modelState?: HermesUiCapabilities["models"];
   onSend: (message: string) => void;
   onStop?: () => void;
+  showContextPanel?: boolean;
   stopControlState?: HermesCapabilityState;
 };
 
 export function Composer({
+  contextItems = [],
   disabled = false,
   isGenerating = false,
   isStopRequested = false,
+  isStartState = false,
   modelLabel = "Hermes default",
   modelState,
   onSend,
   onStop,
+  showContextPanel = false,
   stopControlState = "deferred"
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
@@ -47,7 +56,7 @@ export function Composer({
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} data-start-state={isStartState ? "true" : "false"}>
       <form className={styles.composer} aria-label="Message composer" onSubmit={submit}>
         <div className={styles.box}>
           <textarea
@@ -115,6 +124,24 @@ export function Composer({
                 {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
               </button>
             </div>
+          </div>
+        </div>
+        <div
+          className={styles.contextPanel}
+          data-visible={showContextPanel ? "true" : "false"}
+          aria-hidden={showContextPanel ? undefined : "true"}
+        >
+          <div className={styles.contextPanelInner}>
+            {contextItems.map((item) => (
+              <span className={styles.contextItem} key={`${item.label}:${item.value}`}>
+                <span className={styles.contextLabel}>{item.label}</span>
+                <span className={styles.contextValue}>{item.value}</span>
+              </span>
+            ))}
+            <span className={styles.contextItem}>
+              <span className={styles.contextLabel}>Model</span>
+              <span className={styles.contextValue}>{modelLabel}</span>
+            </span>
           </div>
         </div>
         <div className={styles.note}>

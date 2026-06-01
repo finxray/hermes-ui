@@ -53,13 +53,18 @@
 }
 
 .tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: var(--control-height);
-  padding: 2px 12px;
+  padding: 0 12px;
   border: 0;
   border-radius: 18px;
   background: transparent;
   color: var(--text-muted);
   font-size: var(--font-body);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .tab:hover,
@@ -130,9 +135,9 @@
 
 .metric {
   padding: 10px 12px;
-  border: 0;
+  border: 1px solid var(--border-glass-soft);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.018);
+  background: var(--bg-glass-soft);
 }
 
 .metricValue {
@@ -213,7 +218,7 @@
   width: 100%;
   min-width: 0;
   gap: 3px;
-  padding: 4px 0;
+  padding: 8px 10px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -378,7 +383,7 @@
   height: 28px;
   place-items: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-glass-soft);
   color: var(--accent);
 }
 

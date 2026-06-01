@@ -6,7 +6,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 4px;
+  padding: 6px 8px;
+  border-radius: 10px;
   color: var(--text-muted);
   cursor: pointer;
   font-size: var(--font-small);
@@ -39,7 +40,7 @@
   display: grid;
   gap: 1px;
   margin-top: 6px;
-  padding-left: 22px;
+  padding-left: 26px;
 }
 
 .row {
@@ -49,8 +50,8 @@
   gap: 8px;
   align-items: center;
   min-width: 0;
-  padding: 5px 4px;
-  border-radius: 7px;
+  padding: 6px 8px;
+  border-radius: 10px;
   color: var(--text-secondary);
 }
 
@@ -74,7 +75,7 @@
   overflow: hidden;
   place-items: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.032);
+  background: var(--bg-glass-soft);
   color: var(--text-muted);
 }
 

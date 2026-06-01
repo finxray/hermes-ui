@@ -48,6 +48,20 @@ Slice 0 re-checked Hermes Agent on 2026-05-29 against official docs and source a
 
 See `docs/architecture/HERMES_DISCOVERY.md` and `docs/research/SOURCES.md` for source notes.
 
+## 3A. Latest visual architecture checkpoint
+
+On 2026-06-01, the Studio shell received a production visual architecture pass:
+
+- main canvas now uses a subtle dark gradient system with reduced-motion support,
+- empty/new-chat sessions now use a centered Codex-like start state,
+- composer now has a liquid-glass surface plus a collapsible lower context panel,
+- warning/status copy is inline and calm rather than boxed,
+- right-rail tabs and activity rows were normalized for alignment and density,
+- production chat remains on `/api/hermes/chat/stream`,
+- production Runs, Agent access selector, approval controls, mutation/admin UI, export/import runtime, and fake model switching remain deferred.
+
+See `docs/checkpoints/UI_PRODUCTION_VISUAL_ARCHITECTURE_PASS.md`.
+
 ## 4. Architecture principle
 
 There are two separate integration paths:

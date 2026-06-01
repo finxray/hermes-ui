@@ -64,6 +64,20 @@ export function ChatView({
   const stopRequestedRef = useRef(false);
   const providerModelState = getProviderModelState(hermesStatus, modelChoices);
   const modelLabel = modelLabelForState(providerModelState);
+  const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
+  const composerContextItems = activeSession
+    ? [
+        { label: "Workspace", value: "hermes-ui" },
+        { label: "Project", value: activeProject.name },
+        { label: "Session", value: activeSession.title },
+        { label: "Scope", value: activeProject.memoryScope.stableProjectKey },
+        { label: "Route", value: "Browser -> BFF -> Hermes" }
+      ]
+    : [
+        { label: "Workspace", value: "hermes-ui" },
+        { label: "Project", value: activeProject.name },
+        { label: "Route", value: "Select or create a chat" }
+      ];
 
   async function handleSend(content: string) {
     if (!activeSession || isGenerating) {
@@ -390,28 +404,65 @@ export function ChatView({
   const hasRunningActivity = latestActivityEvent ? isActiveActivityEvent(latestActivityEvent) : false;
 
   return (
-    <section className={styles.workspace} aria-label="Chat workspace">
+    <section
+      className={styles.workspace}
+      data-start-state={isStartState ? "true" : "false"}
+      aria-label="Chat workspace"
+    >
       <ChatHeader title={activeSession?.title ?? "No chat selected"} />
-      <ChatTranscript
-        activeProject={activeProject}
-        activeSession={activeSession}
-        activityEvents={activeActivityEvents}
-        bannerIcon={<AlertTriangle size={15} />}
-        createSession={createSession}
-        isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
-        routeIcon={<SendHorizontal size={14} />}
-        scopeIcon={<BookOpenText size={14} />}
-      />
-      <Composer
-        disabled={!activeSession}
-        isGenerating={isGenerating}
-        isStopRequested={isStopRequested}
-        modelLabel={modelLabel}
-        modelState={providerModelState}
-        onSend={handleSend}
-        onStop={handleStop}
-        stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
-      />
+      {isStartState ? (
+        <div className={styles.startStage}>
+          <ChatTranscript
+            activeProject={activeProject}
+            activeSession={activeSession}
+            activityEvents={activeActivityEvents}
+            bannerIcon={<AlertTriangle size={15} />}
+            createSession={createSession}
+            isStartState
+            isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
+            routeIcon={<SendHorizontal size={14} />}
+            scopeIcon={<BookOpenText size={14} />}
+          />
+          <Composer
+            contextItems={composerContextItems}
+            disabled={!activeSession}
+            isGenerating={isGenerating}
+            isStopRequested={isStopRequested}
+            isStartState
+            modelLabel={modelLabel}
+            modelState={providerModelState}
+            onSend={handleSend}
+            onStop={handleStop}
+            showContextPanel
+            stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
+          />
+        </div>
+      ) : (
+        <>
+          <ChatTranscript
+            activeProject={activeProject}
+            activeSession={activeSession}
+            activityEvents={activeActivityEvents}
+            bannerIcon={<AlertTriangle size={15} />}
+            createSession={createSession}
+            isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
+            routeIcon={<SendHorizontal size={14} />}
+            scopeIcon={<BookOpenText size={14} />}
+          />
+          <Composer
+            contextItems={composerContextItems}
+            disabled={!activeSession}
+            isGenerating={isGenerating}
+            isStopRequested={isStopRequested}
+            modelLabel={modelLabel}
+            modelState={providerModelState}
+            onSend={handleSend}
+            onStop={handleStop}
+            showContextPanel={false}
+            stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
+          />
+        </>
+      )}
     </section>
   );
 }

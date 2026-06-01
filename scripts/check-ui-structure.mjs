@@ -151,6 +151,77 @@ for (const token of [
   }
 }
 
+const chatViewVisualCss = readFileSync(join(root, "apps/web/src/components/chat/ChatView.module.css"), "utf8");
+const chatViewVisualSource = readFileSync(join(root, "apps/web/src/components/chat/ChatView.tsx"), "utf8");
+const chatTranscriptVisualSource = readFileSync(join(root, "apps/web/src/components/chat/ChatTranscript.tsx"), "utf8");
+const composerVisualSource = readFileSync(join(root, "apps/web/src/components/chat/Composer.tsx"), "utf8");
+const composerVisualCss = readFileSync(join(root, "apps/web/src/components/chat/Composer.module.css"), "utf8");
+const contextRailVisualCss = readFileSync(join(root, "apps/web/src/components/shell/ContextRail.module.css"), "utf8");
+
+for (const token of [
+  "data-start-state",
+  "startStage",
+  "isStartState",
+  "showContextPanel"
+]) {
+  if (!chatViewVisualSource.includes(token)) {
+    failures.push(`ChatView new-chat visual contract is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "What should Hermes work on?",
+  "Hermes is reached through the BFF",
+  "data-start-state"
+]) {
+  if (!chatTranscriptVisualSource.includes(token)) {
+    failures.push(`ChatTranscript empty-start contract is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "contextItems",
+  "contextPanel",
+  "data-visible",
+  "Browser -> BFF -> Hermes"
+]) {
+  if (!composerVisualSource.includes(token) && !chatViewVisualSource.includes(token)) {
+    failures.push(`Composer context-panel source contract is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "radial-gradient(circle at 54% 8%",
+  ".startStage",
+  ".startHero",
+  "color: var(--warning)"
+]) {
+  if (!chatViewVisualCss.includes(token)) {
+    failures.push(`ChatView visual CSS contract is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "var(--bg-glass-strong)",
+  "backdrop-filter: blur(24px)",
+  ".contextPanel[data-visible=\"true\"]",
+  "@media (prefers-reduced-motion: reduce)"
+]) {
+  if (!composerVisualCss.includes(token)) {
+    failures.push(`Composer glass/context CSS contract is missing ${token}`);
+  }
+}
+
+for (const token of [
+  "display: inline-flex",
+  "align-items: center",
+  "line-height: 1"
+]) {
+  if (!contextRailVisualCss.includes(token)) {
+    failures.push(`Context rail tab alignment CSS is missing ${token}`);
+  }
+}
+
 const memoryDetailPanel = readFileSync(
   join(root, "apps/web/src/components/memory/MemoryDetailPanel.tsx"),
   "utf8"

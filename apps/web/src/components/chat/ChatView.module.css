@@ -10,9 +10,11 @@
   border: 0;
   border-radius: 20px 0 0 20px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 220px),
-    var(--bg-workspace);
+    radial-gradient(circle at 54% 8%, rgba(145, 184, 255, 0.07), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 240px),
+    rgba(13, 15, 18, 0.74);
   box-shadow: none;
+  backdrop-filter: blur(18px);
 }
 
 .workspace::before {
@@ -31,7 +33,7 @@
   display: block;
   min-width: 0;
   min-height: auto;
-  margin: 16px clamp(20px, 4vw, 52px) 0 20px;
+  margin: 14px clamp(20px, 4vw, 52px) 0 20px;
   background: transparent;
 }
 
@@ -57,6 +59,11 @@
   padding: 24px clamp(20px, 4vw, 52px) 16px;
 }
 
+.transcript[data-start-state="true"] {
+  overflow: visible;
+  padding: 0;
+}
+
 .transcriptInner {
   display: grid;
   max-width: var(--content-width);
@@ -64,15 +71,23 @@
   gap: 20px;
 }
 
+.transcript[data-start-state="true"] .transcriptInner {
+  max-width: var(--composer-width);
+  gap: 14px;
+  justify-items: center;
+}
+
 /* Lightweight informational notice — not alarming */
 .mockBanner {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 10px;
-  border-radius: var(--radius-sm);
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 0;
+  border-radius: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--warning);
   font-size: var(--font-xs);
   line-height: 1.45;
   border: 0;
@@ -80,8 +95,41 @@
 
 .mockBanner svg {
   flex: 0 0 auto;
+  color: var(--warning);
+  opacity: 0.88;
+}
+
+.startStage {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  align-content: center;
+  gap: 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: clamp(26px, 9vh, 96px) clamp(20px, 4vw, 52px) clamp(28px, 8vh, 72px);
+}
+
+.startHero {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+  text-align: center;
+}
+
+.startEyebrow {
   color: var(--text-muted);
-  opacity: 0.7;
+  font-size: var(--font-small);
+  line-height: 1.2;
+}
+
+.startHero h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 560;
+  letter-spacing: 0;
+  line-height: 1.14;
 }
 
 .referenceRow {
@@ -113,5 +161,10 @@
   .header {
     margin-right: 18px;
     margin-left: 18px;
+  }
+
+  .startStage {
+    align-content: start;
+    padding-top: 52px;
   }
 }

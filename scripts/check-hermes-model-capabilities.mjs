@@ -1,0 +1,203 @@
+#!/usr/bin/env node
+/**
+ * check-hermes-model-capabilities.mjs
+ *
+ * Source-level check that verifies:
+ * 1. The Hermes capability contract types exist and are correct
+ * 2. normalizeHermesUiCapabilities always sets clientSelectable=false, serverConfiguredOnly=true
+ * 3. Status polling interval exists in useHermesStatus
+ * 4. No fake model switch route exists in the codebase
+ * 5. Composer receives modelState and has disabled model button
+ * 6. Reactivity fix: useHermesStatus uses setInterval
+ */
+
+import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = resolve(process.cwd());
+
+let passed = 0;
+let failed = 0;
+
+function check(label, condition, detail = "") {
+  if (condition) {
+    console.log(`  PASS  ${label}`);
+    passed++;
+  } else {
+    console.error(`  FAIL  ${label}${detail ? ` — ${detail}` : ""}`);
+    failed++;
+  }
+}
+
+function readFile(relPath) {
+  const abs = resolve(root, relPath);
+  if (!existsSync(abs)) {
+    return null;
+  }
+  return readFileSync(abs, "utf8");
+}
+
+console.log("\ncheck-hermes-model-capabilities");
+console.log("=".repeat(48));
+
+// --- 1. Type contract ---
+const typesFile = readFile("packages/hermes-client/src/types.ts");
+check(
+  "types.ts exists",
+  typesFile !== null
+);
+check(
+  "HermesModelSelectionStatus includes server-configured",
+  typesFile?.includes('"server-configured"') ?? false
+);
+check(
+  "HermesUiCapabilities.models has clientSelectable field",
+  typesFile?.includes("clientSelectable: boolean") ?? false
+);
+check(
+  "HermesUiCapabilities.models has serverConfiguredOnly field",
+  typesFile?.includes("serverConfiguredOnly: boolean") ?? false
+);
+check(
+  "HermesUiCapabilities.models has selectionStatus field",
+  typesFile?.includes("selectionStatus: HermesModelSelectionStatus") ?? false
+);
+check(
+  "HermesUiCapabilities.models has availableModels field",
+  typesFile?.includes("availableModels: HermesModelDescriptor[]") ?? false
+);
+
+// --- 2. normalizeHermesUiCapabilities always produces clientSelectable=false ---
+const indexFile = readFile("packages/hermes-client/src/index.ts");
+check(
+  "index.ts exists",
+  indexFile !== null
+);
+check(
+  "normalizeHermesUiCapabilities sets clientSelectable: false",
+  indexFile?.includes("clientSelectable: false") ?? false
+);
+check(
+  "normalizeHermesUiCapabilities sets serverConfiguredOnly: true",
+  indexFile?.includes("serverConfiguredOnly: true") ?? false
+);
+check(
+  "normalizeHermesUiCapabilities sets uiState: 'deferred' for models",
+  /models:\s*\{[\s\S]{0,600}uiState:\s*"deferred"/.test(indexFile ?? "") ?? false,
+  "models.uiState should be deferred since switching is not supported"
+);
+
+// --- 3. Reactivity: useHermesStatus uses polling interval ---
+const hookFile = readFile("apps/web/src/hooks/useHermesStatus.ts");
+check(
+  "useHermesStatus.ts exists",
+  hookFile !== null
+);
+check(
+  "useHermesStatus uses setInterval for polling",
+  hookFile?.includes("setInterval") ?? false,
+  "Status must poll periodically so UI updates when Hermes connects/disconnects"
+);
+check(
+  "useHermesStatus clears interval on unmount",
+  hookFile?.includes("clearInterval") ?? false,
+  "Must clean up interval to avoid memory leaks"
+);
+check(
+  "useHermesStatus uses mountedRef to prevent stale setState",
+  hookFile?.includes("mountedRef") ?? false,
+  "Must guard against setState after unmount"
+);
+check(
+  "useHermesStatus poll interval is 5-15 seconds",
+  /POLL_INTERVAL_MS\s*=\s*(?:[5-9]_?\d{3}|1[0-5]_?\d{3})/.test(hookFile ?? "") ||
+  /setInterval.*\d{4,5}/.test(hookFile ?? ""),
+  "Polling interval should be 5000-15000ms to avoid spam"
+);
+
+// --- 4. No fake model switch route ---
+const modelSwitchRoutePath = "apps/web/src/app/api/hermes/model/select/route.ts";
+check(
+  "No fake model switch BFF route exists",
+  !existsSync(resolve(root, modelSwitchRoutePath)),
+  "Runtime switching not supported by Hermes; no fake route should exist"
+);
+const modelSelectRoutePath = "apps/web/src/app/api/hermes/model/route.ts";
+check(
+  "No fake model select BFF route exists",
+  !existsSync(resolve(root, modelSelectRoutePath)),
+  "Runtime switching not supported; fake route would be dishonest"
+);
+
+// --- 5. Composer has disabled model button ---
+const composerFile = readFile("apps/web/src/components/chat/Composer.tsx");
+check(
+  "Composer.tsx exists",
+  composerFile !== null
+);
+check(
+  "Composer model button is always disabled",
+  /modelButton[\s\S]{0,200}disabled/.test(composerFile ?? "") ||
+  /disabled[\s\S]{0,50}modelButton/.test(composerFile ?? "") ||
+  (composerFile?.includes("modelButton") && /className=\{styles\.modelButton\}[\s\S]{0,100}disabled/.test(composerFile ?? "")),
+  "Model button must be disabled since client switching is not supported"
+);
+check(
+  "Composer receives modelState prop",
+  composerFile?.includes("modelState") ?? false
+);
+check(
+  "Composer shows modelLabel in button text",
+  composerFile?.includes("{modelLabel}") ?? false
+);
+
+// --- 6. ChatView computes model label from hermesStatus ---
+const chatViewFile = readFile("apps/web/src/components/chat/ChatView.tsx");
+check(
+  "ChatView.tsx exists",
+  chatViewFile !== null
+);
+check(
+  "ChatView passes hermesStatus to modelLabelForState",
+  chatViewFile?.includes("modelLabelForState") ?? false
+);
+check(
+  "ChatView handles unavailable model state",
+  chatViewFile?.includes("unavailable") ?? false
+);
+check(
+  "ChatView passes modelState to Composer",
+  chatViewFile?.includes("modelState={providerModelState}") ?? false
+);
+
+// --- 7. BFF status route is force-dynamic (no caching) ---
+const statusRouteFile = readFile("apps/web/src/app/api/hermes/status/route.ts");
+check(
+  "BFF status route is force-dynamic",
+  statusRouteFile?.includes('dynamic = "force-dynamic"') ?? false,
+  "Route must not be cached so polling picks up fresh Hermes state"
+);
+check(
+  "BFF status route sets Cache-Control: no-store",
+  Boolean(statusRouteFile?.includes('"Cache-Control"') && statusRouteFile?.includes("no-store"))
+);
+
+// --- 8. hermesStatusClient uses cache: no-store ---
+const statusClientFile = readFile("apps/web/src/lib/hermesStatusClient.ts");
+check(
+  "hermesStatusClient.ts exists",
+  statusClientFile !== null
+);
+check(
+  "hermesStatusClient fetch uses cache: no-store",
+  statusClientFile?.includes('"no-store"') ?? false
+);
+
+// --- Summary ---
+console.log("=".repeat(48));
+console.log(`Result: ${passed} passed, ${failed} failed`);
+
+if (failed > 0) {
+  process.exit(1);
+}

@@ -442,10 +442,16 @@ function getProviderModelState(
 }
 
 function modelLabelForState(state: HermesUiCapabilities["models"]) {
-  if (state.selectionStatus === "server-configured") {
-    return `${state.currentModelLabel} - Server-configured`;
+  if (state.selectionStatus === "server-configured" && state.currentModelLabel) {
+    return state.currentModelLabel;
   }
-  return `${state.currentModelLabel} - ${state.selectionStatus}`;
+  if (state.selectionStatus === "unavailable") {
+    return "Hermes unavailable";
+  }
+  if (state.selectionStatus === "unknown" || !state.currentModelLabel) {
+    return "Hermes default";
+  }
+  return state.currentModelLabel;
 }
 
 function assistantSafeId(value: string) {

@@ -25,6 +25,7 @@ const replayHelpers = await import(
 );
 const {
   DEFAULT_TENANT_ID,
+  DEFAULT_USER_DISPLAY_NAME,
   createMockWorkspaceState,
   formatSessionUpdatedAt,
   getVisibleSessions,
@@ -52,6 +53,7 @@ checkRunsReplayPreviewHydrationPersistence();
 checkSessionExportPreview();
 checkArchiveRepairsActiveSession();
 checkResetReturnsValidState();
+checkDefaultUserDisplayName();
 
 console.log("Workspace state checks passed.");
 
@@ -727,4 +729,22 @@ function checkResetReturnsValidState() {
     state.activeSessionId === null ||
       state.sessions.some((session) => session.id === state.activeSessionId && !session.archivedAt)
   );
+}
+
+function checkDefaultUserDisplayName() {
+  assert.equal(typeof DEFAULT_USER_DISPLAY_NAME, "string", "DEFAULT_USER_DISPLAY_NAME must be a string");
+  assert(DEFAULT_USER_DISPLAY_NAME.length > 0, "DEFAULT_USER_DISPLAY_NAME must not be empty");
+  const state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const newMessage = {
+    id: "check-display-name",
+    role: "user",
+    author: DEFAULT_USER_DISPLAY_NAME,
+    content: "check display name",
+    createdAt: "12:00",
+    status: "complete"
+  };
+  const next = workspaceReducer(state, { type: "appendMessage", sessionId: session.id, message: newMessage });
+  const addedMessage = next.sessions.find((s) => s.id === session.id)?.messages.find((m) => m.id === "check-display-name");
+  assert.equal(addedMessage?.author, DEFAULT_USER_DISPLAY_NAME, "appended user message should carry DEFAULT_USER_DISPLAY_NAME");
 }

@@ -94,7 +94,7 @@ export const longSessionMessages: ChatMessage[] = Array.from(
     const oneBased = index + 1;
     const isUser = index % 2 === 0;
     return {
-      author: isUser ? "Alexey" : "Hermes",
+      author: isUser ? "You" : "Hermes",
       content: isUser ? userContent(oneBased) : markdownAssistantContent(oneBased),
       createdAt: iso(LONG_SESSION_MESSAGE_COUNT - index),
       id: `long-message-${String(oneBased).padStart(3, "0")}`,

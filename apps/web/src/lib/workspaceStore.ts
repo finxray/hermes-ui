@@ -17,6 +17,7 @@ import type {
 export const WORKSPACE_STORAGE_KEY = "hermes-ui.workspace.v1";
 export const WORKSPACE_STORAGE_VERSION = 1;
 export const DEFAULT_TENANT_ID = "local-dev";
+export const DEFAULT_USER_DISPLAY_NAME = "You";
 
 const LEGACY_LOCAL_TENANT_ID = "tenant-local";
 

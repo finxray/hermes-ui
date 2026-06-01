@@ -14,7 +14,7 @@ import {
   createPersistedActivityEvent,
   limitPersistedActivityEvents
 } from "@/lib/persistedActivityReplay";
-import { WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
+import { DEFAULT_USER_DISPLAY_NAME, WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesUiCapabilities, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type {
   ChatMessage,
@@ -71,7 +71,7 @@ export function ChatView({
     }
 
     const session = activeSession;
-    const userMessage = createMessage("user", "Alexey", content, "complete");
+    const userMessage = createMessage("user", DEFAULT_USER_DISPLAY_NAME, content, "complete");
     const assistantId = `msg-${crypto.randomUUID()}`;
     const assistantMessage: ChatMessage = {
       id: assistantId,

@@ -119,7 +119,7 @@ const roadmapMessages: ChatMessage[] = [
   {
     id: "msg-1",
     role: "user",
-    author: "Alexey",
+    author: "You",
     createdAt: "13:04",
     content:
       "For Slice 01, make the product surface feel like a real ChatGPT-style workspace, but keep everything mocked and do not touch Hermes or Brain Memory yet."
@@ -136,7 +136,7 @@ const roadmapMessages: ChatMessage[] = [
   {
     id: "msg-3",
     role: "user",
-    author: "Alexey",
+    author: "You",
     createdAt: "13:07",
     content:
       "The active project should be Brain Memory and the active session should be Hermes UI roadmap. Show disconnected mock statuses clearly."
@@ -156,7 +156,7 @@ const gatewayMessages: ChatMessage[] = [
   {
     id: "msg-contract-1",
     role: "user",
-    author: "Alexey",
+    author: "You",
     createdAt: "12:41",
     content: "What should the Brain Memory Gateway expose to the UI first?"
   },

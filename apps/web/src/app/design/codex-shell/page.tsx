@@ -40,7 +40,7 @@ const statusItems = [
 const messages = [
   {
     role: "user",
-    author: "Alexey",
+    author: "You",
     time: "13:04",
     body: "For Slice 10D, make the product surface feel like a real Codex-style local AI workspace, but keep it static until the visual contract is proven."
   },

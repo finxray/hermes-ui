@@ -252,7 +252,7 @@ function ActiveContextSection({
         <div>
           <div className={styles.cardTitle}>
             <span>{activeProject.name}</span>
-            <span className={styles.pill}>mock</span>
+            <span className={styles.pill}>local</span>
           </div>
           <div className={styles.cardBody}>{activeProject.description}</div>
         </div>

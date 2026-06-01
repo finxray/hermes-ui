@@ -149,7 +149,7 @@
 .copyButton {
   display: inline-flex;
   flex: 0 0 auto;
-  width: 124px;
+  min-width: 118px;
   min-height: 28px;
   align-items: center;
   justify-content: center;

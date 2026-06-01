@@ -42,7 +42,7 @@ export function BrainMemoryConsole({
   isStatusLoading,
   onRefreshStatus
 }: BrainMemoryConsoleProps) {
-  const [query, setQuery] = useState("gateway");
+  const [query, setQuery] = useState("");
   const [mockDetail, setMockDetail] = useState<MemoryEvidence | null>(null);
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
   const { isSearching, lastResponse, search } = useBrainMemorySearch();

@@ -281,10 +281,30 @@ but this mechanism is **NOT exposed via the HTTP API** that the Web UI BFF uses.
 Telegram `/model` works because it calls internal gateway methods; the API server
 (`api_server.py`) always reads the model from `config.yaml` and does not honor
 request-body `model` fields for actual model selection (cosmetic only). The
-blocker is API-surface, not capability. Web UI model switching requires a new
-Hermes endpoint (e.g., `PATCH /api/sessions/{session_id}` with model field).
-The Web UI selector remains disabled/read-only with updated explanatory copy.
+blocker is API-surface, not capability.
 See `docs/checkpoints/HERMES_MODEL_SWITCHING_PARITY_INVESTIGATION.md`.
+
+## Checkpoint: Slice 13O Hermes Web UI model switching (IMPLEMENTED)
+
+Implemented **real, per-session, in-memory model switching** for the Web UI on
+2026-06-02. Changes span both the Hermes backend and Web UI:
+
+**Hermes backend (commit `7e76330b1`):**
+- Added `POST /api/sessions/{session_id}/model` endpoint
+- Added `set_session_model_override()` public method on GatewayRunner
+- `_create_agent()` now checks session overrides before config.yaml fallback
+- `GET /v1/models` returns real configured models (catalog data)
+- Namespaced session keys avoid Telegram interference
+
+**Web UI (commit `69fbadf`):**
+- Added `POST /api/hermes/model/select` BFF route
+- Added `selectHermesModel()` client function in hermes-client
+- Composer model selector enabled when 2+ models available
+- Selection goes through BFF → Hermes API → GatewayRunner override
+- Status refreshes after selection
+
+Scope: per-session, in-memory, non-global, no config.yaml write.
+See `docs/checkpoints/HERMES_WEB_UI_MODEL_SWITCHING_IMPLEMENTATION.md`.
 
 ## Checkpoint: Slice 13K Brain Memory event timeline
 

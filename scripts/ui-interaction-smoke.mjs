@@ -462,16 +462,11 @@ async function checkRightRailTabs() {
     }
     if (name === "context") {
       await expectVisible(
-        "right-rail-run-history",
-        page.getByText("Run history", { exact: true }).first(),
-        "Context tab exposes local Web UI run history."
+        "right-rail-context-contract",
+        page.getByText("Active context contract", { exact: true }).first(),
+        "Context tab exposes the active context contract."
       );
       await checkTenantScopeDiagnostics();
-      await expectVisible(
-        "right-rail-run-history-empty-state",
-        page.getByText("No runs in this session yet", { exact: true }).first(),
-        "Run history empty state is honest before a send."
-      );
       await expectVisible(
         "right-rail-export-preview",
         page.getByText("Export preview", { exact: true }).first(),
@@ -1261,21 +1256,11 @@ async function runLiveReplaySmoke({ message, sendButton }) {
   await page.getByText(message, { exact: true }).waitFor({ state: "visible", timeout: timeoutMs });
   addResult("replay-selected-session-retained", "pass", "Selected session still shows the unique user message after reload.");
 
-  const runHistory = await checkRunHistoryStatus("completed", "composer-run-history-replay-after-reload");
-  await expectHidden(
-    "replay-not-empty-after-reload",
-    runHistory.getByText("No persisted activity replay for this run", { exact: true }).first(),
-    "Persisted replay is not empty after reload."
-  );
+  const exportPreview = await checkRunHistoryStatus("completed", "composer-run-history-replay-after-reload");
   await expectVisible(
     "replay-export-preview-after-reload",
-    page.getByText("Local preview only", { exact: true }).first(),
+    exportPreview.getByText("Local preview only", { exact: true }).first(),
     "Local export preview remains available after reload."
-  );
-  await expectVisible(
-    "replay-export-counts-after-reload",
-    page.getByText("replay events", { exact: true }).first(),
-    "Export preview includes replay event count after reload."
   );
   await checkNoVisibleSecrets("replay-visible-secrets");
   await checkNoHorizontalOverflow("replay-after-reload-overflow");
@@ -1284,30 +1269,65 @@ async function runLiveReplaySmoke({ message, sendButton }) {
 async function checkRunHistoryStatus(expectedStatus, name) {
   const contextTab = page.getByRole("button", { name: "Show context panel", exact: true });
   await contextTab.click({ timeout: timeoutMs });
-  const runHistory = page.locator('section[aria-labelledby="run-history-heading"]');
+  const exportPreview = page.locator('section[aria-labelledby="export-preview-heading"]');
   await expectVisible(
     `${name}-section`,
-    runHistory.getByText("Run history", { exact: true }).first(),
-    "Run history section is visible after live composer action."
+    exportPreview.getByText("Export preview", { exact: true }).first(),
+    "Export preview section is visible after live composer action."
   );
-  await expectVisible(
+
+  const storedRun = await page.waitForFunction(
+    ({ expectedStatus: status }) => {
+      const raw = window.localStorage.getItem("hermes-ui.workspace.v1");
+      if (!raw) {
+        return null;
+      }
+      const state = JSON.parse(raw);
+      const active = state.sessions?.find((session) => session.id === state.activeSessionId);
+      const run = active?.runRecords?.find((record) => record.status === status);
+      return run
+        ? {
+            replayCount: Array.isArray(run.activityReplay) ? run.activityReplay.length : 0,
+            status: run.status
+          }
+        : null;
+    },
+    { expectedStatus },
+    { timeout: timeoutMs }
+  ).then((value) => value.jsonValue()).catch(() => null);
+  check(
     name,
-    runHistory.getByText(expectedStatus, { exact: true }).first(),
-    `Run history includes a ${expectedStatus} Web UI run.`
+    storedRun?.status === expectedStatus,
+    storedRun?.status === expectedStatus
+      ? `Workspace persistence includes a ${expectedStatus} Web UI run.`
+      : `Workspace persistence did not include a ${expectedStatus} Web UI run.`
   );
-  await expectVisible(
-    `${name}-persisted-replay`,
-    runHistory.getByText("Persisted replay", { exact: true }).first(),
-    "Selected run exposes persisted replay activity."
+
+  const details = exportPreview.locator("details").first();
+  const isOpen = await details.evaluate((node) => node instanceof HTMLDetailsElement && node.open).catch(() => false);
+  if (!isOpen) {
+    await details.locator("summary").click({ timeout: timeoutMs });
+  }
+  await page.waitForFunction(
+    ({ status }) => {
+      const pre = document.querySelector('section[aria-labelledby="export-preview-heading"] pre[data-export-preview-json="ready"]');
+      const text = pre?.textContent || "";
+      return text.includes(`"status": "${status}"`) && text.includes('"activityReplay"');
+    },
+    { status: expectedStatus },
+    { timeout: timeoutMs }
+  ).then(
+    () => addResult(`${name}-export-preview-run`, "pass", "Export preview JSON includes the persisted run status and activity replay."),
+    () => addResult(`${name}-export-preview-run`, "fail", "Export preview JSON did not include the persisted run status and activity replay.")
   );
   if (expectedStatus === "stopped") {
-    await expectVisible(
+    check(
       `${name}-persisted-stopped-event`,
-      runHistory.getByText("Stopped", { exact: true }).first(),
-      "Stopped run replay includes the persisted stopped activity."
+      Number(storedRun?.replayCount ?? 0) > 0,
+      "Stopped run persistence includes replay activity."
     );
   }
-  return runHistory;
+  return exportPreview;
 }
 
 async function waitForAssistantResponse(initialAssistantCount, expectedMarker = "UI_SMOKE_SEND_OK") {
@@ -1374,7 +1394,6 @@ async function checkDisabledPlaceholders() {
 
   const composerControls = [
     ["attach-context", "Attach context coming soon"],
-    ["model-selector", "Provider and model selector disabled"],
     ["voice-input", "Voice input coming soon"]
   ];
   for (const [name, label] of composerControls) {
@@ -1385,12 +1404,34 @@ async function checkDisabledPlaceholders() {
     );
   }
 
+  const modelButton = page
+    .locator(
+      'button[aria-label="Provider and model selector disabled"], button[aria-label="One Hermes model available"], button[aria-label="Select Hermes model"]'
+    )
+    .first();
+  const modelButtonLabel = await modelButton.getAttribute("aria-label", { timeout: timeoutMs }).catch(() => "");
+  if (modelButtonLabel === "Select Hermes model") {
+    const enabled = await modelButton.isEnabled({ timeout: timeoutMs }).catch(() => false);
+    check(
+      "composer-model-selector-enabled",
+      enabled,
+      "Runtime model selector is enabled when Hermes exposes multiple selectable models."
+    );
+  } else {
+    const disabled = await modelButton.isDisabled({ timeout: timeoutMs }).catch(() => false);
+    check(
+      "composer-model-selector-disabled",
+      disabled,
+      `Model selector remains disabled when Hermes exposes no runtime choice or only one model (${modelButtonLabel || "missing"}).`
+    );
+  }
+
   const stopButtons = await page.getByRole("button", { name: "Stop generation", exact: true }).count();
   check("composer-stop-idle-hidden", stopButtons === 0, "Stop generation is not exposed outside generation state.");
-  const modelStateText = await page.evaluate(() => {
-    const button = document.querySelector('button[aria-label="Provider and model selector disabled"]');
-    return button?.textContent?.replace(/\s+/g, " ").trim() || "";
-  });
+  const modelStateText = await modelButton
+    .innerText({ timeout: timeoutMs })
+    .then((text) => text.replace(/\s+/g, " ").trim())
+    .catch(() => "");
   check(
     "composer-model-server-configured",
     Boolean(modelStateText) &&

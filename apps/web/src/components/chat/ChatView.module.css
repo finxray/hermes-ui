@@ -28,6 +28,11 @@
   padding-bottom: calc(var(--composer-inset, 168px) + 12px);
   scroll-padding-bottom: calc(var(--composer-inset, 168px) + 12px);
   scrollbar-gutter: stable;
+  pointer-events: none;
+}
+
+.scrollViewport > * {
+  pointer-events: auto;
 }
 
 .composerAnchor {

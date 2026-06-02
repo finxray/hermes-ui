@@ -43,7 +43,8 @@ export function Composer({
   const [displacementMapHref, setDisplacementMapHref] = useState(NEUTRAL_DISPLACEMENT_MAP);
   const [displacementScale, setDisplacementScale] = useState(-86);
   const boxRef = useRef<HTMLDivElement>(null);
-  const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
+  const hasDraft = draft.trim().length > 0;
+  const canSend = hasDraft && !disabled && !isGenerating;
   const modelOptions = modelState?.availableModels ?? [];
   const canSelectModel =
     Boolean(modelState?.clientSelectable) &&
@@ -76,10 +77,14 @@ export function Composer({
     return () => observer.disconnect();
   }, []);
 
+  function updateDraft(value: string) {
+    setDraft(value);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || disabled || isGenerating) {
+    if (!message || !canSend) {
       return;
     }
     setDraft("");
@@ -143,7 +148,8 @@ export function Composer({
                   : "Message Hermes…"
               }
               value={draft}
-              onChange={(event) => setDraft(event.currentTarget.value)}
+              onChange={(event) => updateDraft(event.currentTarget.value)}
+              onInput={(event) => updateDraft(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -235,8 +241,9 @@ export function Composer({
                   ]
                     .filter(Boolean)
                     .join(" ")}
+                  data-ready={canSend ? "true" : "false"}
                   type={isGenerating ? "button" : "submit"}
-                  disabled={isGenerating ? disabled || isStopRequested : disabled || draft.trim().length === 0}
+                  disabled={isGenerating ? disabled || isStopRequested : !canSend}
                   aria-label={isGenerating ? "Stop generation" : "Send message"}
                   onClick={isGenerating ? stopGeneration : undefined}
                   title={isGenerating ? stopControlTitle(stopControlState) : undefined}

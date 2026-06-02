@@ -97,6 +97,7 @@ export function ChatView({
     }
 
     const session = activeSession;
+    let generationStarted = false;
     const userMessage = createMessage("user", DEFAULT_USER_DISPLAY_NAME, content, "complete");
     const assistantId = `msg-${crypto.randomUUID()}`;
     const assistantMessage: ChatMessage = {
@@ -156,9 +157,11 @@ export function ChatView({
     });
     setAssistantHasContent(false);
     setIsGenerating(true);
+    generationStarted = true;
     setIsStopRequested(false);
     stopRequestedRef.current = false;
 
+    try {
     if (!canUseRealHermes(hermesStatus)) {
       const fallback = mockUnavailableResponse(hermesStatus, isHermesStatusLoading);
       workspaceActions.updateMessage(session.id, assistantId, fallback, "mock", [
@@ -173,8 +176,6 @@ export function ChatView({
         status: "failed",
         summary: "Hermes unavailable; no real agent call was made."
       });
-      setIsGenerating(false);
-      setIsStopRequested(false);
       return;
     }
 
@@ -307,9 +308,6 @@ export function ChatView({
           : "Stopped by user before assistant output."
       });
       setAssistantHasContent(true);
-      setIsGenerating(false);
-      setIsStopRequested(false);
-      stopRequestedRef.current = false;
       return;
     }
 
@@ -339,9 +337,13 @@ export function ChatView({
           ? summarizeRunPrompt(accumulated)
           : "Hermes completed without assistant text."
     });
-    setIsGenerating(false);
-    setIsStopRequested(false);
-    stopRequestedRef.current = false;
+    } finally {
+      if (generationStarted) {
+        setIsGenerating(false);
+        setIsStopRequested(false);
+        stopRequestedRef.current = false;
+      }
+    }
   }
 
   function handleStop() {

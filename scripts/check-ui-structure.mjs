@@ -257,6 +257,9 @@ if (!chatViewVisualCss.includes("position: absolute") || !chatViewVisualCss.incl
 if (!chatViewVisualCss.includes(".composerDock")) {
   failures.push("Composer must dock to the bottom without shortening the scrollbar track.");
 }
+if (!chatViewVisualCss.includes(".scrollViewport > *") || !chatViewVisualCss.includes("pointer-events: auto")) {
+  failures.push("Chat scroll viewport must not block docked composer pointer events.");
+}
 if (!chatViewVisualCss.includes(".composerAnchor")) {
   failures.push("Composer must use a centered anchor aligned with transcript content width.");
 }

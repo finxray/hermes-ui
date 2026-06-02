@@ -4,6 +4,7 @@ import { Check, Copy, ExternalLink } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypePrism from "rehype-prism-plus";
 import type { Components } from "react-markdown";
 import styles from "./MessageMarkdown.module.css";
 
@@ -16,6 +17,13 @@ export const MessageMarkdown = memo(function MessageMarkdown({
   content,
   isStreaming = false
 }: MessageMarkdownProps) {
+  // During streaming, skip rehype-prism-plus to avoid flickering on incomplete code fences.
+  // We still run remark-gfm so inline formatting like bold/italic renders progressively.
+  const rehypePlugins = useMemo(
+    () => (isStreaming ? [] : [[rehypePrism, { ignoreMissing: true }]]),
+    [isStreaming]
+  ) as import("unified").PluggableList;
+
   const components = useMemo<Components>(
     () => ({
       a({ children, href }) {
@@ -39,7 +47,19 @@ export const MessageMarkdown = memo(function MessageMarkdown({
           );
         }
 
-        return <CodeBlock code={raw} isStreaming={isStreaming} language={language} />;
+        return (
+          <CodeBlock
+            code={raw}
+            isStreaming={isStreaming}
+            language={language}
+            prismChildren={children}
+          />
+        );
+      },
+      pre({ children }) {
+        // react-markdown wraps <code> in <pre>; we handle the <pre> wrapper inside CodeBlock,
+        // so just pass children through to avoid double-wrapping.
+        return <>{children}</>;
       },
       table({ children }) {
         return (
@@ -54,7 +74,12 @@ export const MessageMarkdown = memo(function MessageMarkdown({
 
   return (
     <div className={styles.markdown} data-streaming={isStreaming ? "true" : "false"}>
-      <ReactMarkdown components={components} remarkPlugins={[remarkGfm]} skipHtml>
+      <ReactMarkdown
+        components={components}
+        rehypePlugins={rehypePlugins}
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+      >
         {content}
       </ReactMarkdown>
     </div>
@@ -97,28 +122,14 @@ export function CopyTextButton({
 const CodeBlock = memo(function CodeBlock({
   code,
   isStreaming,
-  language
+  language,
+  prismChildren
 }: {
   code: string;
   isStreaming: boolean;
   language: string;
+  prismChildren: React.ReactNode;
 }) {
-  const highlightedLines = useMemo(
-    () => {
-      if (isStreaming || !language) {
-        return null;
-      }
-      const lines = code.split("\n");
-      return lines.map((line, index) => (
-        <span className={styles.codeLine} key={`${index}-${line}`}>
-          {highlightLine(line, language)}
-          {index < lines.length - 1 ? "\n" : null}
-        </span>
-      ));
-    },
-    [code, isStreaming, language]
-  );
-
   return (
     <figure className={styles.codeBlock}>
       <figcaption className={styles.codeHeader}>
@@ -126,7 +137,11 @@ const CodeBlock = memo(function CodeBlock({
         <CopyTextButton className={styles.copyButton} label="Copy code" text={code} />
       </figcaption>
       <pre>
-        <code>{highlightedLines ?? code}</code>
+        {/* When streaming or no prism highlighting, fall back to plain text.
+            When complete, prismChildren already contains highlighted spans from rehype-prism-plus. */}
+        <code className={language ? `language-${language}` : undefined}>
+          {isStreaming ? code : prismChildren}
+        </code>
       </pre>
     </figure>
   );
@@ -171,112 +186,4 @@ function safeHref(href?: string) {
     return "#";
   }
   return "#";
-}
-
-function highlightLine(line: string, language: string) {
-  const tokens = tokenizeLine(line, language);
-  return tokens.map((token, index) => (
-    <span className={styles[token.kind]} key={`${index}-${token.value}`}>
-      {token.value}
-    </span>
-  ));
-}
-
-function tokenizeLine(line: string, language: string): Array<{ kind: TokenKind; value: string }> {
-  const tokens: Array<{ kind: TokenKind; value: string }> = [];
-  let index = 0;
-  const commentStart = findCommentStart(line, language);
-
-  while (index < line.length) {
-    if (commentStart === index) {
-      tokens.push({ kind: "tokenComment", value: line.slice(index) });
-      break;
-    }
-
-    const char = line[index];
-    if (char === "\"" || char === "'" || char === "`") {
-      const end = findStringEnd(line, index, char);
-      tokens.push({ kind: "tokenString", value: line.slice(index, end) });
-      index = end;
-      continue;
-    }
-
-    const rest = line.slice(index);
-    const number = rest.match(/^\b\d+(?:\.\d+)?\b/);
-    if (number) {
-      tokens.push({ kind: "tokenNumber", value: number[0] });
-      index += number[0].length;
-      continue;
-    }
-
-    const word = rest.match(/^[A-Za-z_$][\w$-]*/);
-    if (word) {
-      tokens.push({
-        kind: keywordSet(language).has(word[0]) ? "tokenKeyword" : "tokenPlain",
-        value: word[0]
-      });
-      index += word[0].length;
-      continue;
-    }
-
-    tokens.push({ kind: "tokenPlain", value: char });
-    index += 1;
-  }
-
-  return tokens.length > 0 ? tokens : [{ kind: "tokenPlain", value: "" }];
-}
-
-type TokenKind = "tokenComment" | "tokenKeyword" | "tokenNumber" | "tokenPlain" | "tokenString";
-
-function findCommentStart(line: string, language: string) {
-  const markers = language === "python" || language === "py" || language === "bash" || language === "sh"
-    ? ["#"]
-    : ["//"];
-  const positions = markers
-    .map((marker) => line.indexOf(marker))
-    .filter((position) => position >= 0);
-  return positions.length > 0 ? Math.min(...positions) : -1;
-}
-
-function findStringEnd(line: string, start: number, quote: string) {
-  for (let index = start + 1; index < line.length; index += 1) {
-    if (line[index] === quote && line[index - 1] !== "\\") {
-      return index + 1;
-    }
-  }
-  return line.length;
-}
-
-function keywordSet(language: string) {
-  if (language === "ts" || language === "tsx" || language === "js" || language === "jsx" || language === "javascript" || language === "typescript") {
-    return new Set([
-      "async",
-      "await",
-      "const",
-      "else",
-      "export",
-      "false",
-      "for",
-      "from",
-      "function",
-      "if",
-      "import",
-      "let",
-      "null",
-      "return",
-      "true",
-      "type",
-      "undefined"
-    ]);
-  }
-  if (language === "python" || language === "py") {
-    return new Set(["and", "as", "def", "else", "False", "for", "from", "if", "import", "in", "None", "return", "True"]);
-  }
-  if (language === "css") {
-    return new Set(["align-items", "background", "border", "color", "display", "flex", "grid", "margin", "padding"]);
-  }
-  if (language === "json") {
-    return new Set(["false", "null", "true"]);
-  }
-  return new Set(["false", "null", "true"]);
 }

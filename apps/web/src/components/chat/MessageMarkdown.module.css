@@ -211,22 +211,110 @@
   border-bottom: 0;
 }
 
-.tokenComment {
+.tableScroller tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+/* Prism token colours — must use :global because rehype-prism-plus emits bare class names */
+:global(.token.comment),
+:global(.token.prolog),
+:global(.token.doctype),
+:global(.token.cdata) {
   color: #738095;
+  font-style: italic;
 }
 
-.tokenKeyword {
-  color: #91b8ff;
+:global(.token.punctuation) {
+  color: #8b9db5;
 }
 
-.tokenNumber {
+:global(.token.namespace) {
+  opacity: 0.7;
+}
+
+:global(.token.property),
+:global(.token.tag),
+:global(.token.boolean),
+:global(.token.number),
+:global(.token.constant),
+:global(.token.symbol),
+:global(.token.deleted),
+:global(.token.attr-name) {
   color: #f3c969;
 }
 
-.tokenPlain {
-  color: #d7dde8;
+:global(.token.selector),
+:global(.token.string),
+:global(.token.char),
+:global(.token.builtin),
+:global(.token.inserted) {
+  color: #8ee6c6;
 }
 
-.tokenString {
-  color: #8ee6c6;
+:global(.token.operator),
+:global(.token.entity),
+:global(.token.url),
+:global(.language-css .token.string),
+:global(.style .token.string) {
+  color: #c5a5ff;
+}
+
+:global(.token.atrule),
+:global(.token.attr-value),
+:global(.token.keyword) {
+  color: #91b8ff;
+}
+
+:global(.token.function),
+:global(.token.class-name) {
+  color: #ffb86c;
+}
+
+:global(.token.regex),
+:global(.token.important),
+:global(.token.variable) {
+  color: #f1836a;
+}
+
+:global(.token.important),
+:global(.token.bold) {
+  font-weight: bold;
+}
+
+:global(.token.italic) {
+  font-style: italic;
+}
+
+:global(.token.entity) {
+  cursor: help;
+}
+
+/* Line numbers support from rehype-prism-plus */
+:global(.code-highlight) {
+  float: left;
+  min-width: 100%;
+}
+
+:global(.code-line) {
+  display: block;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-left: -16px;
+  margin-right: -16px;
+  border-left: 2px solid transparent;
+}
+
+:global(.code-line.inserted) {
+  background-color: rgba(16, 185, 129, 0.1);
+  border-left-color: #10b981;
+}
+
+:global(.code-line.deleted) {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+
+:global(.highlight-line) {
+  background-color: rgba(145, 184, 255, 0.08);
+  border-left-color: rgba(145, 184, 255, 0.6);
 }

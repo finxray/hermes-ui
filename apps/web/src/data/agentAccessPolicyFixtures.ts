@@ -1,4 +1,9 @@
-import type { HermesRunsBffAgentAccessMode } from "@/types/hermesRunsBffRequest";
+export type HermesRunsBffAgentAccessMode =
+  | "chat_only"
+  | "read_only_tools"
+  | "ask_before_tools"
+  | "full_access"
+  | "custom";
 
 export type AgentAccessPolicyFixture = {
   mode: HermesRunsBffAgentAccessMode;

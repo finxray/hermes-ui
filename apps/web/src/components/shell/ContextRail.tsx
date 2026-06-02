@@ -1,13 +1,13 @@
 "use client";
 
-import { Activity, Database, FileText, FolderGit2, History, KeyRound, ShieldCheck, Terminal } from "lucide-react";
+import { Activity, Database, FileText, FolderGit2, KeyRound, ShieldCheck, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
-import { createRunReplaySummary, createSessionExportPreview } from "@/lib/persistedActivityReplay";
+import { createSessionExportPreview } from "@/lib/persistedActivityReplay";
 import { buildTenantScopeDiagnostics, type TenantScopeDiagnostics } from "@/lib/tenantScopeDiagnostics";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
@@ -62,7 +62,6 @@ export function ContextRail({
   const memoryEvidence = activeSession?.memoryEvidence ?? [];
   const toolEvents = activeSession?.toolEvents ?? [];
   const artifacts = activeSession?.artifacts ?? [];
-  const runRecords = activeSession?.runRecords ?? [];
 
   return (
     <aside className={styles.rail} data-shell-rail="right" aria-label="Context, memory, tools, and files">
@@ -102,7 +101,6 @@ export function ContextRail({
               hermesStatus={hermesStatus}
               redactedPosture={tenantScopePosture}
             />
-            <RunHistorySection runRecords={runRecords} />
             <ExportPreviewSection activeSession={activeSession} />
             <ContextContractSection activeProject={activeProject} activeSession={activeSession} />
             <RetrievedMemorySection memoryEvidence={memoryEvidence} />
@@ -357,117 +355,6 @@ function RetrievedMemorySection({ memoryEvidence }: { memoryEvidence: Session["m
   );
 }
 
-function RunHistorySection({ runRecords }: { runRecords: Session["runRecords"] }) {
-  const recentRuns = [...runRecords].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 8);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const selectedRun =
-    recentRuns.find((run) => run.id === selectedRunId) ?? recentRuns[0] ?? null;
-
-  return (
-    <section className={styles.section} aria-labelledby="run-history-heading">
-      <SectionLabel id="run-history-heading" icon={<History size={13} />} label="Run history" />
-      {recentRuns.length === 0 ? (
-        <EmptyState compact title="No runs in this session yet" body="Web UI-created runs will appear here after a send." />
-      ) : (
-        <div className={styles.runHistory}>
-          <ul className={styles.list}>
-            {recentRuns.map((run) => (
-              <li key={run.id}>
-                <button
-                  className={`${styles.runRow} ${selectedRun?.id === run.id ? styles.selectedRunRow : ""}`}
-                  type="button"
-                  onClick={() => setSelectedRunId(run.id)}
-                >
-                  <span className={styles.cardTitle}>
-                    <span>{run.summary ?? "Web UI run"}</span>
-                    <span className={styles.pill}>{run.status}</span>
-                  </span>
-                  <span className={styles.meta}>
-                    {formatRunDate(run.startedAt)} - {run.sourceChannel}
-                    {run.durationMs !== undefined ? ` - ${formatActivityDuration(run.durationMs)}` : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          {selectedRun ? <RunDetail run={selectedRun} /> : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function RunDetail({ run }: { run: Session["runRecords"][number] }) {
-  const replaySummary = createRunReplaySummary(run);
-  return (
-    <div className={styles.runDetail} aria-label="Selected run detail">
-      <div className={styles.fieldGrid}>
-        <ContextField label="Status" value={run.status} />
-        <ContextField label="Source" value={run.sourceChannel} />
-        <ContextField label="Started" value={formatRunDate(run.startedAt)} />
-        <ContextField
-          label="Duration"
-          value={run.durationMs !== undefined ? formatActivityDuration(run.durationMs) : "In progress"}
-        />
-        <ContextField label="Provider" value={run.providerLabel ?? "Hermes server config"} />
-        <ContextField label="Model" value={run.modelLabel ?? "Hermes server model"} />
-        <ContextField label="Hermes session" value={run.hermesSessionId} />
-        <ContextField label="Hermes run" value={run.hermesRunId ?? "Not emitted on this stream"} />
-      </div>
-      <div className={styles.metrics}>
-        <Metric label="tools" value={run.activitySummary.toolCount} />
-        <Metric label="memory" value={run.activitySummary.memoryCount} />
-        <Metric label="commands" value={run.activitySummary.commandCount} />
-        <Metric label="approvals" value={run.activitySummary.approvalCount} />
-      </div>
-      <div className={styles.meta}>
-        {run.activitySummary.errorCount} errors - {run.activityEventIds.length} linked activity events - {replaySummary.eventCount} persisted replay events
-        {run.stoppedByUser ? " - stopped by user" : ""}
-      </div>
-      <PersistedReplayList events={run.activityReplay} />
-    </div>
-  );
-}
-
-function PersistedReplayList({ events }: { events: PersistedActivityEvent[] }) {
-  return (
-    <section className={styles.replaySection} aria-label="Persisted activity replay">
-      <div className={styles.sectionLabel}>
-        <span>Persisted replay</span>
-      </div>
-      {events.length === 0 ? (
-        <EmptyState
-          compact
-          title="No persisted activity replay for this run"
-          body="This run has transcript and run metadata only."
-        />
-      ) : (
-        <ul className={styles.replayList}>
-          {events.slice(-8).map((event) => (
-            <li className={styles.replayRow} data-status={event.status} key={event.id}>
-              <span className={styles.cardTitle}>
-                <span>{event.title}</span>
-                <span className={styles.pill}>{event.status}</span>
-              </span>
-              <span className={styles.cardBody}>
-                {event.command?.commandPreview ??
-                  event.summary ??
-                  event.detailsPreview ??
-                  replayFallback(event)}
-              </span>
-              <span className={styles.meta}>
-                {event.type} - {event.sourceChannel}
-                {event.durationMs !== undefined ? ` - ${formatActivityDuration(event.durationMs)}` : ""}
-                {event.command?.exitCode !== undefined ? ` - exit ${event.command.exitCode}` : ""}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 function ExportPreviewSection({ activeSession }: { activeSession: Session | null }) {
   const [isExportPreviewOpen, setIsExportPreviewOpen] = useState(false);
   const [exportPreviewCache, setExportPreviewCache] = useState<ExportPreviewCache | null>(null);
@@ -500,11 +387,6 @@ function ExportPreviewSection({ activeSession }: { activeSession: Session | null
     );
   }
 
-  const runCount = activeSession.runRecords.length;
-  const replayEventCount = activeSession.runRecords.reduce(
-    (total, run) => total + (run.activityReplay?.length ?? 0),
-    0
-  );
   const previewJson =
     exportPreviewCache?.cacheKey === exportPreviewCacheKey ? exportPreviewCache.previewJson : "";
   const previewBuildMs =
@@ -520,14 +402,12 @@ function ExportPreviewSection({ activeSession }: { activeSession: Session | null
             <span className={styles.pill}>no backend export</span>
           </div>
           <div className={styles.cardBody}>
-            Session transcript, run records, memory scope, and persisted activity replay are previewed from local
+            Session transcript and memory scope are previewed from local
             browser state. Raw payloads and credential-like values are excluded or redacted.
           </div>
         </div>
         <div className={styles.metrics}>
           <Metric label="messages" value={activeSession.messages.length} />
-          <Metric label="runs" value={runCount} />
-          <Metric label="replay events" value={replayEventCount} />
           <Metric label="excluded fields" value={SESSION_EXPORT_EXCLUDED_FIELDS.length} />
         </div>
         <div className={styles.fieldGrid}>

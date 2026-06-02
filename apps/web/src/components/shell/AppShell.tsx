@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
+import { useHermesSessions } from "@/hooks/useHermesSessions";
 import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnosticsPosture";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { useState } from "react";
@@ -16,6 +17,7 @@ import styles from "./AppShell.module.css";
 export function AppShell() {
   const { actions, activeProject, activeSession, isHydrated, state } = useWorkspaceState();
   const hermesStatus = useHermesStatus();
+  const hermesSessions = useHermesSessions(hermesStatus.status?.mode === "real" && hermesStatus.status.reachable);
   const brainMemoryStatus = useBrainMemoryStatus();
   const tenantScopePosture = useTenantScopeDiagnosticsPosture();
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
@@ -66,11 +68,14 @@ export function AppShell() {
         activeSession={activeSession}
         allSessions={state.sessions}
         connectionStatus={state.connectionStatus}
+        hermesSessions={hermesSessions.sessions}
+        isHermesSessionsLoading={hermesSessions.isLoading}
         hermesStatus={hermesStatus.status}
         isHermesStatusLoading={hermesStatus.isLoading}
         isHydrated={isHydrated}
         projects={state.projects}
         refreshHermesStatus={hermesStatus.refresh}
+        refreshHermesSessions={hermesSessions.refresh}
       />
       <div
         className={mainWindowStyles.mainWindow}

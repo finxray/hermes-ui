@@ -18,6 +18,11 @@ import type {
   HermesRunsApprovalProbeResult,
   HermesRunsProbeResult,
   HermesRunsStopProbeResult,
+  HermesSessionDeleteResult,
+  HermesSessionListResult,
+  HermesSessionMessage,
+  HermesSessionMessagesResult,
+  HermesSessionSummary,
   HermesStatusError,
   HermesUiCapabilities,
   NormalizedHermesStatus
@@ -59,6 +64,11 @@ export type {
   HermesRunsProbeResult,
   HermesRunStopResult,
   HermesRunsStopProbeResult,
+  HermesSessionDeleteResult,
+  HermesSessionListResult,
+  HermesSessionMessage,
+  HermesSessionMessagesResult,
+  HermesSessionSummary,
   HermesStatusError,
   HermesUiCapabilities,
   NormalizedHermesStatus
@@ -1323,6 +1333,131 @@ export async function runHermesRunsApprovalProbe(
     blocker,
     timings: { eventStreamMs }
   });
+}
+
+export async function listHermesSessions(
+  config: HermesClientConfig
+): Promise<HermesSessionListResult> {
+  if (config.enabled === false) {
+    return { ok: false, sessions: [], error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." } };
+  }
+  if (!config.baseUrl?.trim()) {
+    return { ok: false, sessions: [], error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes sessions." } };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return { ok: false, sessions: [], error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." } };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const result = await fetchJsonEndpoint({ apiKey: config.apiKey, base, fetchImpl, path: "/api/sessions", signal: config.signal, timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS });
+  if (!result.ok) {
+    return { ok: false, sessions: [], error: result.error };
+  }
+
+  const raw = result.data;
+  const rawSessions = Array.isArray(raw?.sessions) ? raw.sessions : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+  const sessions: HermesSessionSummary[] = (rawSessions as unknown[])
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+    .map((item) => ({
+      id: asString(item.id) || asString(item.session_id),
+      title: asString(item.title) || "Untitled session",
+      model: asString(item.model) || null,
+      startedAt: asString(item.started_at) || asString(item.created_at) || new Date().toISOString(),
+      endedAt: asString(item.ended_at) || asString(item.end_time) || null,
+      messageCount: typeof item.message_count === "number" ? item.message_count : undefined
+    }))
+    .filter((session) => Boolean(session.id));
+
+  return { ok: true, sessions, error: null };
+}
+
+export async function getHermesSessionMessages(
+  config: HermesClientConfig,
+  sessionId: string
+): Promise<HermesSessionMessagesResult> {
+  const safeId = sanitizeHermesId(sessionId);
+  if (config.enabled === false) {
+    return { ok: false, messages: [], sessionId: safeId, error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." } };
+  }
+  if (!config.baseUrl?.trim()) {
+    return { ok: false, messages: [], sessionId: safeId, error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes session messages." } };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return { ok: false, messages: [], sessionId: safeId, error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." } };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const result = await fetchJsonEndpoint({ apiKey: config.apiKey, base, fetchImpl, path: `/api/sessions/${encodeURIComponent(safeId)}/messages`, signal: config.signal, timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS });
+  if (!result.ok) {
+    return { ok: false, messages: [], sessionId: safeId, error: result.error };
+  }
+
+  const raw = result.data;
+  const rawMessages = Array.isArray(raw?.messages) ? raw.messages : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+  const messages: HermesSessionMessage[] = (rawMessages as unknown[])
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+    .map((item) => ({
+      id: asString(item.id) || asString(item.message_id) || `msg-${Math.random().toString(36).slice(2)}`,
+      role: normalizeMessageRole(item.role),
+      content: asString(item.content),
+      createdAt: asString(item.created_at) || asString(item.timestamp) || undefined
+    }))
+    .filter((msg) => Boolean(msg.content));
+
+  return { ok: true, messages, sessionId: safeId, error: null };
+}
+
+export async function deleteHermesSession(
+  config: HermesClientConfig,
+  sessionId: string
+): Promise<HermesSessionDeleteResult> {
+  const safeId = sanitizeHermesId(sessionId);
+  if (config.enabled === false) {
+    return { ok: false, error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." } };
+  }
+  if (!config.baseUrl?.trim()) {
+    return { ok: false, error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes session deletion." } };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return { ok: false, error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." } };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const abort = createLinkedAbortController(config.signal, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const headers = new Headers({ Accept: "application/json" });
+  applyHermesAuth(headers, config.apiKey);
+
+  try {
+    const response = await fetchImpl(buildEndpointUrl(base, `/api/sessions/${encodeURIComponent(safeId)}`), {
+      cache: "no-store",
+      headers,
+      method: "DELETE",
+      signal: abort.signal
+    });
+    if (response.ok || response.status === 404) {
+      return { ok: true, error: null };
+    }
+    const data = await readJsonObject(response);
+    return {
+      ok: false,
+      error: { kind: "http_error", message: await safeHermesErrorMessageFromData(response.status, data, `/api/sessions/${safeId}`) }
+    };
+  } catch (error) {
+    return { ok: false, error: normalizeChatFetchError(error) };
+  } finally {
+    abort.cleanup();
+  }
+}
+
+function normalizeMessageRole(value: unknown): HermesSessionMessage["role"] {
+  const s = asString(value).toLowerCase().trim();
+  if (s === "user" || s === "assistant" || s === "system" || s === "tool") {
+    return s;
+  }
+  return "assistant";
 }
 
 export function normalizeHermesSseEvent(

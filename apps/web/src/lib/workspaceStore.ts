@@ -45,6 +45,7 @@ type WorkspaceAction =
       references?: string[];
     }
   | { type: "appendToolEvent"; sessionId: string; event: ToolEvent }
+  | { type: "loadHermesMessages"; sessionId: string; messages: ChatMessage[] }
   | { type: "reset" };
 
 export type { WorkspaceAction };
@@ -84,6 +85,8 @@ export function workspaceReducer(
       return updateMessage(state, action);
     case "appendToolEvent":
       return appendToolEvent(state, action.sessionId, action.event);
+    case "loadHermesMessages":
+      return loadHermesMessages(state, action.sessionId, action.messages);
     case "reset":
       return createMockWorkspaceState();
     default:
@@ -462,6 +465,30 @@ function appendToolEvent(
     )
   };
   return touchProject(next, session.projectId, now);
+}
+
+function loadHermesMessages(
+  state: WorkspaceState,
+  sessionId: string,
+  messages: ChatMessage[]
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session) {
+    return state;
+  }
+  const now = new Date().toISOString();
+  return {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            messages,
+            updatedAt: now
+          }
+        : item
+    )
+  };
 }
 
 function touchProject(state: WorkspaceState, projectId: string, updatedAt: string): WorkspaceState {

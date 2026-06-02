@@ -62,6 +62,9 @@ export default function LongSessionFixturePage() {
           isHydrated
           projects={longSessionProjects}
           refreshHermesStatus={noop}
+          hermesSessions={[]}
+          isHermesSessionsLoading={false}
+          refreshHermesSessions={noop}
         />
         <section className={styles.transcriptWrap} aria-label="Long-session transcript fixture">
           <ChatTranscript

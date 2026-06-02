@@ -245,6 +245,164 @@
   font-weight: 650;
 }
 
+.sectionRefresh {
+  display: grid;
+  place-items: center;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.sectionRefresh:hover:not(:disabled) {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sectionRefresh:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hermesSessionRow {
+  position: relative;
+}
+
+.hermesSessionItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.hermesSessionItem:hover .hermesSessionDelete {
+  opacity: 1;
+}
+
+.hermesSessionButton {
+  display: grid;
+  min-width: 0;
+  min-height: var(--row-height);
+  padding: 5px 8px 5px 12px;
+  border: 0;
+  border-radius: 10px 0 0 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.hermesSessionButton:hover:not(:disabled),
+.hermesSessionButton:focus-visible {
+  background: rgba(255, 255, 255, 0.052);
+  color: var(--text-primary);
+  outline: 0;
+}
+
+.hermesSessionButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.hermesSessionTitle {
+  display: block;
+  overflow: hidden;
+  font-size: var(--font-xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesSessionMeta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 1px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.hermesSessionDelete {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0 10px 10px 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+}
+
+.hermesSessionDelete:hover,
+.hermesSessionDelete:focus-visible {
+  background: rgba(255, 60, 50, 0.12);
+  color: #ff6060;
+  opacity: 1;
+  outline: 0;
+}
+
+.deleteConfirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--row-height);
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgba(255, 60, 50, 0.08);
+  border: 1px solid rgba(255, 60, 50, 0.18);
+}
+
+.deleteConfirmLabel {
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteConfirmYes,
+.deleteConfirmNo {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: var(--font-xs);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.deleteConfirmYes {
+  background: rgba(255, 60, 50, 0.2);
+  border-color: rgba(255, 60, 50, 0.3);
+  color: #ff7070;
+}
+
+.deleteConfirmYes:hover {
+  background: rgba(255, 60, 50, 0.35);
+  color: #ff9090;
+}
+
+.deleteConfirmNo {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.deleteConfirmNo:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
 .renameInput {
   display: block;
   width: 100%;

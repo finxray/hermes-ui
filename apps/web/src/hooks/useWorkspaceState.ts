@@ -72,7 +72,9 @@ export function useWorkspaceState() {
           content,
           references,
           status
-        })
+        }),
+      loadHermesMessages: (sessionId: string, messages: ChatMessage[]) =>
+        dispatch({ type: "loadHermesMessages", sessionId, messages })
     }),
     []
   );

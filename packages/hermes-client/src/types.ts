@@ -8,6 +8,7 @@ export type HermesStatusError = {
     | "network"
     | "timeout"
     | "http_error"
+    | "bad_response"
     | "unknown";
   message: string;
 };
@@ -384,6 +385,34 @@ export type HermesRunsStopProbeResult = {
   error: HermesChatError | null;
   blocker: string | null;
 };
+
+export type HermesSessionSummary = {
+  id: string;
+  title: string;
+  model: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  messageCount?: number;
+};
+
+export type HermesSessionMessage = {
+  id: string;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  createdAt?: string;
+};
+
+export type HermesSessionListResult =
+  | { ok: true; sessions: HermesSessionSummary[]; error: null }
+  | { ok: false; sessions: []; error: HermesStatusError };
+
+export type HermesSessionMessagesResult =
+  | { ok: true; messages: HermesSessionMessage[]; sessionId: string; error: null }
+  | { ok: false; messages: []; sessionId: string; error: HermesStatusError };
+
+export type HermesSessionDeleteResult =
+  | { ok: true; error: null }
+  | { ok: false; error: HermesStatusError };
 
 export type HermesRunApprovalChoice = "once" | "session" | "always" | "deny";
 

@@ -1,5 +1,5 @@
 import { AlertTriangle, BookOpenText, SendHorizontal } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -71,6 +71,14 @@ export function ChatView({
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
   const composerInsetPx = useComposerInset(composerWrapRef, !isStartState);
+
+  useEffect(() => {
+    setIsGenerating(false);
+    setIsStopRequested(false);
+    stopRequestedRef.current = false;
+    activeStreamControllerRef.current?.abort();
+    activeStreamControllerRef.current = null;
+  }, [activeSession?.id]);
   const selectedSessionModel = activeSession ? selectedModelBySession[activeSession.id] : undefined;
   const providerModelState = applySessionSelectedModel(
     getProviderModelState(hermesStatus, modelChoices),

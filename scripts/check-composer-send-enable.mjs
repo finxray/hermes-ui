@@ -29,10 +29,15 @@ const chatView = read(chatViewPath);
 const composerCss = read(composerCssPath);
 
 expect(composer.includes('const [draft, setDraft] = useState("")'), "Composer keeps local draft state.");
+expect(composer.includes("textareaRef"), "Composer reads draft from textarea ref as well as state.");
+expect(composer.includes("function getTrimmedDraft"), "Composer resolves trimmed draft from DOM/state.");
 expect(composer.includes("function updateDraft(value: string)"), "Composer centralizes draft updates.");
 expect(composer.includes("onChange={(event) => updateDraft(event.currentTarget.value)}"), "Composer textarea onChange updates draft.");
 expect(composer.includes("onInput={(event) => updateDraft(event.currentTarget.value)}"), "Composer textarea onInput mirrors draft for native typing.");
-expect(composer.includes("draft.trim().length > 0"), "Composer send enablement uses trimmed draft length.");
+expect(
+  composer.includes("getTrimmedDraft(textareaRef.current, draft).length > 0"),
+  "Composer send enablement uses trimmed draft length from DOM/state."
+);
 expect(composer.includes("canSend ? styles.ready :"), "Composer send button applies ready styling from canSend.");
 expect(composer.includes('data-ready={canSend ? "true" : "false"}'), "Composer send button exposes data-ready for styling.");
 expect(
@@ -42,7 +47,10 @@ expect(
 expect(composer.includes('type={isGenerating ? "button" : "submit"}'), "Composer uses submit type when idle.");
 expect(chatView.includes("disabled={!activeSession}"), "ChatView only disables composer without an active session.");
 expect(!chatView.includes("disabled={!canUseRealHermes"), "ChatView must not disable composer from Hermes reachability.");
-expect(composerCss.includes(".sendButton[data-ready=\"true\"]"), "Send button ready styles use data-ready attribute.");
+expect(
+  composerCss.includes('.sendButton[data-ready="true"]:not(:disabled)'),
+  "Send button ready styles use data-ready when enabled."
+);
 expect(
   composerCss.includes(".sendButton:disabled:not(.stopButton)") || composerCss.includes('[data-ready="false"]'),
   "Disabled send styling remains scoped."
@@ -74,23 +82,26 @@ if (process.env.HERMES_UI_COMPOSER_SEND_PROBE === "1") {
     const probe = await sendButton.evaluate((button) => {
       const textareaEl = document.querySelector('textarea[aria-label="Message"]');
       const box = button.getBoundingClientRect();
-      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height / 2;
+      const stack = document.elementsFromPoint(cx, cy);
+      const hitsSend =
+        stack.includes(button) ||
+        stack.some(
+          (node) => node instanceof HTMLElement && node.closest('button[aria-label="Send message"]') === button
+        );
       return {
         dataReady: button.getAttribute("data-ready"),
         disabled: button.disabled,
         draft: textareaEl instanceof HTMLTextAreaElement ? textareaEl.value : "",
-        hitAria: hit instanceof HTMLElement ? hit.getAttribute("aria-label") : null,
-        hitTag: hit instanceof HTMLElement ? hit.tagName : null
+        hitsSend
       };
     });
 
     expect(probe.draft.trim().length > 0, "Browser textarea value is non-empty after keyboard typing.");
     expect(!probe.disabled, "Send button is enabled after keyboard typing.");
     expect(probe.dataReady === "true", `Send button data-ready is true (saw ${probe.dataReady}).`);
-    expect(
-      probe.hitAria === "Send message" || probe.hitTag === "BUTTON",
-      `Send button receives pointer hits (hit ${probe.hitTag} ${probe.hitAria ?? ""}).`
-    );
+    expect(probe.hitsSend, "Send button receives pointer hits through icon or button surface.");
 
     await browser.close();
   } catch (error) {

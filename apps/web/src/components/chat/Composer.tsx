@@ -1,5 +1,5 @@
 import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, Plus, Square } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
 import styles from "./Composer.module.css";
@@ -43,7 +43,8 @@ export function Composer({
   const [displacementMapHref, setDisplacementMapHref] = useState(NEUTRAL_DISPLACEMENT_MAP);
   const [displacementScale, setDisplacementScale] = useState(-86);
   const boxRef = useRef<HTMLDivElement>(null);
-  const hasDraft = draft.trim().length > 0;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasDraft = getTrimmedDraft(textareaRef.current, draft).length > 0;
   const canSend = hasDraft && !disabled && !isGenerating;
   const modelOptions = modelState?.availableModels ?? [];
   const canSelectModel =
@@ -77,17 +78,41 @@ export function Composer({
     return () => observer.disconnect();
   }, []);
 
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    const syncFromDom = () => {
+      const next = textarea.value;
+      setDraft((current) => (current === next ? current : next));
+    };
+
+    syncFromDom();
+    textarea.addEventListener("input", syncFromDom);
+    return () => textarea.removeEventListener("input", syncFromDom);
+  }, []);
+
   function updateDraft(value: string) {
     setDraft(value);
   }
 
+  function clearDraft() {
+    setDraft("");
+    if (textareaRef.current) {
+      textareaRef.current.value = "";
+    }
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const message = draft.trim();
-    if (!message || !canSend) {
+    const message = getTrimmedDraft(textareaRef.current, draft);
+    const canSubmit = message.length > 0 && !disabled && !isGenerating;
+    if (!message || !canSubmit) {
       return;
     }
-    setDraft("");
+    clearDraft();
     onSend(message);
   }
 
@@ -140,6 +165,7 @@ export function Composer({
         <div className={styles.box} ref={boxRef}>
           <div className={styles.boxContent}>
             <textarea
+              ref={textareaRef}
               aria-label="Message"
               disabled={disabled || isGenerating}
               placeholder={
@@ -280,6 +306,10 @@ export function Composer({
       </form>
     </div>
   );
+}
+
+function getTrimmedDraft(textarea: HTMLTextAreaElement | null, draft: string) {
+  return (textarea?.value ?? draft).trim();
 }
 
 const NEUTRAL_DISPLACEMENT_MAP =

@@ -136,23 +136,35 @@
 .block[data-type="memory"] .title { color: #d9efe3; }
 .block[data-type="command"] .title { color: #e2e6ee; }
 
-/* Shimmer only on running/queued — icon ::after overlay */
-.block[data-status="completed"] .icon::after,
-.block[data-status="failed"] .icon::after,
-.block[data-status="cancelled"] .icon::after,
-.block[data-status="waiting_for_approval"] .icon::after {
-  display: none;
+/* Active-process shimmer on labels, not icons */
+.block[data-status="running"] .title,
+.block[data-status="queued"] .title,
+.thinkingText[data-active="true"] {
+  display: inline-block;
+  max-width: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 38%,
+    rgba(255, 255, 255, 0.72) 50%,
+    var(--text-muted) 62%,
+    var(--text-muted) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: activityTextShimmer 0.88s linear infinite;
 }
 
-.block[data-status="running"] .icon::after,
-.block[data-status="queued"] .icon::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  animation: activityShimmer 1.35s linear infinite;
+.block[data-status="completed"] .title,
+.block[data-status="failed"] .title,
+.block[data-status="cancelled"] .title {
+  color: var(--text-secondary);
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  animation: none;
 }
 
 .details {
@@ -246,7 +258,6 @@
   color: #ffb4b4;
 }
 
-/* Thinking row — active only, no shimmer on completed */
 .thinking {
   display: flex;
   align-items: center;
@@ -259,24 +270,14 @@
   font-size: var(--font-small);
 }
 
-/* Thinking icon — shimmer only while active */
-.thinking .icon::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  content: "";
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
-  animation: activityShimmer 1.35s linear infinite;
-}
+@keyframes activityTextShimmer {
+  from {
+    background-position: 120% 0;
+  }
 
-.thinkingText[data-active="true"] {
-  color: var(--text-secondary);
-}
-
-@keyframes activityShimmer {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(100%); }
+  to {
+    background-position: -20% 0;
+  }
 }
 
 @media (max-width: 760px) {
@@ -290,9 +291,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .block[data-status="running"] .icon::after,
-  .block[data-status="queued"] .icon::after,
-  .thinking .icon::after {
+  .block[data-status="running"] .title,
+  .block[data-status="queued"] .title,
+  .thinkingText[data-active="true"] {
     animation-duration: 1ms;
+    background-position: 0 0;
+    color: var(--text-secondary);
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
   }
 }

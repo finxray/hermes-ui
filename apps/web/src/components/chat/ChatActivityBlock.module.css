@@ -64,7 +64,7 @@
   pointer-events: none;
   content: "";
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
-  animation: activityShimmer 1.4s linear infinite;
+  animation: activityShimmer 0.82s linear infinite;
 }
 
 .icon {

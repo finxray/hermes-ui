@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AgentActivityBlock } from "@/components/chat/AgentActivityBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MessageBubble } from "@/components/chat/MessageBubble";
@@ -12,7 +12,6 @@ type ChatTranscriptProps = {
   activeSession: Session | null;
   activityEvents: AgentActivityEvent[];
   bannerIcon: ReactNode;
-  composerInsetPx?: number;
   createSession: () => void;
   isStartState?: boolean;
   isThinking: boolean;
@@ -25,7 +24,6 @@ export function ChatTranscript({
   activeSession,
   activityEvents,
   bannerIcon,
-  composerInsetPx = 168,
   createSession,
   isStartState = false,
   isThinking,
@@ -62,19 +60,8 @@ export function ChatTranscript({
       ref={transcriptRef}
       className={styles.transcript}
       data-start-state={isStartState ? "true" : "false"}
-      aria-label="Chat transcript"
-      style={
-        isStartState
-          ? undefined
-          : ({
-              "--transcript-scroll-padding": `${composerInsetPx}px`
-            } as CSSProperties)
-      }
     >
-      <div
-        className={styles.transcriptInner}
-        style={isStartState ? undefined : { paddingBottom: `${composerInsetPx}px` }}
-      >
+      <div className={styles.transcriptInner}>
         <div className={styles.mockBanner} role="status" aria-label="Connection status">
           {bannerIcon}
           <span>Hermes is reached through the BFF when available; offline turns stay local.</span>

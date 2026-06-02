@@ -1,50 +1,66 @@
 .wrap {
   position: relative;
   z-index: 3;
+  width: 100%;
   min-width: 0;
-  padding: 8px clamp(20px, 4vw, 52px) 20px;
-  background:
-    linear-gradient(180deg, transparent, rgba(8, 9, 10, 0.62) 38%, rgba(8, 9, 10, 0.82)),
-    transparent;
-  backdrop-filter: blur(14px);
+  padding: 0;
+  background: transparent;
 }
 
 .wrap[data-start-state="true"] {
   padding: 0;
-  background: transparent;
-  backdrop-filter: none;
+}
+
+.filterDefs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .composer {
+  --composer-control-idle: rgba(255, 255, 255, 0.42);
+
   display: grid;
+  width: 100%;
   min-width: 0;
-  max-width: var(--composer-width);
-  margin: 0 auto;
-  gap: 9px;
+  gap: 8px;
 }
 
 .box {
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+  z-index: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 30px;
+  background: rgba(27, 27, 30, 1);
+  backdrop-filter: none;
+  box-shadow:
+    0 2px 31px rgba(0, 0, 0, 0.9),
+    0 12px 36px rgba(0, 0, 0, 0.9),
+    0 22px 36px rgba(0, 0, 0, 0.9);
+}
+
+.boxContent {
+  position: relative;
+  z-index: 3;
   display: grid;
   min-width: 0;
-  gap: 6px;
-  padding: clamp(9px, calc(6px + 0.19vw), 14px);
-  border: 1px solid var(--border-glass-soft);
-  border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.082), rgba(255, 255, 255, 0.024)),
-    var(--bg-glass-strong);
-  box-shadow:
-    var(--shadow-glass),
-    var(--glass-highlight);
-  backdrop-filter: blur(24px) saturate(1.14);
+  gap: 10px;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 11px 15px 13px;
 }
 
 .box:focus-within {
-  border-color: var(--border-glass);
+  background: rgba(27, 27, 30, 1);
   box-shadow:
-    0 28px 92px rgba(0, 0, 0, 0.54),
-    0 0 0 1px rgba(145, 184, 255, 0.08),
-    var(--glass-highlight);
+    0 2px 34px rgba(0, 0, 0, 0.9),
+    0 12px 36px rgba(0, 0, 0, 0.9),
+    0 22px 36px rgba(0, 0, 0, 0.9);
 }
 
 .box textarea {
@@ -62,7 +78,7 @@
 }
 
 .box textarea::placeholder {
-  color: var(--text-muted);
+  color: var(--composer-control-idle);
 }
 
 .controls {
@@ -81,6 +97,10 @@
   gap: 6px;
 }
 
+.controlsLeft {
+  flex: 1 1 auto;
+}
+
 .toolButton,
 .modelButton,
 .sendButton {
@@ -95,17 +115,30 @@
 .modelButton {
   min-height: calc(var(--control-height) * 0.86);
   background: transparent;
-  color: var(--text-secondary);
   font-size: var(--font-body);
   line-height: 1;
 }
 
 .toolButton {
-  width: calc(var(--control-height) * 0.86);
+  color: var(--composer-control-idle);
 }
 
 .modelButton {
-  max-width: min(42vw, 260px);
+  color: var(--text-secondary);
+}
+
+.toolButton {
+  width: calc(var(--control-height) * 0.86);
+  flex: 0 0 auto;
+}
+
+.plusButton {
+  width: calc(var(--control-height) * 1.032);
+  min-height: calc(var(--control-height) * 1.032);
+}
+
+.modelButton {
+  max-width: min(36vw, 220px);
   min-width: 90px;
   padding: 0 10px;
   overflow: hidden;
@@ -114,20 +147,26 @@
 }
 
 .toolButton:hover,
+.toolButton:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.96);
+}
+
 .modelButton:hover,
-.toolButton:focus-visible,
 .modelButton:focus-visible {
   outline: 0;
-  background: var(--bg-glass-hover);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
 }
 
 .sendButton {
   width: calc(var(--control-height) * 0.92);
   height: calc(var(--control-height) * 0.92);
-  background: rgba(255, 255, 255, 0.16);
+  flex: 0 0 auto;
+  background: var(--composer-control-idle);
   color: #050505;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .sendButton.ready,
@@ -150,7 +189,7 @@
 }
 
 .sendButton:disabled:not(.stopButton) {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--composer-control-idle);
   color: #050505;
   box-shadow: none;
 }
@@ -160,7 +199,10 @@
 }
 
 .contextPanel {
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+  padding: 0 10px;
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -172,27 +214,27 @@
 }
 
 .contextPanel[data-visible="true"] {
-  max-height: 128px;
+  max-height: 156px;
   opacity: 1;
   transform: translateY(0);
 }
 
 .contextPanelInner {
+  position: relative;
   display: flex;
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   flex-wrap: wrap;
   gap: 7px;
   align-items: center;
+  overflow: hidden;
   padding: 9px 12px;
-  border: 1px solid var(--border-glass-soft);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
-    var(--bg-glass);
-  box-shadow:
-    0 18px 52px rgba(0, 0, 0, 0.28),
-    var(--glass-highlight);
-  backdrop-filter: blur(22px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: rgba(30, 30, 30, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(28px);
 }
 
 .contextItem {
@@ -222,22 +264,21 @@
 
 .contextValue {
   min-width: 0;
-  max-width: min(42vw, 240px);
+  max-width: min(36vw, 200px);
   overflow: hidden;
   color: var(--text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.note {
+.statusLine {
   min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
+  padding-top: 2px;
   color: var(--text-muted);
   font-size: var(--font-xs);
-  line-height: 1.45;
+  line-height: 1.35;
   text-align: center;
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 @media (max-width: 760px) {
@@ -246,7 +287,7 @@
   }
 
   .modelButton {
-    max-width: min(52vw, 240px);
+    max-width: min(46vw, 200px);
   }
 
   .contextPanelInner {
@@ -261,5 +302,11 @@
 @media (prefers-reduced-motion: reduce) {
   .contextPanel {
     transition-duration: 1ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .box {
+    background: #232323;
   }
 }

@@ -137,17 +137,28 @@ for (const token of [
 }
 
 const appShellCss = readFileSync(join(root, "apps/web/src/components/shell/AppShell.module.css"), "utf8");
+const mainWindowCssForChecks = existsSync(join(root, "apps/web/src/components/shell/MainWindow.module.css"))
+  ? readFileSync(join(root, "apps/web/src/components/shell/MainWindow.module.css"), "utf8")
+  : "";
 for (const token of [
   '.shell[data-left-collapsed="true"]',
-  '.shell[data-right-collapsed="true"]',
   ".shell:has(.leftToggle:checked)",
-  ".shell:has(.rightToggle:checked)",
   "transition: grid-template-columns 500ms",
   ':global([data-shell-rail="left"])',
-  ':global([data-shell-rail="right"])'
+  '"left main-window"'
 ]) {
   if (!appShellCss.includes(token)) {
     failures.push(`AppShell CSS panel toggle contract is missing ${token}`);
+  }
+}
+for (const token of [
+  "main-window",
+  "data-right-collapsed",
+  "grid-template-columns: minmax(0, 1fr) minmax(0, var(--rail-width-right))",
+  "transition: grid-template-columns 500ms"
+]) {
+  if (!mainWindowCssForChecks.includes(token)) {
+    failures.push(`Main window CSS contract is missing ${token}`);
   }
 }
 
@@ -191,8 +202,9 @@ for (const token of [
 }
 
 for (const token of [
-  "--bg-workspace-solid",
-  "scroll-padding-bottom: var(--transcript-scroll-padding",
+  "background: transparent",
+  "--composer-inset",
+  "scroll-padding-bottom: calc(var(--composer-inset",
   ".scrollAnchor",
   ".startStage",
   ".startHero",
@@ -229,16 +241,50 @@ for (const token of [".userExpandButton", ".userContentWrap", "data-expanded"]) 
   }
 }
 
-for (const token of ["composerInsetPx", "scrollIntoView", "--transcript-scroll-padding", "scrollAnchor"]) {
+for (const token of ["scrollIntoView", "scrollAnchor"]) {
   if (!chatTranscriptSource.includes(token)) {
-    failures.push(`Transcript scroll/composer inset contract is missing ${token}`);
+    failures.push(`Transcript scroll behavior contract is missing ${token}`);
   }
 }
+if (!chatViewVisualCss.includes(".scrollViewport")) {
+  failures.push("Chat scroll viewport must wrap header and transcript for full-height scrollbar.");
+}
+if (!chatViewVisualSource.includes("scrollViewport")) {
+  failures.push("ChatView must use scrollViewport for full-height main window scrolling.");
+}
+if (!chatViewVisualCss.includes("max-width: var(--composer-width)")) {
+  failures.push("Transcript content width must match composer width.");
+}
+if (!chatViewVisualCss.includes("max-width: calc(var(--composer-width) + 20px)")) {
+  failures.push("Composer surface must stay 20px wider than the transcript/content column.");
+}
+if (!appShellCss.includes("clamp(514px, 45%, 691px)")) {
+  failures.push("Composer width must be 10% wider than the prior clamp(467px, 40.9%, 628px).");
+}
 
-for (const token of ["useComposerInset", "composerWrapRef", "preserveKnownModelOnTransientFailure"]) {
+for (const token of [
+  "scrollViewport",
+  "composerAnchor",
+  "composerDock",
+  "composerWrapRef",
+  "useComposerInset",
+  "preserveKnownModelOnTransientFailure"
+]) {
   if (!chatViewVisualSource.includes(token) && !useHermesStatusSource.includes(token)) {
     failures.push(`Chat layout/model stability contract is missing ${token}`);
   }
+}
+if (!chatViewVisualCss.includes("position: absolute") || !chatViewVisualCss.includes("inset: 0")) {
+  failures.push("Chat scroll viewport must fill the main window for a full-height scrollbar track.");
+}
+if (!chatViewVisualCss.includes(".composerDock")) {
+  failures.push("Composer must dock to the bottom without shortening the scrollbar track.");
+}
+if (!chatViewVisualCss.includes(".composerAnchor")) {
+  failures.push("Composer must use a centered anchor aligned with transcript content width.");
+}
+if (chatViewVisualCss.includes("max-width: var(--composer-width)") && chatViewVisualCss.includes("margin: 0 auto") && chatViewVisualCss.match(/\.headerTitle[\s\S]{0,120}margin:\s*0 auto/)) {
+  failures.push("Header title must align to the window edge, not the centered content column.");
 }
 
 if (appShellCss.includes("--composer-width: var(--content-width)")) {
@@ -249,9 +295,87 @@ if (chatViewVisualCss.includes("backdrop-filter: blur(18px)")) {
   failures.push("Main chat workspace must not use glassy backdrop blur on the conversation surface.");
 }
 
+if (!chatViewVisualCss.includes("background: transparent")) {
+  failures.push("Chat workspace must inherit the unified main window surface.");
+}
+
+if (!chatViewVisualCss.includes("background: transparent") || !chatViewVisualCss.includes(".header")) {
+  failures.push("Chat header must remain transparent over the workspace surface.");
+}
+if (chatViewVisualCss.includes(".workspace::before")) {
+  failures.push("Chat workspace must not use a full-width top smoke overlay on the transcript.");
+}
+if (!chatViewVisualCss.includes(".header::before")) {
+  failures.push("Top header shadow must use a ::before fade from the window top.");
+}
+if (!/\.header::before[\s\S]{0,500}right:\s*30px/.test(chatViewVisualCss)) {
+  failures.push("Top header shadow must stop 30px before the right panel.");
+}
+if (!chatViewVisualCss.includes("--header-shadow-title-clear")) {
+  failures.push("Top header shadow must leave the left title area clear.");
+}
+if (/\.header[\s\S]{0,700}backdrop-filter:\s*blur/.test(chatViewVisualCss)) {
+  failures.push("Chat header must not use liquid glass or backdrop blur.");
+}
+if (!messageBubbleCss.includes("mask-image: linear-gradient")) {
+  failures.push("Long user message collapse must use a dispersed mask fade near Show more.");
+}
+
+const tokensCss = readFileSync(join(root, "apps/web/src/styles/tokens.css"), "utf8");
+if (!tokensCss.includes("--bg-workspace-solid: #0f0f0f")) {
+  failures.push("Main workspace solid token must use opaque #0f0f0f (rgba(15,15,15,1)).");
+}
+if (/rgba\(92,\s*76,\s*148,\s*0\.(?:1[5-9]|[2-9])/.test(appShellCss)) {
+  failures.push("Shell canvas purple wash must stay at or below Codex-subtle strength (<= 0.14).");
+}
+if (!appShellCss.includes("var(--bg-rail-warm) 0%") || !appShellCss.includes("var(--bg-canvas) 100%")) {
+  failures.push("Shell canvas must use Codex-like warm-left to dark-right gradient.");
+}
+if (!appShellCss.includes("at 14% 108%")) {
+  failures.push("Shell canvas must place warm burgundy wash at bottom-left (sidebar region).");
+}
+if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes("border: 1px solid")) {
+  if (messageBubbleCss.match(/\.userExpandButton[\s\S]{0,400}border:\s*1px/)) {
+    failures.push("Show more control must be a text button without outline pill styling.");
+  }
+}
+if (!tokensCss.includes("--border-window-outline")) {
+  failures.push("Window outline border token is missing.");
+}
+
+const appShellSource = readFileSync(join(root, "apps/web/src/components/shell/AppShell.tsx"), "utf8");
+if (!appShellSource.includes("mainWindowStyles.mainWindow")) {
+  failures.push("AppShell must wrap chat and context rail in a unified main window.");
+}
+if (!appShellSource.includes("mainWindowStyles.chatPane")) {
+  failures.push("Chat view must sit in a dedicated chat pane.");
+}
+if (appShellSource.includes("ChatDepthField")) {
+  failures.push("Chat depth background must not be mounted in AppShell.");
+}
+if (!mainWindowCssForChecks.includes(".chatPane::before")) {
+  failures.push("Chat pane must use a staggered dot grid background layer.");
+}
+if (!mainWindowCssForChecks.includes("background-position: 0 0, 7.5px 7.5px")) {
+  failures.push("Chat pane dot grid must use staggered (offset row) positioning.");
+}
+if (!mainWindowCssForChecks.includes(".chatPane::after")) {
+  failures.push("Chat pane must use inset edge shadow to fade dot grid at borders.");
+}
+if (!mainWindowCssForChecks.includes("inset 72px 0 96px")) {
+  failures.push("Chat pane inset shadow must disperse dots on left and right edges.");
+}
+if (!mainWindowCssForChecks.includes("border: 1px solid var(--border-window-outline)")) {
+  failures.push("Main window outline border is missing.");
+}
+if (contextRailVisualCss.includes("transform: translateX(100%)")) {
+  failures.push("Context rail must not slide independently; it should collapse with the main window grid.");
+}
+
 for (const token of [
-  "var(--bg-glass-strong)",
-  "backdrop-filter: blur(24px)",
+  "backdrop-filter: none",
+  "rgba(27, 27, 30, 1)",
+  "box-shadow:",
   ".contextPanel[data-visible=\"true\"]",
   "@media (prefers-reduced-motion: reduce)"
 ]) {

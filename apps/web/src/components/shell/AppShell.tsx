@@ -10,6 +10,7 @@ import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnost
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { useState } from "react";
 import type { AgentActivityEvent } from "@/types/agentActivity";
+import mainWindowStyles from "./MainWindow.module.css";
 import styles from "./AppShell.module.css";
 
 export function AppShell() {
@@ -71,30 +72,37 @@ export function AppShell() {
         projects={state.projects}
         refreshHermesStatus={hermesStatus.refresh}
       />
-      <ChatView
-        activeProject={activeProject}
-        activeSession={activeSession}
-        activityEvents={activeActivityEvents}
-        createSession={actions.createSession}
-        hermesStatus={hermesStatus.status}
-        isHermesStatusLoading={hermesStatus.isLoading}
-        modelChoices={state.modelChoices}
-        onActivityEvent={appendActivityEvent}
-        workspaceActions={actions}
-      />
-      <ContextRail
-        activeProject={activeProject}
-        activeSession={activeSession}
-        activityEvents={activeActivityEvents}
-        brainMemoryStatus={brainMemoryStatus.status}
-        hermesStatus={hermesStatus.status}
-        isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
-        isHermesStatusLoading={hermesStatus.isLoading}
-        isHermesStatusRefreshing={hermesStatus.isRefreshing}
-        refreshBrainMemoryStatus={brainMemoryStatus.refresh}
-        refreshHermesStatus={hermesStatus.refresh}
-        tenantScopePosture={tenantScopePosture.posture}
-      />
+      <div
+        className={mainWindowStyles.mainWindow}
+        data-right-collapsed={rightCollapsed ? "true" : "false"}
+      >
+        <div className={mainWindowStyles.chatPane}>
+          <ChatView
+            activeProject={activeProject}
+            activeSession={activeSession}
+            activityEvents={activeActivityEvents}
+            createSession={actions.createSession}
+            hermesStatus={hermesStatus.status}
+            isHermesStatusLoading={hermesStatus.isLoading}
+            modelChoices={state.modelChoices}
+            onActivityEvent={appendActivityEvent}
+            workspaceActions={actions}
+          />
+        </div>
+        <ContextRail
+          activeProject={activeProject}
+          activeSession={activeSession}
+          activityEvents={activeActivityEvents}
+          brainMemoryStatus={brainMemoryStatus.status}
+          hermesStatus={hermesStatus.status}
+          isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
+          isHermesStatusLoading={hermesStatus.isLoading}
+          isHermesStatusRefreshing={hermesStatus.isRefreshing}
+          refreshBrainMemoryStatus={brainMemoryStatus.refresh}
+          refreshHermesStatus={hermesStatus.refresh}
+          tenantScopePosture={tenantScopePosture.posture}
+        />
+      </div>
     </main>
   );
 }

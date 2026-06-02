@@ -3,8 +3,8 @@
 import { useLayoutEffect, useState } from "react";
 import type { RefObject } from "react";
 
-const DEFAULT_INSET_PX = 168;
-const INSET_SAFE_GAP_PX = 20;
+const DEFAULT_INSET_PX = 148;
+const INSET_SAFE_GAP_PX = 18;
 
 export function useComposerInset(composerWrapRef: RefObject<HTMLElement | null>, enabled: boolean) {
   const [insetPx, setInsetPx] = useState(DEFAULT_INSET_PX);

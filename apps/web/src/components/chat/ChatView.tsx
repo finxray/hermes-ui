@@ -1,5 +1,6 @@
 import { AlertTriangle, BookOpenText, SendHorizontal } from "lucide-react";
 import { useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
@@ -412,22 +413,22 @@ export function ChatView({
       data-start-state={isStartState ? "true" : "false"}
       aria-label="Chat workspace"
     >
-      <ChatHeader title={activeSession?.title ?? "No chat selected"} />
       {isStartState ? (
-        <div className={styles.startStage}>
+        <>
+          <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+          <div className={styles.startStage}>
           <ChatTranscript
             activeProject={activeProject}
             activeSession={activeSession}
             activityEvents={activeActivityEvents}
             bannerIcon={<AlertTriangle size={15} />}
-            composerInsetPx={composerInsetPx}
             createSession={createSession}
             isStartState
             isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
             routeIcon={<SendHorizontal size={14} />}
             scopeIcon={<BookOpenText size={14} />}
           />
-          <div ref={composerWrapRef}>
+          <div ref={composerWrapRef} className={styles.composerAnchor}>
           <Composer
             contextItems={composerContextItems}
             disabled={!activeSession}
@@ -443,32 +444,39 @@ export function ChatView({
           />
           </div>
         </div>
+        </>
       ) : (
         <>
-          <ChatTranscript
-            activeProject={activeProject}
-            activeSession={activeSession}
-            activityEvents={activeActivityEvents}
-            bannerIcon={<AlertTriangle size={15} />}
-            composerInsetPx={composerInsetPx}
-            createSession={createSession}
-            isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
-            routeIcon={<SendHorizontal size={14} />}
-            scopeIcon={<BookOpenText size={14} />}
-          />
-          <div ref={composerWrapRef}>
-          <Composer
-            contextItems={composerContextItems}
-            disabled={!activeSession}
-            isGenerating={isGenerating}
-            isStopRequested={isStopRequested}
-            modelLabel={modelLabel}
-            modelState={providerModelState}
-            onSend={handleSend}
-            onStop={handleStop}
-            showContextPanel={false}
-            stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
-          />
+          <div
+            className={styles.scrollViewport}
+            aria-label="Chat transcript"
+            style={{ "--composer-inset": `${composerInsetPx}px` } as CSSProperties}
+          >
+            <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+            <ChatTranscript
+              activeProject={activeProject}
+              activeSession={activeSession}
+              activityEvents={activeActivityEvents}
+              bannerIcon={<AlertTriangle size={15} />}
+              createSession={createSession}
+              isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
+              routeIcon={<SendHorizontal size={14} />}
+              scopeIcon={<BookOpenText size={14} />}
+            />
+          </div>
+          <div ref={composerWrapRef} className={`${styles.composerAnchor} ${styles.composerDock}`}>
+            <Composer
+              contextItems={composerContextItems}
+              disabled={!activeSession}
+              isGenerating={isGenerating}
+              isStopRequested={isStopRequested}
+              modelLabel={modelLabel}
+              modelState={providerModelState}
+              onSend={handleSend}
+              onStop={handleStop}
+              showContextPanel={false}
+              stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
+            />
           </div>
         </>
       )}

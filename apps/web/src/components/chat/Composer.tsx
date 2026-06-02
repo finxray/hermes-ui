@@ -1,5 +1,5 @@
 import { ArrowUp, Mic, Plus, Square } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
 import styles from "./Composer.module.css";
@@ -35,8 +35,35 @@ export function Composer({
   stopControlState = "deferred"
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
+  const [displacementMapHref, setDisplacementMapHref] = useState(NEUTRAL_DISPLACEMENT_MAP);
+  const [displacementScale, setDisplacementScale] = useState(-86);
+  const boxRef = useRef<HTMLDivElement>(null);
   const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
   const streamBatchingDetail = "Streaming batches deltas with an animation-frame flush, not one React update per token.";
+
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    function updateDisplacementMap() {
+      if (!box) {
+        return;
+      }
+      const rect = box.getBoundingClientRect();
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      const radius = Math.min(30, Math.round(Math.min(width, height) / 2));
+      setDisplacementMapHref(buildComposerDisplacementMap({ height, radius, width }));
+      setDisplacementScale(getComposerDisplacementScale({ height, width }));
+    }
+
+    updateDisplacementMap();
+    const observer = new ResizeObserver(updateDisplacementMap);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,72 +84,98 @@ export function Composer({
 
   return (
     <div className={styles.wrap} data-start-state={isStartState ? "true" : "false"}>
+      <svg className={styles.filterDefs} aria-hidden="true" focusable="false">
+        <defs>
+          <filter id="composerGlassFilter" colorInterpolationFilters="sRGB">
+            <feImage
+              x="0"
+              y="0"
+              width="100%"
+              height="100%"
+              href={displacementMapHref}
+              preserveAspectRatio="none"
+              result="map"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="map"
+              scale={displacementScale}
+              xChannelSelector="R"
+              yChannelSelector="B"
+              result="displaced"
+            />
+            <feGaussianBlur in="displaced" stdDeviation="1.15" />
+          </filter>
+        </defs>
+      </svg>
       <form className={styles.composer} aria-label="Message composer" onSubmit={submit}>
-        <div className={styles.box}>
-          <textarea
-            aria-label="Message"
-            disabled={disabled || isGenerating}
-            placeholder={
-              disabled
-                ? "Create or select a chat to send a message."
-                : "Message Hermes…"
-            }
-            value={draft}
-            onChange={(event) => setDraft(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
+        <div className={styles.box} ref={boxRef}>
+          <div className={styles.boxContent}>
+            <textarea
+              aria-label="Message"
+              disabled={disabled || isGenerating}
+              placeholder={
+                disabled
+                  ? "Create or select a chat to send a message."
+                  : "Message Hermes…"
               }
-            }}
-          />
-          <div className={styles.controls} aria-label="Composer controls">
-            <div className={styles.controlsLeft}>
-              <button
-                className={styles.toolButton}
-                type="button"
-                aria-label="Attach context coming soon"
-                title="Attach context controls are coming soon."
-                disabled
-              >
-                <Plus size={17} />
-              </button>
-              <button
-                className={styles.modelButton}
-                type="button"
-                aria-label="Provider and model selector disabled"
-                title={modelSelectorTitle(modelState)}
-                disabled
-              >
-                {modelLabel}
-              </button>
-            </div>
-            <div className={styles.controlsRight}>
-              <button
-                className={styles.toolButton}
-                type="button"
-                aria-label="Voice input coming soon"
-                title="Voice input is coming soon."
-                disabled
-              >
-                <Mic size={16} />
-              </button>
-              <button
-                className={[
-                  styles.sendButton,
-                  canSend ? styles.ready : "",
-                  isGenerating ? styles.stopButton : ""
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                type={isGenerating ? "button" : "submit"}
-                disabled={isGenerating ? disabled || isStopRequested : disabled || draft.trim().length === 0}
-                aria-label={isGenerating ? "Stop generation" : "Send message"}
-                onClick={isGenerating ? stopGeneration : undefined}
-                title={isGenerating ? stopControlTitle(stopControlState) : undefined}
-              >
-                {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
-              </button>
+              value={draft}
+              onChange={(event) => setDraft(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+            />
+            <div className={styles.controls} aria-label="Composer controls">
+              <div className={styles.controlsLeft}>
+                <button
+                  className={`${styles.toolButton} ${styles.plusButton}`}
+                  type="button"
+                  aria-label="Attach context coming soon"
+                  title="Attach context controls are coming soon."
+                  disabled
+                >
+                  <Plus size={20} />
+                </button>
+                <button
+                  className={styles.modelButton}
+                  type="button"
+                  aria-label="Provider and model selector disabled"
+                  title={modelSelectorTitle(modelState)}
+                  disabled
+                >
+                  {modelLabel}
+                </button>
+              </div>
+              <div className={styles.controlsRight}>
+                <button
+                  className={styles.toolButton}
+                  type="button"
+                  aria-label="Voice input coming soon"
+                  title="Voice input is coming soon."
+                  disabled
+                >
+                  <Mic size={16} />
+                </button>
+                <button
+                  className={[
+                    styles.sendButton,
+                    canSend ? styles.ready : "",
+                    isGenerating ? styles.stopButton : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  type={isGenerating ? "button" : "submit"}
+                  disabled={isGenerating ? disabled || isStopRequested : disabled || draft.trim().length === 0}
+                  aria-label={isGenerating ? "Stop generation" : "Send message"}
+                  onClick={isGenerating ? stopGeneration : undefined}
+                  title={isGenerating ? stopControlTitle(stopControlState) : undefined}
+                >
+                  {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -144,18 +197,56 @@ export function Composer({
             </span>
           </div>
         </div>
-        <div className={styles.note}>
-          {isGenerating
-            ? "Generating response…"
-            : (
-              <span title={streamBatchingDetail}>
-                Hermes can make mistakes. Verify important information.
-              </span>
-            )}
-        </div>
+        {isGenerating ? (
+          <div className={styles.statusLine} title={streamBatchingDetail}>
+            Generating response…
+          </div>
+        ) : null}
       </form>
     </div>
   );
+}
+
+const NEUTRAL_DISPLACEMENT_MAP =
+  "data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%201%201%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%221%22%20height%3D%221%22%20fill%3D%22rgb(128%20128%20128)%22%2F%3E%3C%2Fsvg%3E";
+
+function buildComposerDisplacementMap({
+  height,
+  radius,
+  width
+}: {
+  height: number;
+  radius: number;
+  width: number;
+}) {
+  const border = Math.min(width, height) * 0.035;
+  const innerWidth = Math.max(1, width - border * 2);
+  const innerHeight = Math.max(1, height - border * 2);
+  const svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="red" x1="100%" y1="0%" x2="0%" y2="0%">
+<stop offset="0%" stop-color="#000"/>
+<stop offset="100%" stop-color="red"/>
+</linearGradient>
+<linearGradient id="blue" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#000"/>
+<stop offset="100%" stop-color="blue"/>
+</linearGradient>
+</defs>
+<rect x="0" y="0" width="${width}" height="${height}" fill="black"/>
+<rect x="0" y="0" width="${width}" height="${height}" rx="${radius}" fill="url(#red)"/>
+<rect x="0" y="0" width="${width}" height="${height}" rx="${radius}" fill="url(#blue)" style="mix-blend-mode:difference"/>
+<rect x="${border}" y="${border}" width="${innerWidth}" height="${innerHeight}" rx="${radius}" fill="hsl(0 0% 50% / 0.93)" style="filter:blur(11px)"/>
+</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function getComposerDisplacementScale({ height, width }: { height: number; width: number }) {
+  const demoWidth = 336;
+  const demoScale = -58;
+  const widthRatio = Math.min(2.8, Math.max(1, width / demoWidth));
+  const aspectBoost = Math.min(1.25, Math.max(1, width / Math.max(height * 4, 1)));
+  return Math.round(demoScale * widthRatio * aspectBoost);
 }
 
 function modelSelectorTitle(state?: HermesUiCapabilities["models"]) {

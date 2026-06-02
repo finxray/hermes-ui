@@ -45,6 +45,7 @@ export function BrainMemoryConsole({
   const [query, setQuery] = useState("");
   const [mockDetail, setMockDetail] = useState<MemoryEvidence | null>(null);
   const [selectedMemoryId, setSelectedMemoryId] = useState<string | null>(null);
+  const [resultLimit, setResultLimit] = useState(8);
   const { isSearching, lastResponse, search } = useBrainMemorySearch();
   const {
     clearInspection,
@@ -63,6 +64,7 @@ export function BrainMemoryConsole({
   const gatewayResults = lastResponse?.mode === "real" ? lastResponse.results : [];
   const shouldUseMock = !lastResponse || lastResponse.mode !== "real";
   const scope = lastResponse?.mode === "real" ? lastResponse.scope : null;
+  const isGatewayConnected = status?.mode === "real" && status.reachable === true;
   const memoryTimelineItems = useMemo(
     () =>
       createMemoryTimelineItems(activityEvents, {
@@ -79,12 +81,13 @@ export function BrainMemoryConsole({
     () => summarizeMemoryTimeline(memoryTimelineItems),
     [memoryTimelineItems]
   );
-  const canInspectTimelineMemory = status?.mode === "real" && status.reachable === true;
+  const canInspectTimelineMemory = isGatewayConnected;
 
   useEffect(() => {
     setQuery(activeSession?.memoryEvidence[0]?.title ?? activeProject.name);
     setMockDetail(null);
     setSelectedMemoryId(null);
+    setResultLimit(8);
     clearInspection();
   }, [
     activeProject.id,
@@ -94,7 +97,7 @@ export function BrainMemoryConsole({
     clearInspection
   ]);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>, limit = resultLimit) {
     event.preventDefault();
     const cleanQuery = query.trim();
     if (!cleanQuery) {
@@ -105,9 +108,20 @@ export function BrainMemoryConsole({
     clearInspection();
     await search({
       context,
-      limit: 8,
+      limit,
       query: cleanQuery
     });
+  }
+
+  async function showMore() {
+    const newLimit = resultLimit + 8;
+    setResultLimit(newLimit);
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return;
+    setMockDetail(null);
+    setSelectedMemoryId(null);
+    clearInspection();
+    await search({ context, limit: newLimit, query: cleanQuery });
   }
 
   return (
@@ -172,18 +186,35 @@ export function BrainMemoryConsole({
           <span>Memory search</span>
           <Search size={13} aria-hidden="true" />
         </div>
+        {!isGatewayConnected ? (
+          <div className={styles.disabledBanner} role="status">
+            <span className={styles.disabledBannerLabel}>Gateway not connected</span>
+            Brain Memory Gateway is not connected. Only local mock evidence is available. Set{" "}
+            BRAIN_MEMORY_GATEWAY_URL and enable real Gateway to search live memory.
+          </div>
+        ) : null}
         <form className={styles.searchForm} onSubmit={submit}>
           <input
             aria-label="Search Brain Memory"
             className={styles.searchInput}
-            placeholder="Search memory in active scope"
+            disabled={!isGatewayConnected}
+            placeholder={
+              isGatewayConnected
+                ? "Search memory in active scope"
+                : "Gateway not connected — mock results only"
+            }
+            title={
+              isGatewayConnected
+                ? undefined
+                : "Connect Brain Memory Gateway to enable live search"
+            }
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
           <button
             className={styles.searchButton}
             type="submit"
-            disabled={isSearching || query.trim().length === 0}
+            disabled={!isGatewayConnected || isSearching || query.trim().length === 0}
           >
             Search
           </button>
@@ -217,7 +248,9 @@ export function BrainMemoryConsole({
           />
         ) : (
           <GatewayMemoryResults
+            isSearching={isSearching}
             results={gatewayResults}
+            resultLimit={resultLimit}
             selectedMemoryId={selectedMemoryId}
             onSelect={(memory) => {
               setMockDetail(null);
@@ -227,6 +260,7 @@ export function BrainMemoryConsole({
                 memoryId: memory.id
               });
             }}
+            onShowMore={() => void showMore()}
           />
         )}
       </section>
@@ -382,6 +416,11 @@ function MockMemoryResults({
   results: MemoryEvidence[];
   selectedMemoryId: string | null;
 }) {
+  const PREVIEW_COUNT = 6;
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? results : results.slice(0, PREVIEW_COUNT);
+  const remaining = results.length - PREVIEW_COUNT;
+
   if (results.length === 0) {
     return (
       <EmptyState
@@ -393,41 +432,67 @@ function MockMemoryResults({
   }
 
   return (
-    <ul className={styles.resultList}>
-      {results.map((memory) => (
-        <li key={memory.id}>
-          <button
-            aria-current={selectedMemoryId === memory.id ? "true" : undefined}
-            className={`${styles.resultButton} ${
-              selectedMemoryId === memory.id ? styles.resultActive : ""
-            }`}
-            type="button"
-            onClick={() => onSelect(memory)}
-          >
-            <div className={styles.cardTitle}>
-              <span>{memory.title}</span>
-              <span className={styles.pill}>{memory.layer}</span>
-            </div>
-            <div className={styles.cardBody}>{memory.excerpt}</div>
-            <div className={styles.meta}>
-              {memory.source} - mock score {memory.score} - {memory.timestamp}
-            </div>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className={styles.resultList}>
+        {visible.map((memory) => (
+          <li key={memory.id}>
+            <button
+              aria-current={selectedMemoryId === memory.id ? "true" : undefined}
+              className={`${styles.resultItem} ${
+                selectedMemoryId === memory.id ? styles.resultItemActive : ""
+              }`}
+              type="button"
+              onClick={() => onSelect(memory)}
+            >
+              <div className={styles.resultHeader}>
+                <span className={styles.resultTitle}>{memory.title}</span>
+                <div className={styles.resultBadges}>
+                  <span className={styles.scoreBadge}>{memory.score}</span>
+                  <LayerPill layer={memory.layer} />
+                </div>
+              </div>
+              <div className={styles.cardBody}>{memory.excerpt}</div>
+              <div className={styles.resultMeta}>
+                <span>{memory.source}</span>
+                <span className={styles.resultMetaDot}>·</span>
+                <span>{memory.timestamp}</span>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {!showAll && remaining > 0 ? (
+        <button
+          className={styles.showMoreButton}
+          type="button"
+          onClick={() => setShowAll(true)}
+        >
+          Show {remaining} more
+        </button>
+      ) : null}
+    </>
   );
 }
 
 function GatewayMemoryResults({
+  isSearching,
   onSelect,
+  onShowMore,
   results,
+  resultLimit,
   selectedMemoryId
 }: {
+  isSearching: boolean;
   onSelect: (memory: NormalizedMemoryResult) => void;
+  onShowMore: () => void;
   results: NormalizedMemoryResult[];
+  resultLimit: number;
   selectedMemoryId: string | null;
 }) {
+  if (isSearching && results.length === 0) {
+    return <SearchSkeleton />;
+  }
+
   if (results.length === 0) {
     return (
       <EmptyState
@@ -438,35 +503,77 @@ function GatewayMemoryResults({
     );
   }
 
+  const canShowMore = results.length >= resultLimit;
+
   return (
-    <ul className={styles.resultList}>
-      {results.map((memory) => (
-        <li key={memory.id}>
-          <button
-            aria-current={selectedMemoryId === memory.id ? "true" : undefined}
-            className={`${styles.resultButton} ${
-              selectedMemoryId === memory.id ? styles.resultActive : ""
-            }`}
-            type="button"
-            onClick={() => onSelect(memory)}
-          >
-            <div className={styles.cardTitle}>
-              <span>{memory.title ?? memory.id}</span>
-              <span className={styles.pill}>{memory.scopeStatus ?? memory.layer ?? "unknown"}</span>
-            </div>
-            <div className={styles.cardBody}>{memory.snippet ?? memory.content}</div>
-            <div className={styles.meta}>
-              {memory.source ?? "Gateway"} - score {formatScore(memory.score)} - evidence{" "}
-              {memory.evidenceCount ?? 0}
-            </div>
-            <div className={styles.meta}>
-              {memory.projectKey ?? "project scope unknown"} -{" "}
-              {memory.sessionKey ?? "project memory"} - {memory.supersessionStatus ?? "unknown"}
-            </div>
-          </button>
-        </li>
+    <>
+      <ul className={styles.resultList}>
+        {results.map((memory) => (
+          <li key={memory.id}>
+            <button
+              aria-current={selectedMemoryId === memory.id ? "true" : undefined}
+              className={`${styles.resultItem} ${
+                selectedMemoryId === memory.id ? styles.resultItemActive : ""
+              }`}
+              type="button"
+              onClick={() => onSelect(memory)}
+            >
+              <div className={styles.resultHeader}>
+                <span className={styles.resultTitle}>{memory.title ?? memory.id}</span>
+                <div className={styles.resultBadges}>
+                  <span className={styles.scoreBadge}>{formatScore(memory.score)}</span>
+                  <LayerPill layer={memory.layer ?? memory.scopeStatus ?? "unknown"} />
+                </div>
+              </div>
+              <div className={styles.cardBody}>{memory.snippet ?? memory.content}</div>
+              <div className={styles.resultMeta}>
+                <span>{memory.source ?? "Gateway"}</span>
+                <span className={styles.resultMetaDot}>·</span>
+                <span>evidence {memory.evidenceCount ?? 0}</span>
+              </div>
+              <div className={styles.resultScope}>
+                {memory.projectKey ?? "project scope unknown"}
+                {memory.sessionKey ? ` · ${memory.sessionKey}` : ""}
+                {memory.supersessionStatus ? ` · ${memory.supersessionStatus}` : ""}
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {canShowMore ? (
+        <button
+          className={styles.showMoreButton}
+          disabled={isSearching}
+          type="button"
+          onClick={onShowMore}
+        >
+          {isSearching ? "Loading…" : "Show more"}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+function LayerPill({ layer }: { layer: string }) {
+  const normalized = layer?.toLowerCase() ?? "unknown";
+  return (
+    <span className={styles.layerPill} data-layer={normalized}>
+      {layer}
+    </span>
+  );
+}
+
+function SearchSkeleton() {
+  return (
+    <div className={styles.skeletonList} aria-label="Loading results" role="status">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className={styles.skeletonCard}>
+          <div className={styles.skeletonLine} style={{ height: 12, width: "65%" }} />
+          <div className={styles.skeletonLine} style={{ height: 10, width: "90%", marginTop: 8 }} />
+          <div className={styles.skeletonLine} style={{ height: 10, width: "45%", marginTop: 6 }} />
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

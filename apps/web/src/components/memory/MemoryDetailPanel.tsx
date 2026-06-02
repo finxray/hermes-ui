@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { MessageMarkdown } from "@/components/chat/MessageMarkdown";
 import type {
   NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchScope,
@@ -72,7 +73,9 @@ function MockMemoryDetail({ memory }: { memory: MemoryEvidence }) {
         <span>{memory.title}</span>
         <span className={styles.pill}>mock/local</span>
       </div>
-      <div className={styles.detailContent}>{memory.excerpt}</div>
+      <div className={styles.detailContentScroll}>
+        <MessageMarkdown content={memory.excerpt} />
+      </div>
       <div className={styles.fieldGrid}>
         <ContextField label="Memory id" value={memory.id} />
         <ContextField label="Layer" value={memory.layer} />
@@ -101,7 +104,9 @@ function GatewayMemoryDetail({
         <span>Scoped result</span>
         <span className={styles.pill}>{detail.scopeStatus ?? "scoped"}</span>
       </div>
-      <div className={styles.detailContent}>{detail.content}</div>
+      <div className={styles.detailContentScroll}>
+        <MessageMarkdown content={detail.content} />
+      </div>
       {detail.snippet ? <div className={styles.cardBody}>Snippet: {detail.snippet}</div> : null}
       <div className={styles.fieldGrid}>
         <ContextField label="Memory id" value={detail.id} />
@@ -116,17 +121,17 @@ function GatewayMemoryDetail({
         <ContextField label="Audit" value="Metadata only" />
       </div>
       {detail.scope ? <ScopeSummary scope={detail.scope} /> : null}
-      <ReadOnlyStatusSection
+      <EvidenceSection
         label="Evidence"
         status={evidence?.status}
+        items={evidence?.evidence ?? []}
         emptyText="Evidence: not implemented by Gateway yet."
-        count={evidence?.evidence.length ?? 0}
       />
-      <ReadOnlyStatusSection
+      <EvidenceSection
         label="Supersession chain"
         status={supersession?.status}
+        items={supersession?.chain ?? []}
         emptyText="Supersession chain: not implemented by Gateway yet."
-        count={supersession?.chain.length ?? 0}
       />
       {detail.metadata ? (
         <details className={styles.metadata}>
@@ -138,30 +143,68 @@ function GatewayMemoryDetail({
   );
 }
 
-function ReadOnlyStatusSection({
-  count,
+function EvidenceSection({
   emptyText,
+  items,
   label,
   status
 }: {
-  count: number;
   emptyText: string;
+  items: unknown[];
   label: string;
   status?: string;
 }) {
+  const hasItems = status !== "not_implemented" && items.length > 0;
+
   return (
     <div className={styles.readonlySection}>
       <div className={styles.cardTitle}>
         <span>{label}</span>
         <span className={styles.pill}>{status ?? "unknown"}</span>
       </div>
-      <div className={styles.cardBody}>
-        {status === "not_implemented" || count === 0
-          ? emptyText
-          : `${count} read-only item${count === 1 ? "" : "s"} available.`}
-      </div>
+      {hasItems ? (
+        <ul className={styles.evidenceList}>
+          {items.map((item, index) => (
+            <EvidenceItem key={index} item={item} />
+          ))}
+        </ul>
+      ) : (
+        <div className={styles.cardBody}>{emptyText}</div>
+      )}
     </div>
   );
+}
+
+function EvidenceItem({ item }: { item: unknown }) {
+  const shape = extractEvidenceShape(item);
+  return (
+    <li className={styles.evidenceItem}>
+      <div className={styles.evidenceDot} aria-hidden="true" />
+      <div className={styles.evidenceBody}>
+        <div className={styles.evidenceTitle}>{shape.title}</div>
+        {shape.meta ? <div className={styles.evidenceMeta}>{shape.meta}</div> : null}
+      </div>
+    </li>
+  );
+}
+
+function extractEvidenceShape(item: unknown): { title: string; meta: string } {
+  if (!item || typeof item !== "object") {
+    return { title: String(item ?? "(empty)"), meta: "" };
+  }
+  const obj = item as Record<string, unknown>;
+  const title =
+    typeof obj.title === "string"
+      ? obj.title
+      : typeof obj.id === "string"
+        ? obj.id
+        : JSON.stringify(item).slice(0, 80);
+  const parts: string[] = [];
+  if (typeof obj.source === "string") parts.push(obj.source);
+  if (typeof obj.createdAt === "string") parts.push(obj.createdAt);
+  if (typeof obj.date === "string") parts.push(obj.date);
+  if (typeof obj.status === "string") parts.push(obj.status);
+  return { title, meta: parts.join(" · ") };
 }
 
 export function ScopeSummary({ scope }: { scope: NormalizedBrainMemorySearchScope }) {

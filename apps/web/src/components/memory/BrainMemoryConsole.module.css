@@ -189,6 +189,7 @@
 }
 
 .timelineItem {
+  position: relative;
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr);
   gap: 10px;
@@ -297,4 +298,298 @@
   color: #ffb4b4;
   font-size: var(--font-small);
   line-height: 1.45;
+}
+
+/* ── Score badge ───────────────────────────────────────────── */
+.scoreBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(155, 188, 249, 0.12);
+  color: #9bbcf9;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ── Layer color pills ─────────────────────────────────────── */
+.layerPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: var(--font-small);
+  white-space: nowrap;
+}
+
+.layerPill[data-layer="hot"] {
+  background: rgba(142, 230, 198, 0.12);
+  color: #8ee6c6;
+}
+
+.layerPill[data-layer="canonical"] {
+  background: rgba(155, 188, 249, 0.12);
+  color: #9bbcf9;
+}
+
+.layerPill[data-layer="semantic"] {
+  background: rgba(185, 142, 249, 0.12);
+  color: #b98ef9;
+}
+
+.layerPill[data-layer="curated"] {
+  background: rgba(249, 220, 142, 0.12);
+  color: #f9dc8e;
+}
+
+.layerPill[data-layer="raglight"] {
+  background: rgba(249, 180, 100, 0.12);
+  color: #f9b464;
+}
+
+/* Default/unknown layer */
+.layerPill[data-layer="unknown"],
+.layerPill:not([data-layer]) {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* ── Improved result cards ──────────────────────────────────── */
+.resultItem {
+  display: block;
+  width: 100%;
+  padding: 8px 10px 8px 12px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-left-color 0.1s ease, background 0.1s ease;
+}
+
+.resultItem:hover,
+.resultItem:focus-visible {
+  outline: 0;
+  border-left-color: rgba(155, 188, 249, 0.3);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.resultItemActive {
+  border-left-color: #9bbcf9;
+  background: rgba(155, 188, 249, 0.06);
+}
+
+.resultItemActive:hover,
+.resultItemActive:focus-visible {
+  border-left-color: #9bbcf9;
+  background: rgba(155, 188, 249, 0.09);
+}
+
+.resultHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.resultTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultBadges {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.resultMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.resultMetaDot {
+  opacity: 0.4;
+}
+
+.resultScope {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0.7;
+}
+
+/* ── Show more button ───────────────────────────────────────── */
+.showMoreButton {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-small);
+  text-align: center;
+  transition: color 0.1s ease;
+}
+
+.showMoreButton:hover,
+.showMoreButton:focus-visible {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.showMoreButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* ── Loading skeletons ──────────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeletonList {
+  display: grid;
+  gap: 18px;
+}
+
+.skeletonCard {
+  padding: 8px 12px;
+  border-left: 3px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.02);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.skeletonLine {
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.skeletonLine + .skeletonLine {
+  margin-top: 8px;
+}
+
+/* ── Disabled / unconfigured search banner ──────────────────── */
+.disabledBanner {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(249, 220, 142, 0.07);
+  border: 1px solid rgba(249, 220, 142, 0.15);
+  color: #f9dc8e;
+  font-size: var(--font-small);
+  line-height: 1.5;
+}
+
+.disabledBannerLabel {
+  font-weight: 650;
+  font-size: var(--font-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.searchInput:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ── Evidence timeline list ─────────────────────────────────── */
+.evidenceList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidenceItem {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 8px;
+  font-size: var(--font-small);
+}
+
+.evidenceDot {
+  width: 6px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: rgba(155, 188, 249, 0.5);
+}
+
+.evidenceBody {
+  display: grid;
+  gap: 2px;
+}
+
+.evidenceTitle {
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.evidenceMeta {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+/* ── Timeline vertical connector ────────────────────────────── */
+
+/* Vertical connector line drawn as a pseudo-element on the dot wrapper.
+   The dot column is 12px wide; dot is 7px centered. Line sits at left=3px. */
+.timelineItem:not(:last-child) .timelineDot {
+  position: relative;
+}
+
+.timelineItem:not(:last-child) .timelineDot::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 3px;
+  width: 1px;
+  /* Extend down to cover the row gap (14px) so the line meets the next dot */
+  height: calc(100% + 14px);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.detailContentScroll {
+  max-height: 300px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(8, 9, 10, 0.34);
+}
+
+.detailContentScroll :global(.markdown) {
+  font-size: var(--font-small);
+  line-height: 1.55;
 }

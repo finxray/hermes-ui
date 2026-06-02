@@ -13,8 +13,40 @@ export const fullScopedMemoryDetailFixture: NormalizedBrainMemoryInspectResponse
   memoryId: "fixture-memory-detail-15j",
   detail: {
     id: "fixture-memory-detail-15j",
-    content:
-      "This deterministic memory detail fixture represents a Gateway-backed scoped memory. It is rendered without calling Hermes, Brain Memory Gateway, localStorage, or direct storage.",
+    content: `## Fixture Memory — Scoped Gateway Detail
+
+This deterministic memory detail fixture represents a **Gateway-backed scoped memory**. It is rendered without calling Hermes, Brain Memory Gateway, localStorage, or direct storage.
+
+### Key properties verified
+
+- Markdown headings render correctly (h2, h3)
+- **Bold** and _italic_ inline formatting
+- Inline \`code spans\` and fenced code blocks
+- Tables with GFM support
+- Lists (ordered and unordered)
+
+### Code block example
+
+\`\`\`typescript
+const memoryId = "fixture-memory-detail-15j";
+const response = await gateway.inspect({ memoryId, context });
+console.log(response.detail?.content);
+\`\`\`
+
+### Scope table
+
+| Field | Value |
+|-------|-------|
+| Tenant | local-dev |
+| Project key | fixture-project |
+| Session key | fixture-session |
+| Scope status | matching-session |
+
+### Notes
+
+1. The \`detailContentScroll\` wrapper constrains height to 300px.
+2. Overflow scrolls within the container.
+3. Syntax highlighting applies after streaming completes.`,
     snippet: "Deterministic scoped memory detail fixture for read-only UI coverage.",
     layer: "canonical",
     source: "brain-memory-fixture",

@@ -127,6 +127,11 @@
   color: var(--text-secondary);
 }
 
+.modelControl {
+  position: relative;
+  min-width: 0;
+}
+
 .toolButton {
   width: calc(var(--control-height) * 0.86);
   flex: 0 0 auto;
@@ -142,8 +147,19 @@
   min-width: 90px;
   padding: 0 10px;
   overflow: hidden;
+  gap: 5px;
+}
+
+.modelButtonText {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.modelSpinner {
+  flex: 0 0 auto;
+  animation: modelSpinner 900ms linear infinite;
 }
 
 .toolButton:hover,
@@ -158,6 +174,79 @@
   outline: 0;
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
+}
+
+.modelButton:disabled {
+  cursor: default;
+}
+
+.modelMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  display: grid;
+  width: min(320px, 74vw);
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(24, 24, 26, 0.98);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.modelOption {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.modelOption:hover,
+.modelOption:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.modelOption[aria-selected="true"] {
+  color: var(--text-primary);
+}
+
+.modelOptionText {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.modelOptionLabel,
+.modelOptionProvider {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelOptionLabel {
+  font-size: var(--font-sm);
+  line-height: 1.25;
+}
+
+.modelOptionProvider {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  line-height: 1.2;
 }
 
 .sendButton {
@@ -303,10 +392,20 @@
   .contextPanel {
     transition-duration: 1ms;
   }
+
+  .modelSpinner {
+    animation-duration: 1ms;
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .box {
     background: #232323;
+  }
+}
+
+@keyframes modelSpinner {
+  to {
+    transform: rotate(360deg);
   }
 }

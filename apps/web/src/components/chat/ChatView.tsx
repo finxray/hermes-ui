@@ -44,6 +44,7 @@ type ChatViewProps = {
   isHermesStatusLoading: boolean;
   modelChoices: ModelChoice[];
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
+  refreshHermesStatus: () => Promise<void>;
   workspaceActions: WorkspaceActions;
 };
 
@@ -56,18 +57,25 @@ export function ChatView({
   isHermesStatusLoading,
   modelChoices,
   onActivityEvent,
+  refreshHermesStatus,
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStopRequested, setIsStopRequested] = useState(false);
   const [assistantHasContent, setAssistantHasContent] = useState(false);
+  const [modelSelectInProgress, setModelSelectInProgress] = useState(false);
+  const [selectedModelBySession, setSelectedModelBySession] = useState<Record<string, string>>({});
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const stopRequestedRef = useRef(false);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
   const composerInsetPx = useComposerInset(composerWrapRef, !isStartState);
-  const providerModelState = getProviderModelState(hermesStatus, modelChoices);
+  const selectedSessionModel = activeSession ? selectedModelBySession[activeSession.id] : undefined;
+  const providerModelState = applySessionSelectedModel(
+    getProviderModelState(hermesStatus, modelChoices),
+    selectedSessionModel
+  );
   const modelLabel = modelLabelForState(providerModelState);
   const composerContextItems = activeSession
     ? [
@@ -345,6 +353,39 @@ export function ChatView({
     activeStreamControllerRef.current?.abort();
   }
 
+  async function handleModelSelect(modelId: string) {
+    if (!activeSession || modelSelectInProgress) {
+      return;
+    }
+
+    const session = activeSession;
+    setModelSelectInProgress(true);
+    try {
+      const response = await fetch("/api/hermes/model/select", {
+        body: JSON.stringify({
+          model: modelId,
+          sessionId: session.hermesSessionId
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST"
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.ok === false) {
+        console.error("Model select failed:", result);
+        return;
+      }
+      setSelectedModelBySession((current) => ({
+        ...current,
+        [session.id]: result?.selectedModel || modelId
+      }));
+      await refreshHermesStatus();
+    } catch (error) {
+      console.error("Model select error:", error);
+    } finally {
+      setModelSelectInProgress(false);
+    }
+  }
+
   function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
     onActivityEvent(sessionId, event);
   }
@@ -436,7 +477,9 @@ export function ChatView({
             isStopRequested={isStopRequested}
             isStartState
             modelLabel={modelLabel}
+            modelSelectInProgress={modelSelectInProgress}
             modelState={providerModelState}
+            onModelSelect={handleModelSelect}
             onSend={handleSend}
             onStop={handleStop}
             showContextPanel
@@ -471,7 +514,9 @@ export function ChatView({
               isGenerating={isGenerating}
               isStopRequested={isStopRequested}
               modelLabel={modelLabel}
+              modelSelectInProgress={modelSelectInProgress}
               modelState={providerModelState}
+              onModelSelect={handleModelSelect}
               onSend={handleSend}
               onStop={handleStop}
               showContextPanel={false}
@@ -506,6 +551,22 @@ function getProviderModelState(
     serverAdvertisedModel: null,
     serverConfiguredOnly: true,
     uiState: "deferred"
+  };
+}
+
+function applySessionSelectedModel(
+  state: HermesUiCapabilities["models"],
+  selectedModelId: string | undefined
+): HermesUiCapabilities["models"] {
+  if (!selectedModelId) {
+    return state;
+  }
+  const selected = state.availableModels.find((model) => model.id === selectedModelId);
+  return {
+    ...state,
+    currentModelLabel: selected?.label ?? selectedModelId,
+    currentProviderLabel: selected?.provider ?? state.currentProviderLabel,
+    selectedModelId
   };
 }
 

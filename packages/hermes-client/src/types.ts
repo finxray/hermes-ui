@@ -29,6 +29,15 @@ export type HermesModelDescriptor = {
   provider?: string | null;
 };
 
+export type HermesModelSelectResult = {
+  ok: boolean;
+  sessionId: string | null;
+  selectedModel: string | null;
+  provider: string | null;
+  scope: string | null;
+  error: HermesStatusError | null;
+};
+
 export type HermesUiCapabilities = {
   status: {
     configured: boolean;

@@ -86,6 +86,7 @@ export function AppShell() {
             isHermesStatusLoading={hermesStatus.isLoading}
             modelChoices={state.modelChoices}
             onActivityEvent={appendActivityEvent}
+            refreshHermesStatus={hermesStatus.refresh}
             workspaceActions={actions}
           />
         </div>

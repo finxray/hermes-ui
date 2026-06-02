@@ -1,4 +1,4 @@
-import { ArrowUp, Mic, Plus, Square } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, Plus, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
@@ -15,6 +15,8 @@ type ComposerProps = {
   isStartState?: boolean;
   modelLabel?: string;
   modelState?: HermesUiCapabilities["models"];
+  modelSelectInProgress?: boolean;
+  onModelSelect?: (modelId: string) => void;
   onSend: (message: string) => void;
   onStop?: () => void;
   showContextPanel?: boolean;
@@ -29,16 +31,25 @@ export function Composer({
   isStartState = false,
   modelLabel = "Hermes default",
   modelState,
+  modelSelectInProgress = false,
+  onModelSelect,
   onSend,
   onStop,
   showContextPanel = false,
   stopControlState = "deferred"
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [displacementMapHref, setDisplacementMapHref] = useState(NEUTRAL_DISPLACEMENT_MAP);
   const [displacementScale, setDisplacementScale] = useState(-86);
   const boxRef = useRef<HTMLDivElement>(null);
   const canSend = draft.trim().length > 0 && !disabled && !isGenerating;
+  const modelOptions = modelState?.availableModels ?? [];
+  const canSelectModel =
+    Boolean(modelState?.clientSelectable) &&
+    modelOptions.length > 1 &&
+    Boolean(onModelSelect) &&
+    !modelSelectInProgress;
   const streamBatchingDetail = "Streaming batches deltas with an animation-frame flush, not one React update per token.";
 
   useEffect(() => {
@@ -80,6 +91,18 @@ export function Composer({
       return;
     }
     onStop?.();
+  }
+
+  function toggleModelMenu() {
+    if (!canSelectModel) {
+      return;
+    }
+    setIsModelMenuOpen((current) => !current);
+  }
+
+  function selectModel(modelId: string) {
+    setIsModelMenuOpen(false);
+    onModelSelect?.(modelId);
   }
 
   return (
@@ -139,15 +162,60 @@ export function Composer({
                 >
                   <Plus size={20} />
                 </button>
-                <button
-                  className={styles.modelButton}
-                  type="button"
-                  aria-label="Provider and model selector disabled"
-                  title={modelSelectorTitle(modelState)}
-                  disabled
+                <div
+                  className={styles.modelControl}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setIsModelMenuOpen(false);
+                    }
+                  }}
                 >
-                  {modelLabel}
-                </button>
+                  {isModelMenuOpen ? (
+                    <div className={styles.modelMenu} role="listbox" aria-label="Hermes model selector">
+                      {modelOptions.map((model) => {
+                        const isSelected = model.id === modelState?.selectedModelId;
+                        return (
+                          <button
+                            className={styles.modelOption}
+                            type="button"
+                            role="option"
+                            aria-selected={isSelected}
+                            key={model.id}
+                            onClick={() => selectModel(model.id)}
+                            title={model.provider ? `${model.id} (${model.provider})` : model.id}
+                          >
+                            <span className={styles.modelOptionText}>
+                              <span className={styles.modelOptionLabel}>{model.label}</span>
+                              {model.provider ? (
+                                <span className={styles.modelOptionProvider}>{model.provider}</span>
+                              ) : null}
+                            </span>
+                            {isSelected ? <Check size={14} /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  <button
+                    className={styles.modelButton}
+                    type="button"
+                    aria-expanded={canSelectModel ? isModelMenuOpen : undefined}
+                    aria-haspopup={canSelectModel ? "listbox" : undefined}
+                    aria-label={modelButtonLabel(modelState, modelOptions.length)}
+                    title={modelSelectorTitle(modelState, modelOptions.length)}
+                    disabled={!canSelectModel}
+                    onClick={toggleModelMenu}
+                  >
+                    <span className={styles.modelButtonText}>
+                      {modelSelectInProgress ? "Selecting..." : modelLabel}
+                    </span>
+                    {modelSelectInProgress ? (
+                      <LoaderCircle className={styles.modelSpinner} size={14} />
+                    ) : canSelectModel ? (
+                      <ChevronDown size={14} />
+                    ) : null}
+                  </button>
+                </div>
               </div>
               <div className={styles.controlsRight}>
                 <button
@@ -249,12 +317,25 @@ function getComposerDisplacementScale({ height, width }: { height: number; width
   return Math.round(demoScale * widthRatio * aspectBoost);
 }
 
-function modelSelectorTitle(state?: HermesUiCapabilities["models"]) {
+function modelButtonLabel(state?: HermesUiCapabilities["models"], optionCount = 0) {
+  if (state?.clientSelectable && optionCount > 1) {
+    return "Select Hermes model";
+  }
+  if (state?.clientSelectable && optionCount === 1) {
+    return "One Hermes model available";
+  }
+  return "Provider and model selector disabled";
+}
+
+function modelSelectorTitle(state?: HermesUiCapabilities["models"], optionCount = 0) {
   if (!state) {
     return "Hermes model status is loading; runtime model switching is disabled.";
   }
-  if (state.clientSelectable) {
+  if (state.clientSelectable && optionCount > 1) {
     return "Runtime model switching is available through the verified Hermes BFF path.";
+  }
+  if (state.clientSelectable && optionCount === 1) {
+    return "Hermes has one configured model; there is nothing to switch for this session.";
   }
   if (state.selectionStatus === "server-configured") {
     return "Model is server-configured in Hermes. Web UI-safe model switching is not exposed yet; the selector stays read-only.";

@@ -9,6 +9,7 @@ import type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesModelDescriptor,
+  HermesModelSelectResult,
   HermesRunApprovalChoice,
   HermesRunApprovalResult,
   HermesRunStopResult,
@@ -48,6 +49,7 @@ export type {
   HermesEndpointResult,
   HermesFastStreamProfile,
   HermesModelDescriptor,
+  HermesModelSelectResult,
   HermesModelSelectionStatus,
   HermesRunApprovalChoice,
   HermesRunApprovalResult,
@@ -206,8 +208,10 @@ export function normalizeHermesUiCapabilities(
     null;
   const availableModels = modelDescriptors(status.models);
   const modelsListAvailable = Boolean(status.models) || hasEndpoint(endpoints, "models");
+  const clientSelectable = modelsListAvailable && availableModels.length > 0 && status.mode === "real";
   const modelState = normalizeModelUiState({
     availableModels,
+    clientSelectable,
     listAvailable: modelsListAvailable,
     serverAdvertisedModel,
     statusMode: status.mode
@@ -278,7 +282,7 @@ export function normalizeHermesUiCapabilities(
     },
     models: {
       availableModels,
-      clientSelectable: false,
+      clientSelectable,
       currentModelLabel: modelState.currentModelLabel,
       currentProviderLabel: modelState.currentProviderLabel,
       fastStreamProfile: modelState.fastStreamProfile,
@@ -287,8 +291,8 @@ export function normalizeHermesUiCapabilities(
       selectedModelId: modelState.selectedModelId,
       selectionStatus: modelState.selectionStatus,
       serverAdvertisedModel,
-      serverConfiguredOnly: true,
-      uiState: "deferred"
+      serverConfiguredOnly: !clientSelectable,
+      uiState: clientSelectable ? "available" : "deferred"
     },
     memory: {
       instructionBridgeActive: options.memoryScopeBridgeEnabled !== false,
@@ -420,6 +424,105 @@ export async function streamHermesSessionChat(
     hermesSessionId,
     stream: normalizeHermesSseStream(response.body, abort)
   };
+}
+
+export async function selectHermesModel(
+  config: HermesClientConfig,
+  sessionId: string,
+  modelId: string
+): Promise<HermesModelSelectResult> {
+  if (config.enabled === false) {
+    return {
+      ok: false,
+      sessionId: null,
+      selectedModel: null,
+      provider: null,
+      scope: null,
+      error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." }
+    };
+  }
+
+  if (!config.baseUrl?.trim()) {
+    return {
+      ok: false,
+      sessionId: null,
+      selectedModel: null,
+      provider: null,
+      scope: null,
+      error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes model switching." }
+    };
+  }
+
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return {
+      ok: false,
+      sessionId: null,
+      selectedModel: null,
+      provider: null,
+      scope: null,
+      error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid URL." }
+    };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const abort = createLinkedAbortController(config.signal, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const headers = new Headers({ "Content-Type": "application/json" });
+  applyHermesAuth(headers, config.apiKey);
+
+  try {
+    const response = await fetchImpl(
+      buildEndpointUrl(base, `/api/sessions/${encodeURIComponent(sessionId)}/model`),
+      {
+        body: JSON.stringify({ model: modelId }),
+        cache: "no-store",
+        headers,
+        method: "POST",
+        signal: abort.signal
+      }
+    );
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const bodyRecord = objectRecord(body);
+      const errorRecord = objectRecord(bodyRecord?.error);
+      const message = asString(errorRecord?.message) || `HTTP ${response.status}`;
+      return {
+        ok: false,
+        sessionId: null,
+        selectedModel: null,
+        provider: null,
+        scope: null,
+        error: { kind: "http_error", message }
+      };
+    }
+
+    const data = await response.json().catch(() => ({}));
+    const record = objectRecord(data);
+    return {
+      ok: true,
+      sessionId: asString(record?.session_id) || sessionId,
+      selectedModel: asString(record?.selected_model) || modelId,
+      provider: asString(record?.provider) || null,
+      scope: asString(record?.scope) || "session",
+      error: null
+    };
+  } catch (error) {
+    const normalized = normalizeChatFetchError(error);
+    return {
+      ok: false,
+      sessionId: null,
+      selectedModel: null,
+      provider: null,
+      scope: null,
+      error: {
+        kind: normalized.kind === "bad_response" ? "unknown" : normalized.kind,
+        message: normalized.message
+      }
+    };
+  } finally {
+    abort.cleanup();
+  }
 }
 
 export async function runHermesRunsProbe(
@@ -2462,6 +2565,7 @@ function modelDescriptors(models: Record<string, unknown> | null): HermesModelDe
 
 function normalizeModelUiState(args: {
   availableModels: HermesModelDescriptor[];
+  clientSelectable: boolean;
   listAvailable: boolean;
   serverAdvertisedModel: string | null;
   statusMode: string;
@@ -2490,12 +2594,16 @@ function normalizeModelUiState(args: {
 
 function modelSelectionStatus(args: {
   availableModels: HermesModelDescriptor[];
+  clientSelectable: boolean;
   listAvailable: boolean;
   serverAdvertisedModel: string | null;
   statusMode: string;
 }): HermesUiCapabilities["models"]["selectionStatus"] {
   if (args.statusMode === "unconfigured" || args.statusMode === "mock" || args.statusMode === "error") {
     return args.listAvailable ? "deferred" : "unavailable";
+  }
+  if (args.clientSelectable) {
+    return "client-selectable";
   }
   if (args.serverAdvertisedModel || args.availableModels.length > 0) {
     return "server-configured";
@@ -2513,6 +2621,9 @@ function modelSelectionReason(
 ) {
   if (status === "server-configured") {
     return "Hermes advertises a model/profile, but current runtime switching is server-configured and not verified for the session stream API.";
+  }
+  if (status === "client-selectable") {
+    return "Hermes exposes model catalog data and the Web UI can request session-scoped model switching through the BFF.";
   }
   if (status === "unavailable") {
     return "Hermes has not exposed a model list or verified client-selectable model control for this UI process.";

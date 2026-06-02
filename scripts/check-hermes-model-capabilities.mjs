@@ -4,10 +4,10 @@
  *
  * Source-level check that verifies:
  * 1. The Hermes capability contract types exist and are correct
- * 2. normalizeHermesUiCapabilities always sets clientSelectable=false, serverConfiguredOnly=true
+ * 2. normalizeHermesUiCapabilities enables client selection only from real Hermes model data
  * 3. Status polling interval exists in useHermesStatus
- * 4. No fake model switch route exists in the codebase
- * 5. Composer receives modelState and has disabled model button
+ * 4. Session-scoped model select BFF route exists
+ * 5. Composer receives modelState and conditionally enables model selection
  * 6. Reactivity fix: useHermesStatus uses setInterval
  */
 
@@ -67,25 +67,32 @@ check(
   "HermesUiCapabilities.models has availableModels field",
   typesFile?.includes("availableModels: HermesModelDescriptor[]") ?? false
 );
+check(
+  "HermesModelSelectResult type exists",
+  typesFile?.includes("export type HermesModelSelectResult") ?? false
+);
 
-// --- 2. normalizeHermesUiCapabilities always produces clientSelectable=false ---
+// --- 2. normalizeHermesUiCapabilities enables verified client selection ---
 const indexFile = readFile("packages/hermes-client/src/index.ts");
 check(
   "index.ts exists",
   indexFile !== null
 );
 check(
-  "normalizeHermesUiCapabilities sets clientSelectable: false",
-  indexFile?.includes("clientSelectable: false") ?? false
+  "selectHermesModel client function exists",
+  indexFile?.includes("export async function selectHermesModel") ?? false
 );
 check(
-  "normalizeHermesUiCapabilities sets serverConfiguredOnly: true",
-  indexFile?.includes("serverConfiguredOnly: true") ?? false
+  "selectHermesModel calls session model endpoint",
+  indexFile?.includes("/api/sessions/${encodeURIComponent(sessionId)}/model") ?? false
 );
 check(
-  "normalizeHermesUiCapabilities sets uiState: 'deferred' for models",
-  /models:\s*\{[\s\S]{0,600}uiState:\s*"deferred"/.test(indexFile ?? "") ?? false,
-  "models.uiState should be deferred since switching is not supported"
+  "normalizeHermesUiCapabilities computes clientSelectable from real model catalog",
+  Boolean(indexFile?.includes("availableModels.length > 0") && indexFile?.includes('status.mode === "real"'))
+);
+check(
+  "normalizeHermesUiCapabilities can report client-selectable selectionStatus",
+  indexFile?.includes('"client-selectable"') ?? false
 );
 
 // --- 3. Reactivity: useHermesStatus uses polling interval ---
@@ -116,36 +123,49 @@ check(
   "Polling interval should be 5000-15000ms to avoid spam"
 );
 
-// --- 4. No fake model switch route ---
+// --- 4. Session-scoped model switch route ---
 const modelSwitchRoutePath = "apps/web/src/app/api/hermes/model/select/route.ts";
 check(
-  "No fake model switch BFF route exists",
-  !existsSync(resolve(root, modelSwitchRoutePath)),
-  "Runtime switching not supported by Hermes; no fake route should exist"
+  "Model select BFF route exists",
+  existsSync(resolve(root, modelSwitchRoutePath)),
+  "Runtime switching must go through the Web UI BFF"
 );
-const modelSelectRoutePath = "apps/web/src/app/api/hermes/model/route.ts";
+const modelSwitchRouteFile = readFile(modelSwitchRoutePath);
 check(
-  "No fake model select BFF route exists",
-  !existsSync(resolve(root, modelSelectRoutePath)),
-  "Runtime switching not supported; fake route would be dishonest"
+  "Model select BFF route uses selectHermesModel",
+  modelSwitchRouteFile?.includes("selectHermesModel") ?? false
+);
+check(
+  "Model select BFF route does not expose Hermes API key to browser",
+  Boolean(modelSwitchRouteFile?.includes("process.env.HERMES_API_KEY") && !modelSwitchRouteFile?.includes("NEXT_PUBLIC"))
+);
+check(
+  "Model select BFF route is force-dynamic",
+  modelSwitchRouteFile?.includes('dynamic = "force-dynamic"') ?? false
 );
 
-// --- 5. Composer has disabled model button ---
+// --- 5. Composer has conditional model selector ---
 const composerFile = readFile("apps/web/src/components/chat/Composer.tsx");
 check(
   "Composer.tsx exists",
   composerFile !== null
 );
 check(
-  "Composer model button is always disabled",
-  /modelButton[\s\S]{0,200}disabled/.test(composerFile ?? "") ||
-  /disabled[\s\S]{0,50}modelButton/.test(composerFile ?? "") ||
-  (composerFile?.includes("modelButton") && /className=\{styles\.modelButton\}[\s\S]{0,100}disabled/.test(composerFile ?? "")),
-  "Model button must be disabled since client switching is not supported"
+  "Composer model button is disabled unless canSelectModel",
+  composerFile?.includes("disabled={!canSelectModel}") ?? false,
+  "Model button should only enable when Hermes reports selectable models"
 );
 check(
   "Composer receives modelState prop",
   composerFile?.includes("modelState") ?? false
+);
+check(
+  "Composer receives onModelSelect prop",
+  composerFile?.includes("onModelSelect") ?? false
+);
+check(
+  "Composer renders model dropdown options",
+  Boolean(composerFile?.includes("modelMenu") && composerFile?.includes("modelOptions.map"))
 );
 check(
   "Composer shows modelLabel in button text",
@@ -181,6 +201,14 @@ check(
 check(
   "ChatView passes modelState to Composer",
   chatViewFile?.includes("modelState={providerModelState}") ?? false
+);
+check(
+  "ChatView posts selected model to BFF route",
+  Boolean(chatViewFile?.includes('/api/hermes/model/select') && chatViewFile?.includes("session.hermesSessionId"))
+);
+check(
+  "ChatView refreshes Hermes status after model selection",
+  chatViewFile?.includes("refreshHermesStatus") ?? false
 );
 
 // --- 7. BFF status route is force-dynamic (no caching) ---

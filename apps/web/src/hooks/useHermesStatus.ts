@@ -73,7 +73,8 @@ function preserveKnownModelOnTransientFailure(
 
   const previousModels = previous.uiCapabilities.models;
   const shouldPreserveModel =
-    previousModels.selectionStatus === "server-configured" &&
+    (previousModels.selectionStatus === "server-configured" ||
+      previousModels.selectionStatus === "client-selectable") &&
     Boolean(previousModels.currentModelLabel) &&
     (next.mode === "error" ||
       !next.reachable ||
@@ -96,10 +97,12 @@ function preserveKnownModelOnTransientFailure(
             : previousModels.availableModels,
         currentModelLabel: previousModels.currentModelLabel,
         currentProviderLabel: previousModels.currentProviderLabel,
+        clientSelectable: previousModels.clientSelectable,
         selectedModelId: previousModels.selectedModelId ?? next.uiCapabilities.models.selectedModelId,
-        selectionStatus: "server-configured",
+        selectionStatus: previousModels.selectionStatus,
         serverAdvertisedModel:
-          previousModels.serverAdvertisedModel ?? next.uiCapabilities.models.serverAdvertisedModel
+          previousModels.serverAdvertisedModel ?? next.uiCapabilities.models.serverAdvertisedModel,
+        serverConfiguredOnly: previousModels.serverConfiguredOnly
       }
     }
   };

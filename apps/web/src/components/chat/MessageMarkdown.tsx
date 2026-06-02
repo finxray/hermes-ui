@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism-plus";
 import type { Components } from "react-markdown";
+import type { PluggableList } from "unified";
 import styles from "./MessageMarkdown.module.css";
 
 type MessageMarkdownProps = {
@@ -19,10 +20,10 @@ export const MessageMarkdown = memo(function MessageMarkdown({
 }: MessageMarkdownProps) {
   // During streaming, skip rehype-prism-plus to avoid flickering on incomplete code fences.
   // We still run remark-gfm so inline formatting like bold/italic renders progressively.
-  const rehypePlugins = useMemo(
+  const rehypePlugins = useMemo<PluggableList>(
     () => (isStreaming ? [] : [[rehypePrism, { ignoreMissing: true }]]),
     [isStreaming]
-  ) as import("unified").PluggableList;
+  );
 
   const components = useMemo<Components>(
     () => ({

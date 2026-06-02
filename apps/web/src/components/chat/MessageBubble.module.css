@@ -148,6 +148,7 @@
 
 .messageCopyButton {
   display: inline-flex;
+  min-width: 118px;
   min-height: 26px;
   align-items: center;
   justify-content: center;

@@ -560,7 +560,9 @@ function getProviderModelState(
     selectionStatus: "unknown",
     serverAdvertisedModel: null,
     serverConfiguredOnly: true,
-    uiState: "deferred"
+    uiState: "deferred",
+    sessionModelOverrideCapable: false,
+    explicitOverrideSupported: false
   };
 }
 

@@ -94,6 +94,10 @@ export type HermesUiCapabilities = {
     reason: string;
     fastStreamProfile: HermesFastStreamProfile;
     uiState: HermesCapabilityState;
+    /** Explicit capability from Hermes GET /v1/capabilities session_model_override.supported */
+    sessionModelOverrideCapable: boolean;
+    /** True when Hermes explicitly reports session_model_override support */
+    explicitOverrideSupported: boolean;
   };
   memory: {
     sessionContinuityHeader: string | null;

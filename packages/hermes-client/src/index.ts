@@ -218,7 +218,10 @@ export function normalizeHermesUiCapabilities(
     null;
   const availableModels = modelDescriptors(status.models);
   const modelsListAvailable = Boolean(status.models) || hasEndpoint(endpoints, "models");
-  const clientSelectable = modelsListAvailable && availableModels.length > 0 && status.mode === "real";
+  const sessionModelOverrideObj = objectRecord(status.capabilities?.session_model_override);
+  const explicitOverrideSupported = Boolean(sessionModelOverrideObj?.supported === true);
+  const hasSessionModelEndpoint = hasEndpoint(endpoints, "session_model");
+  const clientSelectable = status.mode === "real" && explicitOverrideSupported && availableModels.length > 1 && hasSessionModelEndpoint;
   const modelState = normalizeModelUiState({
     availableModels,
     clientSelectable,
@@ -302,7 +305,9 @@ export function normalizeHermesUiCapabilities(
       selectionStatus: modelState.selectionStatus,
       serverAdvertisedModel,
       serverConfiguredOnly: !clientSelectable,
-      uiState: clientSelectable ? "available" : "deferred"
+      uiState: clientSelectable ? "available" : "deferred",
+      sessionModelOverrideCapable: explicitOverrideSupported,
+      explicitOverrideSupported
     },
     memory: {
       instructionBridgeActive: options.memoryScopeBridgeEnabled !== false,

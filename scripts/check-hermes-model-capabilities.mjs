@@ -198,6 +198,35 @@ check(
     chatViewFile?.includes("state.currentModelLabel &&")
   )
 );
+
+// --- 7a. New: Explicit session model override capability ---
+check(
+  "HermesUiCapabilities.models has sessionModelOverrideCapable field",
+  typesFile?.includes("sessionModelOverrideCapable: boolean") ?? false
+);
+check(
+  "HermesUiCapabilities.models has explicitOverrideSupported field",
+  typesFile?.includes("explicitOverrideSupported: boolean") ?? false
+);
+check(
+  "normalizeHermesUiCapabilities reads session_model_override from capabilities",
+  indexFile?.includes("session_model_override") ?? false
+);
+check(
+  "normalizeHermesUiCapabilities checks explicitOverrideSupported for clientSelectable",
+  indexFile?.includes("explicitOverrideSupported") ?? false
+);
+check(
+  "Smoke script for model switch exists",
+  existsSync(resolve(root, "scripts/hermes-model-switch-smoke.mjs"))
+);
+check(
+  "Smoke script calls BFF not Hermes directly",
+  Boolean(
+    readFile("scripts/hermes-model-switch-smoke.mjs")?.includes("/api/hermes/model/select") &&
+    !readFile("scripts/hermes-model-switch-smoke.mjs")?.includes("process.env.HERMES_API_KEY")
+  )
+);
 check(
   "ChatView passes modelState to Composer",
   chatViewFile?.includes("modelState={providerModelState}") ?? false

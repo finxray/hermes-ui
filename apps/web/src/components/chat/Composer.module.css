@@ -11,14 +11,6 @@
   padding: 0;
 }
 
-.filterDefs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
 .composer {
   --composer-control-idle: rgba(255, 255, 255, 0.42);
 
@@ -31,17 +23,13 @@
 .box {
   position: relative;
   min-width: 0;
-  isolation: isolate;
-  z-index: 0;
   overflow: hidden;
   border: 0;
   border-radius: 30px;
   background: rgba(27, 27, 30, 1);
-  backdrop-filter: none;
   box-shadow:
-    0 2px 31px rgba(0, 0, 0, 0.9),
-    0 12px 36px rgba(0, 0, 0, 0.9),
-    0 22px 36px rgba(0, 0, 0, 0.9);
+    0 10px 30px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045);
 }
 
 .boxContent {
@@ -58,9 +46,8 @@
 .box:focus-within {
   background: rgba(27, 27, 30, 1);
   box-shadow:
-    0 2px 34px rgba(0, 0, 0, 0.9),
-    0 12px 36px rgba(0, 0, 0, 0.9),
-    0 22px 36px rgba(0, 0, 0, 0.9);
+    0 12px 34px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
 .box textarea {
@@ -181,20 +168,16 @@
 }
 
 .modelMenu {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 10;
+  position: fixed;
+  z-index: var(--z-floating);
   display: grid;
-  width: min(320px, 74vw);
-  max-height: 260px;
   overflow: auto;
   padding: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
-  background: rgba(24, 24, 26, 0.98);
+  background: #18181a;
   box-shadow:
-    0 18px 48px rgba(0, 0, 0, 0.45),
+    0 16px 42px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -299,9 +282,9 @@
   opacity: 0;
   transform: translateY(-6px);
   transition:
-    max-height 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 180ms ease,
-    transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    max-height 160ms ease,
+    opacity 120ms ease,
+    transform 160ms ease;
 }
 
 .contextPanel[data-visible="true"] {
@@ -323,9 +306,8 @@
   padding: 9px 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;
-  background: rgba(30, 30, 30, 0.5);
+  background: rgba(30, 30, 30, 0.74);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(28px);
 }
 
 .contextItem {

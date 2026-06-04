@@ -1,6 +1,8 @@
 import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, Plus, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
 import styles from "./Composer.module.css";
 
@@ -40,9 +42,10 @@ export function Composer({
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
-  const [displacementMapHref, setDisplacementMapHref] = useState(NEUTRAL_DISPLACEMENT_MAP);
-  const [displacementScale, setDisplacementScale] = useState(-86);
-  const boxRef = useRef<HTMLDivElement>(null);
+  const [modelMenuStyle, setModelMenuStyle] = useState<CSSProperties | null>(null);
+  const modelControlRef = useRef<HTMLDivElement>(null);
+  const modelButtonRef = useRef<HTMLButtonElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasDraft = getTrimmedDraft(textareaRef.current, draft).length > 0;
   const canSend = hasDraft && !disabled && !isGenerating;
@@ -54,29 +57,72 @@ export function Composer({
     !modelSelectInProgress;
   const streamBatchingDetail = "Streaming batches deltas with an animation-frame flush, not one React update per token.";
 
-  useEffect(() => {
-    const box = boxRef.current;
-    if (!box || typeof ResizeObserver === "undefined") {
+  useLayoutEffect(() => {
+    if (!isModelMenuOpen) {
+      setModelMenuStyle(null);
       return;
     }
 
-    function updateDisplacementMap() {
-      if (!box) {
+    function updateModelMenuPosition() {
+      const button = modelButtonRef.current;
+      if (!button) {
         return;
       }
-      const rect = box.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-      const radius = Math.min(30, Math.round(Math.min(width, height) / 2));
-      setDisplacementMapHref(buildComposerDisplacementMap({ height, radius, width }));
-      setDisplacementScale(getComposerDisplacementScale({ height, width }));
+
+      const rect = button.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const menuWidth = Math.min(320, Math.max(220, viewportWidth - 24));
+      const left = Math.min(Math.max(12, rect.left), viewportWidth - menuWidth - 12);
+      const spaceAbove = Math.max(140, rect.top - 16);
+
+      setModelMenuStyle({
+        bottom: viewportHeight - rect.top + 8,
+        left,
+        maxHeight: Math.min(260, spaceAbove),
+        width: menuWidth
+      });
     }
 
-    updateDisplacementMap();
-    const observer = new ResizeObserver(updateDisplacementMap);
-    observer.observe(box);
-    return () => observer.disconnect();
-  }, []);
+    updateModelMenuPosition();
+    window.addEventListener("resize", updateModelMenuPosition);
+    window.addEventListener("scroll", updateModelMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateModelMenuPosition);
+      window.removeEventListener("scroll", updateModelMenuPosition, true);
+    };
+  }, [isModelMenuOpen]);
+
+  useEffect(() => {
+    if (!isModelMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target && modelControlRef.current?.contains(target)) {
+        return;
+      }
+      if (target && modelMenuRef.current?.contains(target)) {
+        return;
+      }
+      setIsModelMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsModelMenuOpen(false);
+        modelButtonRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isModelMenuOpen]);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -135,34 +181,47 @@ export function Composer({
     onModelSelect?.(modelId);
   }
 
+  const modelMenu =
+    isModelMenuOpen && modelMenuStyle && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className={styles.modelMenu}
+            ref={modelMenuRef}
+            role="listbox"
+            aria-label="Hermes model selector"
+            style={modelMenuStyle}
+          >
+            {modelOptions.map((model) => {
+              const isSelected = model.id === modelState?.selectedModelId;
+              return (
+                <button
+                  className={styles.modelOption}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  key={model.id}
+                  onClick={() => selectModel(model.id)}
+                  title={model.provider ? `${model.id} (${model.provider})` : model.id}
+                >
+                  <span className={styles.modelOptionText}>
+                    <span className={styles.modelOptionLabel}>{model.label}</span>
+                    {model.provider ? (
+                      <span className={styles.modelOptionProvider}>{model.provider}</span>
+                    ) : null}
+                  </span>
+                  {isSelected ? <Check size={14} /> : null}
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div className={styles.wrap} data-start-state={isStartState ? "true" : "false"}>
-      <svg className={styles.filterDefs} aria-hidden="true" focusable="false">
-        <defs>
-          <filter id="composerGlassFilter" colorInterpolationFilters="sRGB">
-            <feImage
-              x="0"
-              y="0"
-              width="100%"
-              height="100%"
-              href={displacementMapHref}
-              preserveAspectRatio="none"
-              result="map"
-            />
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="map"
-              scale={displacementScale}
-              xChannelSelector="R"
-              yChannelSelector="B"
-              result="displaced"
-            />
-            <feGaussianBlur in="displaced" stdDeviation="1.15" />
-          </filter>
-        </defs>
-      </svg>
       <form className={styles.composer} aria-label="Message composer" onSubmit={submit}>
-        <div className={styles.box} ref={boxRef}>
+        <div className={styles.box}>
           <div className={styles.boxContent}>
             <textarea
               ref={textareaRef}
@@ -196,40 +255,11 @@ export function Composer({
                 </button>
                 <div
                   className={styles.modelControl}
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                      setIsModelMenuOpen(false);
-                    }
-                  }}
+                  ref={modelControlRef}
                 >
-                  {isModelMenuOpen ? (
-                    <div className={styles.modelMenu} role="listbox" aria-label="Hermes model selector">
-                      {modelOptions.map((model) => {
-                        const isSelected = model.id === modelState?.selectedModelId;
-                        return (
-                          <button
-                            className={styles.modelOption}
-                            type="button"
-                            role="option"
-                            aria-selected={isSelected}
-                            key={model.id}
-                            onClick={() => selectModel(model.id)}
-                            title={model.provider ? `${model.id} (${model.provider})` : model.id}
-                          >
-                            <span className={styles.modelOptionText}>
-                              <span className={styles.modelOptionLabel}>{model.label}</span>
-                              {model.provider ? (
-                                <span className={styles.modelOptionProvider}>{model.provider}</span>
-                              ) : null}
-                            </span>
-                            {isSelected ? <Check size={14} /> : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
                   <button
                     className={styles.modelButton}
+                    ref={modelButtonRef}
                     type="button"
                     aria-expanded={canSelectModel ? isModelMenuOpen : undefined}
                     aria-haspopup={canSelectModel ? "listbox" : undefined}
@@ -304,54 +334,13 @@ export function Composer({
           </div>
         ) : null}
       </form>
+      {modelMenu}
     </div>
   );
 }
 
 function getTrimmedDraft(textarea: HTMLTextAreaElement | null, draft: string) {
   return (textarea?.value ?? draft).trim();
-}
-
-const NEUTRAL_DISPLACEMENT_MAP =
-  "data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%201%201%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%221%22%20height%3D%221%22%20fill%3D%22rgb(128%20128%20128)%22%2F%3E%3C%2Fsvg%3E";
-
-function buildComposerDisplacementMap({
-  height,
-  radius,
-  width
-}: {
-  height: number;
-  radius: number;
-  width: number;
-}) {
-  const border = Math.min(width, height) * 0.035;
-  const innerWidth = Math.max(1, width - border * 2);
-  const innerHeight = Math.max(1, height - border * 2);
-  const svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-<defs>
-<linearGradient id="red" x1="100%" y1="0%" x2="0%" y2="0%">
-<stop offset="0%" stop-color="#000"/>
-<stop offset="100%" stop-color="red"/>
-</linearGradient>
-<linearGradient id="blue" x1="0%" y1="0%" x2="0%" y2="100%">
-<stop offset="0%" stop-color="#000"/>
-<stop offset="100%" stop-color="blue"/>
-</linearGradient>
-</defs>
-<rect x="0" y="0" width="${width}" height="${height}" fill="black"/>
-<rect x="0" y="0" width="${width}" height="${height}" rx="${radius}" fill="url(#red)"/>
-<rect x="0" y="0" width="${width}" height="${height}" rx="${radius}" fill="url(#blue)" style="mix-blend-mode:difference"/>
-<rect x="${border}" y="${border}" width="${innerWidth}" height="${innerHeight}" rx="${radius}" fill="hsl(0 0% 50% / 0.93)" style="filter:blur(11px)"/>
-</svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-}
-
-function getComposerDisplacementScale({ height, width }: { height: number; width: number }) {
-  const demoWidth = 336;
-  const demoScale = -58;
-  const widthRatio = Math.min(2.8, Math.max(1, width / demoWidth));
-  const aspectBoost = Math.min(1.25, Math.max(1, width / Math.max(height * 4, 1)));
-  return Math.round(demoScale * widthRatio * aspectBoost);
 }
 
 function modelButtonLabel(state?: HermesUiCapabilities["models"], optionCount = 0) {

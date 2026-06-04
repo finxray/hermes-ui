@@ -120,7 +120,7 @@ const mainWindowCssForChecks = existsSync(join(root, "apps/web/src/components/sh
 for (const token of [
   '.shell[data-left-collapsed="true"]',
   ".shell:has(.leftToggle:checked)",
-  "transition: grid-template-columns 500ms",
+  "transition: grid-template-columns 180ms",
   ':global([data-shell-rail="left"])',
   '"left main-window"'
 ]) {
@@ -132,7 +132,7 @@ for (const token of [
   "main-window",
   "data-right-collapsed",
   "grid-template-columns: minmax(0, 1fr) minmax(0, var(--rail-width-right))",
-  "transition: grid-template-columns 500ms"
+  "transition: grid-template-columns 180ms"
 ]) {
   if (!mainWindowCssForChecks.includes(token)) {
     failures.push(`Main window CSS contract is missing ${token}`);
@@ -285,14 +285,8 @@ if (!chatViewVisualCss.includes("background: transparent") || !chatViewVisualCss
 if (chatViewVisualCss.includes(".workspace::before")) {
   failures.push("Chat workspace must not use a full-width top smoke overlay on the transcript.");
 }
-if (!chatViewVisualCss.includes(".header::before")) {
-  failures.push("Top header shadow must use a ::before fade from the window top.");
-}
-if (!/\.header::before[\s\S]{0,500}right:\s*30px/.test(chatViewVisualCss)) {
-  failures.push("Top header shadow must stop 30px before the right panel.");
-}
-if (!chatViewVisualCss.includes("--header-shadow-title-clear")) {
-  failures.push("Top header shadow must leave the left title area clear.");
+if (chatViewVisualCss.includes(".header::before")) {
+  failures.push("Chat header must not use a top smoke/fade overlay.");
 }
 if (/\.header[\s\S]{0,700}backdrop-filter:\s*blur/.test(chatViewVisualCss)) {
   failures.push("Chat header must not use liquid glass or backdrop blur.");
@@ -305,14 +299,8 @@ const tokensCss = readFileSync(join(root, "apps/web/src/styles/tokens.css"), "ut
 if (!tokensCss.includes("--bg-workspace-solid: #0f0f0f")) {
   failures.push("Main workspace solid token must use opaque #0f0f0f (rgba(15,15,15,1)).");
 }
-if (/rgba\(92,\s*76,\s*148,\s*0\.(?:1[5-9]|[2-9])/.test(appShellCss)) {
-  failures.push("Shell canvas purple wash must stay at or below Codex-subtle strength (<= 0.14).");
-}
-if (!appShellCss.includes("var(--bg-rail-warm) 0%") || !appShellCss.includes("var(--bg-canvas) 100%")) {
-  failures.push("Shell canvas must use Codex-like warm-left to dark-right gradient.");
-}
-if (!appShellCss.includes("at 14% 108%")) {
-  failures.push("Shell canvas must place warm burgundy wash at bottom-left (sidebar region).");
+if (appShellCss.includes("radial-gradient(") || appShellCss.includes("ambientCanvasShift")) {
+  failures.push("Shell canvas must not use ambient gradients or animated background layers.");
 }
 if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes("border: 1px solid")) {
   if (messageBubbleCss.match(/\.userExpandButton[\s\S]{0,400}border:\s*1px/)) {
@@ -333,23 +321,11 @@ if (!appShellSource.includes("mainWindowStyles.chatPane")) {
 if (appShellSource.includes("ChatDepthField")) {
   failures.push("Chat depth background must not be mounted in AppShell.");
 }
-if (!mainWindowCssForChecks.includes(".chatPane::before")) {
-  failures.push("Chat pane must use a subtle depth gradient background layer.");
+if (mainWindowCssForChecks.includes(".chatPane::before") || mainWindowCssForChecks.includes(".chatPane::after")) {
+  failures.push("Chat pane must stay a plain dark surface without pseudo-layer gradients.");
 }
-if (!mainWindowCssForChecks.includes("rgba(255, 255, 255, 0.018)")) {
-  failures.push("Chat pane depth gradient must use a subtle glow (<= 2% white at center).");
-}
-if (!mainWindowCssForChecks.includes("rgba(255, 255, 255, 0.008)")) {
-  failures.push("Chat pane depth gradient must decay to near-transparent mid-way.");
-}
-if (!mainWindowCssForChecks.includes("radial-gradient(")) {
-  failures.push("Chat pane depth layer must use radial gradient (not dot grid or solid).");
-}
-if (!mainWindowCssForChecks.includes(".chatPane::after")) {
-  failures.push("Chat pane must use inset edge shadow to fade gradient at borders.");
-}
-if (!mainWindowCssForChecks.includes("inset 72px 0 96px")) {
-  failures.push("Chat pane inset shadow must disperse on left and right edges.");
+if (!mainWindowCssForChecks.includes("box-shadow:")) {
+  failures.push("Main window must keep a subtle edge shadow around the chat surface.");
 }
 if (!mainWindowCssForChecks.includes("border: 1px solid var(--border-window-outline)")) {
   failures.push("Main window outline border is missing.");
@@ -359,9 +335,10 @@ if (contextRailVisualCss.includes("transform: translateX(100%)")) {
 }
 
 for (const token of [
-  "backdrop-filter: none",
   "rgba(27, 27, 30, 1)",
   "box-shadow:",
+  "position: fixed",
+  "var(--z-floating)",
   ".contextPanel[data-visible=\"true\"]",
   "@media (prefers-reduced-motion: reduce)"
 ]) {

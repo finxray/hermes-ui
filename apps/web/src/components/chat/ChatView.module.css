@@ -81,48 +81,8 @@
   overflow: visible;
 }
 
-/* Window-wide top smoke: leaves title clear on the left, stops before the right rail */
-.header::before {
-  --header-shadow-title-clear: clamp(148px, 20vw, 300px);
-
-  position: absolute;
-  top: 0;
-  right: 30px;
-  left: 0;
-  z-index: 0;
-  width: auto;
-  height: 84px;
-  pointer-events: none;
-  content: "";
-  background: linear-gradient(
-    180deg,
-    rgba(15, 15, 15, 0.98) 0%,
-    rgba(15, 15, 15, 0.94) 7%,
-    rgba(15, 15, 15, 0.72) 26%,
-    rgba(15, 15, 15, 0.38) 48%,
-    rgba(15, 15, 15, 0.16) 68%,
-    rgba(15, 15, 15, 0.05) 84%,
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent var(--header-shadow-title-clear),
-    #000 calc(var(--header-shadow-title-clear) + 36px),
-    #000 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent var(--header-shadow-title-clear),
-    #000 calc(var(--header-shadow-title-clear) + 36px),
-    #000 100%
-  );
-}
-
 .headerTitle {
   position: relative;
-  z-index: 1;
   min-width: 0;
   margin: 0;
   background: transparent;

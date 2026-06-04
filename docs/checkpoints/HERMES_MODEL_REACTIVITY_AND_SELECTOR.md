@@ -3,6 +3,8 @@
 **Date:** 2026-06-01
 **Slice:** Hermes model status reactivity + honest model selector
 
+> **⚠️ Update 2026-06-04:** This checkpoint was written before Hermes model switching was implemented. Runtime model switching now IS supported through `POST /api/sessions/{session_id}/model`. The Web UI BFF route `POST /api/hermes/model/select` and client function `selectHermesModel` are live. See `docs/checkpoints/HERMES_MODEL_SWITCHING_FEATURE_CLOSURE.md` for current status. The reactivity fix, type contract, and polling logic documented here remain accurate and unchanged.
+
 ---
 
 ## Summary

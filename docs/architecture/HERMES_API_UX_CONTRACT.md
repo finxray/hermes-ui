@@ -531,6 +531,8 @@ UI contract:
 
 ## 11. Provider And Model Selection
 
+> **✅ Update 2026-06-04:** Model selection is now implemented. The Web UI BFF has `POST /api/hermes/model/select` and `selectHermesModel()`. Selection is session-scoped, in-memory only, and activates when Hermes exposes `session_model_override.supported: true` with ≥2 models. See `docs/checkpoints/HERMES_MODEL_SWITCHING_FEATURE_CLOSURE.md`.
+
 Verified current docs:
 
 - `/v1/models` returns an advertised model/profile id.

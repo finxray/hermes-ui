@@ -1,5 +1,7 @@
 # Hermes Model Switching Backend Hardening
 
+> **✅ Status:** Implemented and live verified as of 2026-06-04. See `docs/checkpoints/HERMES_MODEL_SWITCHING_FEATURE_CLOSURE.md` for full closure report.
+
 ## Summary
 
 Added explicit capability discovery, effective session model exposure, BFF-level capability detection, smoke tests, and source checks for the Hermes Web UI model-switching feature. The model-switching implementation was already in place (Hermes commit `8661e3620`, Web UI commit `69fbadf`); this hardening makes it explicitly discoverable and verifiable.

@@ -1,5 +1,7 @@
 # Hermes Model Switching — Live Verification
 
+> **✅ Superseded by closure.** See `docs/checkpoints/HERMES_MODEL_SWITCHING_FEATURE_CLOSURE.md` for the complete status.
+
 **Date:** 2026-06-04
 **Hermes commit:** `c52f05653` — session model override capability/effective model
 **Web UI commit:** `9d4a905` — harden model switching capability detection

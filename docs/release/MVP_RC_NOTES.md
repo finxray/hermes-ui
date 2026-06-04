@@ -124,7 +124,7 @@ Brain Memory Gateway were real/reachable through the BFF.
 - Final one-command GitHub bundle is not implemented.
 - Export/import is deferred.
 - Real artifact upload/download is deferred.
-- Provider/model runtime switching is deferred.
+- Provider/model runtime switching is implemented (session-scoped, in-memory).
 - Full auth/classification is deferred.
 - Memory admin/mutation UI is deferred.
 - Context compaction runtime is deferred.

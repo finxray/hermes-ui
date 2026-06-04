@@ -47,17 +47,21 @@ async function main() {
   await checkOptionalDesignRoute();
   const hermesStatus = await checkJsonGet("/api/hermes/status", {
     required: true,
-    validate: (body) =>
-      body &&
-      typeof body === "object" &&
-      typeof body.mode === "string" &&
-      body.uiCapabilities &&
-      typeof body.uiCapabilities === "object" &&
-      body.uiCapabilities.chat &&
-      body.uiCapabilities.models &&
-      body.uiCapabilities.models.clientSelectable === false &&
-      body.uiCapabilities.models.selectionStatus &&
-      body.uiCapabilities.ui
+    validate: (body) => {
+      if (!body || typeof body !== "object") return false;
+      if (typeof body.mode !== "string") return false;
+      if (!body.uiCapabilities || typeof body.uiCapabilities !== "object") return false;
+      if (!body.uiCapabilities.chat) return false;
+      if (!body.uiCapabilities.models || typeof body.uiCapabilities.models !== "object") return false;
+      if (typeof body.uiCapabilities.models.clientSelectable !== "boolean") return false;
+      if (!body.uiCapabilities.models.selectionStatus) return false;
+      if (!body.uiCapabilities.ui) return false;
+
+      // When Hermes is not real (mock/unconfigured/error), clientSelectable must be false
+      if (body.mode !== "real" && body.uiCapabilities.models.clientSelectable !== false) return false;
+
+      return true;
+    }
   });
   const brainMemoryStatus = await checkJsonGet("/api/brain-memory/status", {
     required: true,

@@ -15,7 +15,7 @@
   transition: grid-template-columns 500ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Chat column only: static staggered dot grid (not context rail, not outer shell) */
+/* Chat column only: subtle depth gradient (not context rail, not outer shell) */
 .chatPane {
   position: relative;
   isolation: isolate;
@@ -26,20 +26,23 @@
   background-color: var(--bg-workspace-solid);
 }
 
+/* Very subtle warm-center depth gradient — Codex-like, not noisy dots */
 .chatPane::before {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   content: "";
-  background-image:
-    radial-gradient(circle, rgba(210, 218, 235, 0.14) 0.6px, transparent 0.65px),
-    radial-gradient(circle, rgba(210, 218, 235, 0.14) 0.6px, transparent 0.65px);
-  background-size: 15px 15px;
-  background-position: 0 0, 7.5px 7.5px;
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 30%,
+      rgba(255, 255, 255, 0.018) 0%,
+      rgba(255, 255, 255, 0.008) 50%,
+      transparent 100%
+    );
 }
 
-/* Dispersed inset shadow on all sides — dots fade out toward edges */
+/* Dispersed inset shadow — edges fade into the base background */
 .chatPane::after {
   position: absolute;
   inset: 0;

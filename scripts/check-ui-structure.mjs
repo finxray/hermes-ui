@@ -334,16 +334,22 @@ if (appShellSource.includes("ChatDepthField")) {
   failures.push("Chat depth background must not be mounted in AppShell.");
 }
 if (!mainWindowCssForChecks.includes(".chatPane::before")) {
-  failures.push("Chat pane must use a staggered dot grid background layer.");
+  failures.push("Chat pane must use a subtle depth gradient background layer.");
 }
-if (!mainWindowCssForChecks.includes("background-position: 0 0, 7.5px 7.5px")) {
-  failures.push("Chat pane dot grid must use staggered (offset row) positioning.");
+if (!mainWindowCssForChecks.includes("rgba(255, 255, 255, 0.018)")) {
+  failures.push("Chat pane depth gradient must use a subtle glow (<= 2% white at center).");
+}
+if (!mainWindowCssForChecks.includes("rgba(255, 255, 255, 0.008)")) {
+  failures.push("Chat pane depth gradient must decay to near-transparent mid-way.");
+}
+if (!mainWindowCssForChecks.includes("radial-gradient(")) {
+  failures.push("Chat pane depth layer must use radial gradient (not dot grid or solid).");
 }
 if (!mainWindowCssForChecks.includes(".chatPane::after")) {
-  failures.push("Chat pane must use inset edge shadow to fade dot grid at borders.");
+  failures.push("Chat pane must use inset edge shadow to fade gradient at borders.");
 }
 if (!mainWindowCssForChecks.includes("inset 72px 0 96px")) {
-  failures.push("Chat pane inset shadow must disperse dots on left and right edges.");
+  failures.push("Chat pane inset shadow must disperse on left and right edges.");
 }
 if (!mainWindowCssForChecks.includes("border: 1px solid var(--border-window-outline)")) {
   failures.push("Main window outline border is missing.");

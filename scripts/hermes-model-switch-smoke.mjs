@@ -163,15 +163,29 @@ async function main() {
     const modelA = availableModels[0].id;
     const modelB = availableModels[1].id;
 
+    // Get or create a session for model selection
+    let sessionId = "smoke-test-session";
+    const sessionsResult = await bffFetch("/api/hermes/sessions");
+    if (sessionsResult.ok && sessionsResult.body?.sessions?.length > 0) {
+      sessionId = sessionsResult.body.sessions[0].id;
+      ok("Using existing session: " + sessionId.slice(-8));
+    } else {
+      // Try creating a session via Hermes API directly (admin smoke, not browser path)
+      const hermesStatus = statusResult.body;
+      const hermesBaseUrl = hermesStatus?.baseUrl;
+      const hermesApiKey = ""; // Smoke doesn't have the key; skip creation
+      skip("Session creation", "No existing session found and BFF has no create endpoint");
+    }
+
     // Try selecting model A
     console.log(`       Selecting model: ${modelA}`);
     const selectResult = await bffFetch("/api/hermes/model/select", {
       method: "POST",
-      body: JSON.stringify({ sessionId: "smoke-test-session", model: modelA }),
+      body: JSON.stringify({ sessionId, model: modelA }),
     });
     if (selectResult.ok) {
       ok(`Select ${modelA}: response ok`);
-      if (selectResult.body?.selected_model === modelA || selectResult.body?.model === modelA) {
+      if (selectResult.body?.selectedModel === modelA || selectResult.body?.model === modelA || selectResult.body?.selected_model === modelA) {
         ok(`Select ${modelA}: effective model confirmed`);
       } else {
         fail(`Select ${modelA}: model mismatch`, JSON.stringify(selectResult.body));
@@ -186,7 +200,7 @@ async function main() {
     console.log(`       Selecting model: ${modelB}`);
     const selectResult2 = await bffFetch("/api/hermes/model/select", {
       method: "POST",
-      body: JSON.stringify({ sessionId: "smoke-test-session", model: modelB }),
+      body: JSON.stringify({ sessionId, model: modelB }),
     });
     if (selectResult2.ok) {
       ok(`Select ${modelB}: response ok`);
@@ -212,7 +226,7 @@ async function main() {
     console.log("\n--- Step 6: Invalid model rejection ---");
     const invalidResult = await bffFetch("/api/hermes/model/select", {
       method: "POST",
-      body: JSON.stringify({ sessionId: "smoke-test-session", model: "non-existent-model-xyz" }),
+      body: JSON.stringify({ sessionId, model: "non-existent-model-xyz" }),
     });
     if (invalidResult.status === 400) {
       ok("Invalid model rejected with 400");

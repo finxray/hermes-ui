@@ -120,6 +120,7 @@ function GatewayMemoryDetail({
         <ContextField label="Updated" value={detail.updatedAt ?? "unknown"} />
         <ContextField label="Audit" value="Metadata only" />
       </div>
+      {detail.lifecycleState ? <LifecycleSection detail={detail} /> : null}
       {detail.scope ? <ScopeSummary scope={detail.scope} /> : null}
       <EvidenceSection
         label="Evidence"
@@ -138,6 +139,68 @@ function GatewayMemoryDetail({
           <summary>Audit metadata</summary>
           <pre>{safeMetadataJson(detail.metadata)}</pre>
         </details>
+      ) : null}
+    </div>
+  );
+}
+
+function LifecycleSection({ detail }: { detail: NormalizedMemoryDetail }) {
+  const hasChain = (detail.supersessionChain?.length ?? 0) > 0;
+  const hasAudit = (detail.auditEvents?.length ?? 0) > 0;
+
+  return (
+    <div className={styles.readonlySection}>
+      <div className={styles.cardTitle}>
+        <span>Lifecycle</span>
+        <span className={styles.pill}>{detail.lifecycleState}</span>
+      </div>
+      <div className={styles.fieldGrid}>
+        <ContextField label="Lifecycle state" value={detail.lifecycleState ?? "unknown"} />
+        <ContextField label="Created" value={formatDetailDate(detail.createdAt)} />
+        <ContextField label="Updated" value={formatDetailDate(detail.updatedAt)} />
+        <ContextField label="Archived" value={formatDetailDate(detail.archivedAt)} />
+        <ContextField label="Deleted" value={formatDetailDate(detail.deletedAt)} />
+        <ContextField label="Supersedes" value={detail.supersedesMemoryId ?? "-"} />
+        <ContextField label="Superseded by" value={detail.supersededByMemoryId ?? "-"} />
+      </div>
+
+      {hasChain ? (
+        <div className={styles.lifecycleChain}>
+          {detail.supersessionChain?.map((item) => (
+            <div className={styles.lifecycleChainItem} key={item.memoryId}>
+              <div className={styles.evidenceDot} aria-hidden="true" />
+              <div>
+                <div className={styles.evidenceTitle}>{item.memoryId}</div>
+                <div className={styles.evidenceMeta}>
+                  {item.lifecycleState} · {formatDetailDate(item.createdAt)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {hasAudit ? (
+        <div className={styles.lifecycleAudit}>
+          <div className={styles.fieldLabel}>Audit history</div>
+          <ol className={styles.evidenceList}>
+            {detail.auditEvents?.map((event) => (
+              <li className={styles.evidenceItem} key={event.id}>
+                <div className={styles.evidenceDot} aria-hidden="true" />
+                <div className={styles.evidenceBody}>
+                  <div className={styles.evidenceTitle}>
+                    {formatDetailDate(event.createdAt)} - {event.operation} {"->"} {event.toState}
+                  </div>
+                  <div className={styles.evidenceMeta}>
+                    {event.fromState ? `${event.fromState} -> ${event.toState}` : event.toState}
+                    {event.reason ? ` · ${event.reason}` : ""}
+                    {event.callerLabel ? ` · ${event.callerLabel}` : ""}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       ) : null}
     </div>
   );
@@ -234,6 +297,17 @@ export function ContextField({ label, value }: { label: string; value: string })
 
 function safeMetadataJson(value: Record<string, unknown>) {
   return JSON.stringify(redactMetadata(value), null, 2);
+}
+
+function formatDetailDate(value?: string | null) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 function redactMetadata(value: unknown, depth = 0): unknown {

@@ -1,0 +1,172 @@
+.section {
+  margin-bottom: 38px;
+}
+
+.sectionLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-small);
+  font-weight: 650;
+  list-style: none;
+}
+
+.sectionLabel::-webkit-details-marker {
+  display: none;
+}
+
+.feed {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.connector {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.event:not(:last-child) .connector::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 3px;
+  width: 1px;
+  height: calc(100% + 28px);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.eventBody {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding-bottom: 10px;
+}
+
+.eventHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.timestamp,
+.meta {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.35;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: var(--font-small);
+  white-space: nowrap;
+}
+
+.badge[data-operation="archive"] {
+  background: rgba(155, 188, 249, 0.12);
+  color: #9bbcf9;
+}
+
+.badge[data-operation="restore"] {
+  background: rgba(142, 230, 198, 0.12);
+  color: #8ee6c6;
+}
+
+.badge[data-operation="delete"] {
+  background: rgba(255, 143, 143, 0.12);
+  color: #ffb4b4;
+}
+
+.badge[data-operation="supersede"] {
+  background: rgba(185, 142, 249, 0.12);
+  color: #b98ef9;
+}
+
+.badge[data-operation="unknown"] {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.memoryButton {
+  width: fit-content;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--font-xs);
+  font-weight: 650;
+  text-align: left;
+}
+
+.memoryButton:hover,
+.memoryButton:focus-visible {
+  outline: 0;
+  color: #9bbcf9;
+}
+
+.memoryButton:disabled {
+  cursor: default;
+  color: var(--text-primary);
+}
+
+.reason {
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.loadMoreButton {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-small);
+  text-align: center;
+}
+
+.loadMoreButton:hover,
+.loadMoreButton:focus-visible {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.loadMoreButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.error {
+  margin-top: 8px;
+  color: #ffb4b4;
+  font-size: var(--font-small);
+  line-height: 1.45;
+}

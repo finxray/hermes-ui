@@ -142,10 +142,13 @@ async function checkInspectNormalizationAndNoSecretLeakage() {
   assert.deepEqual(response.evidence?.evidence, []);
   assert.equal(response.supersession?.status, "not_implemented");
   assert.deepEqual(response.supersession?.chain, []);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert(calls[0].url.includes("tenantId=local-dev"));
   assert(calls[0].url.includes("projectKey=brain-memory"));
   assert(calls[0].url.includes("sessionKey=slice-08d-scope-bridge"));
+  assert(calls[3].url.includes("/v1/memory/memory-1"));
+  assert(calls[3].url.includes("include_audit=true"));
+  assert(calls[3].url.includes("tenant_id=local-dev"));
   assert.equal(calls[0].headers.get("Authorization"), `Bearer ${secretValues[0]}`);
   assert.equal(calls[0].headers.get("X-Gateway-Memory-Api-Key"), secretValues[1]);
   assertNoSecrets(response);

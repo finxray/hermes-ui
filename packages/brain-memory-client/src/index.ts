@@ -3,15 +3,19 @@ import type {
   BrainMemoryError,
   BrainMemoryInspectRequest,
   BrainMemorySearchRequest,
+  LifecycleMetrics,
+  LifecycleTimelineResponse,
   NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
   NormalizedMemoryDetail,
   NormalizedMemoryEvidence,
+  NormalizedMemoryLifecycleAuditEvent,
   NormalizedMemoryLayer,
   NormalizedMemoryResult,
   NormalizedMemoryScopeStatus,
+  NormalizedMemorySupersessionChainItem,
   NormalizedMemorySupersessionChain,
   NormalizedSupersessionStatus
 } from "./types";
@@ -19,6 +23,8 @@ import type {
 const DEFAULT_TIMEOUT_MS = 3500;
 const SEARCH_PATH = "/ui/memory/search";
 const MEMORY_PATH = "/ui/memory";
+const LIFECYCLE_METRICS_PATH = "/v1/memory/lifecycle/metrics";
+const LIFECYCLE_TIMELINE_PATH = "/v1/memory/lifecycle/timeline";
 const HEALTH_PATH = "/health";
 const CAPABILITIES_PATH = "/ui/capabilities";
 
@@ -29,15 +35,20 @@ export type {
   BrainMemoryMode,
   BrainMemorySearchContext,
   BrainMemorySearchRequest,
+  LifecycleMetrics,
+  LifecycleTimelineResponse,
+  TimelineEvent,
   NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
   NormalizedMemoryDetail,
   NormalizedMemoryEvidence,
+  NormalizedMemoryLifecycleAuditEvent,
   NormalizedMemoryLayer,
   NormalizedMemoryResult,
   NormalizedMemoryScopeStatus,
+  NormalizedMemorySupersessionChainItem,
   NormalizedMemorySupersessionChain,
   NormalizedSupersessionStatus
 } from "./types";
@@ -350,7 +361,7 @@ export async function inspectBrainMemory(
     };
   }
 
-  const [evidenceResult, supersessionResult] = await Promise.all([
+  const [evidenceResult, supersessionResult, lifecycleResult] = await Promise.all([
     fetchGatewayJson({
       base,
       fetchImpl: config.fetchImpl ?? fetch,
@@ -368,6 +379,15 @@ export async function inspectBrainMemory(
       path: buildMemoryReadPath(request, `${memoryId}/supersession-chain`),
       timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       uiApiKey: resolveUiApiKey(config)
+    }),
+    fetchGatewayJson({
+      base,
+      fetchImpl: config.fetchImpl ?? fetch,
+      gatewayMemoryApiKey: config.gatewayMemoryApiKey,
+      method: "GET",
+      path: buildLifecycleInspectPath(request, memoryId),
+      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      uiApiKey: resolveUiApiKey(config)
     })
   ]);
 
@@ -378,10 +398,15 @@ export async function inspectBrainMemory(
     partialError = supersessionResult.error;
   }
 
+  const uiDetail = normalizeMemoryDetail(detailResult.data, memoryId);
+  const lifecycleDetail = lifecycleResult.ok
+    ? normalizeMemoryDetail(lifecycleResult.data, memoryId)
+    : null;
+
   return {
     mode: "real",
     memoryId,
-    detail: normalizeMemoryDetail(detailResult.data, memoryId),
+    detail: mergeMemoryDetails(uiDetail, lifecycleDetail),
     evidence: evidenceResult.ok ? normalizeMemoryEvidence(evidenceResult.data, memoryId) : null,
     supersession: supersessionResult.ok
       ? normalizeMemorySupersessionChain(supersessionResult.data, memoryId)
@@ -389,6 +414,62 @@ export async function inspectBrainMemory(
     error: partialError,
     checkedAt
   };
+}
+
+export async function fetchLifecycleMetrics(
+  config: BrainMemoryClientConfig,
+  tenantId?: string
+): Promise<LifecycleMetrics> {
+  const base = resolveRequiredGatewayBase(config);
+  const path = tenantId?.trim()
+    ? `${LIFECYCLE_METRICS_PATH}?${new URLSearchParams({ tenant_id: tenantId.trim() }).toString()}`
+    : LIFECYCLE_METRICS_PATH;
+  const result = await fetchGatewayJson({
+    base,
+    fetchImpl: config.fetchImpl ?? fetch,
+    gatewayMemoryApiKey: config.gatewayMemoryApiKey,
+    method: "GET",
+    path,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    uiApiKey: resolveUiApiKey(config)
+  });
+
+  if (!result.ok) {
+    throw new Error(result.error.message);
+  }
+
+  return normalizeLifecycleMetrics(result.data);
+}
+
+export async function fetchLifecycleTimeline(
+  config: BrainMemoryClientConfig,
+  params?: { limit?: number; offset?: number; operation?: string }
+): Promise<LifecycleTimelineResponse> {
+  const base = resolveRequiredGatewayBase(config);
+  const query = new URLSearchParams({
+    limit: String(clampTimelineLimit(params?.limit)),
+    offset: String(clampOffset(params?.offset))
+  });
+  const operation = params?.operation?.trim();
+  if (operation) {
+    query.set("operation", operation.slice(0, 256));
+  }
+
+  const result = await fetchGatewayJson({
+    base,
+    fetchImpl: config.fetchImpl ?? fetch,
+    gatewayMemoryApiKey: config.gatewayMemoryApiKey,
+    method: "GET",
+    path: `${LIFECYCLE_TIMELINE_PATH}?${query.toString()}`,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    uiApiKey: resolveUiApiKey(config)
+  });
+
+  if (!result.ok) {
+    throw new Error(result.error.message);
+  }
+
+  return normalizeLifecycleTimeline(result.data);
 }
 
 function parseBaseUrl(value: string): URL | null {
@@ -405,6 +486,20 @@ function parseBaseUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+function resolveRequiredGatewayBase(config: BrainMemoryClientConfig): URL {
+  if (config.enabled === false) {
+    throw new Error("Real Brain Memory Gateway reads are disabled for this UI process.");
+  }
+  if (!config.baseUrl?.trim()) {
+    throw new Error("Set BRAIN_MEMORY_GATEWAY_URL and enable real Gateway reads.");
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    throw new Error("BRAIN_MEMORY_GATEWAY_URL must be a valid http:// or https:// URL.");
+  }
+  return base;
 }
 
 function safeDisplayUrl(url: URL): string {
@@ -596,6 +691,14 @@ function buildMemoryReadPath(request: BrainMemoryInspectRequest, memoryPath: str
   return `${MEMORY_PATH}/${memoryPath.split("/").map(encodeURIComponent).join("/")}?${params.toString()}`;
 }
 
+function buildLifecycleInspectPath(request: BrainMemoryInspectRequest, memoryId: string): string {
+  const params = new URLSearchParams({
+    include_audit: "true",
+    tenant_id: request.context.project.tenantId
+  });
+  return `/v1/memory/${encodeURIComponent(memoryId)}?${params.toString()}`;
+}
+
 function extractCapabilities(data: Record<string, unknown> | null): Record<string, unknown> | null {
   if (data?.features && typeof data.features === "object" && !Array.isArray(data.features)) {
     return data as Record<string, unknown>;
@@ -718,7 +821,18 @@ function normalizeMemoryDetail(
     createdAt: asOptionalString(item.created_at) ?? asOptionalString(item.createdAt),
     updatedAt: asOptionalString(item.updated_at) ?? asOptionalString(item.updatedAt),
     metadata: normalizeMetadata(item.metadata),
-    scope: normalizeSearchScope(data)
+    scope: normalizeSearchScope(data),
+    lifecycleState: asOptionalString(item.lifecycle_state) ?? asOptionalString(item.lifecycleState),
+    archivedAt: asOptionalString(item.archived_at) ?? asOptionalString(item.archivedAt),
+    deletedAt: asOptionalString(item.deleted_at) ?? asOptionalString(item.deletedAt),
+    supersedesMemoryId:
+      asOptionalString(item.supersedes_memory_id) ?? asOptionalString(item.supersedesMemoryId),
+    supersededByMemoryId:
+      asOptionalString(item.superseded_by_memory_id) ?? asOptionalString(item.supersededByMemoryId),
+    auditEvents: normalizeAuditEvents(item.audit_events ?? item.auditEvents),
+    supersessionChain: normalizeSupersessionItems(
+      item.supersession_chain ?? item.supersessionChain
+    )
   };
 }
 
@@ -758,6 +872,113 @@ function normalizeMemorySupersessionChain(
     chain,
     status: asOptionalString(data?.status)
   };
+}
+
+function mergeMemoryDetails(
+  primary: NormalizedMemoryDetail | null,
+  lifecycle: NormalizedMemoryDetail | null
+): NormalizedMemoryDetail | null {
+  if (!primary) {
+    return lifecycle;
+  }
+  if (!lifecycle) {
+    return primary;
+  }
+  return {
+    ...primary,
+    archivedAt: lifecycle.archivedAt ?? primary.archivedAt,
+    auditEvents: lifecycle.auditEvents ?? primary.auditEvents,
+    deletedAt: lifecycle.deletedAt ?? primary.deletedAt,
+    lifecycleState: lifecycle.lifecycleState ?? primary.lifecycleState,
+    supersededByMemoryId: lifecycle.supersededByMemoryId ?? primary.supersededByMemoryId,
+    supersedesMemoryId: lifecycle.supersedesMemoryId ?? primary.supersedesMemoryId,
+    supersessionChain: lifecycle.supersessionChain ?? primary.supersessionChain
+  };
+}
+
+function normalizeLifecycleMetrics(data: Record<string, unknown> | null): LifecycleMetrics {
+  return {
+    active_count: asInteger(data?.active_count) ?? 0,
+    archived_count: asInteger(data?.archived_count) ?? 0,
+    superseded_count: asInteger(data?.superseded_count) ?? 0,
+    deleted_soft_count: asInteger(data?.deleted_soft_count) ?? 0,
+    archives_24h: asInteger(data?.archives_24h) ?? 0,
+    archives_7d: asInteger(data?.archives_7d) ?? 0,
+    archives_lifetime: asInteger(data?.archives_lifetime) ?? 0,
+    restores_24h: asInteger(data?.restores_24h) ?? 0,
+    restores_7d: asInteger(data?.restores_7d) ?? 0,
+    restores_lifetime: asInteger(data?.restores_lifetime) ?? 0,
+    deletes_24h: asInteger(data?.deletes_24h) ?? 0,
+    deletes_7d: asInteger(data?.deletes_7d) ?? 0,
+    deletes_lifetime: asInteger(data?.deletes_lifetime) ?? 0,
+    supersedes_24h: asInteger(data?.supersedes_24h) ?? 0,
+    supersedes_7d: asInteger(data?.supersedes_7d) ?? 0,
+    supersedes_lifetime: asInteger(data?.supersedes_lifetime) ?? 0
+  };
+}
+
+function normalizeLifecycleTimeline(data: Record<string, unknown> | null): LifecycleTimelineResponse {
+  const events = Array.isArray(data?.events)
+    ? data.events
+        .map((item) => (item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : null))
+        .filter((item): item is Record<string, unknown> => Boolean(item))
+        .map((item) => ({
+          audit_event_id: asString(item.audit_event_id),
+          memory_id: asString(item.memory_id),
+          tenant_id: asString(item.tenant_id),
+          operation: asString(item.operation),
+          from_state: asOptionalString(item.from_state) ?? null,
+          to_state: asString(item.to_state),
+          reason: asOptionalString(item.reason) ?? null,
+          caller_label: asOptionalString(item.caller_label) ?? null,
+          created_at: asString(item.created_at),
+          lifecycle_state: asOptionalString(item.lifecycle_state) ?? null,
+          project_key: asOptionalString(item.project_key) ?? null,
+          session_key: asOptionalString(item.session_key) ?? null
+        }))
+        .filter((item) => item.audit_event_id && item.memory_id && item.operation && item.created_at)
+    : [];
+
+  return {
+    events,
+    total: asInteger(data?.total) ?? events.length,
+    limit: asInteger(data?.limit) ?? events.length,
+    offset: asInteger(data?.offset) ?? 0
+  };
+}
+
+function normalizeAuditEvents(value: unknown): NormalizedMemoryLifecycleAuditEvent[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  return value
+    .map((item) => (item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : null))
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => ({
+      id: asString(item.id),
+      operation: asString(item.operation),
+      fromState: asOptionalString(item.from_state) ?? asOptionalString(item.fromState) ?? null,
+      toState: asString(item.to_state) || asString(item.toState),
+      reason: asOptionalString(item.reason) ?? null,
+      callerLabel: asOptionalString(item.caller_label) ?? asOptionalString(item.callerLabel) ?? null,
+      createdAt: asString(item.created_at) || asString(item.createdAt)
+    }))
+    .filter((item) => item.id && item.operation && item.toState && item.createdAt);
+}
+
+function normalizeSupersessionItems(value: unknown): NormalizedMemorySupersessionChainItem[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  return value
+    .map((item) => (item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : null))
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => ({
+      memoryId: asString(item.memory_id) || asString(item.memoryId),
+      lifecycleState: asString(item.lifecycle_state) || asString(item.lifecycleState),
+      createdAt: asString(item.created_at) || asString(item.createdAt)
+    }))
+    .filter((item) => item.memoryId && item.lifecycleState && item.createdAt);
 }
 
 function metadataField(metadata: unknown, key: string): unknown {
@@ -807,6 +1028,18 @@ function normalizeMetadata(value: unknown): Record<string, unknown> | undefined 
 
 function clampLimit(value: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), 1), 20) : 8;
+}
+
+function clampTimelineLimit(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(Math.max(Math.trunc(value), 1), 200)
+    : 50;
+}
+
+function clampOffset(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(Math.trunc(value), 0)
+    : 0;
 }
 
 function asString(value: unknown): string {

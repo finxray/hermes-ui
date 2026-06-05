@@ -80,6 +80,47 @@ export type BrainMemoryInspectRequest = {
   context: BrainMemorySearchContext;
 };
 
+export type LifecycleMetrics = {
+  active_count: number;
+  archived_count: number;
+  superseded_count: number;
+  deleted_soft_count: number;
+  archives_24h: number;
+  archives_7d: number;
+  archives_lifetime: number;
+  restores_24h: number;
+  restores_7d: number;
+  restores_lifetime: number;
+  deletes_24h: number;
+  deletes_7d: number;
+  deletes_lifetime: number;
+  supersedes_24h: number;
+  supersedes_7d: number;
+  supersedes_lifetime: number;
+};
+
+export type TimelineEvent = {
+  audit_event_id: string;
+  memory_id: string;
+  tenant_id: string;
+  operation: string;
+  from_state: string | null;
+  to_state: string;
+  reason: string | null;
+  caller_label: string | null;
+  created_at: string;
+  lifecycle_state: string | null;
+  project_key?: string | null;
+  session_key?: string | null;
+};
+
+export type LifecycleTimelineResponse = {
+  events: TimelineEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type NormalizedMemoryLayer =
   | "hot"
   | "canonical"
@@ -143,6 +184,29 @@ export type NormalizedMemoryDetail = {
   updatedAt?: string;
   metadata?: Record<string, unknown>;
   scope?: NormalizedBrainMemorySearchScope | null;
+  lifecycleState?: string;
+  archivedAt?: string;
+  deletedAt?: string;
+  supersedesMemoryId?: string;
+  supersededByMemoryId?: string;
+  auditEvents?: NormalizedMemoryLifecycleAuditEvent[];
+  supersessionChain?: NormalizedMemorySupersessionChainItem[];
+};
+
+export type NormalizedMemoryLifecycleAuditEvent = {
+  id: string;
+  operation: string;
+  fromState?: string | null;
+  toState: string;
+  reason?: string | null;
+  callerLabel?: string | null;
+  createdAt: string;
+};
+
+export type NormalizedMemorySupersessionChainItem = {
+  memoryId: string;
+  lifecycleState: string;
+  createdAt: string;
 };
 
 export type NormalizedMemoryEvidence = {

@@ -1,7 +1,42 @@
-import { deleteHermesSession } from "@hermes-ui/hermes-client";
+import { deleteHermesSession, getHermesSession } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json({ ok: false, session: null, sessionId: "", error: { kind: "invalid_config", message: "Session id is required." } }, { status: 400 });
+  }
+
+  const result = await getHermesSession(
+    {
+      apiKey: process.env.HERMES_API_KEY,
+      baseUrl: process.env.HERMES_API_BASE_URL,
+      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
+      signal: _request.signal,
+      timeoutMs: 8000
+    },
+    id
+  );
+
+  if (!result.ok) {
+    const status =
+      result.error.kind === "network" || result.error.kind === "timeout"
+        ? 502
+        : result.error.kind === "http_error" && result.error.message.includes("HTTP 404")
+          ? 404
+          : 400;
+    return NextResponse.json(result, { status });
+  }
+
+  return NextResponse.json(result, {
+    headers: { "Cache-Control": "no-store" }
+  });
+}
 
 export async function DELETE(
   _request: Request,

@@ -19,22 +19,31 @@ export function useHermesStatus() {
     isRefreshing: false
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {
+    if (inFlightRef.current) {
+      return;
+    }
+    inFlightRef.current = true;
     setState((current) => ({
       ...current,
-      isRefreshing: true
+      isRefreshing: current.isInitialLoading ? current.isRefreshing : true
     }));
-    const newStatus = await fetchHermesStatus();
-    if (mountedRef.current) {
-      setState((current) => {
-        const resolvedStatus = preserveKnownModelOnTransientFailure(current.status, newStatus);
-        if (!isMeaningfullyChanged(current.status, resolvedStatus)) {
-          return { ...current, isInitialLoading: false, isRefreshing: false };
-        }
-        return { status: resolvedStatus, isInitialLoading: false, isRefreshing: false };
-      });
+    try {
+      const newStatus = await fetchHermesStatus();
+      if (mountedRef.current) {
+        setState((current) => {
+          const resolvedStatus = preserveKnownModelOnTransientFailure(current.status, newStatus);
+          if (!isMeaningfullyChanged(current.status, resolvedStatus)) {
+            return { ...current, isInitialLoading: false, isRefreshing: false };
+          }
+          return { status: resolvedStatus, isInitialLoading: false, isRefreshing: false };
+        });
+      }
+    } finally {
+      inFlightRef.current = false;
     }
   }, []);
 

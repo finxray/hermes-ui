@@ -163,22 +163,25 @@ export function Sidebar({
 
   return (
     <aside className={styles.sidebar} data-shell-rail="left" aria-label="Projects and chats">
-      <div className={styles.brand}>
-        <div className={styles.brandIcon} aria-hidden="true">
-          <Brain size={17} />
+      <div className={styles.sidebarHeader}>
+        <div className={styles.brand}>
+          <div className={styles.brandIcon} aria-hidden="true">
+            <Brain size={17} />
+          </div>
+          <p className={styles.brandTitle}>Brain Memory Studio</p>
         </div>
-        <p className={styles.brandTitle}>Brain Memory Studio</p>
+
+        <div className={styles.quickActions}>
+          <SidebarRow icon={<FolderPlus size={15} />} label="Project" onClick={actions.createProject} />
+          <SidebarRow
+            icon={<MessageSquarePlus size={15} />}
+            label="Chat"
+            onClick={actions.createSession}
+          />
+        </div>
       </div>
 
-      <div className={styles.quickActions}>
-        <SidebarRow icon={<FolderPlus size={15} />} label="Project" onClick={actions.createProject} />
-        <SidebarRow
-          icon={<MessageSquarePlus size={15} />}
-          label="Chat"
-          onClick={actions.createSession}
-        />
-      </div>
-
+      <div className={styles.scrollBody}>
       <section className={styles.section} aria-labelledby="projects-heading">
         <div className={styles.sectionLabel} id="projects-heading">
           <span>Projects</span>
@@ -344,8 +347,11 @@ export function Sidebar({
           )}
         </section>
       )}
+      </div>
 
-      <div className={styles.footer} ref={settingsRef}>
+      <div className={styles.footerDock}>
+        <div className={styles.scrollFade} aria-hidden="true" />
+        <div className={styles.footer} ref={settingsRef}>
         <input
           ref={settingsToggleRef}
           className={styles.settingsToggle}
@@ -406,6 +412,7 @@ export function Sidebar({
           </span>
           <span className={styles.settingsLabel}>Settings</span>
         </label>
+        </div>
       </div>
     </aside>
   );

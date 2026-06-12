@@ -3,33 +3,49 @@
 import { useLayoutEffect, useState } from "react";
 import type { RefObject } from "react";
 
-const DEFAULT_INSET_PX = 148;
-const INSET_SAFE_GAP_PX = 18;
+const DEFAULT_CLEARANCE_PX = 198;
+const COMPOSER_CONTENT_GAP_PX = 50;
 
-export function useComposerInset(composerWrapRef: RefObject<HTMLElement | null>, enabled: boolean) {
-  const [insetPx, setInsetPx] = useState(DEFAULT_INSET_PX);
+export function useComposerInset(
+  scrollViewportRef: RefObject<HTMLElement | null>,
+  composerWrapRef: RefObject<HTMLElement | null>,
+  enabled: boolean
+) {
+  const [clearancePx, setClearancePx] = useState(DEFAULT_CLEARANCE_PX);
 
   useLayoutEffect(() => {
-    const node = composerWrapRef.current;
-    if (!enabled || !node) {
-      setInsetPx(DEFAULT_INSET_PX);
+    const scrollViewport = scrollViewportRef.current;
+    const anchor = composerWrapRef.current;
+
+    if (!enabled || !scrollViewport || !anchor) {
+      setClearancePx(DEFAULT_CLEARANCE_PX);
       return;
     }
 
     const measure = () => {
-      setInsetPx(Math.ceil(node.getBoundingClientRect().height) + INSET_SAFE_GAP_PX);
+      const anchorRect = anchor.getBoundingClientRect();
+      setClearancePx(Math.ceil(anchorRect.height + COMPOSER_CONTENT_GAP_PX));
     };
 
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    window.addEventListener("resize", measure);
+    const scheduleMeasure = () => {
+      measure();
+      window.requestAnimationFrame(measure);
+    };
+
+    scheduleMeasure();
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(anchor);
+    const composerBox = anchor.querySelector<HTMLElement>("[data-composer-box]");
+    if (composerBox) {
+      observer.observe(composerBox);
+    }
+    window.addEventListener("resize", scheduleMeasure);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("resize", measure);
+      window.removeEventListener("resize", scheduleMeasure);
     };
-  }, [composerWrapRef, enabled]);
+  }, [composerWrapRef, enabled, scrollViewportRef]);
 
-  return insetPx;
+  return clearancePx;
 }

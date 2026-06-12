@@ -159,55 +159,83 @@ async function main() {
 
   // 5. If 2+ models, test selection
   console.log("\n--- Step 5: Model selection ---");
+  let sessionId = `smoke-test-session-${Date.now().toString(36)}`;
   if (availableModels.length >= 2) {
-    const modelA = availableModels[0].id;
-    const modelB = availableModels[1].id;
+    const modelA = availableModels[0];
+    const modelB = availableModels[1];
+    const modelAId = modelA.id;
+    const modelBId = modelB.id;
+    const modelASelectId = modelA.selectModelId || modelA.id;
+    const modelBSelectId = modelB.selectModelId || modelB.id;
+    const modelAProvider = modelA.providerKey || modelA.provider || null;
+    const modelBProvider = modelB.providerKey || modelB.provider || null;
 
     // Get or create a session for model selection
-    let sessionId = "smoke-test-session";
     const sessionsResult = await bffFetch("/api/hermes/sessions");
     if (sessionsResult.ok && sessionsResult.body?.sessions?.length > 0) {
       sessionId = sessionsResult.body.sessions[0].id;
       ok("Using existing session: " + sessionId.slice(-8));
     } else {
-      // Try creating a session via Hermes API directly (admin smoke, not browser path)
-      const hermesStatus = statusResult.body;
-      const hermesBaseUrl = hermesStatus?.baseUrl;
-      const hermesApiKey = ""; // Smoke doesn't have the key; skip creation
-      skip("Session creation", "No existing session found and BFF has no create endpoint");
+      ok("Using fresh smoke session id: " + sessionId.slice(-8));
     }
 
     // Try selecting model A
-    console.log(`       Selecting model: ${modelA}`);
+    console.log(`       Selecting model: ${modelAId}`);
     const selectResult = await bffFetch("/api/hermes/model/select", {
       method: "POST",
-      body: JSON.stringify({ sessionId, model: modelA }),
+      body: JSON.stringify({
+        expectedProviderKey: modelAProvider,
+        model: modelASelectId,
+        provider: modelAProvider,
+        sessionId,
+        sessionTitle: "Hermes UI smoke"
+      }),
     });
     if (selectResult.ok) {
-      ok(`Select ${modelA}: response ok`);
-      if (selectResult.body?.selectedModel === modelA || selectResult.body?.model === modelA || selectResult.body?.selected_model === modelA) {
-        ok(`Select ${modelA}: effective model confirmed`);
+      ok(`Select ${modelAId}: response ok`);
+      if (selectResult.body?.selectedModel === modelAId || selectResult.body?.selectedModel === modelASelectId || selectResult.body?.model === modelAId || selectResult.body?.selected_model === modelAId) {
+        ok(`Select ${modelAId}: effective model confirmed by select response`);
       } else {
-        fail(`Select ${modelA}: model mismatch`, JSON.stringify(selectResult.body));
+        fail(`Select ${modelAId}: model mismatch`, JSON.stringify(selectResult.body));
+      }
+      const detailResult = await bffFetch(`/api/hermes/sessions/${encodeURIComponent(sessionId)}`);
+      const detailModel = detailResult.body?.session?.effectiveModel;
+      if (detailResult.ok && (detailModel === modelAId || detailModel === modelASelectId)) {
+        ok(`Session detail verifies ${modelAId}`);
+      } else {
+        fail(`Session detail verifies ${modelAId}`, `${detailResult.status}: ${JSON.stringify(detailResult.body)}`);
       }
     } else if (selectResult.status === 400) {
-      skip(`Select ${modelA}`, "Invalid session (expected without live gateway)");
+      skip(`Select ${modelAId}`, "Invalid or unavailable model/provider for this Hermes config");
     } else {
-      fail(`Select ${modelA}`, `${selectResult.status}: ${JSON.stringify(selectResult.body)}`);
+      fail(`Select ${modelAId}`, `${selectResult.status}: ${JSON.stringify(selectResult.body)}`);
     }
 
     // Try selecting model B
-    console.log(`       Selecting model: ${modelB}`);
+    console.log(`       Selecting model: ${modelBId}`);
     const selectResult2 = await bffFetch("/api/hermes/model/select", {
       method: "POST",
-      body: JSON.stringify({ sessionId, model: modelB }),
+      body: JSON.stringify({
+        expectedProviderKey: modelBProvider,
+        model: modelBSelectId,
+        provider: modelBProvider,
+        sessionId,
+        sessionTitle: "Hermes UI smoke"
+      }),
     });
     if (selectResult2.ok) {
-      ok(`Select ${modelB}: response ok`);
+      ok(`Select ${modelBId}: response ok`);
+      const detailResult2 = await bffFetch(`/api/hermes/sessions/${encodeURIComponent(sessionId)}`);
+      const detailModel2 = detailResult2.body?.session?.effectiveModel;
+      if (detailResult2.ok && (detailModel2 === modelBId || detailModel2 === modelBSelectId)) {
+        ok(`Session detail verifies ${modelBId}`);
+      } else {
+        fail(`Session detail verifies ${modelBId}`, `${detailResult2.status}: ${JSON.stringify(detailResult2.body)}`);
+      }
     } else if (selectResult2.status === 400) {
-      skip(`Select ${modelB}`, "Invalid session (expected without live gateway)");
+      skip(`Select ${modelBId}`, "Invalid or unavailable model/provider for this Hermes config");
     } else {
-      fail(`Select ${modelB}`, `${selectResult2.status}: ${JSON.stringify(selectResult2.body)}`);
+      fail(`Select ${modelBId}`, `${selectResult2.status}: ${JSON.stringify(selectResult2.body)}`);
     }
 
     // No secrets in model select response

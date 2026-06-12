@@ -9,6 +9,11 @@ const componentPath = resolve(root, "apps/web/src/components/chat/AgentActivityB
 const composerPath = resolve(root, "apps/web/src/components/chat/Composer.tsx");
 const cssPath = resolve(root, "apps/web/src/components/chat/AgentActivityBlock.module.css");
 const chatViewPath = resolve(root, "apps/web/src/components/chat/ChatView.tsx");
+const chatTranscriptPath = resolve(root, "apps/web/src/components/chat/ChatTranscript.tsx");
+const messageBubbleCssPath = resolve(root, "apps/web/src/components/chat/MessageBubble.module.css");
+const shimmerCssPath = resolve(root, "apps/web/src/components/chat/ShimmerStatusText.module.css");
+const streamingBodyPath = resolve(root, "apps/web/src/components/chat/StreamingAssistantBody.tsx");
+const streamStatusPath = resolve(root, "apps/web/src/lib/streamStatus.ts");
 const appShellPath = resolve(root, "apps/web/src/components/shell/AppShell.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
 const replayHelperPath = resolve(root, "apps/web/src/lib/persistedActivityReplay.ts");
@@ -57,18 +62,34 @@ function checkComponentSource() {
   const css = readFileSync(cssPath, "utf8");
 
   record(
-    "collapsed-details",
-    component.includes("<details") && component.includes("<summary") && !component.includes("open={"),
-    "Activity blocks use native details/summary and stay collapsed by default."
+    "no-legacy-run-completed-row",
+    !component.includes("Run Completed") && !component.includes("CheckCircle2"),
+    "Chat transcript activity UI does not render legacy Run Completed icon rows."
+  );
+  const streamingBody = existsSync(streamingBodyPath) ? readFileSync(streamingBodyPath, "utf8") : "";
+  const streamStatus = existsSync(streamStatusPath) ? readFileSync(streamStatusPath, "utf8") : "";
+  const shimmerCss = existsSync(shimmerCssPath) ? readFileSync(shimmerCssPath, "utf8") : "";
+  const messageBubbleCss = existsSync(messageBubbleCssPath) ? readFileSync(messageBubbleCssPath, "utf8") : "";
+  const chatTranscript = existsSync(chatTranscriptPath) ? readFileSync(chatTranscriptPath, "utf8") : "";
+
+  record(
+    "stream-status-shimmer",
+    streamingBody.includes("ShimmerStatusText") &&
+      streamStatus.includes('"Thinking"') &&
+      streamStatus.includes('"Running"') &&
+      shimmerCss.includes("shimmerTextPulse") &&
+      messageBubbleCss.includes('data-phase="exit"'),
+    "Streaming assistant shows shimmering Thinking or Running words and fades status without layout jump."
   );
   record(
-    "thinking-row",
-    component.includes("Thinking...") &&
-      component.includes('data-active="true"') &&
-      css.includes("activityTextShimmer") &&
-      css.includes("thinkingText[data-active=\"true\"]") &&
-      css.includes("block[data-status=\"running\"] .title"),
-    "Thinking/running row has a generic label and text shimmer styling."
+    "worked-and-command-details",
+    component.includes("<details") &&
+      component.includes("Worked for") &&
+      component.includes("Ran ") &&
+      component.includes("ChevronRight") &&
+      component.includes("Terminal") &&
+      css.includes(".commandSummary:hover .commandLabel"),
+    "Completed runs expose collapsible Worked and Ran commands rows with chevron and terminal icons."
   );
   record(
     "no-private-reasoning-labels",
@@ -78,12 +99,15 @@ function checkComponentSource() {
     "Activity block source does not render private reasoning or chain-of-thought labels."
   );
   record(
-    "specific-running-suppresses-generic-thinking",
+    "running-indicator-lifecycle",
     existsSync(chatViewPath) &&
-      chatView.includes("!hasRunningActivity") &&
+      !chatView.includes("isRunning=") &&
+      streamStatus.includes("isTemporaryActiveEvent") &&
+      streamStatus.includes("isCommandActivityEvent") &&
+      chatTranscript.includes("resolveStreamStatusLabel") &&
       chatView.includes("makeElapsedActivityEvent") &&
       chatView.includes("makeStoppedActivityEvent"),
-    "Chat view lets specific running activity replace generic Thinking and appends elapsed/stopped markers."
+    "Thinking shows while waiting; Running only during active command or approval work."
   );
   record(
     "stream-delta-batching",
@@ -107,23 +131,11 @@ function checkComponentSource() {
     "Composer exposes an enabled stop-generation button during active streaming."
   );
   record(
-    "metadata-rendering",
-    component.includes("projectKey") &&
-      component.includes("sessionKey") &&
-      component.includes("primary.approval?.approvalId") &&
-      component.includes("safeJson"),
-    "Component renders scope/approval metadata and compact JSON details."
-  );
-  record(
-    "command-detail-rendering",
-    component.includes("extractCommandDetails") &&
-      component.includes("CommandDetails") &&
-      component.includes("stdoutPreview") &&
-      component.includes("stderrPreview") &&
-      component.includes("exitCode") &&
-      css.includes(".commandDetails") &&
-      css.includes(".outputBlock"),
-    "Command activity blocks render structured command metadata and stdout/stderr previews."
+    "activity-helper-still-available",
+    existsSync(helperPath) &&
+      readFileSync(helperPath, "utf8").includes("extractCommandDetails") &&
+      readFileSync(helperPath, "utf8").includes("formatActivityDuration"),
+    "Activity normalization helpers remain available for rails and replay even though chat hides completed rows."
   );
   record(
     "command-right-rail-summary",
@@ -181,20 +193,16 @@ function checkComponentSource() {
   );
   record(
     "approval-display-only",
-    component.includes("Approval action unavailable in current stream path") &&
-      component.includes("ShieldAlert") &&
-      !component.includes("onApprove") &&
-      !component.includes("onReject"),
-    "Approval activity renders as display-only until a BFF approval action route exists."
+    !component.includes("onApprove") &&
+      !component.includes("onReject") &&
+      existsSync(helperPath) &&
+      readFileSync(helperPath, "utf8").includes("approval"),
+    "Chat activity UI stays display-only; approval handling remains in helpers/rails."
   );
   record(
     "status-styling",
-      css.includes('data-status="running"') &&
-      css.includes('data-status="failed"') &&
-      css.includes('data-status="completed"') &&
-      css.includes('data-status="cancelled"') &&
-      css.includes('data-status="waiting_for_approval"'),
-    "CSS includes running, failed, completed, cancelled, and approval-waiting status states."
+    shimmerCss.includes(".shimmerText") && messageBubbleCss.includes("streamContentReveal"),
+    "Stream status uses text shimmer and a gentle content reveal transition."
   );
   record(
     "no-dangerous-html",

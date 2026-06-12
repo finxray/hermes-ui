@@ -1,6 +1,5 @@
-import { AlertTriangle, BookOpenText, SendHorizontal } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
@@ -17,10 +16,10 @@ import {
   limitPersistedActivityEvents
 } from "@/lib/persistedActivityReplay";
 import { DEFAULT_USER_DISPLAY_NAME, WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
-import type { HermesUiCapabilities, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
+import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type {
   ChatMessage,
-  ModelChoice,
   PersistedActivityEvent,
   Project,
   RunActivitySummary,
@@ -34,6 +33,7 @@ import styles from "./ChatView.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ActivityRecorder = (sessionId: string, event: AgentActivityEvent) => void;
+const STREAM_FLUSH_INTERVAL_MS = 48;
 
 type ChatViewProps = {
   activeProject: Project;
@@ -42,9 +42,8 @@ type ChatViewProps = {
   createSession: () => void;
   hermesStatus: NormalizedHermesStatus | null;
   isHermesStatusLoading: boolean;
-  modelChoices: ModelChoice[];
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
-  refreshHermesStatus: () => Promise<void>;
+  sessionModel: HermesSessionModelSync;
   workspaceActions: WorkspaceActions;
 };
 
@@ -55,22 +54,23 @@ export function ChatView({
   createSession,
   hermesStatus,
   isHermesStatusLoading,
-  modelChoices,
   onActivityEvent,
-  refreshHermesStatus,
+  sessionModel,
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStopRequested, setIsStopRequested] = useState(false);
   const [assistantHasContent, setAssistantHasContent] = useState(false);
-  const [modelSelectInProgress, setModelSelectInProgress] = useState(false);
-  const [selectedModelBySession, setSelectedModelBySession] = useState<Record<string, string>>({});
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
+  const flushTimeoutRef = useRef<number | null>(null);
+  const lastFlushAtRef = useRef(0);
+  const assistantHasContentRef = useRef(false);
   const stopRequestedRef = useRef(false);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
-  const composerInsetPx = useComposerInset(composerWrapRef, !isStartState);
+  const composerClearancePx = useComposerInset(scrollViewportRef, composerWrapRef, !isStartState);
 
   useEffect(() => {
     setIsGenerating(false);
@@ -78,13 +78,20 @@ export function ChatView({
     stopRequestedRef.current = false;
     activeStreamControllerRef.current?.abort();
     activeStreamControllerRef.current = null;
+    if (flushTimeoutRef.current !== null) {
+      window.clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
+    if (flushFrameRef.current !== null) {
+      window.cancelAnimationFrame(flushFrameRef.current);
+      flushFrameRef.current = null;
+    }
+    assistantHasContentRef.current = false;
   }, [activeSession?.id]);
-  const selectedSessionModel = activeSession ? selectedModelBySession[activeSession.id] : undefined;
-  const providerModelState = applySessionSelectedModel(
-    getProviderModelState(hermesStatus, modelChoices),
-    selectedSessionModel
-  );
-  const modelLabel = modelLabelForState(providerModelState);
+  const providerModelState = sessionModel.modelState;
+  const modelLabel = sessionModel.modelLabel;
+  const modelSelectError = sessionModel.error;
+  const modelSelectInProgress = sessionModel.modelSelectInProgress;
   const composerContextItems = activeSession
     ? [
         { label: "Workspace", value: "hermes-ui" },
@@ -100,11 +107,13 @@ export function ChatView({
       ];
 
   async function handleSend(content: string) {
-    if (!activeSession || isGenerating) {
+    if (!activeSession || isGenerating || modelSelectInProgress) {
       return;
     }
 
     const session = activeSession;
+    const sendModelState = sessionModel.modelState;
+    const modelRequest = sessionModel.modelRequest;
     let generationStarted = false;
     const userMessage = createMessage("user", DEFAULT_USER_DISPLAY_NAME, content, "complete");
     const assistantId = `msg-${crypto.randomUUID()}`;
@@ -150,20 +159,21 @@ export function ChatView({
       id: runRecordId,
       projectId: activeProject.id,
       sessionId: session.id,
-      hermesSessionId: session.hermesSessionId,
+      hermesSessionId: resolveHermesSessionId(session),
       userMessageId: userMessage.id,
       assistantMessageId: assistantId,
       sourceChannel: "web-ui",
       status: "running",
       startedAt: runStartedAt,
-      modelLabel: providerModelState.currentModelLabel,
-      providerLabel: providerModelState.currentProviderLabel,
+      modelLabel: sendModelState.currentModelLabel,
+      providerLabel: sendModelState.currentProviderLabel,
       summary: summarizeRunPrompt(content),
       activityEventIds: [],
       activityReplay: [],
       activitySummary: runSummary
     });
     setAssistantHasContent(false);
+    assistantHasContentRef.current = false;
     setIsGenerating(true);
     generationStarted = true;
     setIsStopRequested(false);
@@ -193,14 +203,42 @@ export function ChatView({
     let completedAssistant = false;
     let hadStreamError = false;
 
+    const markAssistantHasContent = () => {
+      if (!assistantHasContentRef.current) {
+        assistantHasContentRef.current = true;
+        setAssistantHasContent(true);
+      }
+    };
+
+    const flushNow = (status: ChatMessage["status"] = "streaming", references?: string[]) => {
+      lastFlushAtRef.current = performance.now();
+      workspaceActions.updateMessage(session.id, assistantId, accumulated, status, references);
+    };
+
     const flush = (status: ChatMessage["status"] = "streaming", references?: string[]) => {
       if (flushFrameRef.current !== null) {
         return;
       }
-      flushFrameRef.current = window.requestAnimationFrame(() => {
-        flushFrameRef.current = null;
-        workspaceActions.updateMessage(session.id, assistantId, accumulated, status, references);
-      });
+
+      const scheduleFrame = () => {
+        flushFrameRef.current = window.requestAnimationFrame(() => {
+          flushFrameRef.current = null;
+          flushNow(status, references);
+        });
+      };
+
+      const elapsed = performance.now() - lastFlushAtRef.current;
+      if (elapsed >= STREAM_FLUSH_INTERVAL_MS) {
+        scheduleFrame();
+        return;
+      }
+
+      if (flushTimeoutRef.current === null) {
+        flushTimeoutRef.current = window.setTimeout(() => {
+          flushTimeoutRef.current = null;
+          scheduleFrame();
+        }, STREAM_FLUSH_INTERVAL_MS - elapsed);
+      }
     };
 
     const streamResult = await streamHermesChatFromBff(
@@ -220,7 +258,7 @@ export function ChatView({
             id: session.id,
             title: session.title,
             stableKey: session.memoryScope.stableSessionKey,
-            hermesSessionId: session.hermesSessionId,
+            hermesSessionId: resolveHermesSessionId(session),
             includeProjectContext: session.memoryScope.includeProjectContext,
             includeSessionContext: session.memoryScope.includeSessionContext,
             lastContextRefreshAt: session.memoryScope.lastContextRefreshAt,
@@ -232,8 +270,8 @@ export function ChatView({
           }
         },
         message: content,
-        model: providerModelState.clientSelectable ? providerModelState.selectedModelId : null,
-        provider: null,
+        model: modelRequest?.selectModelId ?? null,
+        provider: modelRequest?.provider ?? null,
         recentMessages: session.messages.slice(-12).map((message) => ({
           role: message.role,
           content: message.content
@@ -244,7 +282,7 @@ export function ChatView({
           if (event.type === "message_delta") {
             accumulated += event.delta;
             if (event.delta.trim()) {
-              setAssistantHasContent(true);
+              markAssistantHasContent();
             }
             flush("streaming");
           } else if (event.type === "message_done") {
@@ -253,7 +291,7 @@ export function ChatView({
             hermesRunId = event.runId || hermesRunId;
             updateRunRecord({ hermesRunId });
             if (accumulated.trim()) {
-              setAssistantHasContent(true);
+              markAssistantHasContent();
             }
             workspaceActions.updateMessage(session.id, assistantId, accumulated, "complete", [
               "Hermes session stream",
@@ -270,7 +308,7 @@ export function ChatView({
           } else if (event.type === "error") {
             hadStreamError = true;
             accumulated = event.error.message;
-            setAssistantHasContent(true);
+            markAssistantHasContent();
             const activityEvent = createActivityEventFromHermesStreamEvent(event, {
               now: new Date().toISOString()
             });
@@ -294,6 +332,10 @@ export function ChatView({
       window.cancelAnimationFrame(flushFrameRef.current);
       flushFrameRef.current = null;
     }
+    if (flushTimeoutRef.current !== null) {
+      window.clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
 
     const completedAt = new Date().toISOString();
     if (streamResult === "aborted" || stopRequestedRef.current) {
@@ -315,22 +357,26 @@ export function ChatView({
           ? "Stopped by user after receiving partial assistant output."
           : "Stopped by user before assistant output."
       });
-      setAssistantHasContent(true);
+      markAssistantHasContent();
       return;
     }
+
+    const emptyAssistantText = !hadStreamError && !accumulated.trim();
 
     if (!completedAssistant && !hadStreamError && accumulated) {
       workspaceActions.updateMessage(session.id, assistantId, accumulated, "complete", [
         "Hermes session stream"
       ]);
-    } else if (!completedAssistant && !hadStreamError && !accumulated) {
+    } else if (emptyAssistantText) {
+      hadStreamError = true;
       workspaceActions.updateMessage(
         session.id,
         assistantId,
-        "Hermes finished without returning assistant text.",
+        emptyHermesResponseMessage(sendModelState.currentModelLabel),
         "error",
         ["Hermes stream"]
       );
+      markAssistantHasContent();
     }
 
     appendElapsedActivityEvent(session.id, runStartedAt, completedAt, recordRunActivity);
@@ -347,6 +393,7 @@ export function ChatView({
     });
     } finally {
       if (generationStarted) {
+        void sessionModel.refresh();
         setIsGenerating(false);
         setIsStopRequested(false);
         stopRequestedRef.current = false;
@@ -361,39 +408,6 @@ export function ChatView({
     stopRequestedRef.current = true;
     setIsStopRequested(true);
     activeStreamControllerRef.current?.abort();
-  }
-
-  async function handleModelSelect(modelId: string) {
-    if (!activeSession || modelSelectInProgress) {
-      return;
-    }
-
-    const session = activeSession;
-    setModelSelectInProgress(true);
-    try {
-      const response = await fetch("/api/hermes/model/select", {
-        body: JSON.stringify({
-          model: modelId,
-          sessionId: session.hermesSessionId
-        }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST"
-      });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || result?.ok === false) {
-        console.error("Model select failed:", result);
-        return;
-      }
-      setSelectedModelBySession((current) => ({
-        ...current,
-        [session.id]: result?.selectedModel || modelId
-      }));
-      await refreshHermesStatus();
-    } catch (error) {
-      console.error("Model select error:", error);
-    } finally {
-      setModelSelectInProgress(false);
-    }
   }
 
   function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
@@ -455,8 +469,6 @@ export function ChatView({
   }
 
   const activeActivityEvents = activeSession ? activityEvents : [];
-  const latestActivityEvent = activeActivityEvents.at(-1);
-  const hasRunningActivity = latestActivityEvent ? isActiveActivityEvent(latestActivityEvent) : false;
 
   return (
     <section
@@ -475,9 +487,6 @@ export function ChatView({
             bannerIcon={<AlertTriangle size={15} />}
             createSession={createSession}
             isStartState
-            isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
-            routeIcon={<SendHorizontal size={14} />}
-            scopeIcon={<BookOpenText size={14} />}
           />
           <div ref={composerWrapRef} className={styles.composerAnchor}>
           <Composer
@@ -487,12 +496,13 @@ export function ChatView({
             isStopRequested={isStopRequested}
             isStartState
             modelLabel={modelLabel}
+            modelSelectError={modelSelectError}
             modelSelectInProgress={modelSelectInProgress}
             modelState={providerModelState}
-            onModelSelect={handleModelSelect}
+            onModelSelect={sessionModel.selectModel}
             onSend={handleSend}
             onStop={handleStop}
-            showContextPanel
+            showContextPanel={false}
             stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
           />
           </div>
@@ -501,21 +511,25 @@ export function ChatView({
       ) : (
         <>
           <div
+            ref={scrollViewportRef}
             className={styles.scrollViewport}
             aria-label="Chat transcript"
-            style={{ "--composer-inset": `${composerInsetPx}px` } as CSSProperties}
           >
-            <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+            <div className={styles.topChrome}>
+              <div className={styles.contentFadeLayer} aria-hidden="true" />
+              <div className={styles.headerLayer}>
+                <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+              </div>
+            </div>
             <ChatTranscript
               activeProject={activeProject}
               activeSession={activeSession}
               activityEvents={activeActivityEvents}
               bannerIcon={<AlertTriangle size={15} />}
+              bottomClearancePx={composerClearancePx}
               createSession={createSession}
-              isThinking={isGenerating && !assistantHasContent && !hasRunningActivity}
-              routeIcon={<SendHorizontal size={14} />}
-              scopeIcon={<BookOpenText size={14} />}
             />
+            <div className={styles.scrollFadeBottom} aria-hidden="true" />
           </div>
           <div ref={composerWrapRef} className={`${styles.composerAnchor} ${styles.composerDock}`}>
             <Composer
@@ -524,9 +538,10 @@ export function ChatView({
               isGenerating={isGenerating}
               isStopRequested={isStopRequested}
               modelLabel={modelLabel}
+              modelSelectError={modelSelectError}
               modelSelectInProgress={modelSelectInProgress}
               modelState={providerModelState}
-              onModelSelect={handleModelSelect}
+              onModelSelect={sessionModel.selectModel}
               onSend={handleSend}
               onStop={handleStop}
               showContextPanel={false}
@@ -539,75 +554,12 @@ export function ChatView({
   );
 }
 
-function getProviderModelState(
-  status: NormalizedHermesStatus | null,
-  modelChoices: ModelChoice[]
-): HermesUiCapabilities["models"] {
-  if (status?.uiCapabilities.models) {
-    return status.uiCapabilities.models;
-  }
-
-  const fallback = modelChoices.find((choice) => choice.id === "hermes-default");
-  return {
-    availableModels: [],
-    clientSelectable: false,
-    currentModelLabel: fallback?.label ?? "Hermes server model",
-    currentProviderLabel: "Hermes server config",
-    fastStreamProfile: "unknown",
-    listAvailable: false,
-    reason: "Hermes model status has not loaded; runtime selection remains disabled.",
-    selectedModelId: null,
-    selectionStatus: "unknown",
-    serverAdvertisedModel: null,
-    serverConfiguredOnly: true,
-    uiState: "deferred",
-    sessionModelOverrideCapable: false,
-    explicitOverrideSupported: false
-  };
-}
-
-function applySessionSelectedModel(
-  state: HermesUiCapabilities["models"],
-  selectedModelId: string | undefined
-): HermesUiCapabilities["models"] {
-  if (!selectedModelId) {
-    return state;
-  }
-  const selected = state.availableModels.find((model) => model.id === selectedModelId);
-  return {
-    ...state,
-    currentModelLabel: selected?.label ?? selectedModelId,
-    currentProviderLabel: selected?.provider ?? state.currentProviderLabel,
-    selectedModelId
-  };
-}
-
-function modelLabelForState(state: HermesUiCapabilities["models"]) {
-  if (state.selectionStatus === "unavailable") {
-    return "Hermes unavailable";
-  }
-  if (state.currentModelLabel && state.currentModelLabel !== "Hermes server model") {
-    return state.currentModelLabel;
-  }
-  if (state.selectionStatus === "server-configured" && state.currentModelLabel) {
-    return state.currentModelLabel;
-  }
-  if (state.selectionStatus === "unknown" || !state.currentModelLabel) {
-    return "Hermes default";
-  }
-  return state.currentModelLabel;
+function resolveHermesSessionId(session: Session): string {
+  return session.hermesSessionId || `hermes-${session.id}`;
 }
 
 function assistantSafeId(value: string) {
   return value.replace(/[^a-z0-9_-]/gi, "_");
-}
-
-function isActiveActivityEvent(event: AgentActivityEvent) {
-  return (
-    event.status === "queued" ||
-    event.status === "running" ||
-    event.status === "waiting_for_approval"
-  );
 }
 
 function canUseRealHermes(status: NormalizedHermesStatus | null) {
@@ -683,6 +635,10 @@ function mockUnavailableResponse(
     return "Real Hermes chat is disabled for this UI process, so this response is a local mock fallback.";
   }
   return "Hermes is currently unreachable. Your message stayed in this local session; retry after the status panel reports connected.";
+}
+
+function emptyHermesResponseMessage(modelLabel: string): string {
+  return `Hermes completed the turn without returning assistant text for ${modelLabel}. The selected provider may be unavailable or misrouted; try another model or check Hermes provider configuration.`;
 }
 
 function toToolEvent(event: AgentActivityEvent): ToolEvent {

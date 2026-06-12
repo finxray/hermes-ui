@@ -11,7 +11,7 @@
   --bg-elevated: #22262b;
   --bg-workspace: #0f0f0f;
   --bg-workspace-solid: #0f0f0f;
-  --border-window-outline: rgba(255, 255, 255, 0.09);
+  --border-window-outline: rgba(255, 255, 255, 0.13);
   --bg-control-hover: rgba(255, 255, 255, 0.055);
   --bg-control-active: rgba(255, 255, 255, 0.082);
   --bg-user-bubble: rgba(28, 30, 35, 0.9);
@@ -32,10 +32,13 @@
 
   --accent: #8ee6c6;
   --accent-2: #91b8ff;
+  --markdown-inline-code: #79b8ff;
+  --markdown-status-check: #4caf50;
   --accent-dim: rgba(142, 230, 198, 0.12);
   --danger: #ff6b6b;
   --warning: #ffb86b;
   --warning-dim: rgba(255, 184, 107, 0.12);
+  --notice: #f08c4a;
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -49,6 +52,11 @@
 
   /* Z-index scale: keep transient overlays above clipped app panels. */
   --z-floating: 1000;
+  --scrollbar-size: 10px;
+  --scrollbar-thumb-border: 3px;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  --scrollbar-track: transparent;
 
   /* Activity shimmer keyframes are defined per-component */
 }

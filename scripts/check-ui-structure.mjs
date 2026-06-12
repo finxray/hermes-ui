@@ -150,7 +150,7 @@ for (const token of [
   "data-start-state",
   "startStage",
   "isStartState",
-  "showContextPanel"
+  "showContextPanel={false}"
 ]) {
   if (!chatViewVisualSource.includes(token)) {
     failures.push(`ChatView new-chat visual contract is missing ${token}`);
@@ -180,12 +180,10 @@ for (const token of [
 
 for (const token of [
   "background: transparent",
-  "--composer-inset",
-  "scroll-padding-bottom: calc(var(--composer-inset",
-  ".scrollAnchor",
+  "transcriptBottomSpacer",
   ".startStage",
   ".startHero",
-  "color: var(--warning)"
+  "color: var(--notice)"
 ]) {
   if (!chatViewVisualCss.includes(token)) {
     failures.push(`ChatView visual CSS contract is missing ${token}`);
@@ -218,7 +216,7 @@ for (const token of [".userExpandButton", ".userContentWrap", "data-expanded"]) 
   }
 }
 
-for (const token of ["scrollIntoView", "scrollAnchor"]) {
+for (const token of ["scrollToBottom", "scrollTo"]) {
   if (!chatTranscriptSource.includes(token)) {
     failures.push(`Transcript scroll behavior contract is missing ${token}`);
   }
@@ -235,8 +233,8 @@ if (!chatViewVisualCss.includes("max-width: var(--composer-width)")) {
 if (!chatViewVisualCss.includes("max-width: calc(var(--composer-width) + 20px)")) {
   failures.push("Composer surface must stay 20px wider than the transcript/content column.");
 }
-if (!appShellCss.includes("clamp(514px, 45%, 691px)")) {
-  failures.push("Composer width must be 10% wider than the prior clamp(467px, 40.9%, 628px).");
+if (!appShellCss.includes("clamp(581px, 50.9%, 781px)")) {
+  failures.push("Composer width must be 13% wider than the prior clamp(514px, 45%, 691px).");
 }
 
 for (const token of [
@@ -299,7 +297,12 @@ const tokensCss = readFileSync(join(root, "apps/web/src/styles/tokens.css"), "ut
 if (!tokensCss.includes("--bg-workspace-solid: #0f0f0f")) {
   failures.push("Main workspace solid token must use opaque #0f0f0f (rgba(15,15,15,1)).");
 }
-if (appShellCss.includes("radial-gradient(") || appShellCss.includes("ambientCanvasShift")) {
+if (
+  appShellCss.includes("gradient(") ||
+  appShellCss.includes("@keyframes") ||
+  appShellCss.includes("ambientCanvasShift") ||
+  appShellCss.includes("shellAmbient")
+) {
   failures.push("Shell canvas must not use ambient gradients or animated background layers.");
 }
 if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes("border: 1px solid")) {
@@ -335,10 +338,10 @@ if (contextRailVisualCss.includes("transform: translateX(100%)")) {
 }
 
 for (const token of [
-  "rgba(27, 27, 30, 1)",
+  "rgba(38, 38, 40, 1)",
   "box-shadow:",
   "position: fixed",
-  "var(--z-floating)",
+  "z-index",
   ".contextPanel[data-visible=\"true\"]",
   "@media (prefers-reduced-motion: reduce)"
 ]) {

@@ -7,6 +7,7 @@ import {
 } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
 import { buildMemoryScopeBridgeInstruction } from "@/lib/memoryScopeBridge";
+import { buildHermesRuntimeIdentityInstruction } from "@/lib/hermesRuntimeIdentity";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -70,6 +71,8 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
   const input = body as Record<string, unknown>;
   const message = cleanText(input.message, MAX_MESSAGE_CHARS);
   const context = readContext(input.context);
+  const model = cleanOptionalString(input.model, 128);
+  const provider = cleanOptionalString(input.provider, 128);
 
   if (!message) {
     return badRequest("bad_response", "Message is required.");
@@ -82,12 +85,13 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
     ok: true,
     request: {
       context,
-      instructions: isMemoryScopeBridgeEnabled()
-        ? buildMemoryScopeBridgeInstruction(context)
-        : null,
+      instructions: joinInstructions(
+        buildHermesRuntimeIdentityInstruction({ model, provider }),
+        isMemoryScopeBridgeEnabled() ? buildMemoryScopeBridgeInstruction(context) : null
+      ),
       message,
-      provider: cleanOptionalString(input.provider, 128),
-      model: cleanOptionalString(input.model, 128),
+      provider,
+      model,
       recentMessages: readRecentMessages(input.recentMessages)
     }
   };
@@ -121,6 +125,11 @@ function cleanOptionalString(value: unknown, maxLength: number): string | null {
   return typeof value === "string"
     ? value.replace(/[\r\n\x00]/g, " ").trim().slice(0, maxLength) || null
     : null;
+}
+
+function joinInstructions(...parts: Array<string | null>): string | null {
+  const clean = parts.filter((part): part is string => Boolean(part?.trim()));
+  return clean.length > 0 ? clean.join("\n\n") : null;
 }
 
 function readContext(value: unknown): HermesChatContext | null {

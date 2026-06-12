@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Route, ShieldCheck } from "lucide-react";
+import { Brain } from "lucide-react";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { ContextRail } from "@/components/shell/ContextRail";
 import { Sidebar } from "@/components/shell/Sidebar";
@@ -17,9 +17,11 @@ import {
   longSessionSessions,
   longSessionWorkspaceState
 } from "@/data/longSessionFixture";
+import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import styles from "./page.module.css";
 
 const noop = () => undefined;
+const asyncNoop = async () => undefined;
 const fixtureActions = {
   appendMessage: noop,
   appendRunRecord: noop,
@@ -34,6 +36,37 @@ const fixtureActions = {
   switchSession: noop,
   updateMessage: noop,
   updateRunRecord: noop
+};
+const fixtureSessionModel: HermesSessionModelSync = {
+  checkedAt: null,
+  effectiveModel: null,
+  effectiveProvider: null,
+  error: null,
+  hermesSessionId: longSessionActiveSession.hermesSessionId,
+  modelLabel: "Hermes fixture model",
+  modelRequest: null,
+  modelSelectInProgress: false,
+  modelState: {
+    availableModels: [],
+    clientSelectable: false,
+    currentModelLabel: "Hermes fixture model",
+    currentProviderLabel: "Fixture provider",
+    explicitOverrideSupported: false,
+    fastStreamProfile: "unknown",
+    listAvailable: false,
+    reason: "Static fixture only.",
+    selectedModelId: null,
+    selectionStatus: "deferred",
+    serverAdvertisedModel: null,
+    serverConfiguredOnly: true,
+    sessionModelOverrideCapable: false,
+    uiState: "deferred"
+  },
+  providerLabel: "Fixture provider",
+  refresh: asyncNoop,
+  selectModel: asyncNoop,
+  sessionId: longSessionActiveSession.id,
+  syncStatus: "fallback"
 };
 
 export default function LongSessionFixturePage() {
@@ -66,16 +99,13 @@ export default function LongSessionFixturePage() {
           isHermesSessionsLoading={false}
           refreshHermesSessions={noop}
         />
-        <section className={styles.transcriptWrap} aria-label="Long-session transcript fixture">
+        <section className={styles.transcriptWrap} aria-label="Chat transcript">
           <ChatTranscript
             activeProject={longSessionActiveProject}
             activeSession={longSessionActiveSession}
             activityEvents={longSessionActivityEvents}
             bannerIcon={<Brain size={16} />}
             createSession={noop}
-            isThinking={false}
-            routeIcon={<Route size={13} />}
-            scopeIcon={<ShieldCheck size={13} />}
           />
         </section>
         <ContextRail
@@ -84,6 +114,7 @@ export default function LongSessionFixturePage() {
           activityEvents={longSessionActivityEvents}
           brainMemoryStatus={null}
           hermesStatus={null}
+          hermesSessionModel={fixtureSessionModel}
           isBrainMemoryStatusLoading={false}
           isHermesStatusLoading={false}
           refreshBrainMemoryStatus={noop}

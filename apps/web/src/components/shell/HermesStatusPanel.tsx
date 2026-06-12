@@ -1,4 +1,5 @@
 import { RefreshCw } from "lucide-react";
+import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import styles from "./StatusPanel.module.css";
 
@@ -7,11 +8,22 @@ type HermesStatusPanelProps = {
   isLoading: boolean;
   isRefreshing?: boolean;
   onRefresh: () => void;
+  sessionModel?: HermesSessionModelSync | null;
 };
 
-export function HermesStatusPanel({ status, isLoading, isRefreshing = false, onRefresh }: HermesStatusPanelProps) {
-  const capabilityRows = getCapabilityRows(status);
+export function HermesStatusPanel({
+  status,
+  isLoading,
+  isRefreshing = false,
+  onRefresh,
+  sessionModel = null
+}: HermesStatusPanelProps) {
+  const activeModelState = sessionModel?.modelState ?? status?.uiCapabilities.models ?? null;
+  const capabilityRows = getCapabilityRows(status, sessionModel);
   const checkedAt = status?.checkedAt ? new Date(status.checkedAt).toLocaleTimeString() : "Never";
+  const sessionCheckedAt = sessionModel?.checkedAt
+    ? new Date(sessionModel.checkedAt).toLocaleTimeString()
+    : null;
 
   return (
     <section className={styles.section} aria-labelledby="hermes-status-heading">
@@ -40,12 +52,37 @@ export function HermesStatusPanel({ status, isLoading, isRefreshing = false, onR
           {status?.baseUrl ? `Base URL: ${status.baseUrl}` : "Set HERMES_API_BASE_URL to enable real checks."}
         </div>
         {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
-        {status?.uiCapabilities.models ? (
+        {sessionModel ? (
+          <div className={styles.syncStrip} data-state={sessionModel.syncStatus}>
+            <div className={styles.syncTop}>
+              <span>Session model pipeline</span>
+              <span className={styles.syncState}>{syncStatusLabel(sessionModel.syncStatus)}</span>
+            </div>
+            <div className={styles.syncPipeline} aria-label="Model sync pipeline">
+              <span className={styles.syncNode}>Hermes</span>
+              <span className={styles.syncLine} aria-hidden="true" />
+              <span className={styles.syncNode}>BFF</span>
+              <span className={styles.syncLine} aria-hidden="true" />
+              <span className={styles.syncNode}>UI</span>
+            </div>
+            <div className={styles.meta}>
+              {sessionModel.syncStatus === "fallback"
+                ? "Hermes has not created this session yet; using the server default."
+                : sessionModel.syncStatus === "turn-ready"
+                  ? "UI OpenRouter model will be sent through Hermes on each turn."
+                : sessionCheckedAt
+                  ? `Session verified: ${sessionCheckedAt}`
+                  : "Waiting for Hermes session verification."}
+            </div>
+            {sessionModel.error ? <div className={styles.error}>{sessionModel.error}</div> : null}
+          </div>
+        ) : null}
+        {activeModelState ? (
           <div className={styles.fieldGrid} aria-label="Hermes model state">
-            <ModelField label="Model" value={status.uiCapabilities.models.currentModelLabel} />
-            <ModelField label="Provider" value={status.uiCapabilities.models.currentProviderLabel} />
-            <ModelField label="Selection" value={status.uiCapabilities.models.selectionStatus} />
-            <ModelField label="Fast stream" value={status.uiCapabilities.models.fastStreamProfile} />
+            <ModelField label="Model" value={sessionModel?.modelLabel ?? activeModelState.currentModelLabel} />
+            <ModelField label="Provider" value={sessionModel?.providerLabel ?? activeModelState.currentProviderLabel} />
+            <ModelField label="Selection" value={activeModelState.selectionStatus} />
+            <ModelField label="Fast stream" value={activeModelState.fastStreamProfile} />
           </div>
         ) : null}
         {capabilityRows.length > 0 ? (
@@ -102,7 +139,29 @@ function statusLabel(status: NormalizedHermesStatus | null, isLoading: boolean) 
   return "Hermes unreachable";
 }
 
-function getCapabilityRows(status: NormalizedHermesStatus | null) {
+function syncStatusLabel(status: HermesSessionModelSync["syncStatus"]) {
+  if (status === "synced") {
+    return "verified";
+  }
+  if (status === "verifying") {
+    return "switching";
+  }
+  if (status === "loading") {
+    return "checking";
+  }
+  if (status === "fallback") {
+    return "server default";
+  }
+  if (status === "turn-ready") {
+    return "per-turn";
+  }
+  if (status === "error") {
+    return "attention";
+  }
+  return "unavailable";
+}
+
+function getCapabilityRows(status: NormalizedHermesStatus | null, sessionModel?: HermesSessionModelSync | null) {
   const ui = status?.uiCapabilities;
   if (!ui) {
     return [];
@@ -131,7 +190,7 @@ function getCapabilityRows(status: NormalizedHermesStatus | null) {
     },
     {
       label: "model",
-      value: ui.models.currentModelLabel
+      value: sessionModel?.modelLabel ?? ui.models.currentModelLabel
     },
     {
       label: "model mode",

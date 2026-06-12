@@ -13,45 +13,80 @@
   justify-items: start;
 }
 
-.card {
-  min-width: 0;
-  width: 100%;
-}
-
-.message[data-role="user"] .card {
+.userStack {
+  display: grid;
   width: fit-content;
   max-width: min(72%, 740px);
-  padding: 14px 18px;
-  border-radius: 20px;
-  border: 0;
-  background: #1b1c1c;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2);
-  backdrop-filter: none;
-}
-
-.message[data-role="assistant"] .card {
-  max-width: 100%;
-  padding: 0;
-  background: transparent;
-}
-
-.head {
-  display: flex;
-  flex-wrap: wrap;
+  min-width: 0;
   gap: 6px;
-  align-items: baseline;
-  margin-bottom: 6px;
+  justify-items: end;
 }
 
-.author {
-  color: var(--text-secondary);
-  font-size: var(--font-small);
-  font-weight: 600;
+.userBubble {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 12px 20px;
+  border-radius: 11px;
+  background: rgba(38, 38, 38, 0.5);
+  box-sizing: border-box;
 }
 
-.meta {
+.userBubble .content,
+.userBubble p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.userBubble p + p {
+  margin-top: 10px;
+}
+
+.messageFooter {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.message[data-role="user"] .messageFooter {
+  justify-content: flex-end;
+  padding-right: 2px;
+}
+
+.assistantStack {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+}
+
+.assistantFooter {
+  justify-content: flex-start;
+  padding-left: 2px;
+}
+
+.message:hover .messageFooter,
+.message:focus-within .messageFooter {
+  opacity: 1;
+}
+
+.messageMeta {
   color: var(--text-muted);
   font-size: var(--font-xs);
+  line-height: 1;
+}
+
+.messageActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .content {
@@ -70,6 +105,8 @@
 
 .userContentWrap {
   display: grid;
+  width: fit-content;
+  max-width: 100%;
   gap: 8px;
   min-width: 0;
 }
@@ -133,104 +170,70 @@
   text-underline-offset: 3px;
 }
 
-.actionRow {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 10px;
-  opacity: 0;
-  transition: opacity 120ms ease;
+.streamingFrame {
+  position: relative;
+  contain: layout style;
+  min-height: 1.7em;
 }
 
-.message:hover .actionRow,
-.message:focus-within .actionRow {
+.streamStatus {
+  opacity: 1;
+  transform: translateY(0);
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  line-height: 1.7;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.streamStatus[data-phase="exit"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+}
+
+.streamStatus[data-phase="hidden"] {
+  display: none;
+}
+
+.streamContent {
+  position: relative;
+  z-index: 0;
   opacity: 1;
 }
 
-.messageCopyButton {
-  display: inline-flex;
-  min-width: 118px;
-  min-height: 26px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 8px;
-  border: 1px solid var(--border-glass-soft);
-  border-radius: var(--radius-sm);
-  background: var(--bg-glass-soft);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--font-xs);
+.streamContent[data-entering="true"] {
+  animation: streamContentReveal 220ms ease;
 }
 
-.messageCopyButton:hover {
-  border-color: var(--border-glass);
-  background: var(--bg-glass-hover);
-  color: var(--text-secondary);
-}
+@keyframes streamContentReveal {
+  from {
+    opacity: 0.42;
+  }
 
-.messageCopyButton:focus-visible {
-  outline: 2px solid rgba(145, 184, 255, 0.72);
-  outline-offset: 2px;
-}
-
-/* Streaming placeholder — a slim pulsing bar, no layout shift */
-.streamPlaceholder {
-  display: block;
-  width: clamp(120px, 38%, 240px);
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  overflow: hidden;
-  position: relative;
-}
-
-.streamPlaceholder::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.11) 50%, transparent 100%);
-  animation: shimmer 0.82s linear infinite;
-}
-
-.pill {
-  display: inline-flex;
-  min-height: 18px;
-  align-items: center;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
-  font-size: var(--font-xs);
-}
-
-.referenceRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.referenceChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-muted);
-  font-size: var(--font-xs);
-}
-
-@keyframes shimmer {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(100%); }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 760px) {
-  .message[data-role="user"] .card {
+  .userStack {
     max-width: min(88%, 560px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .streamPlaceholder::after {
-    animation-duration: 1ms;
+  .streamStatus {
+    transition: none;
+  }
+
+  .streamContent[data-entering="true"] {
+    animation: none;
   }
 }

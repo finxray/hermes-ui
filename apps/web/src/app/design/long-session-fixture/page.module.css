@@ -60,11 +60,13 @@
   min-width: 0;
   min-height: 0;
   grid-area: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.transcriptWrap > :global([aria-label="Chat transcript"]) {
-  height: 100%;
-  min-height: 0;
+.transcriptWrap > * {
+  min-height: 100%;
 }
 
 @media (max-width: 1180px) {

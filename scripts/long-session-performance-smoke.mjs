@@ -204,8 +204,8 @@ async function checkRailAndDetails() {
   );
   await expectVisible(
     "fixture-run-history-visible",
-    page.getByText("Run history", { exact: true }),
-    "Run history section is visible."
+    page.getByText("Active context", { exact: true }),
+    "Active context section is visible."
   );
   await expectVisible(
     "fixture-export-preview-visible",
@@ -326,7 +326,7 @@ async function checkRightRailTabSwitching() {
     { label: "Show memory panel", marker: "Memory search", name: "memory" },
     { label: "Show tools panel", marker: "Recent commands", name: "tools" },
     { label: "Show files panel", marker: "Files and artifacts", name: "files" },
-    { label: "Show context panel", marker: "Run history", name: "context" }
+    { label: "Show context panel", marker: "Active context", name: "context" }
   ];
   const metrics = [];
 

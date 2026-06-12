@@ -51,6 +51,7 @@ checkNormalizationFillsTitleMetadata();
 checkRunRecordPersistence();
 checkRunsReplayPreviewHydrationPersistence();
 checkSessionExportPreview();
+checkSessionModelPreferencePersistence();
 checkArchiveRepairsActiveSession();
 checkResetReturnsValidState();
 checkDefaultUserDisplayName();
@@ -702,6 +703,41 @@ function checkSessionExportPreview() {
   assert(preview.excluded.includes("api keys and credentials"));
   assert(serialized.includes("[redacted]"));
   assert(!serialized.includes("abc123"));
+}
+
+function checkSessionModelPreferencePersistence() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const previousUpdatedAt = session.updatedAt;
+
+  state = workspaceReducer(state, {
+    type: "setSessionModelPreference",
+    sessionId: session.id,
+    preference: {
+      catalogModelId: "moonshotai/kimi-k2.6",
+      catalogSource: "ui-openrouter",
+      label: "Kimi K2.6",
+      provider: "OpenRouter",
+      selectedAt: "2026-06-06T14:00:00.000Z",
+      selectionScope: "turn",
+      selectModelId: "moonshotai/kimi-k2.6"
+    }
+  });
+
+  const updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.modelPreference?.catalogModelId, "moonshotai/kimi-k2.6");
+  assert.equal(updated?.modelPreference?.catalogSource, "ui-openrouter");
+  assert.equal(updated?.modelPreference?.provider, "OpenRouter");
+  assert.equal(updated?.modelPreference?.selectionScope, "turn");
+  assert(Date.parse(updated?.updatedAt ?? "") >= Date.parse(previousUpdatedAt));
+
+  const legacy = structuredClone(state);
+  legacy.sessions[0].modelPreference = {
+    catalogModelId: "bad-model",
+    selectModelId: ""
+  };
+  const normalized = workspaceReducer(base, { type: "hydrate", state: legacy });
+  assert.equal(normalized.sessions[0].modelPreference, undefined);
 }
 
 function checkArchiveRepairsActiveSession() {

@@ -8,6 +8,10 @@ export async function POST(request: Request) {
 
   const sessionId = body?.sessionId || body?.hermesSessionId;
   const modelId = body?.model;
+  const provider = typeof body?.provider === "string" ? body.provider : undefined;
+  const expectedProviderKey =
+    typeof body?.expectedProviderKey === "string" ? body.expectedProviderKey : provider;
+  const sessionTitle = typeof body?.sessionTitle === "string" ? body.sessionTitle : undefined;
 
   if (!sessionId || typeof sessionId !== "string") {
     return NextResponse.json(
@@ -32,7 +36,12 @@ export async function POST(request: Request) {
       timeoutMs: 10_000
     },
     sessionId,
-    modelId
+    modelId,
+    {
+      expectedProviderKey,
+      provider,
+      sessionTitle
+    }
   );
 
   if (!result.ok) {

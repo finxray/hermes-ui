@@ -5,8 +5,10 @@ import { ContextRail } from "@/components/shell/ContextRail";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
+import { useHermesSessionModel } from "@/hooks/useHermesSessionModel";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
 import { useHermesSessions } from "@/hooks/useHermesSessions";
+import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnosticsPosture";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { useState } from "react";
@@ -17,7 +19,16 @@ import styles from "./AppShell.module.css";
 export function AppShell() {
   const { actions, activeProject, activeSession, isHydrated, state } = useWorkspaceState();
   const hermesStatus = useHermesStatus();
+  const openRouterModels = useOpenRouterModels();
   const hermesSessions = useHermesSessions(hermesStatus.status?.mode === "real" && hermesStatus.status.reachable);
+  const hermesSessionModel = useHermesSessionModel({
+    activeSession,
+    hermesStatus: hermesStatus.status,
+    modelChoices: state.modelChoices,
+    openRouterModels: openRouterModels.models,
+    persistSessionModelPreference: actions.setSessionModelPreference,
+    refreshHermesStatus: hermesStatus.refresh
+  });
   const brainMemoryStatus = useBrainMemoryStatus();
   const tenantScopePosture = useTenantScopeDiagnosticsPosture();
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
@@ -89,9 +100,8 @@ export function AppShell() {
             createSession={actions.createSession}
             hermesStatus={hermesStatus.status}
             isHermesStatusLoading={hermesStatus.isLoading}
-            modelChoices={state.modelChoices}
             onActivityEvent={appendActivityEvent}
-            refreshHermesStatus={hermesStatus.refresh}
+            sessionModel={hermesSessionModel}
             workspaceActions={actions}
           />
         </div>
@@ -101,6 +111,7 @@ export function AppShell() {
           activityEvents={activeActivityEvents}
           brainMemoryStatus={brainMemoryStatus.status}
           hermesStatus={hermesStatus.status}
+          hermesSessionModel={hermesSessionModel}
           isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
           isHermesStatusLoading={hermesStatus.isLoading}
           isHermesStatusRefreshing={hermesStatus.isRefreshing}

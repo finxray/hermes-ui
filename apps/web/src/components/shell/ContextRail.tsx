@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
+import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
 import { createSessionExportPreview } from "@/lib/persistedActivityReplay";
 import { buildTenantScopeDiagnostics, type TenantScopeDiagnostics } from "@/lib/tenantScopeDiagnostics";
@@ -21,6 +22,7 @@ type ContextRailProps = {
   activityEvents: AgentActivityEvent[];
   brainMemoryStatus: NormalizedBrainMemoryStatus | null;
   hermesStatus: NormalizedHermesStatus | null;
+  hermesSessionModel: HermesSessionModelSync;
   isBrainMemoryStatusLoading: boolean;
   isHermesStatusLoading: boolean;
   isHermesStatusRefreshing?: boolean;
@@ -51,6 +53,7 @@ export function ContextRail({
   activityEvents,
   brainMemoryStatus,
   hermesStatus,
+  hermesSessionModel,
   isBrainMemoryStatusLoading,
   isHermesStatusLoading,
   isHermesStatusRefreshing = false,
@@ -90,7 +93,11 @@ export function ContextRail({
             <HermesStatusPanel
               isLoading={isHermesStatusLoading}
               isRefreshing={isHermesStatusRefreshing}
-              onRefresh={refreshHermesStatus}
+              onRefresh={() => {
+                refreshHermesStatus();
+                void hermesSessionModel.refresh();
+              }}
+              sessionModel={hermesSessionModel}
               status={hermesStatus}
             />
             <ActiveContextSection activeProject={activeProject} activeSession={activeSession} />
@@ -204,7 +211,7 @@ function TenantScopeDiagnosticsSection({
           </ul>
         ) : null}
         {diagnostics.checks.warnings.length > 0 ? (
-          <ul className={styles.diagnosticsList} aria-label="Tenant scope warnings">
+          <ul className={`${styles.diagnosticsList} ${styles.diagnosticsWarnings}`} aria-label="Tenant scope warnings">
             {diagnostics.checks.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}

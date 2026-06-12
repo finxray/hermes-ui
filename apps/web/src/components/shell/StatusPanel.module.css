@@ -110,12 +110,85 @@
   gap: 8px 10px;
 }
 
+.syncStrip {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.syncTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.syncState {
+  color: var(--text-muted);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.syncPipeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12px, 28px) minmax(0, 1fr) minmax(12px, 28px) minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.syncNode {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  box-sizing: border-box;
+}
+
+.syncLine {
+  height: 1px;
+  min-width: 12px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(170, 220, 255, 0.42));
+}
+
+.syncStrip[data-state="synced"] .syncState,
+.syncStrip[data-state="synced"] .syncNode {
+  color: #d8f8e4;
+}
+
+.syncStrip[data-state="verifying"] .syncState,
+.syncStrip[data-state="loading"] .syncState {
+  color: #c8dcff;
+}
+
+.syncStrip[data-state="error"] .syncState {
+  color: var(--notice);
+}
+
+.syncStrip[data-state="fallback"] .syncState {
+  color: #f4d7a1;
+}
+
 .error {
   padding: 2px 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #ffb4b4;
+  color: var(--notice);
   font-size: var(--font-small);
   line-height: 1.45;
 }

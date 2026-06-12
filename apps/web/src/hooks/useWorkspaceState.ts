@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   createMockWorkspaceState,
   getVisibleSessions,
@@ -9,11 +9,14 @@ import {
   workspaceReducer,
   type WorkspaceAction
 } from "@/lib/workspaceStore";
-import type { ChatMessage, RunRecord, ToolEvent } from "@/data/types";
+import type { ChatMessage, RunRecord, SessionModelPreference, ToolEvent } from "@/data/types";
 
 export function useWorkspaceState() {
   const [state, dispatch] = useReducer(workspaceReducer, undefined, createMockWorkspaceState);
   const [isHydrated, setIsHydrated] = useState(false);
+  const latestStateRef = useRef(state);
+
+  latestStateRef.current = state;
 
   useEffect(() => {
     const loaded = loadWorkspaceState(window.localStorage);
@@ -24,10 +27,30 @@ export function useWorkspaceState() {
   }, []);
 
   useEffect(() => {
-    if (isHydrated) {
-      saveWorkspaceState(window.localStorage, state);
+    if (!isHydrated) {
+      return;
     }
+
+    const timeout = window.setTimeout(() => {
+      saveWorkspaceState(window.localStorage, latestStateRef.current);
+    }, 500);
+
+    return () => window.clearTimeout(timeout);
   }, [isHydrated, state]);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    const flush = () => saveWorkspaceState(window.localStorage, latestStateRef.current);
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+    };
+  }, [isHydrated]);
 
   const activeProject =
     state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0];
@@ -74,7 +97,9 @@ export function useWorkspaceState() {
           status
         }),
       loadHermesMessages: (sessionId: string, messages: ChatMessage[]) =>
-        dispatch({ type: "loadHermesMessages", sessionId, messages })
+        dispatch({ type: "loadHermesMessages", sessionId, messages }),
+      setSessionModelPreference: (sessionId: string, preference: SessionModelPreference) =>
+        dispatch({ type: "setSessionModelPreference", sessionId, preference })
     }),
     []
   );

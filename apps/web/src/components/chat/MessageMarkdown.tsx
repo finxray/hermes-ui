@@ -1,13 +1,16 @@
 "use client";
 
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink, type LucideIcon } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism-plus";
 import type { Components } from "react-markdown";
 import type { PluggableList } from "unified";
+import { StatusCheckIcon } from "@/components/ui/StatusCheckIcon";
 import styles from "./MessageMarkdown.module.css";
+
+const CHECK_SENTINEL = "__check__";
 
 type MessageMarkdownProps = {
   content: string;
@@ -41,8 +44,12 @@ export const MessageMarkdown = memo(function MessageMarkdown({
         const isBlock = Boolean(language) || raw.includes("\n");
 
         if (!isBlock) {
+          if (isCheckSentinel(raw)) {
+            return <StatusCheckIcon className={styles.statusCheckInline} />;
+          }
+
           return (
-            <code className={styles.inlineCode} {...props}>
+            <code className={inlineCodeClassName(raw)} {...props}>
               {children}
             </code>
           );
@@ -68,10 +75,23 @@ export const MessageMarkdown = memo(function MessageMarkdown({
             <table>{children}</table>
           </div>
         );
+      },
+      input({ checked, disabled, type, ...props }) {
+        if (type !== "checkbox") {
+          return <input {...props} checked={checked} disabled={disabled} type={type} />;
+        }
+
+        if (!checked) {
+          return <span className={styles.taskCheckTodo} aria-hidden="true" />;
+        }
+
+        return <StatusCheckIcon className={styles.statusCheckList} />;
       }
     }),
     [isStreaming]
   );
+
+  const preparedContent = useMemo(() => prepareMarkdownContent(content), [content]);
 
   return (
     <div className={styles.markdown} data-streaming={isStreaming ? "true" : "false"}>
@@ -81,7 +101,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({
         remarkPlugins={[remarkGfm]}
         skipHtml
       >
-        {content}
+        {preparedContent}
       </ReactMarkdown>
     </div>
   );
@@ -89,14 +109,20 @@ export const MessageMarkdown = memo(function MessageMarkdown({
 
 export function CopyTextButton({
   className,
+  icon: Icon = Copy,
   label = "Copy",
-  text
+  text,
+  variant = "icon"
 }: {
   className?: string;
+  icon?: LucideIcon;
   label?: string;
   text: string;
+  variant?: "icon" | "pill";
 }) {
   const [copied, setCopied] = useState(false);
+  const buttonClassName = className ?? styles.iconActionButton;
+  const DisplayIcon = copied ? Check : Icon;
 
   async function handleCopy() {
     const ok = await copyText(text);
@@ -110,12 +136,13 @@ export function CopyTextButton({
   return (
     <button
       aria-label={copied ? "Copied" : label}
-      className={className ?? styles.copyButton}
+      className={buttonClassName}
       onClick={handleCopy}
+      title={copied ? "Copied" : label}
       type="button"
     >
-      {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
-      <span>{copied ? "Copied" : label}</span>
+      <DisplayIcon size={16} aria-hidden="true" />
+      {variant === "pill" ? <span>{copied ? "Copied" : label}</span> : null}
     </button>
   );
 }
@@ -135,7 +162,7 @@ const CodeBlock = memo(function CodeBlock({
     <figure className={styles.codeBlock}>
       <figcaption className={styles.codeHeader}>
         <span>{language || "text"}</span>
-        <CopyTextButton className={styles.copyButton} label="Copy code" text={code} />
+        <CopyTextButton label="Copy code" text={code} variant="icon" />
       </figcaption>
       <pre>
         {/* When streaming or no prism highlighting, fall back to plain text.
@@ -172,6 +199,66 @@ async function copyText(text: string) {
 
 function parseLanguage(className?: string) {
   return className?.match(/language-([\w-]+)/)?.[1]?.toLowerCase() ?? "";
+}
+
+const HTTP_METHOD_PATTERN = "(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)";
+const HTTP_PATH_PATTERN = "(\\/[^\\s`<>]+)";
+
+function inlineCodeClassName(value: string) {
+  const text = value.trim();
+  if (isHttpEndpointCode(text)) {
+    return styles.inlineCodeEndpoint;
+  }
+  return styles.inlineCode;
+}
+
+function isCheckSentinel(value: string) {
+  const text = value.trim();
+  return text === CHECK_SENTINEL || text === "✓" || text === "✔";
+}
+
+function isHttpEndpointCode(text: string) {
+  return (
+    new RegExp(`^${HTTP_METHOD_PATTERN}\\s+${HTTP_PATH_PATTERN}$`, "i").test(text) ||
+    new RegExp(`^${HTTP_PATH_PATTERN}$`).test(text) ||
+    new RegExp(`^${HTTP_METHOD_PATTERN}$`, "i").test(text)
+  );
+}
+
+function joinHttpMethodPaths(content: string) {
+  const methodPath = new RegExp(
+    `\`(${HTTP_METHOD_PATTERN})\`\\s*(?:\\n\\s*)?\`?(${HTTP_PATH_PATTERN})\`?`,
+    "gi"
+  );
+  const plainLineBreak = new RegExp(`\\b(${HTTP_METHOD_PATTERN})\\s*\\n\\s*(${HTTP_PATH_PATTERN})`, "gi");
+
+  return content
+    .replace(methodPath, (_match, method, path) => `\`${method} ${path}\``)
+    .replace(plainLineBreak, (_match, method, path) => `\`${method} ${path}\``);
+}
+
+const LEADING_CHECK_LINE_PATTERN = /^(\s*)(?:[-*+]\s+)?[✓✔✅]\s+(.*)$/;
+
+function prepareMarkdownContent(content: string) {
+  return joinHttpMethodPaths(
+    content
+      .split("\n")
+      .map((line) => {
+        const leadingCheck = line.match(LEADING_CHECK_LINE_PATTERN);
+        if (leadingCheck) {
+          return `${leadingCheck[1]}- [x] ${leadingCheck[2]}`;
+        }
+        return normalizeInlineStatusChecks(line);
+      })
+      .join("\n")
+  );
+}
+
+function normalizeInlineStatusChecks(line: string) {
+  return line
+    .replace(/✅\s*/g, `\`${CHECK_SENTINEL}\` `)
+    .replace(/([—–])\s*[✓✔]\s*/g, `$1 \`${CHECK_SENTINEL}\` `)
+    .replace(/(\S)\s+[✓✔](?=\s)/g, `$1 \`${CHECK_SENTINEL}\``);
 }
 
 function safeHref(href?: string) {

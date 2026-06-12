@@ -1,0 +1,42 @@
+.shimmerText {
+  display: inline-block;
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 38%,
+    rgba(255, 255, 255, 0.72) 50%,
+    var(--text-muted) 62%,
+    var(--text-muted) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmerTextPulse 0.88s linear infinite;
+}
+
+@keyframes shimmerTextPulse {
+  from {
+    background-position: 120% 0;
+  }
+
+  to {
+    background-position: -20% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmerText {
+    animation-duration: 1ms;
+    background-position: 0 0;
+    color: var(--text-muted);
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+  }
+}

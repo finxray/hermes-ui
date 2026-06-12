@@ -10,9 +10,42 @@ import {
   largeArtifactsToolsProject,
   largeArtifactsToolsSession
 } from "@/data/largeArtifactsToolsFixture";
+import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import styles from "./page.module.css";
 
 const noop = () => undefined;
+const asyncNoop = async () => undefined;
+const fixtureSessionModel: HermesSessionModelSync = {
+  checkedAt: null,
+  effectiveModel: null,
+  effectiveProvider: null,
+  error: null,
+  hermesSessionId: largeArtifactsToolsSession.hermesSessionId,
+  modelLabel: "Hermes fixture model",
+  modelRequest: null,
+  modelSelectInProgress: false,
+  modelState: {
+    availableModels: [],
+    clientSelectable: false,
+    currentModelLabel: "Hermes fixture model",
+    currentProviderLabel: "Fixture provider",
+    explicitOverrideSupported: false,
+    fastStreamProfile: "unknown",
+    listAvailable: false,
+    reason: "Static fixture only.",
+    selectedModelId: null,
+    selectionStatus: "deferred",
+    serverAdvertisedModel: null,
+    serverConfiguredOnly: true,
+    sessionModelOverrideCapable: false,
+    uiState: "deferred"
+  },
+  providerLabel: "Fixture provider",
+  refresh: asyncNoop,
+  selectModel: asyncNoop,
+  sessionId: largeArtifactsToolsSession.id,
+  syncStatus: "fallback"
+};
 
 export default function ArtifactsToolsLargeFixturePage() {
   return (
@@ -46,6 +79,7 @@ export default function ArtifactsToolsLargeFixturePage() {
           activityEvents={largeActivityEvents}
           brainMemoryStatus={null}
           hermesStatus={null}
+          hermesSessionModel={fixtureSessionModel}
           isBrainMemoryStatusLoading={false}
           isHermesStatusLoading={false}
           refreshBrainMemoryStatus={noop}

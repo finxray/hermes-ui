@@ -21,30 +21,36 @@ export function useHermesSessions(enabled = true) {
     lastFetchedAt: null
   });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
   const load = useCallback(async () => {
-    if (!enabled) {
+    if (!enabled || inFlightRef.current) {
       return;
     }
+    inFlightRef.current = true;
     setState((prev) => ({ ...prev, isLoading: true }));
-    const result = await fetchHermesSessions();
-    if (!mountedRef.current) {
-      return;
-    }
-    if (result.ok) {
-      setState({
-        sessions: result.sessions,
-        isLoading: false,
-        error: null,
-        lastFetchedAt: new Date().toISOString()
-      });
-    } else {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: result.error.message
-      }));
+    try {
+      const result = await fetchHermesSessions();
+      if (!mountedRef.current) {
+        return;
+      }
+      if (result.ok) {
+        setState({
+          sessions: result.sessions,
+          isLoading: false,
+          error: null,
+          lastFetchedAt: new Date().toISOString()
+        });
+      } else {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: result.error.message
+        }));
+      }
+    } finally {
+      inFlightRef.current = false;
     }
   }, [enabled]);
 

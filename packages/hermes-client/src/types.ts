@@ -24,10 +24,40 @@ export type HermesModelSelectionStatus =
 
 export type HermesFastStreamProfile = "normal" | "high-throughput" | "unknown";
 
+export type HermesModelCatalogSource = "hermes-config" | "ui-openrouter";
+
 export type HermesModelDescriptor = {
   id: string;
   label: string;
   provider?: string | null;
+  /** Hermes-owned provider key from GET /v1/models `owned_by`, when present. */
+  providerKey?: string | null;
+  /** Model id sent to POST /api/sessions/{id}/model. */
+  selectModelId?: string;
+  /** Where the UI discovered this model. */
+  catalogSource?: HermesModelCatalogSource;
+  /** Whether selection can be persisted through Hermes session model override or sent per turn. */
+  selectionScope?: "session" | "turn";
+  description?: string | null;
+  contextLength?: number | null;
+  created?: number | null;
+  inputModalities?: string[];
+  outputModalities?: string[];
+  supportedParameters?: string[];
+  pricing?: {
+    prompt?: string | null;
+    completion?: string | null;
+    request?: string | null;
+    image?: string | null;
+  } | null;
+};
+
+export type OpenRouterModelCatalogResult = {
+  ok: boolean;
+  models: HermesModelDescriptor[];
+  checkedAt: string;
+  source: "openrouter";
+  error: HermesStatusError | null;
 };
 
 export type HermesModelSelectResult = {
@@ -145,6 +175,7 @@ export type NormalizedHermesStatus = {
 export type HermesClientConfig = {
   baseUrl?: string | null;
   apiKey?: string | null;
+  configuredDefaultModelId?: string | null;
   enabled?: boolean;
   memoryScopeBridgeEnabled?: boolean;
   signal?: AbortSignal;
@@ -399,6 +430,15 @@ export type HermesSessionSummary = {
   messageCount?: number;
 };
 
+export type HermesSessionDetail = HermesSessionSummary & {
+  effectiveModel: string | null;
+  effectiveProvider: string | null;
+  selectedModel: string | null;
+  modelOverrideActive: boolean;
+  modelOverrideScope: string | null;
+  modelOverridePersistent: boolean | null;
+};
+
 export type HermesSessionMessage = {
   id: string;
   role: "user" | "assistant" | "system" | "tool";
@@ -409,6 +449,10 @@ export type HermesSessionMessage = {
 export type HermesSessionListResult =
   | { ok: true; sessions: HermesSessionSummary[]; error: null }
   | { ok: false; sessions: []; error: HermesStatusError };
+
+export type HermesSessionDetailResult =
+  | { ok: true; session: HermesSessionDetail; sessionId: string; error: null }
+  | { ok: false; session: null; sessionId: string; error: HermesStatusError };
 
 export type HermesSessionMessagesResult =
   | { ok: true; messages: HermesSessionMessage[]; sessionId: string; error: null }

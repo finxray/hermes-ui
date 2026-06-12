@@ -233,12 +233,23 @@ export type Session = {
   toolEvents: ToolEvent[];
   runRecords: RunRecord[];
   artifacts: Artifact[];
+  modelPreference?: SessionModelPreference;
 };
 
 export type ModelChoice = {
   id: string;
   label: string;
   provider: string;
+};
+
+export type SessionModelPreference = {
+  catalogModelId: string;
+  catalogSource?: "hermes-config" | "ui-openrouter";
+  label?: string;
+  provider: string | null;
+  selectedAt: string;
+  selectionScope?: "session" | "turn";
+  selectModelId: string;
 };
 
 export type WorkspaceState = {

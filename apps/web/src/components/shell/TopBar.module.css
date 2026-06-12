@@ -1,11 +1,12 @@
 .topbar {
+  --topbar-menu-padding: clamp(8px, calc(6px + 0.16vw), 12px);
   grid-area: top;
   grid-column: 1 / -1;
   display: flex;
   min-height: var(--topbar-height);
   align-items: center;
   gap: 14px;
-  padding: 0 16px;
+  padding: 0 var(--shell-rail-padding-x, 8px);
   color: var(--text-secondary);
   background: transparent;
   border-bottom: 0;
@@ -23,7 +24,15 @@
 .left,
 .right {
   min-width: 0;
-  gap: 6px;
+}
+
+.left {
+  gap: var(--shell-column-gap, 9px);
+  margin-left: var(--shell-row-padding-x);
+}
+
+.left > .iconButton {
+  margin-left: -10px;
 }
 
 .right {
@@ -49,7 +58,7 @@
 
 .menuItem {
   min-height: calc(var(--control-height) * 0.72);
-  padding: 0 clamp(8px, calc(6px + 0.16vw), 12px);
+  padding: var(--topbar-menu-padding);
   border-radius: 8px;
   font-size: var(--font-small);
   font-weight: 400;
@@ -72,11 +81,16 @@
 
 .menuItem:hover,
 .menuItem:focus-visible,
-.menuItem.active,
 .iconButton:hover,
 .iconButton:focus-visible {
   outline: 0;
   background: var(--bg-control-hover);
+  color: var(--text-primary);
+}
+
+.menuItem.active {
+  outline: 0;
+  background: transparent;
   color: var(--text-primary);
 }
 

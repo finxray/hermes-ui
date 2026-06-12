@@ -1,7 +1,7 @@
 .shell {
   --density-scale: 1;
-  --content-width: clamp(640px, 56%, 860px);
-  --composer-width: clamp(514px, 45%, 691px);
+  --content-width: clamp(723px, 63.3%, 972px);
+  --composer-width: clamp(581px, 50.9%, 781px);
   --font-xs: 11.5px;
   --font-small: 13px;
   --font-body: 15px;
@@ -14,6 +14,13 @@
   --control-height: 34px;
   --row-height: 36px;
   --topbar-height: 54px;
+  --shell-rail-padding-x: 8px;
+  --shell-row-padding-x: clamp(12px, calc(8px + 0.25vw), 18px);
+  --shell-column-gap: 9px;
+  --shell-left-icon-inset: calc(var(--shell-rail-padding-x) + var(--shell-row-padding-x));
+  --shell-left-text-inset: calc(
+    var(--shell-left-icon-inset) + var(--icon-sm) + var(--shell-column-gap)
+  );
   --rail-width-left: clamp(220px, 14vw, 280px);
   --rail-width-right: clamp(300px, 20vw, 420px);
   position: relative;

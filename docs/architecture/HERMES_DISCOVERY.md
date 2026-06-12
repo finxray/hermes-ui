@@ -223,6 +223,21 @@ The README says Hermes can use many providers, including Kimi/Moonshot, and user
 
 Current source inspection confirms model names are advertised via `/v1/models` and request bodies read `model` in multiple paths, but Slice 03 should test whether `X-Hermes-Model` is honored consistently by the current API server before exposing a model selector.
 
+2026-06-06 live provider-resolution note:
+
+- Treat `/v1/models[*].owned_by` as the catalog/routing owner, not necessarily the final runtime provider.
+- Treat `GET /api/sessions/{session_id}` fields such as `effective_model` and `effective_provider` as the session truth after a selection.
+- Current live examples:
+  - `gpt-oss-120b` and `zai-glm-4.7` advertise `owned_by: cerebras-gpt-oss-120b`; the Web UI should display this provider family as `Cerebras`.
+  - `moonshotai/kimi-k2.6` advertises `owned_by: openrouter`, but Hermes may verify the effective session provider as `nvidia`; the Web UI should accept the verified model readback, keep user-facing provider display as `OpenRouter`, and treat `nvidia` as an internal route detail.
+  - Claude models may appear twice, for example `anthropic/claude-sonnet-4.6` via `openrouter` and `claude-sonnet-4-6` via direct `anthropic`. If both are present, the Web UI should prefer the routed public OpenRouter catalog entry and hide the direct duplicate alias from the Composer.
+  - `qwen/qwen3.7-max` advertises and self-reports cleanly through `OpenRouter`.
+- Browser code must still send model selection through the BFF only. The BFF should preserve raw routing keys for Hermes requests, while user-facing UI should display the catalog provider family labels such as `Cerebras` and `OpenRouter`.
+- The Web UI may provide additional OpenRouter catalog models beyond Hermes' configured `/v1/models` list. These are UI-discovered choices only. Hermes' session model endpoint rejects models absent from `/v1/models`, but the Hermes session chat stream can route those OpenRouter IDs when `model` and `provider: openrouter` are supplied in the request body.
+- UI-provided OpenRouter models are therefore per-turn overrides, not persisted Hermes session overrides, until Hermes exposes a registration/allowlist or broader session model endpoint.
+- OpenRouter catalog lookup uses the OpenRouter `GET https://openrouter.ai/api/v1/models` endpoint through the Web UI BFF. Browser code must not call OpenRouter directly or receive `OPENROUTER_API_KEY`.
+- Hermes Configured model ordering is deterministic in the Web UI. The project default `DeepSeek V4 Flash` is synthesized at the top when Hermes does not advertise it in `/v1/models`; then `GPT OSS 120B` and `Zai GLM 4.7` follow in stable order.
+
 ## Stable Enough To Build Against
 
 Stable enough for first integration:
@@ -270,4 +285,3 @@ Before Slice 03/04 real integration:
 - Send `X-Hermes-Session-Id` and `X-Hermes-Session-Key`; confirm returned headers and memory scoping behavior.
 - Test a model override via request `model` and, separately, `X-Hermes-Model`.
 - Test stream disconnection and ensure Hermes interrupts or completes safely.
-

@@ -10,6 +10,7 @@ import type {
   RunRecord,
   Session,
   SessionMemoryScope,
+  SessionModelPreference,
   ToolEvent,
   WorkspaceState
 } from "@/data/types";
@@ -46,6 +47,7 @@ type WorkspaceAction =
     }
   | { type: "appendToolEvent"; sessionId: string; event: ToolEvent }
   | { type: "loadHermesMessages"; sessionId: string; messages: ChatMessage[] }
+  | { type: "setSessionModelPreference"; sessionId: string; preference: SessionModelPreference }
   | { type: "reset" };
 
 export type { WorkspaceAction };
@@ -87,6 +89,8 @@ export function workspaceReducer(
       return appendToolEvent(state, action.sessionId, action.event);
     case "loadHermesMessages":
       return loadHermesMessages(state, action.sessionId, action.messages);
+    case "setSessionModelPreference":
+      return setSessionModelPreference(state, action.sessionId, action.preference);
     case "reset":
       return createMockWorkspaceState();
     default:
@@ -491,6 +495,33 @@ function loadHermesMessages(
   };
 }
 
+function setSessionModelPreference(
+  state: WorkspaceState,
+  sessionId: string,
+  preference: SessionModelPreference
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  const normalizedPreference = normalizeSessionModelPreference(preference);
+  if (!session || !normalizedPreference) {
+    return state;
+  }
+
+  const now = new Date().toISOString();
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            modelPreference: normalizedPreference,
+            updatedAt: now
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
 function touchProject(state: WorkspaceState, projectId: string, updatedAt: string): WorkspaceState {
   return {
     ...state,
@@ -569,7 +600,46 @@ function normalizeSession(session: Session, projects: Project[]): Session {
       .slice(0, 24),
     artifacts: (session.artifacts ?? []).map((artifact) =>
       normalizeArtifact(artifact, session, project)
-    )
+    ),
+    modelPreference: normalizeSessionModelPreference(session.modelPreference)
+  };
+}
+
+function normalizeSessionModelPreference(
+  value: unknown
+): SessionModelPreference | undefined {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+
+  const catalogModelId = asString(source.catalogModelId).trim();
+  const selectModelId = asString(source.selectModelId).trim();
+  if (!catalogModelId || !selectModelId) {
+    return undefined;
+  }
+
+  const rawCatalogSource = asString(source.catalogSource).trim();
+  const catalogSource =
+    rawCatalogSource === "hermes-config" || rawCatalogSource === "ui-openrouter"
+      ? rawCatalogSource
+      : undefined;
+  const rawSelectionScope = asString(source.selectionScope).trim();
+  const selectionScope =
+    rawSelectionScope === "session" || rawSelectionScope === "turn"
+      ? rawSelectionScope
+      : undefined;
+  const selectedAt = normalizeTimestamp(source.selectedAt) || new Date().toISOString();
+  const label = truncateText(asString(source.label), 120) || undefined;
+
+  return {
+    catalogModelId,
+    catalogSource,
+    label,
+    provider: asString(source.provider).trim() || null,
+    selectedAt,
+    selectionScope,
+    selectModelId
   };
 }
 

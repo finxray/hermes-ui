@@ -9,6 +9,7 @@ import type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesModelDescriptor,
+  OpenRouterModelCatalogResult,
   HermesModelSelectResult,
   HermesRunApprovalChoice,
   HermesRunApprovalResult,
@@ -19,6 +20,8 @@ import type {
   HermesRunsProbeResult,
   HermesRunsStopProbeResult,
   HermesSessionDeleteResult,
+  HermesSessionDetail,
+  HermesSessionDetailResult,
   HermesSessionListResult,
   HermesSessionMessage,
   HermesSessionMessagesResult,
@@ -29,6 +32,14 @@ import type {
 } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 3500;
+const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+const PROJECT_DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
+const PROJECT_DEFAULT_MODEL_LABEL = "DeepSeek V4 Flash";
+const STABLE_HERMES_MODEL_ORDER = [
+  PROJECT_DEFAULT_MODEL_ID,
+  "gpt-oss-120b",
+  "zai-glm-4.7"
+];
 
 const ENDPOINTS: Array<{
   name: HermesEndpointName;
@@ -53,7 +64,9 @@ export type {
   HermesEndpointName,
   HermesEndpointResult,
   HermesFastStreamProfile,
+  HermesModelCatalogSource,
   HermesModelDescriptor,
+  OpenRouterModelCatalogResult,
   HermesModelSelectResult,
   HermesModelSelectionStatus,
   HermesRunApprovalChoice,
@@ -65,6 +78,8 @@ export type {
   HermesRunStopResult,
   HermesRunsStopProbeResult,
   HermesSessionDeleteResult,
+  HermesSessionDetail,
+  HermesSessionDetailResult,
   HermesSessionListResult,
   HermesSessionMessage,
   HermesSessionMessagesResult,
@@ -95,6 +110,15 @@ const HERMES_RUNS_APPROVAL_PROBE_PROMPT = [
 ].join("\n");
 const RUNS_APPROVAL_PROBE_TIMEOUT_MS = 60_000;
 const PROBE_PREVIEW_LIMIT = 600;
+const MODEL_LABEL_ACRONYMS: Record<string, string> = {
+  ai: "AI",
+  api: "API",
+  glm: "GLM",
+  gpt: "GPT",
+  oss: "OSS",
+  ui: "UI"
+};
+const MODEL_LABEL_UNITS = new Set(["b", "k", "m"]);
 
 export async function getHermesStatus(
   config: HermesClientConfig
@@ -206,24 +230,107 @@ export async function getHermesStatus(
   }, config);
 }
 
+export async function getOpenRouterModelCatalog(options: {
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+} = {}): Promise<OpenRouterModelCatalogResult> {
+  const checkedAt = new Date().toISOString();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const endpoint = openRouterModelsUrl(options.baseUrl);
+  const abort = createLinkedAbortController(options.signal, options.timeoutMs ?? 8_000);
+  const headers = new Headers({
+    Accept: "application/json"
+  });
+  if (options.apiKey?.trim()) {
+    headers.set("Authorization", `Bearer ${options.apiKey.trim()}`);
+  }
+
+  try {
+    const response = await fetchImpl(endpoint, {
+      cache: "no-store",
+      headers,
+      method: "GET",
+      signal: abort.signal
+    });
+
+    if (!response.ok) {
+      const data = await readJsonObject(response);
+      return {
+        ok: false,
+        models: [],
+        checkedAt,
+        source: "openrouter",
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, "/api/v1/models")
+        }
+      };
+    }
+
+    const data = await readJsonObject(response);
+    return {
+      ok: true,
+      models: normalizeOpenRouterModels(data),
+      checkedAt,
+      source: "openrouter",
+      error: null
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      models: [],
+      checkedAt,
+      source: "openrouter",
+      error: normalizeChatFetchError(error)
+    };
+  } finally {
+    abort.cleanup();
+  }
+}
+
 export function normalizeHermesUiCapabilities(
   status: Omit<NormalizedHermesStatus, "uiCapabilities">,
-  options: { memoryScopeBridgeEnabled?: boolean } = {}
+  options: { configuredDefaultModelId?: string | null; memoryScopeBridgeEnabled?: boolean } = {}
 ): HermesUiCapabilities {
   const features = objectRecord(status.capabilities?.features);
   const endpoints = objectRecord(status.capabilities?.endpoints);
-  const serverAdvertisedModel =
+  const configuredDefaultCandidates = extractConfiguredDefaultModelIds(
+    status,
+    options.configuredDefaultModelId
+  );
+  const catalogModels = ensureConfiguredDefaultModelDescriptors(
+    modelDescriptors(status.models),
+    configuredDefaultCandidates
+  ).filter((model) => !isPlaceholderHermesModelId(model.id));
+  const selectableModels = preferPublicProviderCatalogModels(
+    catalogModels.filter(isSessionSelectableCatalogModel)
+  );
+  const rawServerAdvertisedModel =
+    configuredDefaultCandidates[0] ||
     asString(status.capabilities?.model) ||
     firstModelId(status.models) ||
     null;
-  const availableModels = modelDescriptors(status.models);
+  const serverAdvertisedModel = resolveAdvertisedModelId(
+    rawServerAdvertisedModel,
+    selectableModels,
+    configuredDefaultCandidates
+  );
+  const orderedModels = orderModelsWithDefaultFirst(selectableModels, serverAdvertisedModel);
   const modelsListAvailable = Boolean(status.models) || hasEndpoint(endpoints, "models");
   const sessionModelOverrideObj = objectRecord(status.capabilities?.session_model_override);
   const explicitOverrideSupported = Boolean(sessionModelOverrideObj?.supported === true);
   const hasSessionModelEndpoint = hasEndpoint(endpoints, "session_model");
-  const clientSelectable = status.mode === "real" && explicitOverrideSupported && availableModels.length > 1 && hasSessionModelEndpoint;
+  const clientSelectable =
+    status.mode === "real" &&
+    explicitOverrideSupported &&
+    selectableModels.length > 1 &&
+    hasSessionModelEndpoint;
   const modelState = normalizeModelUiState({
-    availableModels,
+    availableModels: orderedModels,
+    catalogModels,
     clientSelectable,
     listAvailable: modelsListAvailable,
     serverAdvertisedModel,
@@ -294,7 +401,7 @@ export function normalizeHermesUiCapabilities(
       uploadSupported: false
     },
     models: {
-      availableModels,
+      availableModels: orderedModels,
       clientSelectable,
       currentModelLabel: modelState.currentModelLabel,
       currentProviderLabel: modelState.currentProviderLabel,
@@ -371,7 +478,7 @@ export async function streamHermesSessionChat(
     apiKey: config.apiKey,
     base,
     fetchImpl,
-    model: request.model,
+    model: null,
     signal: config.signal,
     sessionId: hermesSessionId,
     sessionTitle: request.context.session.title,
@@ -380,6 +487,40 @@ export async function streamHermesSessionChat(
 
   if (!sessionResult.ok) {
     return sessionResult;
+  }
+
+  const runtimeModelId = resolveRuntimeModelId(request.model);
+  if (runtimeModelId) {
+    const modelResult = await selectHermesModel(config, hermesSessionId, runtimeModelId, {
+      expectedProviderKey: request.provider ?? null,
+      provider: request.provider ?? null,
+      sessionTitle: request.context.session.title
+    });
+    if (!modelResult.ok) {
+      const error = modelResult.error ?? {
+        kind: "http_error" as const,
+        message: "Failed to apply the selected Hermes model for this session."
+      };
+      if (canUseTurnScopedOpenRouterModel(runtimeModelId, request.provider, error)) {
+        // Hermes' session model endpoint only accepts models in GET /v1/models,
+        // but session chat can still route OpenRouter catalog ids supplied in
+        // the request body. Continue as a turn-scoped model override.
+      } else {
+        const status =
+          error.kind === "timeout" || error.kind === "network"
+            ? 502
+            : error.kind === "disabled" || error.kind === "unconfigured"
+              ? 503
+              : error.kind === "invalid_config"
+                ? 500
+                : 400;
+        return chatFailure(
+          status,
+          error.kind === "unknown" ? "http_error" : error.kind,
+          error.message
+        );
+      }
+    }
   }
 
   const abort = createLinkedAbortController(config.signal, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -399,6 +540,8 @@ export async function streamHermesSessionChat(
         conversation_history: request.recentMessages ?? [],
         input: request.message,
         instructions: request.instructions || undefined,
+        model: runtimeModelId || undefined,
+        provider: request.provider || undefined,
         metadata: {
           context: request.context,
           memory_scope_bridge_enabled: Boolean(request.instructions),
@@ -437,15 +580,256 @@ export async function streamHermesSessionChat(
   return {
     ok: true,
     hermesSessionId,
-    stream: normalizeHermesSseStream(response.body, abort)
+    stream: normalizeHermesSseStream(
+      response.body,
+      abort,
+      runtimeModelId
+        ? emptyAssistantModelFallback(runtimeModelId, request.provider)
+        : undefined
+    )
   };
+}
+
+function canUseTurnScopedOpenRouterModel(
+  modelId: string | null,
+  provider: string | null | undefined,
+  error: HermesStatusError
+): boolean {
+  if (!modelId || !isOpenRouterCatalogProvider(provider ?? "")) {
+    return false;
+  }
+  return /not recognized|not available|GET \/v1\/models/i.test(error.message);
+}
+
+export function isPlaceholderHermesModelId(modelId: string | null | undefined): boolean {
+  if (!modelId) {
+    return false;
+  }
+  const normalized = modelId.trim().toLowerCase();
+  return (
+    normalized === "hermes-agent" ||
+    normalized === "hermes-default" ||
+    normalized === "hermes" ||
+    normalized === "default"
+  );
+}
+
+export function isSessionSelectableCatalogModel(descriptor: HermesModelDescriptor): boolean {
+  const providerKey = (descriptor.providerKey ?? descriptor.provider ?? "").trim().toLowerCase();
+  const id = descriptor.id.trim().toLowerCase();
+
+  if (isPlaceholderHermesModelId(descriptor.id)) {
+    return false;
+  }
+
+  // Copilot catalog entries are listed by GET /v1/models but not session-switchable.
+  if (providerKey === "copilot") {
+    return false;
+  }
+
+  // Local inference catalogs are not switchable through the HTTP session model API.
+  if (providerKey.startsWith("local-")) {
+    return false;
+  }
+
+  // Embedding and other non-chat models.
+  if (id.includes("embed") || id.startsWith("text-embedding")) {
+    return false;
+  }
+
+  // Ollama-style runtime tags.
+  if (id.includes(":")) {
+    return false;
+  }
+
+  // Hermes currently rejects OpenRouter ids that repeat the provider prefix.
+  if (id.startsWith("openrouter/")) {
+    return false;
+  }
+
+  return true;
+}
+
+export function resolveCatalogModelIdFromRuntimeModel(
+  modelId: string | null | undefined,
+  availableModels: HermesModelDescriptor[] = []
+): string | null {
+  if (!modelId) {
+    return null;
+  }
+  if (availableModels.some((model) => model.id === modelId)) {
+    return modelId;
+  }
+  const matchedSelectId = availableModels.find((model) => model.selectModelId === modelId);
+  if (matchedSelectId) {
+    return matchedSelectId.id;
+  }
+
+  const aliasKey = catalogAliasKey(modelId);
+  const matchedAlias = availableModels.find((model) => catalogAliasKey(model.id) === aliasKey);
+  return matchedAlias?.id ?? modelId;
+}
+
+export function formatHermesModelLabel(modelId: string): string {
+  const slug = (modelId.includes("/") ? modelId.split("/").pop() : modelId)?.trim();
+  if (!slug) {
+    return modelId;
+  }
+
+  return slug
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(formatModelLabelSegment)
+    .join(" ");
+}
+
+export function formatHermesProviderLabel(provider: string | null | undefined): string {
+  const raw = provider?.trim();
+  if (!raw) {
+    return "";
+  }
+  const normalized = raw.toLowerCase();
+  if (normalized.startsWith("cerebras")) {
+    return "Cerebras";
+  }
+  if (normalized === "openrouter") {
+    return "OpenRouter";
+  }
+  if (normalized === "nous") {
+    return "Nous";
+  }
+  if (normalized === "nvidia") {
+    return "NVIDIA";
+  }
+  if (normalized === "anthropic") {
+    return "Anthropic";
+  }
+  if (normalized === "openai") {
+    return "OpenAI";
+  }
+  if (normalized === "moonshot" || normalized === "kimi") {
+    return "Moonshot";
+  }
+  if (normalized === "zai" || normalized === "z.ai") {
+    return "Z.ai";
+  }
+  if (normalized.startsWith("local-")) {
+    return raw.replace(/^local-/i, "Local ");
+  }
+  return raw
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map(formatModelLabelSegment)
+    .join(" ");
+}
+
+function formatModelLabelSegment(segment: string): string {
+  const lower = segment.toLowerCase();
+  const acronym = MODEL_LABEL_ACRONYMS[lower];
+  if (acronym) {
+    return acronym;
+  }
+  const numberWithUnit = segment.match(/^(\d+)([a-z]+)$/i);
+  if (numberWithUnit && MODEL_LABEL_UNITS.has(numberWithUnit[2].toLowerCase())) {
+    return `${numberWithUnit[1]}${numberWithUnit[2].toUpperCase()}`;
+  }
+  const version = segment.match(/^v(\d+)$/i);
+  if (version) {
+    return `V${version[1]}`;
+  }
+  if (lower === "deepseek") {
+    return "DeepSeek";
+  }
+  if (lower === "openrouter") {
+    return "OpenRouter";
+  }
+  if (lower === "openai") {
+    return "OpenAI";
+  }
+  return segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase();
+}
+
+export function findHermesModelDescriptor(
+  availableModels: HermesModelDescriptor[],
+  catalogModelId: string | null | undefined
+): HermesModelDescriptor | undefined {
+  if (!catalogModelId) {
+    return undefined;
+  }
+  return availableModels.find((model) => model.id === catalogModelId);
+}
+
+export function resolveModelSelectRequest(
+  catalogModelId: string | null | undefined,
+  availableModels: HermesModelDescriptor[] = []
+): {
+  catalogModelId: string;
+  catalogSource?: HermesModelDescriptor["catalogSource"];
+  provider: string | null;
+  selectionScope?: HermesModelDescriptor["selectionScope"];
+  selectModelId: string;
+} | null {
+  const descriptor = findHermesModelDescriptor(availableModels, catalogModelId);
+  if (!descriptor) {
+    if (!catalogModelId || isPlaceholderHermesModelId(catalogModelId)) {
+      return null;
+    }
+    return {
+      catalogModelId,
+      catalogSource: undefined,
+      provider: null,
+      selectionScope: undefined,
+      selectModelId: catalogModelId
+    };
+  }
+
+  return {
+    catalogModelId: descriptor.id,
+    catalogSource: descriptor.catalogSource,
+    provider: descriptor.providerKey ?? descriptor.provider ?? null,
+    selectionScope: descriptor.selectionScope,
+    selectModelId: descriptor.selectModelId || descriptor.id
+  };
+}
+
+export function resolveRuntimeModelId(
+  modelId: string | null | undefined,
+  availableModels: HermesModelDescriptor[] = []
+): string | null {
+  if (!modelId || isPlaceholderHermesModelId(modelId)) {
+    return null;
+  }
+  if (availableModels.length === 0) {
+    return modelId;
+  }
+  return availableModels.some((model) => model.id === modelId) ? modelId : null;
 }
 
 export async function selectHermesModel(
   config: HermesClientConfig,
   sessionId: string,
-  modelId: string
+  modelId: string,
+  options: {
+    expectedProviderKey?: string | null;
+    provider?: string | null;
+    sessionTitle?: string;
+  } = {}
 ): Promise<HermesModelSelectResult> {
+  if (isPlaceholderHermesModelId(modelId)) {
+    return {
+      ok: false,
+      sessionId: null,
+      selectedModel: null,
+      provider: null,
+      scope: null,
+      error: {
+        kind: "http_error",
+        message:
+          "Placeholder model ids such as 'hermes-agent' cannot be selected. Use GET /v1/models for real model ids."
+      }
+    };
+  }
+
   if (config.enabled === false) {
     return {
       ok: false,
@@ -481,15 +865,48 @@ export async function selectHermesModel(
   }
 
   const fetchImpl = config.fetchImpl ?? fetch;
+  const safeSessionId = sanitizeHermesId(sessionId);
+  const sessionResult = await ensureHermesSession({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    model: null,
+    signal: config.signal,
+    sessionId: safeSessionId,
+    sessionTitle: options.sessionTitle || safeSessionId,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  });
+
+  if (!sessionResult.ok) {
+    return {
+      ok: false,
+      sessionId: null,
+      selectedModel: null,
+      provider: null,
+      scope: null,
+      error: mapChatErrorToStatusError(
+        sessionResult.error ?? {
+          kind: "http_error",
+          message: "Failed to ensure Hermes session before model selection."
+        }
+      )
+    };
+  }
+
   const abort = createLinkedAbortController(config.signal, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const headers = new Headers({ "Content-Type": "application/json" });
   applyHermesAuth(headers, config.apiKey);
 
   try {
     const response = await fetchImpl(
-      buildEndpointUrl(base, `/api/sessions/${encodeURIComponent(sessionId)}/model`),
+      buildEndpointUrl(base, `/api/sessions/${encodeURIComponent(safeSessionId)}/model`),
       {
-        body: JSON.stringify({ model: modelId }),
+        body: JSON.stringify({
+          model: modelId,
+          scope: "session",
+          global: false,
+          ...(options.provider ? { provider: options.provider } : {})
+        }),
         cache: "no-store",
         headers,
         method: "POST",
@@ -514,14 +931,31 @@ export async function selectHermesModel(
 
     const data = await response.json().catch(() => ({}));
     const record = objectRecord(data);
-    return {
+    const result: HermesModelSelectResult = {
       ok: true,
-      sessionId: asString(record?.session_id) || sessionId,
-      selectedModel: asString(record?.selected_model) || modelId,
-      provider: asString(record?.provider) || null,
+      sessionId: asString(record?.session_id) || safeSessionId,
+      selectedModel:
+        asString(record?.effective_model) ||
+        asString(record?.selected_model) ||
+        asString(record?.model) ||
+        modelId,
+      provider:
+        asString(record?.effective_provider) || asString(record?.provider) || null,
       scope: asString(record?.scope) || "session",
       error: null
     };
+    const providerMismatch = validateDedicatedProviderSelect(options.expectedProviderKey, result);
+    if (providerMismatch) {
+      return {
+        ok: false,
+        sessionId: null,
+        selectedModel: null,
+        provider: null,
+        scope: null,
+        error: providerMismatch
+      };
+    }
+    return result;
   } catch (error) {
     const normalized = normalizeChatFetchError(error);
     return {
@@ -1377,6 +1811,59 @@ export async function listHermesSessions(
   return { ok: true, sessions, error: null };
 }
 
+export async function getHermesSession(
+  config: HermesClientConfig,
+  sessionId: string
+): Promise<HermesSessionDetailResult> {
+  const safeId = sanitizeHermesId(sessionId);
+  if (config.enabled === false) {
+    return { ok: false, session: null, sessionId: safeId, error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." } };
+  }
+  if (!config.baseUrl?.trim()) {
+    return { ok: false, session: null, sessionId: safeId, error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes session detail." } };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return { ok: false, session: null, sessionId: safeId, error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." } };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const result = await fetchJsonEndpoint({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    path: `/api/sessions/${encodeURIComponent(safeId)}`,
+    signal: config.signal,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  });
+  if (!result.ok) {
+    return { ok: false, session: null, sessionId: safeId, error: result.error };
+  }
+
+  const record =
+    objectRecord(result.data.session) ??
+    objectRecord(result.data.data) ??
+    objectRecord(result.data);
+  if (!record) {
+    return {
+      ok: false,
+      session: null,
+      sessionId: safeId,
+      error: {
+        kind: "bad_response",
+        message: `Hermes session ${safeId} did not return a session object.`
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    session: normalizeHermesSessionDetail(record, safeId),
+    sessionId: safeId,
+    error: null
+  };
+}
+
 export async function getHermesSessionMessages(
   config: HermesClientConfig,
   sessionId: string
@@ -1412,6 +1899,79 @@ export async function getHermesSessionMessages(
     .filter((msg) => Boolean(msg.content));
 
   return { ok: true, messages, sessionId: safeId, error: null };
+}
+
+function normalizeHermesSessionDetail(
+  item: Record<string, unknown>,
+  fallbackId: string
+): HermesSessionDetail {
+  const modelOverride =
+    objectRecord(item.model_override) ??
+    objectRecord(item.modelOverride) ??
+    objectRecord(item.override);
+  const model = firstString(
+    item.model,
+    item.base_model,
+    item.default_model,
+    modelOverride?.base_model
+  ) || null;
+  const selectedModel = firstString(
+    item.selected_model,
+    item.selectedModel,
+    item.current_model,
+    modelOverride?.selected_model,
+    modelOverride?.model
+  ) || null;
+  const effectiveModel = firstString(
+    item.effective_model,
+    item.effectiveModel,
+    item.current_model,
+    item.runtime_model,
+    modelOverride?.effective_model,
+    selectedModel,
+    model
+  ) || null;
+  const effectiveProvider = firstString(
+    item.effective_provider,
+    item.effectiveProvider,
+    item.provider,
+    item.runtime_provider,
+    modelOverride?.effective_provider,
+    modelOverride?.provider
+  ) || null;
+  const modelOverrideActive =
+    optionalBoolean(item.model_override_active) ??
+    optionalBoolean(item.modelOverrideActive) ??
+    optionalBoolean(modelOverride?.active) ??
+    Boolean(selectedModel && model && selectedModel !== model);
+
+  return {
+    id: firstString(item.id, item.session_id) || fallbackId,
+    title: firstString(item.title, item.name) || "Untitled session",
+    model,
+    startedAt: firstString(item.started_at, item.created_at, item.startedAt) || new Date().toISOString(),
+    endedAt: firstString(item.ended_at, item.end_time, item.endedAt) || null,
+    messageCount: typeof item.message_count === "number"
+      ? item.message_count
+      : typeof item.messageCount === "number"
+        ? item.messageCount
+        : undefined,
+    effectiveModel,
+    effectiveProvider,
+    selectedModel,
+    modelOverrideActive,
+    modelOverrideScope: firstString(
+      item.model_override_scope,
+      item.modelOverrideScope,
+      item.scope,
+      modelOverride?.scope
+    ) || null,
+    modelOverridePersistent: optionalBoolean(
+      item.model_override_persistent,
+      item.modelOverridePersistent,
+      modelOverride?.persistent
+    )
+  };
 }
 
 export async function deleteHermesSession(
@@ -2644,11 +3204,12 @@ async function fetchJsonEndpoint(args: {
 
 function withUiCapabilities(
   status: Omit<NormalizedHermesStatus, "uiCapabilities">,
-  config: Pick<HermesClientConfig, "memoryScopeBridgeEnabled">
+  config: Pick<HermesClientConfig, "configuredDefaultModelId" | "memoryScopeBridgeEnabled">
 ): NormalizedHermesStatus {
   return {
     ...status,
     uiCapabilities: normalizeHermesUiCapabilities(status, {
+      configuredDefaultModelId: config.configuredDefaultModelId,
       memoryScopeBridgeEnabled: config.memoryScopeBridgeEnabled
     })
   };
@@ -2658,6 +3219,34 @@ function objectRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    const text = asString(value).trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function optionalBoolean(...values: unknown[]): boolean | null {
+  for (const value of values) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "true" || normalized === "yes" || normalized === "1") {
+        return true;
+      }
+      if (normalized === "false" || normalized === "no" || normalized === "0") {
+        return false;
+      }
+    }
+  }
+  return null;
 }
 
 function flag(value: Record<string, unknown> | null, key: string): boolean {
@@ -2678,6 +3267,170 @@ function firstModelId(models: Record<string, unknown> | null): string {
   return first ? asString((first as Record<string, unknown>).id) : "";
 }
 
+function extractConfiguredDefaultModelIds(
+  status: Omit<NormalizedHermesStatus, "uiCapabilities">,
+  configuredDefaultModelId?: string | null
+): string[] {
+  const capabilities = status.capabilities;
+  const healthDetailed = objectRecord(status.health?.detailed);
+  const healthBasic = objectRecord(status.health?.basic);
+  const modelsRoot = objectRecord(status.models);
+  const gatewayDefaults = objectRecord(capabilities?.gateway_model_defaults);
+  const modelConfig = objectRecord(capabilities?.model_config);
+  const modelObject = objectRecord(capabilities?.model);
+
+  const candidates = [
+    asString(configuredDefaultModelId),
+    asString(gatewayDefaults?.model),
+    asString(gatewayDefaults?.default),
+    asString(gatewayDefaults?.default_model),
+    asString(capabilities?.default_model),
+    asString(modelConfig?.default),
+    asString(modelObject?.default),
+    asString(healthDetailed?.default_model),
+    asString(healthDetailed?.model),
+    asString(healthBasic?.default_model),
+    asString(healthBasic?.model),
+    asString(modelsRoot?.default_model),
+    flaggedDefaultModelId(status.models),
+    PROJECT_DEFAULT_MODEL_ID
+  ].filter((value): value is string => Boolean(value) && !isPlaceholderHermesModelId(value));
+
+  return [...new Set(candidates)];
+}
+
+function ensureConfiguredDefaultModelDescriptors(
+  models: HermesModelDescriptor[],
+  configuredDefaults: string[]
+): HermesModelDescriptor[] {
+  const next = [...models];
+  for (const id of configuredDefaults) {
+    if (next.some((model) => sameModelId(model.id, id))) {
+      continue;
+    }
+    const descriptor = defaultModelDescriptor(id);
+    if (descriptor) {
+      next.unshift(descriptor);
+    }
+  }
+  return next;
+}
+
+function defaultModelDescriptor(id: string): HermesModelDescriptor | null {
+  const normalized = normalizeModelIdForCompare(id);
+  if (!normalized.includes("deepseekv4flash")) {
+    return null;
+  }
+  return {
+    id: PROJECT_DEFAULT_MODEL_ID,
+    label: PROJECT_DEFAULT_MODEL_LABEL,
+    provider: "OpenRouter",
+    providerKey: "openrouter",
+    catalogSource: "hermes-config",
+    selectionScope: "turn",
+    selectModelId: PROJECT_DEFAULT_MODEL_ID,
+    contextLength: 1_048_576,
+    description: "Project default model. Sent through Hermes as an OpenRouter per-turn override when Hermes does not advertise it in /v1/models."
+  };
+}
+
+function flaggedDefaultModelId(models: Record<string, unknown> | null): string {
+  const data = models?.data;
+  if (!Array.isArray(data)) {
+    return "";
+  }
+
+  for (const item of data) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    if (record.default === true) {
+      return asString(record.id);
+    }
+  }
+
+  return "";
+}
+
+function orderModelsWithDefaultFirst(
+  models: HermesModelDescriptor[],
+  defaultModelId: string | null
+): HermesModelDescriptor[] {
+  return [...models].sort((a, b) => {
+    const defaultCompare = modelDefaultRank(a, defaultModelId) - modelDefaultRank(b, defaultModelId);
+    if (defaultCompare !== 0) {
+      return defaultCompare;
+    }
+    const stableCompare = stableHermesModelRank(a) - stableHermesModelRank(b);
+    if (stableCompare !== 0) {
+      return stableCompare;
+    }
+    const labelCompare = a.label.localeCompare(b.label);
+    if (labelCompare !== 0) {
+      return labelCompare;
+    }
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function modelDefaultRank(model: HermesModelDescriptor, defaultModelId: string | null): number {
+  if (!defaultModelId) {
+    return 1;
+  }
+  return sameModelId(model.id, defaultModelId) ? 0 : 1;
+}
+
+function stableHermesModelRank(model: HermesModelDescriptor): number {
+  const index = STABLE_HERMES_MODEL_ORDER.findIndex((id) => sameModelId(id, model.id));
+  return index === -1 ? STABLE_HERMES_MODEL_ORDER.length : index;
+}
+
+function sameModelId(a: string, b: string): boolean {
+  return normalizeModelIdForCompare(a) === normalizeModelIdForCompare(b);
+}
+
+function normalizeModelIdForCompare(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function resolveAdvertisedModelId(
+  rawModelId: string | null,
+  availableModels: HermesModelDescriptor[],
+  configuredDefaults: string[] = []
+): string | null {
+  const candidates = [
+    ...configuredDefaults,
+    ...(rawModelId && !isPlaceholderHermesModelId(rawModelId) ? [rawModelId] : [])
+  ];
+
+  for (const candidate of candidates) {
+    if (availableModels.some((model) => model.id === candidate)) {
+      return candidate;
+    }
+  }
+
+  const inferredDefault = inferCatalogDefaultModelId(availableModels);
+  if (inferredDefault) {
+    return inferredDefault;
+  }
+
+  return availableModels[0]?.id ?? null;
+}
+
+function inferCatalogDefaultModelId(availableModels: HermesModelDescriptor[]): string | null {
+  const preferredPatterns = [/deepseek-v4-flash/i, /deepseek.*v4.*flash/i, /deepseek.*flash/i];
+
+  for (const pattern of preferredPatterns) {
+    const match = availableModels.find((model) => pattern.test(model.id));
+    if (match) {
+      return match.id;
+    }
+  }
+
+  return null;
+}
+
 function modelDescriptors(models: Record<string, unknown> | null): HermesModelDescriptor[] {
   const data = models?.data;
   if (!Array.isArray(data)) {
@@ -2694,17 +3447,183 @@ function modelDescriptors(models: Record<string, unknown> | null): HermesModelDe
     if (!id) {
       continue;
     }
+    const providerKey = asString(record.owned_by) || null;
+    const provider = providerKey || providerFromModelId(id);
     descriptors.push({
       id,
-      label: id,
-      provider: asString(record.owned_by) || null
+      label: modelLabelFromDescriptor(record, id),
+      provider: formatHermesProviderLabel(provider) || provider,
+      catalogSource: "hermes-config",
+      selectionScope: "session",
+      providerKey,
+      selectModelId: resolveModelSelectId(id, providerKey)
     });
   }
   return descriptors;
 }
 
+function openRouterModelsUrl(baseUrl: string | null | undefined): string {
+  const raw = baseUrl?.trim();
+  if (!raw) {
+    return OPENROUTER_MODELS_URL;
+  }
+  try {
+    const url = new URL(raw);
+    if (!url.pathname || url.pathname === "/") {
+      url.pathname = "/api/v1/models";
+    }
+    return url.toString();
+  } catch {
+    return OPENROUTER_MODELS_URL;
+  }
+}
+
+function normalizeOpenRouterModels(data: Record<string, unknown> | null): HermesModelDescriptor[] {
+  const items = data?.data;
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  const models: HermesModelDescriptor[] = [];
+  for (const item of items) {
+    const record = objectRecord(item);
+    if (!record) {
+      continue;
+    }
+    const id = asString(record.id);
+    if (!id || isPlaceholderHermesModelId(id)) {
+      continue;
+    }
+    const architecture = objectRecord(record.architecture);
+    const pricing = objectRecord(record.pricing);
+    models.push({
+      id,
+      label: asString(record.name) || formatHermesModelLabel(id),
+      provider: "OpenRouter",
+      providerKey: "openrouter",
+      selectModelId: id,
+      catalogSource: "ui-openrouter",
+      selectionScope: "turn",
+      description: asString(record.description) || null,
+      contextLength: numberOrNull(record.context_length),
+      created: numberOrNull(record.created),
+      inputModalities: stringArray(architecture?.input_modalities),
+      outputModalities: stringArray(architecture?.output_modalities),
+      supportedParameters: stringArray(record.supported_parameters),
+      pricing: pricing
+        ? {
+            completion: asString(pricing.completion) || null,
+            image: asString(pricing.image) || null,
+            prompt: asString(pricing.prompt) || null,
+            request: asString(pricing.request) || null
+          }
+        : null
+    });
+  }
+
+  return models.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function preferPublicProviderCatalogModels(models: HermesModelDescriptor[]): HermesModelDescriptor[] {
+  const publicProviderAliases = new Set(
+    models
+      .filter((model) => isOpenRouterCatalogProvider(model.providerKey ?? model.provider ?? ""))
+      .map((model) => catalogAliasKey(model.id))
+  );
+
+  return models.filter((model) => {
+    const providerKey = (model.providerKey ?? model.provider ?? "").trim().toLowerCase();
+    const id = model.id.trim().toLowerCase();
+    if (providerKey === "anthropic" && !id.includes("/") && publicProviderAliases.has(catalogAliasKey(id))) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function catalogAliasKey(modelId: string): string {
+  const slug = (modelId.includes("/") ? modelId.split("/").pop() ?? modelId : modelId).trim().toLowerCase();
+  return slug.replace(/[^a-z0-9]/g, "");
+}
+
+function modelLabelFromDescriptor(record: Record<string, unknown>, id: string): string {
+  const label = (
+    asString(record.display_name) ||
+    asString(record.displayName) ||
+    asString(record.name) ||
+    asString(record.label) ||
+    formatHermesModelLabel(id)
+  );
+  return formatHermesModelLabel(label);
+}
+
+function providerFromModelId(id: string): string | null {
+  const prefix = id.includes("/") ? id.split("/")[0]?.trim() : "";
+  if (!prefix) {
+    return null;
+  }
+  return formatHermesProviderLabel(prefix);
+}
+
+function resolveModelSelectId(id: string, _providerKey: string | null): string {
+  // Hermes POST /api/sessions/{id}/model expects the catalog id from GET /v1/models.
+  // Provider routing is supplied separately via the `provider` field — not `provider:id`.
+  return id;
+}
+
+function isOpenRouterCatalogProvider(providerKey: string): boolean {
+  const normalized = providerKey.trim().toLowerCase();
+  return normalized === "openrouter" || normalized === "nous";
+}
+
+function validateDedicatedProviderSelect(
+  expectedProviderKey: string | null | undefined,
+  result: HermesModelSelectResult
+): HermesStatusError | null {
+  if (!expectedProviderKey) {
+    return null;
+  }
+
+  const resolvedProvider = result.provider?.trim().toLowerCase() ?? "";
+  const expected = expectedProviderKey.trim().toLowerCase();
+  if (!resolvedProvider) {
+    return null;
+  }
+
+  if (isOpenRouterCatalogProvider(expectedProviderKey)) {
+    // OpenRouter catalog ids can be resolved by Hermes through provider-specific
+    // backends such as NVIDIA. Hermes' effective provider readback is the source
+    // of truth; the UI should not reject a verified model just because the
+    // catalog owner was OpenRouter.
+    return null;
+  }
+
+  const selectedModel = result.selectedModel?.trim() ?? "";
+  const misroutedThroughOpenRouter =
+    resolvedProvider === "openrouter" || resolvedProvider === "nous";
+  const providerMismatch =
+    !misroutedThroughOpenRouter &&
+    !resolvedProvider.includes(expected) &&
+    !expected.includes(resolvedProvider) &&
+    !resolvedProvider.includes(expected.split("-")[0]);
+
+  if (misroutedThroughOpenRouter || providerMismatch) {
+    const resolvedLabel = result.provider || selectedModel || "another provider";
+    return {
+      kind: "http_error",
+      message:
+        `Hermes routed this model through ${resolvedLabel} instead of ${expectedProviderKey}. ` +
+        "Telegram /model can disambiguate providers; the HTTP session model API needs both `model`, `provider`, and `scope: session`. " +
+        "Verify the provider API key and endpoint in Hermes (`hermes model`) and config.yaml."
+    };
+  }
+
+  return null;
+}
+
 function normalizeModelUiState(args: {
   availableModels: HermesModelDescriptor[];
+  catalogModels?: HermesModelDescriptor[];
   clientSelectable: boolean;
   listAvailable: boolean;
   serverAdvertisedModel: string | null;
@@ -2718,8 +3637,13 @@ function normalizeModelUiState(args: {
   selectionStatus: HermesUiCapabilities["models"]["selectionStatus"];
 } {
   const selectedModelId = args.serverAdvertisedModel ?? args.availableModels[0]?.id ?? null;
-  const currentModelLabel = selectedModelId ?? "Hermes server model";
-  const currentProviderLabel = "Hermes server config";
+  const labelCatalog = args.catalogModels ?? args.availableModels;
+  const selectedModel = selectedModelId
+    ? labelCatalog.find((model) => model.id === selectedModelId) ??
+      args.availableModels.find((model) => model.id === selectedModelId)
+    : undefined;
+  const currentModelLabel = selectedModel?.label ?? selectedModelId ?? "Hermes server model";
+  const currentProviderLabel = selectedModel?.provider ?? "Hermes server config";
   const selectionStatus = modelSelectionStatus(args);
 
   return {
@@ -2763,7 +3687,7 @@ function modelSelectionReason(
     return "Hermes advertises a model/profile, but current runtime switching is server-configured and not verified for the session stream API.";
   }
   if (status === "client-selectable") {
-    return "Hermes exposes model catalog data and the Web UI can request session-scoped model switching through the BFF.";
+    return "Hermes exposes session-switchable models and the Web UI can request per-session overrides through the BFF.";
   }
   if (status === "unavailable") {
     return "Hermes has not exposed a model list or verified client-selectable model control for this UI process.";
@@ -2867,6 +3791,16 @@ function makeHermesSessionTitle(title: string, sessionId: string): string {
   return `${base} [${suffix}]`;
 }
 
+function emptyAssistantModelFallback(modelId: string, provider: string | null | undefined): string {
+  const modelLabel = formatHermesModelLabel(modelId);
+  const providerLabel = formatHermesProviderLabel(provider) || "Hermes configured provider";
+  return (
+    `Hermes selected ${modelLabel} via ${providerLabel} for this session, ` +
+    "but the provider completed this turn without returning assistant text. " +
+    "Detailed model specs were not exposed by Hermes for this request."
+  );
+}
+
 function sanitizeHermesId(value: string): string {
   return value.replace(/[\r\n\x00]/g, "").slice(0, 256) || "studio-session";
 }
@@ -2881,7 +3815,8 @@ function sanitizeHeaderValue(value: string | null): string | null {
 
 function normalizeHermesSseStream(
   upstream: ReadableStream<Uint8Array>,
-  abort: LinkedAbortController
+  abort: LinkedAbortController,
+  emptyAssistantFallback?: string
 ) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -2891,6 +3826,10 @@ function normalizeHermesSseStream(
       const reader = upstream.getReader();
       let buffer = "";
       let doneSent = false;
+      const streamState = {
+        emptyAssistantFallback,
+        hasAssistantText: false
+      };
 
       try {
         while (true) {
@@ -2903,14 +3842,15 @@ function normalizeHermesSseStream(
           const frames = buffer.split(/\r?\n\r?\n/);
           buffer = frames.pop() ?? "";
           for (const frame of frames) {
-            doneSent = writeNormalizedFrame(controller, encoder, frame) || doneSent;
+            doneSent = writeNormalizedFrame(controller, encoder, frame, streamState) || doneSent;
           }
         }
 
         if (buffer.trim()) {
-          doneSent = writeNormalizedFrame(controller, encoder, buffer) || doneSent;
+          doneSent = writeNormalizedFrame(controller, encoder, buffer, streamState) || doneSent;
         }
         if (!doneSent) {
+          writeEmptyAssistantFallback(controller, encoder, streamState);
           writeUiSse(controller, encoder, { type: "done" });
         }
       } catch (error) {
@@ -2938,18 +3878,65 @@ function normalizeHermesSseStream(
 function writeNormalizedFrame(
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
-  frame: string
+  frame: string,
+  streamState?: {
+    emptyAssistantFallback?: string;
+    hasAssistantText: boolean;
+  }
 ): boolean {
   const parsed = parseSseFrame(frame);
   if (!parsed) {
     return false;
   }
-  const normalized = normalizeHermesSseEvent(parsed.eventName, parsed.payload);
+  let normalized = normalizeHermesSseEvent(parsed.eventName, parsed.payload);
   if (normalized) {
+    if (normalized.type === "message_delta" && normalized.delta.trim()) {
+      if (streamState) {
+        streamState.hasAssistantText = true;
+      }
+    }
+    if (normalized.type === "message_done") {
+      if (!normalized.message.content.trim() && streamState?.emptyAssistantFallback && !streamState.hasAssistantText) {
+        normalized = {
+          ...normalized,
+          message: {
+            ...normalized.message,
+            content: streamState.emptyAssistantFallback
+          }
+        };
+      }
+      if (normalized.message.content.trim() && streamState) {
+        streamState.hasAssistantText = true;
+      }
+    }
+    if (normalized.type === "done") {
+      writeEmptyAssistantFallback(controller, encoder, streamState);
+    }
     writeUiSse(controller, encoder, normalized);
     return normalized.type === "done";
   }
   return false;
+}
+
+function writeEmptyAssistantFallback(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  encoder: TextEncoder,
+  streamState?: {
+    emptyAssistantFallback?: string;
+    hasAssistantText: boolean;
+  }
+) {
+  if (!streamState?.emptyAssistantFallback || streamState.hasAssistantText) {
+    return;
+  }
+  streamState.hasAssistantText = true;
+  writeUiSse(controller, encoder, {
+    type: "message_done",
+    message: {
+      role: "assistant",
+      content: streamState.emptyAssistantFallback
+    }
+  });
 }
 
 function parseSseFrame(frame: string): { eventName: string; payload: Record<string, unknown> | null } | null {
@@ -3091,6 +4078,28 @@ function normalizeFetchError(error: unknown): HermesStatusError {
   };
 }
 
+function mapChatErrorToStatusError(error: HermesChatError): HermesStatusError {
+  if (
+    error.kind === "disabled" ||
+    error.kind === "unconfigured" ||
+    error.kind === "invalid_config" ||
+    error.kind === "timeout" ||
+    error.kind === "network" ||
+    error.kind === "http_error" ||
+    error.kind === "bad_response"
+  ) {
+    return {
+      kind: error.kind,
+      message: error.message
+    };
+  }
+
+  return {
+    kind: "unknown",
+    message: error.message
+  };
+}
+
 function normalizeChatFetchError(error: unknown): HermesChatError {
   if (isAbortError(error)) {
     return {
@@ -3200,6 +4209,17 @@ function chatFailure(
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
 function truncatePreview(value: string): string {

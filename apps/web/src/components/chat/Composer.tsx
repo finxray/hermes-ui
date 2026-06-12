@@ -1,10 +1,17 @@
-import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, Plus, Square } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, Plus, Search, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { CSSProperties } from "react";
-import { createPortal } from "react-dom";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
 import styles from "./Composer.module.css";
+
+const COMPOSER_CONTENT_INSET_X = 15;
+const MODEL_MENU_EMERGE_OFFSET = 50;
+const MODEL_MENU_ANIMATION_MS = 500;
+
+type ModelMenuStyle = CSSProperties & {
+  "--model-menu-max-height": string;
+};
 
 type ComposerProps = {
   contextItems?: Array<{
@@ -16,6 +23,7 @@ type ComposerProps = {
   isStopRequested?: boolean;
   isStartState?: boolean;
   modelLabel?: string;
+  modelSelectError?: string | null;
   modelState?: HermesUiCapabilities["models"];
   modelSelectInProgress?: boolean;
   onModelSelect?: (modelId: string) => void;
@@ -32,6 +40,7 @@ export function Composer({
   isStopRequested = false,
   isStartState = false,
   modelLabel = "Hermes default",
+  modelSelectError = null,
   modelState,
   modelSelectInProgress = false,
   onModelSelect,
@@ -42,13 +51,21 @@ export function Composer({
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
+  const [modelMenuClosing, setModelMenuClosing] = useState(false);
+  const [modelMenuReady, setModelMenuReady] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
   const [modelMenuStyle, setModelMenuStyle] = useState<CSSProperties | null>(null);
+  const [prefersReducedTransparency, setPrefersReducedTransparency] = useState(false);
+  const modelMenuMounted = isModelMenuOpen || modelMenuClosing;
+  const modelMenuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const composerBoxRef = useRef<HTMLDivElement>(null);
   const modelControlRef = useRef<HTMLDivElement>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+  const modelSearchRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasDraft = getTrimmedDraft(textareaRef.current, draft).length > 0;
-  const canSend = hasDraft && !disabled && !isGenerating;
+  const canSend = hasDraft && !disabled && !isGenerating && !modelSelectInProgress;
   const modelOptions = modelState?.availableModels ?? [];
   const canSelectModel =
     Boolean(modelState?.clientSelectable) &&
@@ -58,30 +75,47 @@ export function Composer({
   const streamBatchingDetail = "Streaming batches deltas with an animation-frame flush, not one React update per token.";
 
   useLayoutEffect(() => {
-    if (!isModelMenuOpen) {
+    if (!modelMenuMounted) {
       setModelMenuStyle(null);
       return;
     }
 
     function updateModelMenuPosition() {
-      const button = modelButtonRef.current;
-      if (!button) {
+      const box = composerBoxRef.current;
+      if (!box) {
         return;
       }
 
-      const rect = button.getBoundingClientRect();
+      const rect = box.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const menuWidth = Math.min(320, Math.max(220, viewportWidth - 24));
-      const left = Math.min(Math.max(12, rect.left), viewportWidth - menuWidth - 12);
-      const spaceAbove = Math.max(140, rect.top - 16);
+      const edgeInset = 12;
+      const contentInsetX = COMPOSER_CONTENT_INSET_X;
+      const width = rect.width - contentInsetX * 2;
+      const left = Math.min(
+        Math.max(edgeInset, rect.left + contentInsetX),
+        viewportWidth - width - edgeInset
+      );
+      const bottom = viewportHeight - rect.top - MODEL_MENU_EMERGE_OFFSET;
+      const availableAbove = Math.max(180, rect.top + MODEL_MENU_EMERGE_OFFSET - edgeInset);
+      const maxHeight = Math.min(Math.round(viewportHeight * 0.5), availableAbove);
+      const transparencyStyle = prefersReducedTransparency
+        ? {}
+        : {
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)"
+          };
 
-      setModelMenuStyle({
-        bottom: viewportHeight - rect.top + 8,
+      const nextStyle: ModelMenuStyle = {
+        bottom,
         left,
-        maxHeight: Math.min(260, spaceAbove),
-        width: menuWidth
-      });
+        width,
+        maxHeight,
+        ...transparencyStyle,
+        "--model-menu-max-height": `${maxHeight}px`
+      };
+
+      setModelMenuStyle(nextStyle);
     }
 
     updateModelMenuPosition();
@@ -91,10 +125,42 @@ export function Composer({
       window.removeEventListener("resize", updateModelMenuPosition);
       window.removeEventListener("scroll", updateModelMenuPosition, true);
     };
-  }, [isModelMenuOpen]);
+  }, [modelMenuMounted, prefersReducedTransparency]);
 
   useEffect(() => {
-    if (!isModelMenuOpen) {
+    const media = window.matchMedia("(prefers-reduced-transparency: reduce)");
+    const updatePreference = () => setPrefersReducedTransparency(media.matches);
+
+    updatePreference();
+    media.addEventListener("change", updatePreference);
+    return () => media.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!isModelMenuOpen || modelMenuClosing) {
+      setModelMenuReady(false);
+      return;
+    }
+
+    setModelMenuReady(false);
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setModelMenuReady(true));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isModelMenuOpen, modelMenuClosing]);
+
+  useEffect(() => {
+    if (!isModelMenuOpen || modelMenuClosing) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      modelSearchRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isModelMenuOpen, modelMenuClosing]);
+
+  useEffect(() => {
+    if (!modelMenuMounted) {
       return;
     }
 
@@ -106,12 +172,12 @@ export function Composer({
       if (target && modelMenuRef.current?.contains(target)) {
         return;
       }
-      setIsModelMenuOpen(false);
+      closeModelMenu();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsModelMenuOpen(false);
+        closeModelMenu();
         modelButtonRef.current?.focus();
       }
     }
@@ -122,7 +188,15 @@ export function Composer({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isModelMenuOpen]);
+  }, [modelMenuMounted]);
+
+  useEffect(() => {
+    return () => {
+      if (modelMenuCloseTimerRef.current) {
+        clearTimeout(modelMenuCloseTimerRef.current);
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -169,59 +243,103 @@ export function Composer({
     onStop?.();
   }
 
+  function openModelMenu() {
+    if (modelMenuCloseTimerRef.current) {
+      clearTimeout(modelMenuCloseTimerRef.current);
+      modelMenuCloseTimerRef.current = null;
+    }
+    setModelMenuClosing(false);
+    setIsModelMenuOpen(true);
+  }
+
+  function closeModelMenu() {
+    if (!isModelMenuOpen || modelMenuClosing) {
+      return;
+    }
+    setModelMenuClosing(true);
+    setModelMenuReady(false);
+    modelMenuCloseTimerRef.current = setTimeout(() => {
+      setIsModelMenuOpen(false);
+      setModelMenuClosing(false);
+      modelMenuCloseTimerRef.current = null;
+    }, MODEL_MENU_ANIMATION_MS);
+  }
+
   function toggleModelMenu() {
     if (!canSelectModel) {
       return;
     }
-    setIsModelMenuOpen((current) => !current);
+    if (isModelMenuOpen && !modelMenuClosing) {
+      closeModelMenu();
+      return;
+    }
+    if (!isModelMenuOpen) {
+      openModelMenu();
+    }
   }
 
   function selectModel(modelId: string) {
-    setIsModelMenuOpen(false);
+    closeModelMenu();
+    setModelSearch("");
     onModelSelect?.(modelId);
   }
 
+  const modelGroups = groupModelOptions(modelOptions, modelSearch);
+
+  const modelMenuState = modelMenuClosing ? "closing" : modelMenuReady ? "open" : "entering";
+
   const modelMenu =
-    isModelMenuOpen && modelMenuStyle && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            className={styles.modelMenu}
-            ref={modelMenuRef}
-            role="listbox"
-            aria-label="Hermes model selector"
-            style={modelMenuStyle}
-          >
-            {modelOptions.map((model) => {
-              const isSelected = model.id === modelState?.selectedModelId;
-              return (
-                <button
-                  className={styles.modelOption}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  key={model.id}
-                  onClick={() => selectModel(model.id)}
-                  title={model.provider ? `${model.id} (${model.provider})` : model.id}
-                >
-                  <span className={styles.modelOptionText}>
-                    <span className={styles.modelOptionLabel}>{model.label}</span>
-                    {model.provider ? (
-                      <span className={styles.modelOptionProvider}>{model.provider}</span>
-                    ) : null}
-                  </span>
-                  {isSelected ? <Check size={14} /> : null}
-                </button>
-              );
-            })}
-          </div>,
-          document.body
-        )
-      : null;
+    modelMenuMounted && modelMenuStyle ? (
+      <div
+        className={styles.modelMenu}
+        ref={modelMenuRef}
+        role="dialog"
+        aria-label="Model browser"
+        data-state={modelMenuState}
+        style={modelMenuStyle}
+      >
+        <div className={styles.modelMenuContent}>
+          <div className={styles.modelSearchWrap}>
+            <Search size={16} aria-hidden="true" />
+            <input
+              ref={modelSearchRef}
+              aria-label="Search models"
+              value={modelSearch}
+              onChange={(event) => setModelSearch(event.currentTarget.value)}
+              placeholder="Search models"
+            />
+          </div>
+          <div className={styles.modelSections} role="listbox" aria-label="Available models">
+            <ModelSection
+              title="Hermes Configured"
+              count={modelGroups.hermes.length}
+              models={modelGroups.hermes}
+              selectedModelId={modelState?.selectedModelId ?? null}
+              onSelect={selectModel}
+              headerTone="configured"
+            />
+            <ModelSection
+              title="OpenRouter"
+              count={modelGroups.openRouter.length}
+              models={modelGroups.openRouter}
+              selectedModelId={modelState?.selectedModelId ?? null}
+              onSelect={selectModel}
+              headerTone="configured"
+            />
+          </div>
+        </div>
+      </div>
+    ) : null;
 
   return (
-    <div className={styles.wrap} data-start-state={isStartState ? "true" : "false"}>
+    <div
+      className={styles.wrap}
+      data-start-state={isStartState ? "true" : "false"}
+      data-model-menu-open={modelMenuMounted ? "true" : "false"}
+    >
+      {modelMenu}
       <form className={styles.composer} aria-label="Message composer" onSubmit={submit}>
-        <div className={styles.box}>
+        <div className={styles.box} data-composer-box ref={composerBoxRef}>
           <div className={styles.boxContent}>
             <textarea
               ref={textareaRef}
@@ -261,7 +379,7 @@ export function Composer({
                     className={styles.modelButton}
                     ref={modelButtonRef}
                     type="button"
-                    aria-expanded={canSelectModel ? isModelMenuOpen : undefined}
+                    aria-expanded={canSelectModel ? modelMenuMounted : undefined}
                     aria-haspopup={canSelectModel ? "listbox" : undefined}
                     aria-label={modelButtonLabel(modelState, modelOptions.length)}
                     title={modelSelectorTitle(modelState, modelOptions.length)}
@@ -334,9 +452,112 @@ export function Composer({
           </div>
         ) : null}
       </form>
-      {modelMenu}
+      {modelSelectError ? (
+        <p className={styles.modelSelectError} role="alert">
+          {modelSelectError}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+function ModelSection({
+  count,
+  headerTone = "default",
+  models,
+  onSelect,
+  selectedModelId,
+  title
+}: {
+  count: number;
+  headerTone?: "default" | "configured";
+  models: NonNullable<HermesUiCapabilities["models"]["availableModels"]>;
+  onSelect: (modelId: string) => void;
+  selectedModelId: string | null;
+  title: string;
+}) {
+  return (
+    <section className={styles.modelSection} aria-label={title}>
+      <div
+        className={[
+          styles.modelSectionHeader,
+          headerTone === "configured" ? styles.modelSectionHeaderConfigured : ""
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <span className={styles.modelSectionTitle}>{title}</span>
+        <span className={styles.modelSectionCount}>{count}</span>
+      </div>
+      <div className={styles.modelOptionGrid}>
+        {models.length > 0 ? (
+          models.map((model) => {
+            const isSelected = model.id === selectedModelId;
+            return (
+              <button
+                className={styles.modelOption}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                key={`${model.catalogSource ?? "model"}:${model.id}`}
+                onClick={() => onSelect(model.id)}
+                title={model.provider ? `${model.id} (${model.provider})` : model.id}
+              >
+                <span className={styles.modelOptionText}>
+                  <span className={styles.modelOptionLabel}>{model.label}</span>
+                  <span className={styles.modelOptionProvider}>
+                    {model.provider ?? "Provider inherited"}
+                    {model.contextLength ? ` · ${formatContextLength(model.contextLength)}` : ""}
+                  </span>
+                </span>
+                {isSelected ? <Check size={15} /> : null}
+              </button>
+            );
+          })
+        ) : (
+          <div className={styles.modelEmptyState}>No matching models</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function groupModelOptions(
+  options: HermesUiCapabilities["models"]["availableModels"],
+  query: string
+) {
+  const cleanQuery = query.trim().toLowerCase();
+  const matches = (model: HermesUiCapabilities["models"]["availableModels"][number]) => {
+    if (!cleanQuery) {
+      return true;
+    }
+    return [
+      model.label,
+      model.id,
+      model.provider,
+      model.description,
+      ...(model.supportedParameters ?? [])
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(cleanQuery);
+  };
+
+  return {
+    hermes: options.filter((model) => model.catalogSource !== "ui-openrouter" && matches(model)),
+    openRouter: options.filter((model) => model.catalogSource === "ui-openrouter" && matches(model))
+  };
+}
+
+function formatContextLength(value: number) {
+  if (value >= 1_000_000) {
+    return `${Math.round(value / 1_000_000)}M context`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}K context`;
+  }
+  return `${value} context`;
 }
 
 function getTrimmedDraft(textarea: HTMLTextAreaElement | null, draft: string) {

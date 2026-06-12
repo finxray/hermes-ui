@@ -35,6 +35,7 @@
     "smoke:markdown": "node scripts/markdown-fixture-smoke.mjs",
     "smoke:markdown:long": "node scripts/markdown-long-fixture-smoke.mjs",
     "smoke:long-session": "node scripts/long-session-performance-smoke.mjs",
+    "smoke:animation": "node scripts/animation-performance-smoke.mjs",
     "smoke:memory-detail": "node scripts/memory-detail-fixture-smoke.mjs",
     "smoke:sidebar:large": "node scripts/sidebar-large-smoke.mjs",
     "smoke:artifacts-tools:large": "node scripts/artifacts-tools-large-smoke.mjs",

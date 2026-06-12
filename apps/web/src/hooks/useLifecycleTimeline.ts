@@ -2,70 +2,69 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { fetchLifecycleTimeline } from "@/lib/brainMemoryClient";
-import type { TimelineEvent } from "@hermes-ui/brain-memory-client";
+import type { BrainMemoryMode, TimelineEvent } from "@hermes-ui/brain-memory-client";
 
 type LifecycleTimelineState = {
   error: string | null;
   events: TimelineEvent[];
   isLoading: boolean;
+  mode: BrainMemoryMode | null;
   total: number;
 };
 
-export function useLifecycleTimeline(limit = 20, offset = 0) {
+/**
+ * Pass enabled=false while the Gateway is disconnected/disabled so standalone
+ * mode never issues lifecycle requests; the hook reports an idle state instead.
+ */
+export function useLifecycleTimeline(limit = 20, offset = 0, enabled = true) {
   const [state, setState] = useState<LifecycleTimelineState>({
     error: null,
     events: [],
-    isLoading: true,
+    isLoading: enabled,
+    mode: null,
     total: 0
   });
 
   const refresh = useCallback(async () => {
-    setState((current) => ({ ...current, error: null, isLoading: true }));
-    try {
-      const response = await fetchLifecycleTimeline({ limit, offset });
-      setState({
-        error: null,
-        events: response.events,
-        isLoading: false,
-        total: response.total
-      });
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        error: error instanceof Error ? error.message : "Could not fetch lifecycle timeline.",
-        isLoading: false
-      }));
-    }
-  }, [limit, offset]);
-
-  const loadMore = useCallback(async () => {
-    if (state.isLoading || state.events.length >= state.total) {
+    if (!enabled) {
       return;
     }
     setState((current) => ({ ...current, error: null, isLoading: true }));
-    try {
-      const response = await fetchLifecycleTimeline({
-        limit,
-        offset: offset + state.events.length
-      });
-      setState((current) => ({
-        error: null,
-        events: [...current.events, ...response.events],
-        isLoading: false,
-        total: response.total
-      }));
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        error: error instanceof Error ? error.message : "Could not fetch more lifecycle events.",
-        isLoading: false
-      }));
+    const response = await fetchLifecycleTimeline({ limit, offset });
+    setState({
+      error: response.error?.message ?? null,
+      events: response.events,
+      isLoading: false,
+      mode: response.mode,
+      total: response.total
+    });
+  }, [enabled, limit, offset]);
+
+  const loadMore = useCallback(async () => {
+    if (!enabled || state.isLoading || state.events.length >= state.total) {
+      return;
     }
-  }, [limit, offset, state.events.length, state.isLoading, state.total]);
+    setState((current) => ({ ...current, error: null, isLoading: true }));
+    const response = await fetchLifecycleTimeline({
+      limit,
+      offset: offset + state.events.length
+    });
+    setState((current) => ({
+      error: response.error?.message ?? null,
+      events: response.error ? current.events : [...current.events, ...response.events],
+      isLoading: false,
+      mode: response.mode,
+      total: response.error ? current.total : response.total
+    }));
+  }, [enabled, limit, offset, state.events.length, state.isLoading, state.total]);
 
   useEffect(() => {
+    if (!enabled) {
+      setState({ error: null, events: [], isLoading: false, mode: null, total: 0 });
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   return {
     error: state.error,
@@ -73,6 +72,7 @@ export function useLifecycleTimeline(limit = 20, offset = 0) {
     hasMore: state.events.length < state.total,
     isLoading: state.isLoading,
     loadMore,
+    mode: state.mode,
     refresh,
     total: state.total
   };

@@ -3,6 +3,8 @@
 import { Activity, Database, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { BrainMemoryStatusPanel } from "@/components/memory/BrainMemoryStatusPanel";
+import { LifecycleDashboard } from "@/components/memory/LifecycleDashboard";
+import { LifecycleTimeline } from "@/components/memory/LifecycleTimeline";
 import { ContextField, MemoryDetailPanel, ScopeSummary } from "@/components/memory/MemoryDetailPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useBrainMemorySearch } from "@/hooks/useBrainMemorySearch";
@@ -166,6 +168,21 @@ export function BrainMemoryConsole({
           </div>
         </div>
       </section>
+
+      <LifecycleDashboard isGatewayConnected={isGatewayConnected} />
+
+      <LifecycleTimeline
+        canInspectMemory={canInspectTimelineMemory}
+        isGatewayConnected={isGatewayConnected}
+        onInspectMemory={(memoryId) => {
+          setMockDetail(null);
+          setSelectedMemoryId(memoryId);
+          void inspect({
+            context,
+            memoryId
+          });
+        }}
+      />
 
       <MemoryTimelineSection
         canInspectMemory={canInspectTimelineMemory}
@@ -348,7 +365,7 @@ function MemoryTimelineRow({
         {item.scopeStatus ? <div className={styles.meta}>scope {item.scopeStatus}</div> : null}
         <details className={styles.metadata}>
           <summary>Redacted details</summary>
-          <pre>{safeJson(item.details)}</pre>
+          <pre className={styles.metadataPre}>{safeJson(item.details)}</pre>
         </details>
         {hasInspectAction ? (
           <button

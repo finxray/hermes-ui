@@ -8,14 +8,35 @@ import styles from "./LifecycleTimeline.module.css";
 
 type LifecycleTimelineProps = {
   canInspectMemory: boolean;
+  isGatewayConnected: boolean;
   onInspectMemory: (memoryId: string) => void;
 };
 
 export function LifecycleTimeline({
   canInspectMemory,
+  isGatewayConnected,
   onInspectMemory
 }: LifecycleTimelineProps) {
-  const { error, events, hasMore, isLoading, loadMore, total } = useLifecycleTimeline(20, 0);
+  const { error, events, hasMore, isLoading, loadMore, mode, total } = useLifecycleTimeline(
+    20,
+    0,
+    isGatewayConnected
+  );
+
+  if (!isGatewayConnected) {
+    return (
+      <details className={styles.section} open>
+        <summary className={styles.sectionLabel}>
+          <span>Lifecycle timeline</span>
+          <Clock3 size={13} aria-hidden="true" />
+        </summary>
+        <div className={styles.meta} role="status">
+          Brain Memory Gateway is not connected. Lifecycle audit events appear when a Gateway is
+          configured and reachable.
+        </div>
+      </details>
+    );
+  }
 
   return (
     <details className={styles.section} open>
@@ -27,7 +48,7 @@ export function LifecycleTimeline({
       <div className={styles.meta}>
         Showing {events.length} of {total} events
       </div>
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {mode === "error" && error ? <div className={styles.error}>{error}</div> : null}
 
       {events.length === 0 && !isLoading ? (
         <EmptyState compact title="No lifecycle events" body="No lifecycle audit events were returned." />

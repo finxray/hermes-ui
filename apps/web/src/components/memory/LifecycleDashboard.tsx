@@ -5,8 +5,12 @@ import { useLifecycleMetrics } from "@/hooks/useLifecycleMetrics";
 import type { LifecycleMetrics } from "@hermes-ui/brain-memory-client";
 import styles from "./LifecycleDashboard.module.css";
 
-export function LifecycleDashboard() {
-  const { error, isLoading, metrics, refresh } = useLifecycleMetrics();
+type LifecycleDashboardProps = {
+  isGatewayConnected: boolean;
+};
+
+export function LifecycleDashboard({ isGatewayConnected }: LifecycleDashboardProps) {
+  const { error, isLoading, metrics, mode, refresh } = useLifecycleMetrics(isGatewayConnected);
 
   return (
     <details className={styles.section} open>
@@ -17,7 +21,7 @@ export function LifecycleDashboard() {
           <button
             aria-label="Refresh lifecycle metrics"
             className={styles.iconButton}
-            disabled={isLoading}
+            disabled={!isGatewayConnected || isLoading}
             type="button"
             onClick={(event) => {
               event.preventDefault();
@@ -29,9 +33,18 @@ export function LifecycleDashboard() {
         </span>
       </summary>
 
-      {error ? <div className={styles.error}>{error}</div> : null}
-      <StateCards metrics={metrics} isLoading={isLoading} />
-      <OperationCards metrics={metrics} isLoading={isLoading} />
+      {!isGatewayConnected ? (
+        <div className={styles.muted} role="status">
+          Brain Memory Gateway is not connected. Lifecycle metrics appear when a Gateway is
+          configured and reachable.
+        </div>
+      ) : (
+        <>
+          {mode === "error" && error ? <div className={styles.error}>{error}</div> : null}
+          <StateCards metrics={metrics} isLoading={isLoading} />
+          <OperationCards metrics={metrics} isLoading={isLoading} />
+        </>
+      )}
     </details>
   );
 }

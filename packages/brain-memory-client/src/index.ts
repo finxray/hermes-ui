@@ -2,6 +2,7 @@ import type {
   BrainMemoryClientConfig,
   BrainMemoryError,
   BrainMemoryInspectRequest,
+  BrainMemoryMode,
   BrainMemorySearchRequest,
   LifecycleMetrics,
   LifecycleTimelineResponse,
@@ -9,6 +10,8 @@ import type {
   NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
+  NormalizedLifecycleMetricsResponse,
+  NormalizedLifecycleTimelineResponse,
   NormalizedMemoryDetail,
   NormalizedMemoryEvidence,
   NormalizedMemoryLifecycleAuditEvent,
@@ -42,6 +45,8 @@ export type {
   NormalizedBrainMemorySearchScope,
   NormalizedBrainMemorySearchResponse,
   NormalizedBrainMemoryStatus,
+  NormalizedLifecycleMetricsResponse,
+  NormalizedLifecycleTimelineResponse,
   NormalizedMemoryDetail,
   NormalizedMemoryEvidence,
   NormalizedMemoryLifecycleAuditEvent,
@@ -419,13 +424,18 @@ export async function inspectBrainMemory(
 export async function fetchLifecycleMetrics(
   config: BrainMemoryClientConfig,
   tenantId?: string
-): Promise<LifecycleMetrics> {
-  const base = resolveRequiredGatewayBase(config);
+): Promise<NormalizedLifecycleMetricsResponse> {
+  const checkedAt = new Date().toISOString();
+  const gateway = resolveGatewayBase(config);
+  if (!gateway.ok) {
+    return { mode: gateway.mode, metrics: null, error: gateway.error, checkedAt };
+  }
+
   const path = tenantId?.trim()
     ? `${LIFECYCLE_METRICS_PATH}?${new URLSearchParams({ tenant_id: tenantId.trim() }).toString()}`
     : LIFECYCLE_METRICS_PATH;
   const result = await fetchGatewayJson({
-    base,
+    base: gateway.base,
     fetchImpl: config.fetchImpl ?? fetch,
     gatewayMemoryApiKey: config.gatewayMemoryApiKey,
     method: "GET",
@@ -435,20 +445,40 @@ export async function fetchLifecycleMetrics(
   });
 
   if (!result.ok) {
-    throw new Error(result.error.message);
+    return { mode: "error", metrics: null, error: result.error, checkedAt };
   }
 
-  return normalizeLifecycleMetrics(result.data);
+  return {
+    mode: "real",
+    metrics: normalizeLifecycleMetrics(result.data),
+    error: null,
+    checkedAt
+  };
 }
 
 export async function fetchLifecycleTimeline(
   config: BrainMemoryClientConfig,
   params?: { limit?: number; offset?: number; operation?: string }
-): Promise<LifecycleTimelineResponse> {
-  const base = resolveRequiredGatewayBase(config);
+): Promise<NormalizedLifecycleTimelineResponse> {
+  const checkedAt = new Date().toISOString();
+  const limit = clampTimelineLimit(params?.limit);
+  const offset = clampOffset(params?.offset);
+  const gateway = resolveGatewayBase(config);
+  if (!gateway.ok) {
+    return {
+      mode: gateway.mode,
+      events: [],
+      total: 0,
+      limit,
+      offset,
+      error: gateway.error,
+      checkedAt
+    };
+  }
+
   const query = new URLSearchParams({
-    limit: String(clampTimelineLimit(params?.limit)),
-    offset: String(clampOffset(params?.offset))
+    limit: String(limit),
+    offset: String(offset)
   });
   const operation = params?.operation?.trim();
   if (operation) {
@@ -456,7 +486,7 @@ export async function fetchLifecycleTimeline(
   }
 
   const result = await fetchGatewayJson({
-    base,
+    base: gateway.base,
     fetchImpl: config.fetchImpl ?? fetch,
     gatewayMemoryApiKey: config.gatewayMemoryApiKey,
     method: "GET",
@@ -466,10 +496,19 @@ export async function fetchLifecycleTimeline(
   });
 
   if (!result.ok) {
-    throw new Error(result.error.message);
+    return {
+      mode: "error",
+      events: [],
+      total: 0,
+      limit,
+      offset,
+      error: result.error,
+      checkedAt
+    };
   }
 
-  return normalizeLifecycleTimeline(result.data);
+  const timeline = normalizeLifecycleTimeline(result.data);
+  return { mode: "real", ...timeline, error: null, checkedAt };
 }
 
 function parseBaseUrl(value: string): URL | null {
@@ -488,18 +527,43 @@ function parseBaseUrl(value: string): URL | null {
   }
 }
 
-function resolveRequiredGatewayBase(config: BrainMemoryClientConfig): URL {
+function resolveGatewayBase(
+  config: BrainMemoryClientConfig
+):
+  | { ok: true; base: URL }
+  | { ok: false; mode: BrainMemoryMode; error: BrainMemoryError } {
   if (config.enabled === false) {
-    throw new Error("Real Brain Memory Gateway reads are disabled for this UI process.");
+    return {
+      ok: false,
+      mode: "mock",
+      error: {
+        kind: "disabled",
+        message: "Real Brain Memory Gateway reads are disabled for this UI process."
+      }
+    };
   }
   if (!config.baseUrl?.trim()) {
-    throw new Error("Set BRAIN_MEMORY_GATEWAY_URL and enable real Gateway reads.");
+    return {
+      ok: false,
+      mode: "unconfigured",
+      error: {
+        kind: "unconfigured",
+        message: "Set BRAIN_MEMORY_GATEWAY_URL and enable real Gateway reads."
+      }
+    };
   }
   const base = parseBaseUrl(config.baseUrl);
   if (!base) {
-    throw new Error("BRAIN_MEMORY_GATEWAY_URL must be a valid http:// or https:// URL.");
+    return {
+      ok: false,
+      mode: "error",
+      error: {
+        kind: "invalid_config",
+        message: "BRAIN_MEMORY_GATEWAY_URL must be a valid http:// or https:// URL."
+      }
+    };
   }
-  return base;
+  return { ok: true, base };
 }
 
 function safeDisplayUrl(url: URL): string {

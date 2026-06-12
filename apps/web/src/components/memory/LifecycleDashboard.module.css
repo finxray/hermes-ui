@@ -111,6 +111,12 @@
   line-height: 1.45;
 }
 
+.muted {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.45;
+}
+
 @media (max-width: 900px) {
   .cardGrid,
   .operationGrid {

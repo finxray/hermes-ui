@@ -1,11 +1,11 @@
 import type {
   BrainMemoryInspectRequest,
   BrainMemorySearchContext,
-  LifecycleMetrics,
-  LifecycleTimelineResponse,
   NormalizedBrainMemoryInspectResponse,
   NormalizedBrainMemorySearchResponse,
-  NormalizedBrainMemoryStatus
+  NormalizedBrainMemoryStatus,
+  NormalizedLifecycleMetricsResponse,
+  NormalizedLifecycleTimelineResponse
 } from "@hermes-ui/brain-memory-client";
 
 export async function fetchBrainMemoryStatus(): Promise<NormalizedBrainMemoryStatus> {
@@ -85,41 +85,57 @@ export async function inspectBrainMemoryViaBff(
   }
 }
 
-export async function fetchLifecycleMetrics(): Promise<LifecycleMetrics> {
-  const response = await fetch("/api/brain-memory/lifecycle/metrics", {
-    cache: "no-store"
-  });
+export async function fetchLifecycleMetrics(): Promise<NormalizedLifecycleMetricsResponse> {
+  try {
+    const response = await fetch("/api/brain-memory/lifecycle/metrics", {
+      cache: "no-store"
+    });
 
-  if (!response.ok) {
-    throw new Error(`Brain Memory lifecycle metrics route returned HTTP ${response.status}.`);
+    if (!response.ok) {
+      return lifecycleMetricsError(
+        `Brain Memory lifecycle metrics route returned HTTP ${response.status}.`
+      );
+    }
+
+    return (await response.json()) as NormalizedLifecycleMetricsResponse;
+  } catch {
+    return lifecycleMetricsError("Could not reach the local Brain Memory lifecycle metrics route.");
   }
-
-  return (await response.json()) as LifecycleMetrics;
 }
 
 export async function fetchLifecycleTimeline(params?: {
   limit?: number;
   offset?: number;
   operation?: string;
-}): Promise<LifecycleTimelineResponse> {
+}): Promise<NormalizedLifecycleTimelineResponse> {
   const query = new URLSearchParams();
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
   if (params?.offset !== undefined) query.set("offset", String(params.offset));
   if (params?.operation) query.set("operation", params.operation);
 
   const queryString = query.toString();
-  const response = await fetch(
-    `/api/brain-memory/lifecycle/timeline${queryString ? `?${queryString}` : ""}`,
-    {
-      cache: "no-store"
+  try {
+    const response = await fetch(
+      `/api/brain-memory/lifecycle/timeline${queryString ? `?${queryString}` : ""}`,
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      return lifecycleTimelineError(
+        params,
+        `Brain Memory lifecycle timeline route returned HTTP ${response.status}.`
+      );
     }
-  );
 
-  if (!response.ok) {
-    throw new Error(`Brain Memory lifecycle timeline route returned HTTP ${response.status}.`);
+    return (await response.json()) as NormalizedLifecycleTimelineResponse;
+  } catch {
+    return lifecycleTimelineError(
+      params,
+      "Could not reach the local Brain Memory lifecycle timeline route."
+    );
   }
-
-  return (await response.json()) as LifecycleTimelineResponse;
 }
 
 function brainMemoryStatusError(message: string): NormalizedBrainMemoryStatus {
@@ -151,6 +167,36 @@ function brainMemorySearchError(
       message
     },
     searchedAt: new Date().toISOString()
+  };
+}
+
+function lifecycleMetricsError(message: string): NormalizedLifecycleMetricsResponse {
+  return {
+    mode: "error",
+    metrics: null,
+    error: {
+      kind: "network",
+      message
+    },
+    checkedAt: new Date().toISOString()
+  };
+}
+
+function lifecycleTimelineError(
+  params: { limit?: number; offset?: number } | undefined,
+  message: string
+): NormalizedLifecycleTimelineResponse {
+  return {
+    mode: "error",
+    events: [],
+    total: 0,
+    limit: params?.limit ?? 50,
+    offset: params?.offset ?? 0,
+    error: {
+      kind: "network",
+      message
+    },
+    checkedAt: new Date().toISOString()
   };
 }
 

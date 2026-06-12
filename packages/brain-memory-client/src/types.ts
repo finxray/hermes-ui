@@ -121,6 +121,23 @@ export type LifecycleTimelineResponse = {
   offset: number;
 };
 
+export type NormalizedLifecycleMetricsResponse = {
+  mode: BrainMemoryMode;
+  metrics: LifecycleMetrics | null;
+  error: BrainMemoryError | null;
+  checkedAt: string;
+};
+
+export type NormalizedLifecycleTimelineResponse = {
+  mode: BrainMemoryMode;
+  events: TimelineEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+  error: BrainMemoryError | null;
+  checkedAt: string;
+};
+
 export type NormalizedMemoryLayer =
   | "hot"
   | "canonical"

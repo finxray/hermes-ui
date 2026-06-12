@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { inspectBrainMemory, searchBrainMemory } from "@hermes-ui/brain-memory-client";
+import {
+  fetchLifecycleMetrics,
+  fetchLifecycleTimeline,
+  inspectBrainMemory,
+  searchBrainMemory
+} from "@hermes-ui/brain-memory-client";
 
 const context = {
   project: {
@@ -30,6 +35,9 @@ await checkHttpErrorMessages();
 await checkInspectNormalizationAndNoSecretLeakage();
 await checkMissingEvidenceSupersessionNormalization();
 await checkSearchScopeNormalization();
+await checkLifecycleDisabledAndUnconfiguredEnvelopes();
+await checkLifecycleErrorEnvelopes();
+await checkLifecycleSuccessNormalization();
 
 console.log("Brain Memory client shape checks passed.");
 
@@ -238,6 +246,131 @@ async function checkSearchScopeNormalization() {
   assert.equal(response.scope?.legacyUnscopedExcluded, 3);
   assert.equal(response.scope?.mismatchedProjectExcluded, 1);
   assert.equal(response.scope?.mismatchedSessionExcluded, 2);
+}
+
+async function checkLifecycleDisabledAndUnconfiguredEnvelopes() {
+  const disabledMetrics = await fetchLifecycleMetrics({
+    baseUrl: "http://brain-memory.test",
+    enabled: false,
+    gatewayMemoryApiKey: secretValues[1],
+    uiApiKey: secretValues[0]
+  });
+  assert.equal(disabledMetrics.mode, "mock");
+  assert.equal(disabledMetrics.error?.kind, "disabled");
+  assert.equal(disabledMetrics.metrics, null);
+  assertNoSecrets(disabledMetrics);
+
+  const unconfiguredTimeline = await fetchLifecycleTimeline({
+    baseUrl: "",
+    enabled: true,
+    gatewayMemoryApiKey: secretValues[1],
+    uiApiKey: secretValues[0]
+  });
+  assert.equal(unconfiguredTimeline.mode, "unconfigured");
+  assert.equal(unconfiguredTimeline.error?.kind, "unconfigured");
+  assert.deepEqual(unconfiguredTimeline.events, []);
+  assert.equal(unconfiguredTimeline.total, 0);
+  assertNoSecrets(unconfiguredTimeline);
+}
+
+async function checkLifecycleErrorEnvelopes() {
+  const metrics = await fetchLifecycleMetrics({
+    baseUrl: "http://brain-memory.test",
+    enabled: true,
+    fetchImpl: async () => jsonResponse(401, { detail: "controlled" }),
+    gatewayMemoryApiKey: secretValues[1],
+    uiApiKey: secretValues[0]
+  });
+  assert.equal(metrics.mode, "error");
+  assert.equal(metrics.error?.kind, "unauthorized");
+  assert.equal(metrics.metrics, null);
+  assertNoSecrets(metrics);
+
+  const timeline = await fetchLifecycleTimeline(
+    {
+      baseUrl: "http://brain-memory.test",
+      enabled: true,
+      fetchImpl: async () => jsonResponse(503, { detail: "controlled" }),
+      gatewayMemoryApiKey: secretValues[1],
+      uiApiKey: secretValues[0]
+    },
+    { limit: 10, offset: 0 }
+  );
+  assert.equal(timeline.mode, "error");
+  assert.equal(timeline.error?.kind, "http_error");
+  assert.deepEqual(timeline.events, []);
+  assertNoSecrets(timeline);
+}
+
+async function checkLifecycleSuccessNormalization() {
+  const metrics = await fetchLifecycleMetrics({
+    baseUrl: "http://brain-memory.test",
+    enabled: true,
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        active_count: 12,
+        archived_count: 3,
+        superseded_count: 1,
+        deleted_soft_count: 2,
+        archives_24h: 1,
+        archives_7d: 2,
+        archives_lifetime: 3,
+        restores_24h: 0,
+        restores_7d: 0,
+        restores_lifetime: 1,
+        deletes_24h: 0,
+        deletes_7d: 1,
+        deletes_lifetime: 2,
+        supersedes_24h: 0,
+        supersedes_7d: 0,
+        supersedes_lifetime: 1
+      }),
+    gatewayMemoryApiKey: secretValues[1],
+    uiApiKey: secretValues[0]
+  });
+  assert.equal(metrics.mode, "real");
+  assert.equal(metrics.error, null);
+  assert.equal(metrics.metrics?.active_count, 12);
+  assert.equal(metrics.metrics?.archived_count, 3);
+  assertNoSecrets(metrics);
+
+  const timeline = await fetchLifecycleTimeline(
+    {
+      baseUrl: "http://brain-memory.test",
+      enabled: true,
+      fetchImpl: async () =>
+        jsonResponse(200, {
+          events: [
+            {
+              audit_event_id: "evt-1",
+              memory_id: "memory-1",
+              tenant_id: "local-dev",
+              operation: "archive",
+              from_state: "active",
+              to_state: "archived",
+              reason: "stale",
+              caller_label: "studio",
+              created_at: "2026-06-01T00:00:00Z",
+              lifecycle_state: "archived",
+              project_key: "brain-memory",
+              session_key: null
+            }
+          ],
+          total: 1,
+          limit: 20,
+          offset: 0
+        }),
+      gatewayMemoryApiKey: secretValues[1],
+      uiApiKey: secretValues[0]
+    },
+    { limit: 20, offset: 0 }
+  );
+  assert.equal(timeline.mode, "real");
+  assert.equal(timeline.error, null);
+  assert.equal(timeline.events.length, 1);
+  assert.equal(timeline.events[0].operation, "archive");
+  assert.equal(timeline.total, 1);
+  assertNoSecrets(timeline);
 }
 
 function jsonResponse(status, body) {

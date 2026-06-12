@@ -118,10 +118,10 @@ function checkComponentSource() {
   );
   record(
     "model-selection-not-faked",
-    chatView.includes("providerModelState.clientSelectable ? providerModelState.selectedModelId : null") &&
-      composer.includes("Provider and model selector disabled") &&
-      composer.includes("Runtime model switching is not verified"),
-    "Provider/model control stays disabled and does not send a placeholder model id."
+    chatView.includes("model: modelRequest?.selectModelId ?? null") &&
+      composer.includes("canSelectModel") &&
+      composer.includes("disabled={!canSelectModel}"),
+    "Model selection flows through the verified session pipeline and never sends a placeholder model id."
   );
   record(
     "stop-button-accessibility",

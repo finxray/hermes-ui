@@ -117,6 +117,8 @@ const appShellCss = readFileSync(join(root, "apps/web/src/components/shell/AppSh
 const mainWindowCssForChecks = existsSync(join(root, "apps/web/src/components/shell/MainWindow.module.css"))
   ? readFileSync(join(root, "apps/web/src/components/shell/MainWindow.module.css"), "utf8")
   : "";
+const sidebarCssForChecks = readFileSync(join(root, "apps/web/src/components/shell/Sidebar.module.css"), "utf8");
+const topBarCssForChecks = readFileSync(join(root, "apps/web/src/components/shell/TopBar.module.css"), "utf8");
 for (const token of [
   '.shell[data-left-collapsed="true"]',
   ".shell:has(.leftToggle:checked)",
@@ -313,6 +315,11 @@ if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes
 if (!tokensCss.includes("--border-window-outline")) {
   failures.push("Window outline border token is missing.");
 }
+for (const token of ["--bg-panel-left", "--bg-panel-top", "--bg-panel-right"]) {
+  if (!tokensCss.includes(token)) {
+    failures.push(`Plain panel surface token is missing ${token}.`);
+  }
+}
 
 const appShellSource = readFileSync(join(root, "apps/web/src/components/shell/AppShell.tsx"), "utf8");
 if (!appShellSource.includes("mainWindowStyles.mainWindow")) {
@@ -332,6 +339,24 @@ if (!mainWindowCssForChecks.includes("box-shadow:")) {
 }
 if (!mainWindowCssForChecks.includes("border: 1px solid var(--border-window-outline)")) {
   failures.push("Main window outline border is missing.");
+}
+for (const [label, css, tokens] of [
+  [
+    "Sidebar",
+    sidebarCssForChecks,
+    ["background: var(--bg-panel-left)", "border-right: 1px solid var(--border-soft)", "box-shadow: var(--shadow-panel-left)"]
+  ],
+  [
+    "Top bar",
+    topBarCssForChecks,
+    ["background: var(--bg-panel-top)", "border-bottom: 1px solid var(--border-soft)", "box-shadow: var(--shadow-panel-top)"]
+  ]
+]) {
+  for (const token of tokens) {
+    if (!css.includes(token)) {
+      failures.push(`${label} must keep plain solid panel separation: missing ${token}.`);
+    }
+  }
 }
 if (contextRailVisualCss.includes("transform: translateX(100%)")) {
   failures.push("Context rail must not slide independently; it should collapse with the main window grid.");

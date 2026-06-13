@@ -8,9 +8,9 @@
   gap: 14px;
   padding: 0 var(--shell-rail-padding-x, 8px);
   color: var(--text-secondary);
-  background: transparent;
-  border-bottom: 0;
-  box-shadow: none;
+  background: var(--bg-panel-top);
+  border-bottom: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-panel-top);
 }
 
 .left,
@@ -90,7 +90,7 @@
 
 .menuItem.active {
   outline: 0;
-  background: transparent;
+  background: var(--bg-control-active);
   color: var(--text-primary);
 }
 

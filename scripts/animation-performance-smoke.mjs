@@ -58,6 +58,7 @@ async function main() {
     await page.waitForLoadState("load", { timeout: timeoutMs });
 
     await checkPlainShellCanvas();
+    await checkPanelHierarchy();
     await checkMainWindowSurface();
     await checkInteractionPolish();
     await sampleAnimationFrames();
@@ -152,6 +153,43 @@ async function checkMainWindowSurface() {
       surface.composerBoxShadow === "none" &&
       (!surface.userBubbleBoxShadow || surface.userBubbleBoxShadow === "none"),
     `Main window=${surface.mainWindowBackground || "missing"}, chat pane=${surface.chatPaneBackground || "missing"}, chat workspace=${surface.chatWorkspaceBackground || "missing"}, context rail=${surface.contextRailBackground || "missing"}, context head=${surface.contextRailHeadBackground || "missing"}, context scroll=${surface.contextRailScrollBackground || "missing"}, main border=${surface.mainWindowBorderWidth || "missing"} ${surface.mainWindowBorderColor || "missing"}, main shadow=${surface.mainWindowBoxShadow || "missing"}, composer shadow=${surface.composerBoxShadow || "missing"}, bubble shadow=${surface.userBubbleBoxShadow || "missing"}.`
+  );
+}
+
+async function checkPanelHierarchy() {
+  const panels = await page.evaluate(() => {
+    const sidebar = document.querySelector("[data-shell-rail='left']");
+    const topbar = document.querySelector("[class*='topbar']");
+    const activeTopItem = topbar?.querySelector("[aria-current='page']");
+    const sidebarStyle = sidebar ? window.getComputedStyle(sidebar) : null;
+    const topbarStyle = topbar ? window.getComputedStyle(topbar) : null;
+    const activeTopItemStyle = activeTopItem ? window.getComputedStyle(activeTopItem) : null;
+    return {
+      activeTopItemBackground: activeTopItemStyle?.backgroundColor ?? null,
+      sidebarBackground: sidebarStyle?.backgroundColor ?? null,
+      sidebarBorderColor: sidebarStyle?.borderRightColor ?? null,
+      sidebarBorderWidth: sidebarStyle?.borderRightWidth ?? null,
+      sidebarBoxShadow: sidebarStyle?.boxShadow ?? null,
+      topbarBackground: topbarStyle?.backgroundColor ?? null,
+      topbarBorderColor: topbarStyle?.borderBottomColor ?? null,
+      topbarBorderWidth: topbarStyle?.borderBottomWidth ?? null,
+      topbarBoxShadow: topbarStyle?.boxShadow ?? null
+    };
+  });
+  report.metrics.panelHierarchy = panels;
+
+  check(
+    "left-top-panels-solid-surfaces",
+    panels.sidebarBackground === "rgb(16, 17, 20)" &&
+      panels.sidebarBorderWidth === "1px" &&
+      panels.sidebarBorderColor === "rgba(255, 255, 255, 0.08)" &&
+      panels.sidebarBoxShadow !== "none" &&
+      panels.topbarBackground === "rgb(11, 12, 14)" &&
+      panels.topbarBorderWidth === "1px" &&
+      panels.topbarBorderColor === "rgba(255, 255, 255, 0.08)" &&
+      panels.topbarBoxShadow !== "none" &&
+      panels.activeTopItemBackground === "rgba(255, 255, 255, 0.082)",
+    `Sidebar bg=${panels.sidebarBackground || "missing"}, border=${panels.sidebarBorderWidth || "missing"} ${panels.sidebarBorderColor || "missing"}, shadow=${panels.sidebarBoxShadow || "missing"}; topbar bg=${panels.topbarBackground || "missing"}, border=${panels.topbarBorderWidth || "missing"} ${panels.topbarBorderColor || "missing"}, shadow=${panels.topbarBoxShadow || "missing"}, active=${panels.activeTopItemBackground || "missing"}.`
   );
 }
 

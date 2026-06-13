@@ -38,8 +38,9 @@
   flex-direction: column;
   overflow: hidden;
   padding: 23px var(--sidebar-rail-padding-x) 0;
-  background: transparent;
-  border: 0;
+  background: var(--bg-panel-left);
+  border-right: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-panel-left);
   transition:
     opacity 180ms ease,
     transform 180ms ease,
@@ -166,6 +167,8 @@
   position: relative;
   flex: 0 0 auto;
   padding-bottom: 20px;
+  margin-right: calc(-1 * var(--sidebar-rail-padding-x));
+  padding-right: var(--sidebar-rail-padding-x);
   background: linear-gradient(180deg, rgba(20, 18, 20, 0.96) 0%, var(--sidebar-footer-bg) 100%);
 }
 

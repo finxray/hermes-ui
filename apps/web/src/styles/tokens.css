@@ -3,6 +3,9 @@
 
   --bg-canvas: #07080a;
   --bg-app: #0c0d0f;
+  --bg-panel-left: #101114;
+  --bg-panel-top: #0b0c0e;
+  --bg-panel-right: #121214;
   --bg-rail: #101114;
   --bg-rail-warm: #1d1719;
   --bg-shell-glass: rgba(14, 15, 18, 0.78);
@@ -46,6 +49,8 @@
   --radius-xl: 24px;
 
   --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.35);
+  --shadow-panel-left: inset -1px 0 0 rgba(255, 255, 255, 0.025), 10px 0 32px rgba(0, 0, 0, 0.18);
+  --shadow-panel-top: 0 10px 30px rgba(0, 0, 0, 0.2);
   --shadow-workspace: 0 30px 110px rgba(0, 0, 0, 0.56);
   --shadow-glass: 0 24px 80px rgba(0, 0, 0, 0.46);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);

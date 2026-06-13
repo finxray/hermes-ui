@@ -12,7 +12,7 @@ import { createSessionExportPreview } from "@/lib/persistedActivityReplay";
 import { buildTenantScopeDiagnostics, type TenantScopeDiagnostics } from "@/lib/tenantScopeDiagnostics";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import type { PersistedActivityEvent, Project, Session } from "@/data/types";
+import type { Project, Session } from "@/data/types";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ContextRail.module.css";
 
@@ -460,16 +460,6 @@ function createExportPreviewCacheKey(session: Session) {
     session.runRecords.length,
     replayEventCount
   ].join(":");
-}
-
-function replayFallback(event: PersistedActivityEvent) {
-  if (event.memory?.operation) {
-    return `Memory ${event.memory.operation} activity`;
-  }
-  if (event.approval?.requestedAction) {
-    return event.approval.requestedAction;
-  }
-  return "Persisted activity metadata";
 }
 
 function ToolActivitySection({

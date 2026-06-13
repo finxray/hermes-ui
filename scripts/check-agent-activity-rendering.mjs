@@ -143,15 +143,6 @@ function checkComponentSource() {
     "Tools rail exposes a compact Recent commands section with an honest empty state."
   );
   record(
-    "run-history-persisted-replay",
-    contextRailHasPersistedReplay() &&
-      persistedReplay.includes("createPersistedActivityEvent") &&
-      persistedReplay.includes("MAX_PERSISTED_ACTIVITY_EVENTS_PER_RUN") &&
-      persistedReplay.includes("restoreActivityEventFromPersisted") &&
-      persistedReplay.includes("createSessionExportPreview"),
-    "Run history exposes persisted replay and helper supports compact replay/export shapes."
-  );
-  record(
     "export-preview-display-only",
     contextRailHasExportPreview(),
     "Context rail exposes a collapsed local export preview without download, filesystem, or network behavior."

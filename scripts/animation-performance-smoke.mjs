@@ -167,6 +167,7 @@ async function checkPanelHierarchy() {
     return {
       activeTopItemBackground: activeTopItemStyle?.backgroundColor ?? null,
       sidebarBackground: sidebarStyle?.backgroundColor ?? null,
+      sidebarBackgroundImage: sidebarStyle?.backgroundImage ?? null,
       sidebarBorderColor: sidebarStyle?.borderRightColor ?? null,
       sidebarBorderWidth: sidebarStyle?.borderRightWidth ?? null,
       sidebarBoxShadow: sidebarStyle?.boxShadow ?? null,
@@ -181,15 +182,17 @@ async function checkPanelHierarchy() {
   check(
     "left-top-panels-solid-surfaces",
     panels.sidebarBackground === "rgb(16, 17, 20)" &&
+      panels.sidebarBackgroundImage?.includes("radial-gradient") &&
+      panels.sidebarBackgroundImage?.includes("linear-gradient") &&
       panels.sidebarBorderWidth === "1px" &&
       panels.sidebarBorderColor === "rgba(255, 255, 255, 0.08)" &&
       panels.sidebarBoxShadow !== "none" &&
-      panels.topbarBackground === "rgb(11, 12, 14)" &&
+      panels.topbarBackground === "rgb(16, 17, 20)" &&
       panels.topbarBorderWidth === "1px" &&
       panels.topbarBorderColor === "rgba(255, 255, 255, 0.08)" &&
       panels.topbarBoxShadow !== "none" &&
       panels.activeTopItemBackground === "rgba(255, 255, 255, 0.082)",
-    `Sidebar bg=${panels.sidebarBackground || "missing"}, border=${panels.sidebarBorderWidth || "missing"} ${panels.sidebarBorderColor || "missing"}, shadow=${panels.sidebarBoxShadow || "missing"}; topbar bg=${panels.topbarBackground || "missing"}, border=${panels.topbarBorderWidth || "missing"} ${panels.topbarBorderColor || "missing"}, shadow=${panels.topbarBoxShadow || "missing"}, active=${panels.activeTopItemBackground || "missing"}.`
+    `Sidebar bg=${panels.sidebarBackground || "missing"}, image=${panels.sidebarBackgroundImage || "missing"}, border=${panels.sidebarBorderWidth || "missing"} ${panels.sidebarBorderColor || "missing"}, shadow=${panels.sidebarBoxShadow || "missing"}; topbar bg=${panels.topbarBackground || "missing"}, border=${panels.topbarBorderWidth || "missing"} ${panels.topbarBorderColor || "missing"}, shadow=${panels.topbarBoxShadow || "missing"}, active=${panels.activeTopItemBackground || "missing"}.`
   );
 }
 

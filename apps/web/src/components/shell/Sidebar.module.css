@@ -38,7 +38,10 @@
   flex-direction: column;
   overflow: hidden;
   padding: 23px var(--sidebar-rail-padding-x) 0;
-  background: var(--bg-panel-left);
+  background-color: var(--bg-panel-left);
+  background-image: var(--bg-panel-left-gradient);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   border-right: 1px solid var(--border-soft);
   box-shadow: var(--shadow-panel-left);
   transition:

@@ -315,7 +315,7 @@ if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes
 if (!tokensCss.includes("--border-window-outline")) {
   failures.push("Window outline border token is missing.");
 }
-for (const token of ["--bg-panel-left", "--bg-panel-top", "--bg-panel-right"]) {
+for (const token of ["--bg-panel-left", "--bg-panel-left-gradient", "--bg-panel-top", "--bg-panel-right"]) {
   if (!tokensCss.includes(token)) {
     failures.push(`Plain panel surface token is missing ${token}.`);
   }
@@ -344,12 +344,17 @@ for (const [label, css, tokens] of [
   [
     "Sidebar",
     sidebarCssForChecks,
-    ["background: var(--bg-panel-left)", "border-right: 1px solid var(--border-soft)", "box-shadow: var(--shadow-panel-left)"]
+    [
+      "background-color: var(--bg-panel-left)",
+      "background-image: var(--bg-panel-left-gradient)",
+      "border-right: 1px solid var(--border-soft)",
+      "box-shadow: var(--shadow-panel-left)"
+    ]
   ],
   [
     "Top bar",
     topBarCssForChecks,
-    ["background: var(--bg-panel-top)", "border-bottom: 1px solid var(--border-soft)", "box-shadow: var(--shadow-panel-top)"]
+    ["background-color: var(--bg-panel-top)", "border-bottom: 1px solid var(--border-soft)", "box-shadow: var(--shadow-panel-top)"]
   ]
 ]) {
   for (const token of tokens) {

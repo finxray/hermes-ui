@@ -140,16 +140,16 @@ async function checkMainWindowSurface() {
 
   check(
     "main-window-solid-surface",
-    surface.mainWindowBackground === "rgb(18, 18, 20)" &&
-      surface.chatPaneBackground === "rgb(18, 18, 20)" &&
+    surface.mainWindowBackground === "rgb(15, 15, 15)" &&
+      surface.chatPaneBackground === "rgb(15, 15, 15)" &&
       surface.chatWorkspaceBackground === "rgb(18, 18, 20)" &&
       surface.contextRailBackground === "rgb(18, 18, 20)" &&
       surface.contextRailHeadBackground === "rgb(18, 18, 20)" &&
       surface.contextRailScrollBackground === "rgb(18, 18, 20)" &&
       surface.mainWindowBorderColor === "rgba(255, 255, 255, 0.13)" &&
       surface.mainWindowBorderWidth === "1px" &&
-      surface.mainWindowBoxShadow.includes("inset") &&
-      surface.mainWindowBoxShadow.includes("30px") &&
+      surface.mainWindowBoxShadow.includes("-18px") &&
+      surface.mainWindowBoxShadow.includes("44px") &&
       surface.composerBoxShadow === "none" &&
       (!surface.userBubbleBoxShadow || surface.userBubbleBoxShadow === "none"),
     `Main window=${surface.mainWindowBackground || "missing"}, chat pane=${surface.chatPaneBackground || "missing"}, chat workspace=${surface.chatWorkspaceBackground || "missing"}, context rail=${surface.contextRailBackground || "missing"}, context head=${surface.contextRailHeadBackground || "missing"}, context scroll=${surface.contextRailScrollBackground || "missing"}, main border=${surface.mainWindowBorderWidth || "missing"} ${surface.mainWindowBorderColor || "missing"}, main shadow=${surface.mainWindowBoxShadow || "missing"}, composer shadow=${surface.composerBoxShadow || "missing"}, bubble shadow=${surface.userBubbleBoxShadow || "missing"}.`
@@ -172,6 +172,7 @@ async function checkPanelHierarchy() {
       sidebarBorderWidth: sidebarStyle?.borderRightWidth ?? null,
       sidebarBoxShadow: sidebarStyle?.boxShadow ?? null,
       topbarBackground: topbarStyle?.backgroundColor ?? null,
+      topbarBackgroundImage: topbarStyle?.backgroundImage ?? null,
       topbarBorderColor: topbarStyle?.borderBottomColor ?? null,
       topbarBorderWidth: topbarStyle?.borderBottomWidth ?? null,
       topbarBoxShadow: topbarStyle?.boxShadow ?? null
@@ -180,19 +181,17 @@ async function checkPanelHierarchy() {
   report.metrics.panelHierarchy = panels;
 
   check(
-    "left-top-panels-solid-surfaces",
-    panels.sidebarBackground === "rgb(16, 17, 20)" &&
-      panels.sidebarBackgroundImage?.includes("radial-gradient") &&
-      panels.sidebarBackgroundImage?.includes("linear-gradient") &&
-      panels.sidebarBorderWidth === "1px" &&
-      panels.sidebarBorderColor === "rgba(255, 255, 255, 0.08)" &&
-      panels.sidebarBoxShadow !== "none" &&
-      panels.topbarBackground === "rgb(16, 17, 20)" &&
-      panels.topbarBorderWidth === "1px" &&
-      panels.topbarBorderColor === "rgba(255, 255, 255, 0.08)" &&
-      panels.topbarBoxShadow !== "none" &&
-      panels.activeTopItemBackground === "rgba(255, 255, 255, 0.082)",
-    `Sidebar bg=${panels.sidebarBackground || "missing"}, image=${panels.sidebarBackgroundImage || "missing"}, border=${panels.sidebarBorderWidth || "missing"} ${panels.sidebarBorderColor || "missing"}, shadow=${panels.sidebarBoxShadow || "missing"}; topbar bg=${panels.topbarBackground || "missing"}, border=${panels.topbarBorderWidth || "missing"} ${panels.topbarBorderColor || "missing"}, shadow=${panels.topbarBoxShadow || "missing"}, active=${panels.activeTopItemBackground || "missing"}.`
+    "left-top-panels-restored-historical-shell",
+    panels.sidebarBackground === "rgba(0, 0, 0, 0)" &&
+      panels.sidebarBackgroundImage === "none" &&
+      panels.sidebarBorderWidth === "0px" &&
+      panels.sidebarBoxShadow === "none" &&
+      panels.topbarBackground === "rgba(0, 0, 0, 0)" &&
+      panels.topbarBackgroundImage === "none" &&
+      panels.topbarBorderWidth === "0px" &&
+      panels.topbarBoxShadow === "none" &&
+      panels.activeTopItemBackground === "rgba(0, 0, 0, 0)",
+    `Sidebar bg=${panels.sidebarBackground || "missing"}, image=${panels.sidebarBackgroundImage || "missing"}, border=${panels.sidebarBorderWidth || "missing"} ${panels.sidebarBorderColor || "missing"}, shadow=${panels.sidebarBoxShadow || "missing"}; topbar bg=${panels.topbarBackground || "missing"}, image=${panels.topbarBackgroundImage || "missing"}, border=${panels.topbarBorderWidth || "missing"} ${panels.topbarBorderColor || "missing"}, shadow=${panels.topbarBoxShadow || "missing"}, active=${panels.activeTopItemBackground || "missing"}.`
   );
 }
 

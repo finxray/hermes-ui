@@ -6,13 +6,15 @@
   min-height: 0;
   overflow: hidden;
   grid-template-columns: minmax(0, 1fr) minmax(0, var(--rail-width-right));
-  background-color: rgba(18, 18, 20, 1);
+  background-color: var(--bg-workspace-solid);
   background-image: none;
   border: 1px solid var(--border-window-outline);
+  border-right: 0;
+  border-bottom: 0;
   border-radius: 20px 0 0 20px;
   box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.34),
-    inset 0 0 30px rgba(0, 0, 0, 0.72);
+    -18px 0 44px rgba(0, 0, 0, 0.34),
+    inset 1px 0 0 rgba(255, 255, 255, 0.025);
   transition: grid-template-columns 180ms ease;
 }
 
@@ -22,7 +24,7 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
-  background: rgba(18, 18, 20, 1);
+  background-color: var(--bg-workspace-solid);
 }
 
 .chatPane > * {

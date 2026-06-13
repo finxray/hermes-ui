@@ -315,10 +315,8 @@ if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes
 if (!tokensCss.includes("--border-window-outline")) {
   failures.push("Window outline border token is missing.");
 }
-for (const token of ["--bg-panel-left", "--bg-panel-left-gradient", "--bg-panel-top", "--bg-panel-right"]) {
-  if (!tokensCss.includes(token)) {
-    failures.push(`Plain panel surface token is missing ${token}.`);
-  }
+if (tokensCss.includes("--bg-panel-left-gradient") || tokensCss.includes("--bg-panel-top")) {
+  failures.push("Shell panel restoration must not use newly invented panel gradient tokens.");
 }
 
 const appShellSource = readFileSync(join(root, "apps/web/src/components/shell/AppShell.tsx"), "utf8");
@@ -345,22 +343,27 @@ for (const [label, css, tokens] of [
     "Sidebar",
     sidebarCssForChecks,
     [
-      "background-color: var(--bg-panel-left)",
-      "background-image: var(--bg-panel-left-gradient)",
-      "border-right: 1px solid var(--border-soft)",
-      "box-shadow: var(--shadow-panel-left)"
+      "background: transparent",
+      "border: 0",
+      "--sidebar-content-mask",
+      ".footerDock"
     ]
   ],
   [
     "Top bar",
     topBarCssForChecks,
-    ["background-color: var(--bg-panel-top)", "border-bottom: 1px solid var(--border-soft)", "box-shadow: var(--shadow-panel-top)"]
+    ["background: transparent", "border-bottom: 0", "box-shadow: none", ".menuItem.active"]
   ]
 ]) {
   for (const token of tokens) {
     if (!css.includes(token)) {
       failures.push(`${label} must keep plain solid panel separation: missing ${token}.`);
     }
+  }
+}
+for (const token of ["border-right: 0", "border-bottom: 0", "-18px 0 44px rgba(0, 0, 0, 0.34)"]) {
+  if (!mainWindowCssForChecks.includes(token)) {
+    failures.push(`Main window must keep restored historical edge treatment: missing ${token}.`);
   }
 }
 if (contextRailVisualCss.includes("transform: translateX(100%)")) {

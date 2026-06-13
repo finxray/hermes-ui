@@ -3,12 +3,6 @@
 
   --bg-canvas: #07080a;
   --bg-app: #0c0d0f;
-  --bg-panel-left: #101114;
-  --bg-panel-left-gradient:
-    radial-gradient(ellipse at 0% 92%, rgba(86, 45, 61, 0.32) 0%, rgba(48, 31, 39, 0.2) 34%, rgba(16, 17, 20, 0) 68%),
-    linear-gradient(90deg, rgba(29, 25, 31, 0.76) 0%, rgba(16, 17, 20, 0.48) 58%, rgba(16, 17, 20, 0) 100%);
-  --bg-panel-top: #101114;
-  --bg-panel-right: #121214;
   --bg-rail: #101114;
   --bg-rail-warm: #1d1719;
   --bg-shell-glass: rgba(14, 15, 18, 0.78);
@@ -52,8 +46,6 @@
   --radius-xl: 24px;
 
   --shadow-soft: 0 18px 60px rgba(0, 0, 0, 0.35);
-  --shadow-panel-left: inset -1px 0 0 rgba(255, 255, 255, 0.025), 8px 0 28px rgba(0, 0, 0, 0.16);
-  --shadow-panel-top: 0 8px 24px rgba(0, 0, 0, 0.18);
   --shadow-workspace: 0 30px 110px rgba(0, 0, 0, 0.56);
   --shadow-glass: 0 24px 80px rgba(0, 0, 0, 0.46);
   --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);

@@ -14,10 +14,12 @@ import type { AgentActivityEvent, AgentActivityStatus } from "@/types/agentActiv
 import styles from "./AgentActivityBlock.module.css";
 
 type AgentActivityBlockProps = {
+  autoCollapseCompletedWork?: boolean;
   events: AgentActivityEvent[];
   isWorking?: boolean;
   legacyEvents?: ToolEvent[];
   liveTokenUsage?: LiveTokenUsageSnapshot | null;
+  onCompletedWorkAutoCollapse?: () => void;
   startedAt?: string | null;
 };
 
@@ -53,10 +55,12 @@ type ActivityTimelineItem =
     };
 
 export const AgentActivityBlock = memo(function AgentActivityBlock({
+  autoCollapseCompletedWork = false,
   events,
   isWorking = false,
   legacyEvents = [],
   liveTokenUsage = null,
+  onCompletedWorkAutoCollapse,
   startedAt = null
 }: AgentActivityBlockProps) {
   const displayEvents = useMemo(
@@ -69,16 +73,25 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
   // current run's rows instead of briefly replaying the previous run's
   // completed rows — which read as several lines flashing in then vanishing.
   const wasWorkingRef = useRef(false);
+  const completedWorkCollapseKeyRef = useRef<string | null>(null);
+  const completedWorkCollapseSequenceRef = useRef(0);
   const liveBaselineIdsRef = useRef<ReadonlySet<string>>(EMPTY_ACTIVITY_ID_SET);
   let completedFromWorking = false;
   if (isWorking && !wasWorkingRef.current) {
+    completedWorkCollapseKeyRef.current = null;
     liveBaselineIdsRef.current = new Set(displayEvents.map((event) => event.id));
   } else if (!isWorking && wasWorkingRef.current) {
     completedFromWorking = true;
+    completedWorkCollapseSequenceRef.current += 1;
+    completedWorkCollapseKeyRef.current = `completed-work-${completedWorkCollapseSequenceRef.current}`;
     liveBaselineIdsRef.current = EMPTY_ACTIVITY_ID_SET;
   }
   wasWorkingRef.current = isWorking;
   const liveBaselineIds = isWorking ? liveBaselineIdsRef.current : EMPTY_ACTIVITY_ID_SET;
+  const completedWorkCollapseKey = completedWorkCollapseKeyRef.current;
+  const shouldAutoCollapseCompletedWork = Boolean(
+    completedWorkCollapseKey && autoCollapseCompletedWork
+  );
 
   const sections = useMemo(
     () => buildActivitySections(displayEvents, liveBaselineIds),
@@ -98,10 +111,12 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
         <WorkingLog items={sections.liveTimelineItems} label={workingLabel} liveTokenUsage={liveTokenUsage} />
       ) : showWorked ? (
         <WorkedRow
-          autoCollapseDelayMs={completedFromWorking ? COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS : null}
-          initiallyOpen={completedFromWorking}
+          autoCollapseDelayMs={shouldAutoCollapseCompletedWork ? COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS : null}
+          autoCollapseKey={shouldAutoCollapseCompletedWork ? completedWorkCollapseKey : null}
+          initiallyOpen={completedFromWorking || Boolean(completedWorkCollapseKey)}
           items={sections.timelineItems}
           label={sections.workedLabel!}
+          onAutoCollapseStart={onCompletedWorkAutoCollapse}
           tokenParts={sections.tokenParts}
         />
       ) : (
@@ -151,22 +166,28 @@ function WorkingLog({
 
 function WorkedRow({
   autoCollapseDelayMs = null,
+  autoCollapseKey = null,
   initiallyOpen = false,
   items,
   label,
+  onAutoCollapseStart,
   tokenParts
 }: {
   autoCollapseDelayMs?: number | null;
+  autoCollapseKey?: string | null;
   initiallyOpen?: boolean;
   items: ActivityTimelineItem[];
   label: string;
+  onAutoCollapseStart?: () => void;
   tokenParts: Array<{ key: string; kind: "in" | "out" | "total"; label: string }>;
 }) {
   return (
     <AnimatedDisclosure
       autoCollapseDelayMs={autoCollapseDelayMs}
+      autoCollapseKey={autoCollapseKey}
       className={styles.workedBlock}
       initiallyOpen={initiallyOpen}
+      onAutoCollapseStart={onAutoCollapseStart}
       summaryClassName={styles.workedSummary}
       type={initiallyOpen ? "completed-work" : undefined}
       summary={
@@ -297,31 +318,49 @@ function CommandItemRow({ item }: { item: CommandItem }) {
 
 function AnimatedDisclosure({
   autoCollapseDelayMs = null,
+  autoCollapseKey = null,
   children,
   className,
   initiallyOpen = false,
+  onAutoCollapseStart,
   summary,
   summaryClassName,
   type
 }: {
   autoCollapseDelayMs?: number | null;
+  autoCollapseKey?: string | null;
   children: ReactNode;
   className: string;
   initiallyOpen?: boolean;
+  onAutoCollapseStart?: () => void;
   summary: ReactNode;
   summaryClassName: string;
   type?: string;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
+  const handledAutoCollapseKeyRef = useRef<string | null>(null);
+  const onAutoCollapseStartRef = useRef(onAutoCollapseStart);
 
   useEffect(() => {
-    if (!initiallyOpen || typeof autoCollapseDelayMs !== "number") {
+    onAutoCollapseStartRef.current = onAutoCollapseStart;
+  }, [onAutoCollapseStart]);
+
+  useEffect(() => {
+    if (
+      !autoCollapseKey ||
+      typeof autoCollapseDelayMs !== "number" ||
+      handledAutoCollapseKeyRef.current === autoCollapseKey
+    ) {
       return;
     }
 
-    const timer = window.setTimeout(() => setOpen(false), autoCollapseDelayMs);
+    handledAutoCollapseKeyRef.current = autoCollapseKey;
+    const timer = window.setTimeout(() => {
+      onAutoCollapseStartRef.current?.();
+      setOpen(false);
+    }, autoCollapseDelayMs);
     return () => window.clearTimeout(timer);
-  }, [autoCollapseDelayMs, initiallyOpen]);
+  }, [autoCollapseDelayMs, autoCollapseKey]);
 
   return (
     <div className={className} data-open={open ? "true" : "false"} data-type={type}>
@@ -334,7 +373,7 @@ function AnimatedDisclosure({
         {summary}
       </button>
       <div className={styles.disclosureBody} data-open={open ? "true" : "false"} aria-hidden={!open}>
-        {children}
+        <div className={styles.disclosureInner}>{children}</div>
       </div>
     </div>
   );

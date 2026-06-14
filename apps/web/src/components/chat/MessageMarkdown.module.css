@@ -1,8 +1,13 @@
 .markdown {
+  --markdown-text: #d7dbe2;
+  --markdown-heading: #f2f3f5;
+  --markdown-strong: #e3e6ec;
+
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--markdown-text);
   font-size: var(--font-body);
-  line-height: 1.7;
+  font-weight: 400;
+  line-height: 1.58;
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -15,54 +20,70 @@
   margin-bottom: 0;
 }
 
+.markdown[data-streaming="true"] > * {
+  animation: markdownStreamBlockReveal 180ms ease-out both;
+  will-change: opacity, transform;
+}
+
+.markdown[data-streaming="true"] :is(p, li, h1, h2, h3, h4, blockquote) {
+  animation: markdownStreamLineReveal 180ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
+  will-change: clip-path, opacity;
+}
+
 .markdown p {
-  margin: 0 0 13px;
+  margin: 0 0 10px;
 }
 
 .markdown h1,
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  margin: 24px 0 10px;
-  color: var(--text-primary);
-  font-weight: 680;
+  margin: 22px 0 8px;
+  color: var(--markdown-heading);
+  font-weight: 620;
   letter-spacing: 0;
-  line-height: 1.25;
+  line-height: 1.28;
 }
 
 .markdown h1 {
-  font-size: 1.34rem;
+  font-size: 1.24rem;
 }
 
 .markdown h2 {
-  font-size: 1.22rem;
+  font-size: 1.13rem;
 }
 
 .markdown h3 {
-  font-size: 1.08rem;
+  font-size: 1.03rem;
 }
 
 .markdown h4 {
   font-size: 1rem;
 }
 
+.markdown strong {
+  color: var(--markdown-strong);
+  font-weight: 590;
+}
+
 .markdown ul,
 .markdown ol {
-  margin: 0 0 14px;
-  padding-left: 22px;
+  margin: 4px 0 12px;
+  padding-left: 20px;
 }
 
 .markdown li {
-  margin: 6px 0;
+  margin: 4px 0;
   padding-left: 2px;
 }
 
 .markdown li::marker {
   color: var(--text-muted);
+  font-size: 0.82em;
 }
 
 .markdown blockquote {
-  margin: 16px 0;
+  margin: 14px 0;
   padding: 2px 0 2px 16px;
   border-left: 2px solid rgba(145, 184, 255, 0.42);
   color: var(--text-muted);
@@ -70,7 +91,7 @@
 
 .markdown hr {
   height: 1px;
-  margin: 22px 0;
+  margin: 18px 0;
   border: 0;
   background: var(--border-soft);
 }
@@ -130,8 +151,18 @@
   margin-top: 5px;
 }
 
+.taskCheckNative {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .markdown :global(ul.contains-task-list) {
-  padding-left: 22px;
+  padding-left: 20px;
 }
 
 .markdown :global(li.task-list-item) {
@@ -152,13 +183,14 @@
 }
 
 .codeBlock {
-  overflow: visible;
-  margin: 16px 0;
+  overflow: hidden;
+  margin: 14px 0;
   border: 1px solid var(--border-glass-soft);
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent),
     #0a0c0f;
+  background-clip: padding-box;
   box-shadow: var(--glass-highlight);
 }
 
@@ -171,6 +203,7 @@
   padding: 0 8px 0 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.035);
+  background-clip: padding-box;
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: var(--font-xs);
@@ -182,6 +215,7 @@
   max-height: min(56vh, 520px);
   margin: 0;
   padding: 14px 18px;
+  background: #0a0c0f;
   color: #d7dde8;
   font-family: var(--font-mono);
   font-size: 13px;
@@ -203,22 +237,42 @@
 }
 
 .iconActionButton {
+  --icon-action-size: 23px;
+  --icon-action-pad: 7px;
+  --icon-action-glyph: 3.2px;
+
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  box-sizing: border-box;
+  width: var(--icon-action-size);
+  height: var(--icon-action-size);
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
+  padding: var(--icon-action-pad);
   border: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.52);
+  color: currentColor;
   cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.iconActionButton svg {
+  display: block;
+  width: var(--icon-action-glyph);
+  height: var(--icon-action-glyph);
+  flex: 0 0 auto;
+}
+
+.iconActionButton[data-copy-action="true"] {
+  --icon-action-glyph: 2.56px;
 }
 
 .iconActionButton:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .iconActionButton:focus-visible {
@@ -227,17 +281,21 @@
 }
 
 .tableScroller {
+  overflow: hidden;
   overflow-x: auto;
   max-width: 100%;
-  margin: 16px 0;
+  margin: 14px 0;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.012);
+  background-clip: padding-box;
 }
 
 .tableScroller table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.94rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.93rem;
 }
 
 .tableScroller th,
@@ -362,4 +420,35 @@
 :global(.highlight-line) {
   background-color: rgba(145, 184, 255, 0.08);
   border-left-color: rgba(145, 184, 255, 0.6);
+}
+
+@keyframes markdownStreamBlockReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes markdownStreamLineReveal {
+  from {
+    opacity: 0.72;
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown[data-streaming="true"] > *,
+  .markdown[data-streaming="true"] :is(p, li, h1, h2, h3, h4, blockquote) {
+    animation: none;
+  }
 }

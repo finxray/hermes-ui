@@ -9,6 +9,7 @@ import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
 const ACTIVITY_REVEAL_DELAY_MS = 5_000;
+const COMPLETED_WORK_SCROLL_SETTLE_MS = 1_700;
 
 type ChatTranscriptProps = {
   activeProject: Project;
@@ -44,13 +45,18 @@ export function ChatTranscript({
   const bottomFollowFrameRef = useRef<number | null>(null);
   const bottomFollowPassesRef = useRef(0);
   const bottomFollowBehaviorRef = useRef<ScrollBehavior>("auto");
+  const bottomSettleFrameRef = useRef<number | null>(null);
+  const bottomSettleUntilRef = useRef(0);
   const [activityDelayElapsed, setActivityDelayElapsed] = useState(false);
+  const [revealedAssistantMessageId, setRevealedAssistantMessageId] = useState<string | null>(null);
   const lastMessage = activeSession?.messages.at(-1);
   const messageCount = activeSession?.messages.length ?? 0;
   const activityAnchorMessage = activeSession
     ? [...activeSession.messages].reverse().find((message) => message.role === "assistant")
     : undefined;
   const activityAnchorMessageId = activityAnchorMessage?.id;
+  const assistantRevealComplete =
+    !activityAnchorMessage?.content || revealedAssistantMessageId === activityAnchorMessageId;
   const isStreamingAssistant =
     lastMessage?.role === "assistant" && lastMessage.status === "streaming";
   const streamStatusLabel =
@@ -68,13 +74,19 @@ export function ChatTranscript({
   const activitySignal = `${shouldShowActivityBlock ? "visible" : "hidden"}:${activityEvents.length}:${activeSession?.toolEvents.length ?? 0}`;
   const activityBlock = activeSession && shouldShowActivityBlock ? (
     <AgentActivityBlock
+      autoCollapseCompletedWork={!isGenerating && assistantRevealComplete}
       events={activityEvents}
       isWorking={isGenerating}
       legacyEvents={activeSession.toolEvents}
       liveTokenUsage={liveTokenUsage}
+      onCompletedWorkAutoCollapse={handleCompletedWorkAutoCollapse}
       startedAt={generationStartedAt}
     />
   ) : null;
+
+  function handleCompletedWorkAutoCollapse() {
+    startBottomSettleFollow(COMPLETED_WORK_SCROLL_SETTLE_MS);
+  }
 
   const getScrollViewport = () => transcriptRef.current?.parentElement ?? null;
 
@@ -91,7 +103,7 @@ export function ChatTranscript({
     }
 
     scrollViewport.scrollTo({
-      top: scrollViewport.scrollHeight - scrollViewport.clientHeight,
+      top: Math.max(0, scrollViewport.scrollHeight - scrollViewport.clientHeight),
       behavior
     });
   };
@@ -127,14 +139,65 @@ export function ChatTranscript({
     bottomFollowFrameRef.current = window.requestAnimationFrame(follow);
   };
 
+  const startBottomSettleFollow = (durationMs: number) => {
+    const scrollViewport = getScrollViewport();
+    if (!scrollViewport) {
+      return;
+    }
+
+    const scrollThreshold = typeof bottomClearancePx === "number" ? bottomClearancePx + 160 : 220;
+    if (!isNearBottom(scrollViewport, scrollThreshold)) {
+      return;
+    }
+
+    bottomSettleUntilRef.current = Math.max(bottomSettleUntilRef.current, performance.now() + durationMs);
+    if (bottomSettleFrameRef.current !== null) {
+      return;
+    }
+
+    const followSettlingLayout = () => {
+      bottomSettleFrameRef.current = null;
+      const viewport = getScrollViewport();
+      if (!viewport) {
+        return;
+      }
+
+      if (!isNearBottom(viewport, scrollThreshold)) {
+        return;
+      }
+
+      scrollToBottom("auto");
+
+      if (performance.now() < bottomSettleUntilRef.current) {
+        bottomSettleFrameRef.current = window.requestAnimationFrame(followSettlingLayout);
+      }
+    };
+
+    bottomSettleFrameRef.current = window.requestAnimationFrame(followSettlingLayout);
+  };
+
   useLayoutEffect(() => {
     return () => {
       if (bottomFollowFrameRef.current !== null) {
         window.cancelAnimationFrame(bottomFollowFrameRef.current);
         bottomFollowFrameRef.current = null;
       }
+      if (bottomSettleFrameRef.current !== null) {
+        window.cancelAnimationFrame(bottomSettleFrameRef.current);
+        bottomSettleFrameRef.current = null;
+      }
     };
   }, []);
+
+  useEffect(() => {
+    setRevealedAssistantMessageId(null);
+  }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (isGenerating) {
+      setRevealedAssistantMessageId(null);
+    }
+  }, [isGenerating, lastMessage?.id]);
 
   useEffect(() => {
     if (!isGenerating || !generationStartedAt) {
@@ -313,6 +376,11 @@ export function ChatTranscript({
                 {message.id === activityAnchorMessageId ? activityBlock : null}
                 <MessageBubble
                   message={message}
+                  onRevealComplete={
+                    message.id === activityAnchorMessageId
+                      ? () => setRevealedAssistantMessageId(message.id)
+                      : undefined
+                  }
                   showFooterAlways={
                     message.role === "assistant" && message.id === activityAnchorMessageId
                   }

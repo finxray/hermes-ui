@@ -26,8 +26,8 @@
   width: fit-content;
   max-width: 100%;
   min-width: 0;
-  padding: 12px 20px;
-  border-radius: 11px;
+  padding: 10px 18px;
+  border-radius: 20px;
   background: rgba(38, 38, 38, 0.5);
   box-sizing: border-box;
 }
@@ -49,8 +49,9 @@
 .messageFooter {
   display: flex;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -58,6 +59,10 @@
 .message[data-role="user"] .messageFooter {
   justify-content: flex-end;
   padding-right: 2px;
+}
+
+.message[data-role="assistant"][data-footer-always="true"] .messageFooter {
+  opacity: 1;
 }
 
 .assistantStack {
@@ -68,7 +73,6 @@
 }
 
 .assistantFooter {
-  justify-content: flex-start;
   padding-left: 2px;
 }
 
@@ -77,26 +81,35 @@
   opacity: 1;
 }
 
-.messageMeta {
+.messageMeta,
+.usageMeta {
+  flex: 0 0 auto;
   color: var(--text-muted);
   font-size: var(--font-xs);
   line-height: 1;
 }
 
+.usageMeta {
+  line-height: 1.35;
+}
+
 .messageActions {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 2px;
+  color: var(--text-muted);
 }
 
 .content {
   color: var(--text-secondary);
   font-size: var(--font-body);
-  line-height: 1.7;
+  font-weight: 400;
+  line-height: 1.58;
 }
 
 .content p {
-  margin: 0 0 10px;
+  margin: 0 0 9px;
 }
 
 .content p:last-child {
@@ -173,7 +186,7 @@
 .streamingFrame {
   position: relative;
   contain: layout style;
-  min-height: 1.7em;
+  min-height: 1.58em;
 }
 
 .streamStatus {
@@ -181,7 +194,8 @@
   transform: translateY(0);
   color: var(--text-muted);
   font-size: var(--font-body);
-  line-height: 1.7;
+  font-weight: 400;
+  line-height: 1.58;
   transition:
     opacity 150ms ease,
     transform 150ms ease;
@@ -208,17 +222,47 @@
   opacity: 1;
 }
 
+.emptyAssistantText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  line-height: 1.58;
+}
+
 .streamContent[data-entering="true"] {
-  animation: streamContentReveal 220ms ease;
+  animation: streamContentReveal 180ms ease-out;
+}
+
+.streamTrailingStatus {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  font-weight: 400;
+  line-height: 1.58;
+  animation: streamLineReveal 180ms ease-out both;
 }
 
 @keyframes streamContentReveal {
   from {
-    opacity: 0.42;
+    opacity: 0.5;
+    transform: translateY(2px);
   }
 
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes streamLineReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -234,6 +278,10 @@
   }
 
   .streamContent[data-entering="true"] {
+    animation: none;
+  }
+
+  .streamTrailingStatus {
     animation: none;
   }
 }

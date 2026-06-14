@@ -1,8 +1,8 @@
 .wrap {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  padding: 2px 0 4px;
+  padding: 4px 0 6px;
 }
 
 .running {
@@ -39,22 +39,63 @@
   border: 0;
 }
 
+.workedBlock {
+  animation: activityFoldSettle 180ms ease-out both;
+}
+
+.workLog {
+  display: grid;
+  min-width: 0;
+  animation: activityFoldSettle 180ms ease-out both;
+}
+
+.workHeader {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .workedSummary,
 .commandSummary {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
+  border: 0;
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  font: inherit;
   list-style: none;
+  text-align: left;
   user-select: none;
+}
+
+.workedSummary {
+  width: 100%;
+  padding: 7px 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.commandSummary {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 0;
+  animation: activityInlineReveal 260ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
 }
 
 .workedSummary::-webkit-details-marker,
 .commandSummary::-webkit-details-marker {
   display: none;
+}
+
+.workedSummary:focus,
+.commandSummary:focus {
+  outline: none;
 }
 
 .chevron {
@@ -63,67 +104,255 @@
   transition: transform 130ms ease;
 }
 
-.workedBlock[open] .chevron {
+.workedBlock[data-open="true"] .chevron {
   transform: rotate(90deg);
 }
 
-.commandBlock[open] .commandIcon {
+.commandBlock[data-open="true"] .commandChevron {
+  opacity: 1;
   transform: rotate(90deg);
 }
 
 .workedLabel,
 .commandLabel {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
-  font-size: var(--font-small);
-  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: color 120ms ease;
 }
 
+.workedLabel {
+  font-size: var(--font-small);
+  line-height: 1.35;
+}
+
+.commandLabel {
+  font-size: var(--font-body);
+  line-height: 1.55;
+}
+
+.tokenPart {
+  font-size: var(--font-xs);
+  line-height: 1.35;
+}
+
+.tokenPart::before {
+  content: "\00b7";
+  padding-right: 8px;
+}
+
+.tokenPart[data-kind="in"] {
+  color: var(--markdown-inline-code);
+}
+
+.tokenPart[data-kind="out"] {
+  color: var(--notice);
+}
+
+.workedSummary:hover .workedLabel,
 .commandSummary:hover .commandLabel {
   color: var(--text-primary);
 }
 
 .commandIcon {
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
+  position: relative;
+  display: inline-block;
+  width: 11px;
+  height: 11px;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+  border-radius: 4px;
   color: var(--text-muted);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  transition: transform 130ms ease, color 120ms ease;
+  background: transparent;
 }
 
-.commandSummary:hover .commandIcon {
-  color: var(--text-secondary);
+.commandIconChevron {
+  position: absolute;
+  top: 0.5px;
+  left: 1.8px;
+  color: currentColor;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.commandIconCursor {
+  position: absolute;
+  right: 1.5px;
+  bottom: 2px;
+  width: 3px;
+  height: 1px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.commandChevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 140ms ease, transform 130ms ease, color 120ms ease;
+}
+
+.commandSummary:hover .commandChevron,
+.commandSummary:focus-visible .commandChevron {
+  opacity: 1;
 }
 
 .commandBlock .expandedBody {
-  padding: 2px 0 10px 30px;
+  padding: 8px 0 12px;
+}
+
+.disclosureBody {
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 0;
+  opacity: 0;
+  clip-path: inset(0 0 100% 0);
+  pointer-events: none;
+  transition:
+    grid-template-rows 320ms cubic-bezier(0.22, 0.78, 0.2, 1),
+    opacity 220ms ease,
+    clip-path 320ms cubic-bezier(0.22, 0.78, 0.2, 1);
+}
+
+.disclosureBody[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  pointer-events: auto;
+}
+
+.workedBlock[data-type="completed-work"] .disclosureBody {
+  transition:
+    grid-template-rows 1400ms cubic-bezier(0.2, 0.82, 0.16, 1),
+    opacity 900ms ease,
+    clip-path 1400ms cubic-bezier(0.2, 0.82, 0.16, 1);
+}
+
+.disclosureBody > * {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .expandedBody {
   display: grid;
-  gap: 8px;
-  padding: 2px 0 10px 22px;
+  gap: 10px;
+  padding: 12px 0 14px;
 }
 
+.liveProgressBody {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0 8px;
+}
+
+.liveProgressBody .commandSummary,
+.liveProgressBody .commandItemSummary,
+.liveProgressBody .reasoningChunk,
+.liveProgressBody .toolNote {
+  animation-duration: 220ms;
+}
+
+.timeline {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reasoningChunk,
+.toolNoteBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.toolNote {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  animation: activityInlineReveal 260ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
+}
+
+.toolNoteLine {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolNoteTitle {
+  color: var(--text-muted);
+}
+
+.toolNoteTarget {
+  margin-left: 8px;
+  color: var(--text-secondary);
+}
+
+.reasoningChunk {
+  animation: activityInlineReveal 260ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
+}
+
+.toolIcon {
+  position: relative;
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  margin-top: 0;
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.toolIcon::before,
+.toolIcon::after {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+  background: currentColor;
+  content: "";
+}
+
+.toolIcon::before {
+  top: 3px;
+}
+
+.toolIcon::after {
+  bottom: 3px;
+}
+
+.reasoningTitle,
 .reasoningLine,
 .reasoningEmpty,
+.thinkingLine,
 .commandDetailTitle,
 .commandMeta {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-small);
+  color: var(--text-muted);
+  font-size: var(--font-body);
   line-height: 1.55;
 }
 
-.reasoningEmpty,
-.commandMeta {
+.reasoningLine {
   color: var(--text-muted);
+}
+
+.thinkingLine {
+  padding-top: 2px;
 }
 
 .commandDetail {
@@ -132,14 +361,101 @@
   min-width: 0;
 }
 
-.commandPreview {
-  max-height: 180px;
-  margin: 0;
+.commandItems {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.commandItemBlock {
+  min-width: 0;
+  border: 0;
+}
+
+.commandItemSummary {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  list-style: none;
+  text-align: left;
+  user-select: none;
+  animation: activityInlineReveal 260ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
+}
+
+.commandItemSummary::-webkit-details-marker {
+  display: none;
+}
+
+.commandItemSummary:focus {
+  outline: none;
+}
+
+.commandItemLabel {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 150ms ease;
+}
+
+.commandItemChevron {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 160ms ease, transform 150ms ease, color 150ms ease;
+}
+
+.commandItemSummary:hover .commandItemLabel,
+.commandItemBlock[data-open="true"] .commandItemLabel {
+  color: var(--text-primary);
+}
+
+.commandItemSummary:hover .commandItemChevron,
+.commandItemSummary:focus-visible .commandItemChevron,
+.commandItemBlock[data-open="true"] .commandItemChevron {
+  opacity: 1;
+}
+
+.commandItemBlock[data-open="true"] .commandItemChevron {
+  transform: rotate(90deg);
+}
+
+.commandItemDetail {
+  padding: 10px 0 12px;
+}
+
+.commandDetailPanel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  max-height: 292px;
   overflow: auto;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.24);
+  padding: 14px 18px 12px;
+  border-radius: 20px;
+  background: rgba(42, 42, 42, 0.9);
   color: var(--text-secondary);
+}
+
+.commandPreview {
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
@@ -151,6 +467,22 @@
   color: #ffb4b4;
 }
 
+.commandResult {
+  margin: 0 8px 0 auto;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.35;
+}
+
+.commandResult[data-status="completed"]::before {
+  content: "\2713";
+  padding-right: 6px;
+}
+
+.commandResult[data-status="failed"] {
+  color: #ffb4b4;
+}
+
 @keyframes activityTextShimmer {
   from {
     background-position: 120% 0;
@@ -158,6 +490,44 @@
 
   to {
     background-position: -20% 0;
+  }
+}
+
+@keyframes activityFoldSettle {
+  from {
+    opacity: 0.82;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes activityDetailsReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    clip-path: inset(0 0 100% 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes activityInlineReveal {
+  from {
+    opacity: 0.68;
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
   }
 }
 
@@ -178,7 +548,19 @@
   }
 
   .chevron,
-  .commandIcon {
+  .commandChevron,
+  .commandItemChevron {
+    transition: none;
+  }
+
+  .workedBlock,
+  .workLog,
+  .commandSummary,
+  .commandItemSummary,
+  .reasoningChunk,
+  .toolNote,
+  .workedBlock[data-type="completed-work"] .disclosureBody,
+  .disclosureBody {
     transition: none;
   }
 }

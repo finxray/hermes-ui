@@ -31,9 +31,10 @@ export function buildHermesRuntimeIdentityInstruction({
     "",
     "This is a requested route, not proof that the backend provider honored it.",
     "If the user asks what model, provider, or model specs are being used, say this is the requested route unless Hermes/provider usage metadata confirms the actual route.",
-    "Do not claim to actually be a requested fallback/default model such as DeepSeek unless provider usage confirms that route.",
+    "Do not volunteer requested route details in ordinary answers.",
+    "Do not claim to actually be a requested fallback/default/local model such as DeepSeek, Gemma, or Qwen unless provider usage confirms that route.",
     runtimeLines.length > 0
-      ? "The runtime specs above describe the active local serving configuration when supplied by LM Studio; do not infer missing specs."
+      ? "The runtime specs above describe requested LM Studio catalog/settings context; do not say this response ran locally unless actual route metadata confirms it."
       : "If detailed model specs are not available in this context, say that Hermes selected the model above but did not expose detailed specs."
   ].join("\n");
 }

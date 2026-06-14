@@ -717,6 +717,9 @@ function checkTokenUsageMetadata() {
     finish_reason: "stop",
     latency_ms: 1200,
     request_id: "req-activity-usage",
+    requested_model: "deepseek/deepseek-v4-flash",
+    requested_provider: "openrouter",
+    route_verified: true,
     source: "provider"
   });
 
@@ -734,6 +737,9 @@ function checkTokenUsageMetadata() {
       usage.finishReason === "stop" &&
       usage.latencyMs === 1200 &&
       usage.requestId === "req-activity-usage" &&
+      usage.requestedModel === "deepseek/deepseek-v4-flash" &&
+      usage.requestedProvider === "openrouter" &&
+      usage.routeVerified === true &&
       usage.source === "provider",
     "provider token usage metadata is normalized for elapsed activity display."
   );

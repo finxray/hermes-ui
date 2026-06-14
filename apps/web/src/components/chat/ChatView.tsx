@@ -42,7 +42,6 @@ const ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND = 2.5;
 const LIVE_TOKEN_ESTIMATE_INTERVAL_MS = 650;
 const LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS = 512;
 const LIVE_TOKEN_AFTERGLOW_MS = 15_000;
-const FINAL_ACTIVITY_PREFOLD_MS = 1_550;
 
 type ChatViewProps = {
   activeProject: Project;
@@ -212,10 +211,14 @@ export function ChatView({
       if (!usage) {
         return;
       }
-      if (typeof usage.promptTokens === "number") {
+      if (typeof usage.promptTokens !== "number" && typeof usage.completionTokens !== "number") {
+        return;
+      }
+      const usageIsEstimated = usage.source === "estimated";
+      if (!usageIsEstimated && typeof usage.promptTokens === "number") {
         authoritativePromptTokensRef.current = true;
       }
-      if (typeof usage.completionTokens === "number") {
+      if (!usageIsEstimated && typeof usage.completionTokens === "number") {
         authoritativeCompletionTokensRef.current = true;
       }
       setLiveTokenUsage((current) => ({
@@ -246,6 +249,34 @@ export function ChatView({
         Math.floor(((performance.now() - liveEstimateStartedAtMs) / 1000) * ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND)
       );
       return Math.max(visibleTextTokens, activityTokens + elapsedTokens);
+    };
+
+    const withEstimatedTokenFallback = (usage: HermesTokenUsage | undefined) => {
+      const next: HermesTokenUsage = usage ? { ...usage } : {};
+      let usedEstimate = false;
+
+      if (typeof next.promptTokens !== "number" && estimatedPromptTokens > 0) {
+        next.promptTokens = estimatedPromptTokens;
+        usedEstimate = true;
+      }
+
+      if (typeof next.completionTokens !== "number") {
+        next.completionTokens = estimateLiveCompletionTokens();
+        usedEstimate = true;
+      }
+
+      if (
+        typeof next.totalTokens !== "number" &&
+        (typeof next.promptTokens === "number" || typeof next.completionTokens === "number")
+      ) {
+        next.totalTokens = (next.promptTokens ?? 0) + (next.completionTokens ?? 0);
+      }
+
+      if (usedEstimate) {
+        next.source = "estimated";
+      }
+
+      return next;
     };
 
     const syncEstimatedLiveTokenUsage = () => {
@@ -469,14 +500,16 @@ export function ChatView({
       cancelPendingFlush();
       const nextCompletion = pendingCompletion;
       pendingCompletion = null;
-      const completionUsage = annotateTokenUsageRoute(nextCompletion.usage ?? responseTokenUsage, modelRequest);
+      const completionUsage = withEstimatedTokenFallback(
+        annotateTokenUsageRoute(nextCompletion.usage ?? responseTokenUsage, modelRequest)
+      );
       responseTokenUsage = completionUsage;
+      syncLiveTokenUsage(responseTokenUsage);
       appendElapsedActivityOnce(completedAt);
+      completeAssistantMessage(nextCompletion.references, completionUsage);
       if (!hadStreamError && !stopRequestedRef.current) {
         setIsFinalizingResponse(true);
-        await waitForFinalActivityPrefold();
       }
-      completeAssistantMessage(nextCompletion.references, completionUsage);
       // Keep isFinalizingResponse true until generation fully ends — the finally
       // block clears it together with isGenerating. Clearing it here, while
       // isGenerating is still true, flips activityIsWorking back to true, which
@@ -625,7 +658,8 @@ export function ChatView({
     await completePendingAssistantMessage(completedAt);
 
     if (!completedAssistant && !hadStreamError && accumulated) {
-      responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
+      responseTokenUsage = withEstimatedTokenFallback(annotateTokenUsageRoute(responseTokenUsage, modelRequest));
+      syncLiveTokenUsage(responseTokenUsage);
       completeAssistantMessage(["Hermes session stream"], responseTokenUsage);
     } else if (emptyAssistantText) {
       hadStreamError = true;
@@ -640,7 +674,12 @@ export function ChatView({
       markAssistantHasContent();
     }
 
-    responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
+    if (!emptyAssistantText) {
+      responseTokenUsage = withEstimatedTokenFallback(annotateTokenUsageRoute(responseTokenUsage, modelRequest));
+      syncLiveTokenUsage(responseTokenUsage);
+    } else {
+      responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
+    }
     appendElapsedActivityOnce(completedAt);
     updateRunRecord({
       completedAt,
@@ -1050,23 +1089,6 @@ function estimateTokenCount(value: string) {
   return Math.max(1, Math.ceil(clean.length / ESTIMATED_CHARS_PER_TOKEN));
 }
 
-async function waitForFinalActivityPrefold() {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    return;
-  }
-  await waitForNextPaint();
-  await delay(FINAL_ACTIVITY_PREFOLD_MS);
-}
-
-function waitForNextPaint() {
-  return new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
-}
-
-function delay(ms: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-}
 
 function composerDraftStorageKey(variant: ChatViewProps["variant"], sessionId: string) {
   return `hermes-ui:composer-draft:v1:${variant ?? "main"}:${sessionId}`;

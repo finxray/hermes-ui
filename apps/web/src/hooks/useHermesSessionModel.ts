@@ -60,6 +60,7 @@ type SessionModelSnapshot = {
   effectiveModel: string | null;
   effectiveProvider: string | null;
   error: string | null;
+  errorModelId: string | null;
   hermesSessionId: string | null;
   localSessionId: string | null;
   syncStatus: HermesSessionModelSyncStatus;
@@ -86,6 +87,7 @@ export function useHermesSessionModel({
     emptySnapshot(null, null, "unavailable")
   );
   const requestSeqRef = useRef(0);
+  const selectionSeqRef = useRef(0);
   const appliedPreferenceKeyRef = useRef<string | null>(null);
   const missingHermesSessionIdsRef = useRef(new Set<string>());
   const snapshotRef = useRef(snapshot);
@@ -138,6 +140,7 @@ export function useHermesSessionModel({
             : emptySnapshot(session.id, hermesSessionId, "fallback")),
           checkedAt: new Date().toISOString(),
           error: null,
+          errorModelId: null,
           hermesSessionId,
           localSessionId: session.id,
           syncStatus: "fallback"
@@ -152,6 +155,7 @@ export function useHermesSessionModel({
         return {
           ...(sameSession ? current : emptySnapshot(session.id, hermesSessionId, phase)),
           error: null,
+          errorModelId: null,
           hermesSessionId,
           localSessionId: session.id,
           syncStatus: phase
@@ -181,6 +185,7 @@ export function useHermesSessionModel({
             : emptySnapshot(session.id, hermesSessionId, fallbackOnly ? "fallback" : "error")),
           checkedAt: new Date().toISOString(),
           error,
+          errorModelId: expected?.catalogModelId ?? null,
           hermesSessionId,
           localSessionId: session.id,
           syncStatus: fallbackOnly ? "fallback" : "error"
@@ -201,6 +206,7 @@ export function useHermesSessionModel({
       const verified = {
         ...next,
         error: mismatch,
+        errorModelId: mismatch ? next.catalogModelId ?? expected?.catalogModelId ?? null : null,
         syncStatus: mismatch ? "error" as const : "synced" as const
       };
       setSnapshot(verified);
@@ -215,24 +221,29 @@ export function useHermesSessionModel({
         return;
       }
 
+      const selectionRequestId = ++selectionSeqRef.current;
+      const isCurrentSelectionRequest = () => selectionSeqRef.current === selectionRequestId;
       const selectedModel = baseModelState.availableModels.find(
         (model) => model.id === selectRequest.catalogModelId
       );
       const preference = preferenceFromSelectRequest(selectRequest, selectedModel);
       const preferenceKey = modelPreferenceKey(activeSession.id, preference);
-      appliedPreferenceKeyRef.current = preferenceKey;
-
-      if (persistPreference) {
-        persistSessionModelPreference?.(activeSession.id, preference);
+      if (!persistPreference) {
+        appliedPreferenceKeyRef.current = preferenceKey;
       }
 
       setSnapshot((current) => ({
         ...current,
         error: null,
+        errorModelId: null,
         syncStatus: "verifying"
       }));
 
       if (selectRequest.selectionScope === "turn") {
+        appliedPreferenceKeyRef.current = preferenceKey;
+        if (persistPreference) {
+          persistSessionModelPreference?.(activeSession.id, preference);
+        }
         setSnapshot(snapshotFromSelectRequest(selectRequest, activeSession, "turn-ready"));
         return;
       }
@@ -251,6 +262,9 @@ export function useHermesSessionModel({
           method: "POST"
         });
         const result = await response.json().catch(() => null);
+        if (!isCurrentSelectionRequest()) {
+          return;
+        }
         if (!response.ok || result?.ok === false) {
           const message =
             result?.error?.message ||
@@ -258,21 +272,38 @@ export function useHermesSessionModel({
           setSnapshot((current) => ({
             ...current,
             error: message,
+            errorModelId: selectRequest.catalogModelId,
             syncStatus: "error"
           }));
           return;
         }
 
-        await loadSessionModel("verifying", {
+        if (!isCurrentSelectionRequest()) {
+          return;
+        }
+        const verified = await loadSessionModel("verifying", {
           catalogModelId: selectRequest.catalogModelId,
           provider: selectRequest.provider
         });
+        if (!isCurrentSelectionRequest()) {
+          return;
+        }
+        if (verified?.syncStatus === "synced" && !verified.error) {
+          appliedPreferenceKeyRef.current = preferenceKey;
+          if (persistPreference) {
+            persistSessionModelPreference?.(activeSession.id, preference);
+          }
+        }
         void refreshHermesStatus();
       } catch (error) {
+        if (!isCurrentSelectionRequest()) {
+          return;
+        }
         console.error("Model select error:", error);
         setSnapshot((current) => ({
           ...current,
           error: "Could not reach Hermes to switch models. Try again in a moment.",
+          errorModelId: selectRequest.catalogModelId,
           syncStatus: "error"
         }));
       }
@@ -319,6 +350,7 @@ export function useHermesSessionModel({
         setSnapshot((current) => ({
           ...current,
           error: "That model id is not available for session switching.",
+          errorModelId: modelId,
           syncStatus: "error"
         }));
         return;
@@ -350,11 +382,17 @@ export function useHermesSessionModel({
     await loadSessionModel("loading");
   }, [activeSession, applySessionModelSelection, baseModelState, loadSessionModel]);
 
+  const scopedError =
+    !snapshot.error ||
+    snapshot.errorModelId && modelState.selectedModelId && snapshot.errorModelId !== modelState.selectedModelId
+      ? null
+      : snapshot.error;
+
   return {
     checkedAt: snapshot.checkedAt,
     effectiveModel: snapshot.effectiveModel,
     effectiveProvider: snapshot.effectiveProvider,
-    error: snapshot.error,
+    error: scopedError,
     hermesSessionId: snapshot.hermesSessionId,
     modelLabel,
     modelRequest,
@@ -413,6 +451,7 @@ function snapshotFromSelectRequest(
     effectiveModel: request.selectModelId,
     effectiveProvider: request.provider,
     error: null,
+    errorModelId: null,
     hermesSessionId: resolveHermesSessionId(session),
     localSessionId: session.id,
     syncStatus
@@ -561,6 +600,7 @@ function snapshotFromHermesSession(
     effectiveModel,
     effectiveProvider: session.effectiveProvider,
     error: null,
+    errorModelId: null,
     hermesSessionId,
     localSessionId,
     syncStatus: "synced"
@@ -639,6 +679,7 @@ function emptySnapshot(
     effectiveModel: null,
     effectiveProvider: null,
     error: null,
+    errorModelId: null,
     hermesSessionId,
     localSessionId,
     syncStatus

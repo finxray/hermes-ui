@@ -72,7 +72,7 @@ export function HermesStatusPanel({
               {sessionModel.syncStatus === "fallback"
                 ? "Hermes has not created this session yet; using the server default."
                 : sessionModel.syncStatus === "turn-ready"
-                  ? "Per-turn catalog model will be sent through Hermes on each turn."
+                  ? "Requested through Hermes but not verified as the active session model."
                 : sessionCheckedAt
                   ? `Session verified: ${sessionCheckedAt}`
                   : "Waiting for Hermes session verification."}
@@ -205,7 +205,7 @@ function syncStatusLabel(status: HermesSessionModelSync["syncStatus"]) {
     return "server default";
   }
   if (status === "turn-ready") {
-    return "per-turn";
+    return "unverified";
   }
   if (status === "error") {
     return "attention";

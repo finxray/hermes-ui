@@ -16,6 +16,7 @@
     "studio:open": "node scripts/open-studio-browser.mjs",
     "studio:web": "node scripts/studio-web-dev.mjs",
     "studio:web:3002": "node scripts/studio-web-dev.mjs --port 3002",
+    "studio:stack": "powershell -ExecutionPolicy Bypass -File scripts/studio-stack.ps1",
     "build": "npm run build -w @hermes-ui/web",
     "check:agent-access-policy": "node scripts/check-agent-access-policy.mjs",
     "check:agent-activity": "node scripts/check-agent-activity-events.mjs",

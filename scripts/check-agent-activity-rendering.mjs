@@ -98,28 +98,44 @@ function checkComponentSource() {
     component.includes("AnimatedDisclosure") &&
       component.includes("Worked for") &&
       component.includes("Ran ") &&
+      component.includes("<ActivityTimeline allowActiveState items={items} />") &&
+      component.includes("<ActivityTimeline items={items} />") &&
+      component.includes("allowActiveState && commandItems.some(commandItemIsActive)") &&
+      component.includes("allowActiveState && isActiveActivityStatus(event.status)") &&
+      component.includes("commandItemRowLabel(item, allowActiveState)") &&
       component.includes("ChevronRight") &&
+      component.includes("styles.workedChevron") &&
+      component.indexOf("styles.workedLabel") < component.indexOf("styles.workedChevron") &&
       component.includes("commandIconChevron") &&
       component.includes("buildCommandItems") &&
       css.includes(".disclosureBody") &&
       css.includes('data-open="true"') &&
+      css.includes('.workedBlock[data-type="completed-work"][data-open="true"] .workedChevron') &&
+      css.includes("transform: rotate(90deg)") &&
+      css.includes("margin-left: 4px") &&
+      !css.includes("margin-left: auto") &&
+      !css.includes("transform: translateX(-2px)") &&
       css.includes("grid-template-rows 320ms") &&
       css.includes(".commandItems") &&
       css.includes(".commandSummary:hover .commandLabel"),
-    "Completed runs expose animated Worked and Ran command disclosures with chevron and terminal icons."
+    "Completed runs expose animated Worked and Ran command disclosures, with the Worked chevron trailing, visible after completion, and rotated down while open."
   );
   record(
-    "worked-auto-collapse-before-final-reveal",
-    component.includes("COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 900") &&
+    "worked-auto-collapse-after-final-reveal",
+    component.includes("COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 1000") &&
       component.includes("completedWorkAutoCollapseDelayMs") &&
       chatTranscript.includes("assistantRevealComplete") &&
-      chatTranscript.includes("FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS = 80") &&
-      chatTranscript.includes("isFinalizingResponse || (!activityIsWorking && assistantRevealComplete)") &&
-      chatView.includes("FINAL_ACTIVITY_PREFOLD_MS") &&
+      chatTranscript.includes("autoCollapseCompletedWork={!activityIsWorking && assistantRevealComplete}") &&
+      !chatTranscript.includes("FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS") &&
+      !chatView.includes("FINAL_ACTIVITY_PREFOLD_MS") &&
       chatView.includes("completePendingAssistantMessage") &&
       css.includes("grid-template-rows 1400ms") &&
-      chatTranscript.includes("startBottomSettleFollow(COMPLETED_WORK_SCROLL_SETTLE_MS)"),
-    "Completed Worked details fold during a short finalizing phase before the assistant completion state is revealed, while the transcript follows bottom layout changes."
+      css.includes("cubic-bezier(0.42, 0, 0.2, 1)") &&
+      css.includes("ease-in-out") &&
+      chatTranscript.includes("startActivityCollapseAnchorLock(COMPLETED_WORK_ANCHOR_LOCK_MS)") &&
+      chatTranscript.includes("ResizeObserver") &&
+      chatTranscript.includes("viewport.scrollTop = Math.max(0, viewport.scrollTop + delta)"),
+    "Completed Worked details wait for the assistant reveal to finish, then fold after 1s with ease-in-out motion while the transcript compensates height loss above the answer."
   );
   record(
     "transcript-session-bottom-snap",

@@ -391,12 +391,22 @@ export function normalizeActivityTokenUsage(value: unknown): HermesTokenUsage | 
     generationId: ["generationId", "generation_id"],
     finishReason: ["finishReason", "finish_reason"],
     requestId: ["requestId", "request_id"],
+    requestedModel: ["requestedModel", "requested_model"],
+    requestedProvider: ["requestedProvider", "requested_provider"],
     source: ["source"]
   }) as Array<[keyof HermesTokenUsage, string[]]>) {
     const text = sourceKeys.map((key) => asString(usage[key])).find(Boolean);
     if (text) {
       normalized[targetKey] = text as never;
     }
+  }
+  const routeMismatch = booleanValue(usage.routeMismatch) ?? booleanValue(usage.route_mismatch);
+  const routeVerified = booleanValue(usage.routeVerified) ?? booleanValue(usage.route_verified);
+  if (routeMismatch !== undefined) {
+    normalized.routeMismatch = routeMismatch;
+  }
+  if (routeVerified !== undefined) {
+    normalized.routeVerified = routeVerified;
   }
   const latencyMs = finiteOptionalNumber(usage.latencyMs) ?? finiteOptionalNumber(usage.latency_ms);
   if (latencyMs !== undefined) {
@@ -438,6 +448,10 @@ function finiteTokenCount(value: unknown): number | undefined {
 
 function finiteOptionalNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function booleanValue(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function secondsToMs(value: number | undefined): number | undefined {

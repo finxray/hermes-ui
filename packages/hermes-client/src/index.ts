@@ -571,25 +571,19 @@ export async function streamHermesSessionChat(
         kind: "http_error" as const,
         message: "Failed to apply the selected Hermes model for this session."
       };
-      if (canUseTurnScopedOpenRouterModel(runtimeModelId, request.provider, error)) {
-        // Hermes' session model endpoint only accepts models in GET /v1/models,
-        // but session chat can still route OpenRouter catalog ids supplied in
-        // the request body. Continue as a turn-scoped model override.
-      } else {
-        const status =
-          error.kind === "timeout" || error.kind === "network"
-            ? 502
-            : error.kind === "disabled" || error.kind === "unconfigured"
-              ? 503
-              : error.kind === "invalid_config"
-                ? 500
-                : 400;
-        return chatFailure(
-          status,
-          error.kind === "unknown" ? "http_error" : error.kind,
-          error.message
-        );
-      }
+      const status =
+        error.kind === "timeout" || error.kind === "network"
+          ? 502
+          : error.kind === "disabled" || error.kind === "unconfigured"
+            ? 503
+            : error.kind === "invalid_config"
+              ? 500
+              : 400;
+      return chatFailure(
+        status,
+        error.kind === "unknown" ? "http_error" : error.kind,
+        error.message
+      );
     }
   }
 
@@ -662,17 +656,6 @@ export async function streamHermesSessionChat(
         : undefined
     )
   };
-}
-
-function canUseTurnScopedOpenRouterModel(
-  modelId: string | null,
-  provider: string | null | undefined,
-  error: HermesStatusError
-): boolean {
-  if (!modelId || !isOpenRouterCatalogProvider(provider ?? "")) {
-    return false;
-  }
-  return /not recognized|not available|GET \/v1\/models/i.test(error.message);
 }
 
 export function isPlaceholderHermesModelId(modelId: string | null | undefined): boolean {
@@ -4038,10 +4021,10 @@ function defaultModelDescriptor(id: string): HermesModelDescriptor | null {
     provider: "OpenRouter",
     providerKey: "openrouter",
     catalogSource: "hermes-config",
-    selectionScope: "turn",
+    selectionScope: "session",
     selectModelId: PROJECT_DEFAULT_MODEL_ID,
     contextLength: 1_048_576,
-    description: "Project default model. Sent through Hermes as an OpenRouter per-turn override when Hermes does not advertise it in /v1/models."
+    description: "Project default model. Requires Hermes session verification before the UI treats it as active."
   };
 }
 
@@ -4230,7 +4213,7 @@ function normalizeOpenRouterModels(data: Record<string, unknown> | null): Hermes
       providerKey: "openrouter",
       selectModelId: id,
       catalogSource: "ui-openrouter",
-      selectionScope: "turn",
+      selectionScope: "session",
       description: asString(record.description) || null,
       contextLength: numberOrNull(record.context_length),
       created: numberOrNull(record.created),
@@ -4270,6 +4253,10 @@ function normalizeLmStudioModels(data: Record<string, unknown> | null): HermesMo
     if (type === "embedding") {
       continue;
     }
+    const loadedInstances = Array.isArray(record.loaded_instances) ? record.loaded_instances : [];
+    if (loadedInstances.length === 0) {
+      continue;
+    }
 
     const id = asString(record.id) || asString(record.key) || asString(record.model);
     if (!id || isPlaceholderHermesModelId(id)) {
@@ -4284,7 +4271,7 @@ function normalizeLmStudioModels(data: Record<string, unknown> | null): HermesMo
       providerKey: LOCAL_LMSTUDIO_PROVIDER_KEY,
       selectModelId: id,
       catalogSource: "ui-lmstudio",
-      selectionScope: "turn",
+      selectionScope: "session",
       contextLength: runtime.loadedContextLength ?? runtime.maxContextLength ?? null,
       inputModalities: normalizeLmStudioInputModalities(record),
       outputModalities: ["text"],

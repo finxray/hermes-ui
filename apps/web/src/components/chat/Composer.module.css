@@ -672,10 +672,15 @@
 }
 
 .modelSelectError {
-  margin: 6px 4px 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 6px auto 0;
+  padding: 0 15px;
   color: var(--notice);
   font-size: 12px;
   line-height: 1.45;
+  text-align: center;
+  text-wrap: balance;
 }
 
 @keyframes modelSpinner {

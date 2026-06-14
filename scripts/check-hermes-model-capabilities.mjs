@@ -38,6 +38,10 @@ function readFile(relPath) {
   return readFileSync(abs, "utf8");
 }
 
+function countOccurrences(value, token) {
+  return value.split(token).length - 1;
+}
+
 console.log("\ncheck-hermes-model-capabilities");
 console.log("=".repeat(48));
 
@@ -120,28 +124,30 @@ check(
   Boolean(
     indexFile?.includes("/api/sessions/${encodeURIComponent(hermesSessionId)}/chat/stream") &&
       indexFile?.includes("model: runtimeModelId || undefined") &&
-      indexFile?.includes("provider: request.provider || undefined")
+      indexFile?.includes("provider: request.provider || undefined") &&
+      indexFile?.includes("requested_model: runtimeModelId ?? null") &&
+      indexFile?.includes("model_selection_scope: request.modelSelectionScope ?? null")
   ),
-  "Hermes session stream must receive the selected model too; a pre-stream override alone can still fall back to the default model."
+  "Hermes session stream must receive the selected model and route metadata; a pre-stream override alone can still fall back to the default model."
 );
 check(
-  "streamHermesSessionChat supports turn-scoped OpenRouter catalog models",
+  "streamHermesSessionChat does not silently fall back to unverified OpenRouter routing",
   Boolean(
-    indexFile?.includes("canUseTurnScopedOpenRouterModel") &&
-      indexFile?.includes("turn-scoped model override") &&
-      indexFile?.includes("not recognized|not available|GET \\/v1\\/models")
+    !indexFile?.includes("canUseTurnScopedOpenRouterModel") &&
+      indexFile?.includes("Failed to apply the selected Hermes model for this session.") &&
+      indexFile?.includes("return chatFailure(")
   ),
-  "Hermes can stream arbitrary OpenRouter ids in the chat body even when session model select rejects models absent from /v1/models."
+  "If Hermes rejects a model selection, the UI must fail loudly instead of continuing on the server default model."
 );
 check(
-  "streamHermesSessionChat skips session override for turn-scoped model requests",
+  "streamHermesSessionChat only skips session override for explicit turn-scope requests",
   Boolean(
     typesFile?.includes('modelSelectionScope?: "session" | "turn" | null') &&
       indexFile?.includes('request.modelSelectionScope !== "turn"') &&
       indexFile?.includes("model: runtimeModelId || undefined") &&
       indexFile?.includes("provider: request.provider || undefined")
   ),
-  "Turn-scoped local or UI catalog models should be sent in the chat stream body without first calling the session model override endpoint."
+  "The low-level API keeps a compatibility escape hatch, but UI catalog models should require session verification."
 );
 check(
   "streamHermesSessionChat emits verified-model fallback for empty assistant completions",
@@ -254,14 +260,15 @@ check(
   "UI-added models should come from a typed server-side OpenRouter catalog client."
 );
 check(
-  "LM Studio chat models from Hermes catalog remain selectable as turn-scoped local models",
+  "LM Studio chat models from Hermes catalog use verified session selection",
   Boolean(
     indexFile?.includes('LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio"') &&
       indexFile?.includes("isTurnScopedLocalProvider(providerKey)") &&
-      indexFile?.includes('selectionScope: isTurnScopedLocalProvider(providerKey) ? "turn" : "session"') &&
+      indexFile?.includes('selectionScope: "session"') &&
+      indexFile?.includes("use the session select endpoint so the UI can verify") &&
       indexFile?.includes('return "LM Studio"')
   ),
-  "Hermes can advertise LM Studio models in /v1/models; the UI should show chat ids such as qwen/qwen3.6-35b-a3b while still keeping them turn-scoped."
+  "Hermes-advertised LM Studio chat ids such as qwen/qwen3.6-35b-a3b should be verified through the session model endpoint when Hermes can select them."
 );
 check(
   "Local non-chat models remain filtered",
@@ -271,6 +278,15 @@ check(
       indexFile?.includes('providerKey.startsWith("local-") && !isTurnScopedLocalProvider(providerKey)')
   ),
   "Embeddings and Ollama-style local tags should not appear in the chat model selector."
+);
+check(
+  "LM Studio UI catalog exposes only loaded chat models",
+  Boolean(
+    indexFile?.includes("const loadedInstances = Array.isArray(record.loaded_instances)") &&
+      indexFile?.includes("loadedInstances.length === 0") &&
+      indexFile?.includes('type === "embedding"')
+  ),
+  "Installed but unloaded LM Studio models must not look selectable in Composer."
 );
 check(
   "normalizeHermesUiCapabilities computes clientSelectable from real model catalog",
@@ -365,11 +381,11 @@ check(
   "Runtime identity instruction builder exists",
   Boolean(
     runtimeIdentityFile?.includes("buildHermesRuntimeIdentityInstruction") &&
-      runtimeIdentityFile?.includes("Runtime model identity for this turn") &&
-      runtimeIdentityFile?.includes("Use the provider display name above") &&
-      runtimeIdentityFile?.includes("Do not claim to be a fallback/default model")
+      runtimeIdentityFile?.includes("Requested runtime model route for this turn") &&
+      runtimeIdentityFile?.includes("This is a requested route, not proof") &&
+      runtimeIdentityFile?.includes("provider usage metadata confirms the actual route")
   ),
-  "Assistant replies should not self-report DeepSeek when the verified session model is GPT OSS 120B or Zai GLM 4.7"
+  "Assistant replies must not self-report a requested route as the actual billed provider/model without usage confirmation."
 );
 check(
   "Chat stream route includes selected runtime identity in instructions",
@@ -389,6 +405,14 @@ check(
       readFile("apps/web/src/hooks/useHermesSessionModel.ts")?.includes("modelRuntime")
   ),
   "The browser should read local-model specs through the Web UI BFF and pass only typed runtime metadata through the session model pipeline."
+);
+check(
+  "LM Studio catalog defaults to native metadata-rich model endpoint",
+  Boolean(
+    indexFile?.includes('LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/api/v1/models"') &&
+      indexFile?.includes('url.pathname = "/api/v1/models"')
+  ),
+  "Local model discovery should use LM Studio's native /api/v1/models endpoint so the UI sees loaded context, quantization, and runtime settings."
 );
 
 // --- 5. Composer has conditional model selector ---
@@ -474,13 +498,15 @@ check(
   "UI-provided OpenRouter models must use the same Composer -> Hermes verification path as Hermes-configured models."
 );
 check(
-  "useHermesSessionModel marks UI OpenRouter models as per-turn ready",
+  "UI-provided OpenRouter and LM Studio models require session verification",
   Boolean(
-    sessionModelHookFile?.includes('"turn-ready"') &&
-      sessionModelHookFile?.includes('selectRequest.selectionScope === "turn"') &&
-      readFile("apps/web/src/components/shell/HermesStatusPanel.tsx")?.includes("per-turn")
+    indexFile?.includes('catalogSource: "ui-openrouter"') &&
+      indexFile?.includes('catalogSource: "ui-lmstudio"') &&
+      countOccurrences(indexFile ?? "", 'selectionScope: "session"') >= 4 &&
+      !indexFile?.includes('catalogSource: "ui-openrouter",\n      selectionScope: "turn"') &&
+      !indexFile?.includes('catalogSource: "ui-lmstudio",\n      selectionScope: "turn"')
   ),
-  "OpenRouter models outside Hermes /v1/models cannot be persisted as session overrides; the rail should label them as per-turn."
+  "UI-discovered models must not become active through an unverified per-turn hint."
 );
 check(
   "useHermesSessionModel persists and reapplies the last session model preference",
@@ -488,19 +514,30 @@ check(
     sessionModelHookFile?.includes("persistSessionModelPreference") &&
       sessionModelHookFile?.includes("activeSession?.modelPreference") &&
       sessionModelHookFile?.includes("preferenceFromSelectRequest") &&
-      sessionModelHookFile?.includes("appliedPreferenceKeyRef")
+      sessionModelHookFile?.includes("appliedPreferenceKeyRef") &&
+      sessionModelHookFile?.includes('verified?.syncStatus === "synced"')
   ),
-  "Refreshing the page must restore the last model selected in Composer instead of falling back to Hermes' transient current model."
+  "Refreshing the page must restore the last verified model selected in Composer, while failed selections must not poison session preference."
 );
 check(
-  "useHermesSessionModel refresh preserves persisted or turn-scoped Composer selection",
+  "useHermesSessionModel refresh reapplies persisted Composer selection through verification",
   Boolean(
     sessionModelHookFile?.includes("const refreshModel = useCallback") &&
       sessionModelHookFile?.includes("await applySessionModelSelection(selectRequest, false)") &&
-      sessionModelHookFile?.includes('snapshotRef.current.syncStatus === "turn-ready"') &&
       sessionModelHookFile?.includes("refresh: refreshModel")
   ),
-  "The post-send refresh must not replace a DeepSeek/OpenRouter Composer choice with Hermes' older session model such as Kimi."
+  "The post-send refresh must not replace a Composer choice without first reapplying the current verified selection."
+);
+check(
+  "useHermesSessionModel ignores stale model-select responses and scopes errors to the selected model",
+  Boolean(
+    sessionModelHookFile?.includes("selectionSeqRef") &&
+      sessionModelHookFile?.includes("isCurrentSelectionRequest") &&
+      sessionModelHookFile?.includes("errorModelId") &&
+      sessionModelHookFile?.includes("const scopedError") &&
+      sessionModelHookFile?.includes("error: scopedError")
+  ),
+  "A slow failed selection must not leave a stale model error under a newer Composer model label."
 );
 check(
   "workspace state stores session model preference in persisted local workspace",

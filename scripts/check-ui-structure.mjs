@@ -315,6 +315,14 @@ if (!chatViewVisualCss.includes(".scrollViewport > *") || !chatViewVisualCss.inc
 if (!chatViewVisualCss.includes(".composerAnchor")) {
   failures.push("Composer must use a centered anchor aligned with transcript content width.");
 }
+if (
+  !composerVisualCss.includes(".modelSelectError") ||
+  !composerVisualCss.includes("margin: 6px auto 0") ||
+  !composerVisualCss.includes("text-align: center") ||
+  !composerVisualCss.includes("text-wrap: balance")
+) {
+  failures.push("Composer model-select error text must be centered to the composer surface.");
+}
 if (!chatViewVisualCss.includes("padding: 0 clamp(20px, 2vw, 36px) 1px")) {
   failures.push("Main and split chat composers must share the 10px visual bottom anchor.");
 }
@@ -2483,7 +2491,10 @@ for (const token of [
 
 for (const token of [
   "responseTokenUsage",
-  "normalizeActivityTokenUsage(event.usage)",
+  "updateResponseTokenUsage(event.usage)",
+  "annotateTokenUsageRoute",
+  "withEstimatedTokenFallback",
+  'next.source = "estimated"',
   "metadata: tokenUsage ? { tokenUsage } : undefined"
 ]) {
   if (!chatViewVisualSource.includes(token)) {

@@ -3,6 +3,7 @@
   gap: 4px;
   min-width: 0;
   padding: 4px 0 6px;
+  overflow-anchor: none;
 }
 
 .running {
@@ -104,7 +105,19 @@
   transition: transform 130ms ease;
 }
 
-.workedBlock[data-open="true"] .chevron {
+.workedChevron {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  color: var(--text-muted);
+  opacity: 1;
+  transform: rotate(0deg);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    color 120ms ease;
+}
+
+.workedBlock[data-type="completed-work"][data-open="true"] .workedChevron {
   transform: rotate(90deg);
 }
 
@@ -153,6 +166,11 @@
 
 .workedSummary:hover .workedLabel,
 .commandSummary:hover .commandLabel {
+  color: var(--text-primary);
+}
+
+.workedSummary:hover .workedChevron,
+.workedSummary:focus-visible .workedChevron {
   color: var(--text-primary);
 }
 
@@ -255,9 +273,9 @@
 
 .workedBlock[data-type="completed-work"] .disclosureBody {
   transition:
-    grid-template-rows 1400ms cubic-bezier(0.2, 0.82, 0.16, 1),
-    opacity 1400ms ease,
-    clip-path 1400ms cubic-bezier(0.2, 0.82, 0.16, 1);
+    grid-template-rows 1400ms cubic-bezier(0.42, 0, 0.2, 1),
+    opacity 1400ms ease-in-out,
+    clip-path 1400ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
 .disclosureInner {

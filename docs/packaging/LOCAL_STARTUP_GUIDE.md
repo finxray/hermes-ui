@@ -128,3 +128,41 @@ Web UI is optional and does not install Brain Memory yet.
 Use Brain Memory standalone when you only need its backend/MCP/Gateway behavior.
 Use this Web UI when you want a ChatGPT-like Studio surface on top of Hermes and
 Gateway-approved Brain Memory inspection.
+
+## F. Full Local Stack (Windows + WSL + Docker)
+
+When Hermes runs in WSL, Brain Memory uses Docker Desktop, and the Web UI runs
+on Windows, use the stack launcher from the Hermes UI repo root:
+
+```powershell
+npm run studio:stack
+```
+
+Dry run (planned actions only):
+
+```powershell
+npm run studio:stack -- -DryRun
+```
+
+The launcher:
+
+1. starts Docker Desktop when the engine is down and waits for `docker info`;
+2. runs Brain Memory's sanctioned `scripts/start-brain-memory.ps1` from the
+   sibling `../brain-memory` repo (override with `STUDIO_BRAIN_MEMORY_REPO`);
+3. starts Hermes gateway in WSL via `hermes gateway start` when
+   `http://127.0.0.1:8642/health` is down (distro default `Ubuntu`, override
+   with `STUDIO_WSL_DISTRO`);
+4. starts or verifies the Web UI with `npm run studio:web` on port `3000`;
+5. probes Brain Memory `/health` and `/ready`, Hermes `/health`, and the Web UI.
+
+It does **not** modify `.env.local`, print API keys, or install services.
+
+If Docker Desktop stalls on login, license, update, or WSL prompts, complete
+those in the GUI and re-run the command.
+
+After the stack is up:
+
+```powershell
+npm run studio:launch -- --check --base-url http://127.0.0.1:3000
+npm run studio:doctor
+```

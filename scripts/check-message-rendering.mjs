@@ -106,6 +106,9 @@ expect(transcript.includes("isStreamingAssistant && activityIsWorking"), "Comple
 expect(bubble.includes("CopyTextButton") && bubble.includes("Copy message"), "Assistant message-level copy action is present.");
 expect(bubble.includes("userBubble") && bubble.includes("messageFooter"), "Messages use a hover footer row for timestamp and actions.");
 expect(!bubble.includes("styles.author") && !bubble.includes('<span className={styles.author}'), "Assistant responses do not render a visible author header.");
+expect(!bubble.includes("formatRouteUsagePart") && !bubble.includes("requestedModel") && !bubbleCss.includes('.usageMeta[data-tone="warning"]'), "Assistant usage footer stays compact and does not show requested model route labels.");
+expect(!bubble.includes("tokensPerSecond") && !bubble.includes("formatCost") && !bubble.includes("formatSpeed"), "Assistant usage footer only shows input/output token counts.");
+expect(bubble.includes("Estimated token usage.") && bubble.includes("Provider or Hermes reported usage."), "Assistant usage footer distinguishes estimated token counts from provider-reported usage.");
 expect(bubble.includes("Pencil"), "User hover footer includes an edit action placeholder.");
 expect(bubble.includes(".split(\"\\n\")"), "User messages keep simple newline-preserving rendering.");
 expect(!bubble.includes("referenceRow"), "Message bubbles do not render retrieval reference chips under assistant text.");

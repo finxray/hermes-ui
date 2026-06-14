@@ -29,7 +29,7 @@ type AgentActivityBlockProps = {
 // the whole activity block — and any thinking/command rows under it — vanish the
 // moment a short run completed.
 const WORKED_LABEL_MIN_DURATION_MS = 0;
-const COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 900;
+const COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 1000;
 const EMPTY_ACTIVITY_ID_SET: ReadonlySet<string> = new Set();
 
 type CommandGroup = {
@@ -108,7 +108,7 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
   }
 
   return (
-    <section className={styles.wrap} aria-label="Agent activity">
+    <section className={styles.wrap} data-agent-activity-block="true" aria-label="Agent activity">
       {workingLabel ? (
         <WorkingLog items={sections.liveTimelineItems} label={workingLabel} liveTokenUsage={liveTokenUsage} />
       ) : showWorked ? (
@@ -159,7 +159,7 @@ function WorkingLog({
       </div>
       {items.length > 0 ? (
         <div className={styles.liveProgressBody}>
-          <ActivityTimeline items={items} />
+          <ActivityTimeline allowActiveState items={items} />
         </div>
       ) : null}
     </div>
@@ -194,13 +194,13 @@ function WorkedRow({
       type={initiallyOpen ? "completed-work" : undefined}
       summary={
         <>
-          <ChevronRight className={styles.chevron} size={14} aria-hidden="true" />
           <span className={styles.workedLabel}>{label}</span>
           {tokenParts.map((part) => (
             <span className={styles.tokenPart} data-kind={part.kind} key={part.key}>
               {part.label}
             </span>
           ))}
+          <ChevronRight className={styles.workedChevron} size={14} aria-hidden="true" />
         </>
       }
     >
@@ -215,21 +215,33 @@ function WorkedRow({
   );
 }
 
-function ActivityTimeline({ items }: { items: ActivityTimelineItem[] }) {
+function ActivityTimeline({
+  allowActiveState = false,
+  items
+}: {
+  allowActiveState?: boolean;
+  items: ActivityTimelineItem[];
+}) {
   return (
     <div className={styles.timeline}>
       {items.map((item) =>
         item.kind === "commands" ? (
-          <CommandGroupRow events={item.events} key={item.id} />
+          <CommandGroupRow allowActiveState={allowActiveState} events={item.events} key={item.id} />
         ) : (
-          <ReasoningChunk event={item.event} key={item.id} />
+          <ReasoningChunk allowActiveState={allowActiveState} event={item.event} key={item.id} />
         )
       )}
     </div>
   );
 }
 
-function ReasoningChunk({ event }: { event: AgentActivityEvent }) {
+function ReasoningChunk({
+  allowActiveState = false,
+  event
+}: {
+  allowActiveState?: boolean;
+  event: AgentActivityEvent;
+}) {
   const title = titleForReasoningChunk(event);
   const detail = summarizeWorkedDetail(event);
   const showDetail = detail ? !isSameActivityLabel(title, detail) : false;
@@ -238,7 +250,7 @@ function ReasoningChunk({ event }: { event: AgentActivityEvent }) {
     // Render a tool note as a single status-like line ("Used Write File
     // /tmp/...") instead of a title stacked over its target, matching the
     // inline Thinking/Running/Reading status rows.
-    const active = isActiveActivityStatus(event.status);
+    const active = allowActiveState && isActiveActivityStatus(event.status);
     return (
       <div className={styles.toolNote}>
         <span className={styles.toolIcon} aria-hidden="true" />
@@ -258,12 +270,18 @@ function ReasoningChunk({ event }: { event: AgentActivityEvent }) {
   );
 }
 
-function CommandGroupRow({ events }: { events: AgentActivityEvent[] }) {
+function CommandGroupRow({
+  allowActiveState = false,
+  events
+}: {
+  allowActiveState?: boolean;
+  events: AgentActivityEvent[];
+}) {
   const commandItems = buildCommandItems(events);
   const count = commandItems.length;
-  const isActive = commandItems.some(commandItemIsActive);
+  const isActive = allowActiveState && commandItems.some(commandItemIsActive);
   const label = count === 1
-    ? commandItemRowLabel(commandItems[0])
+    ? commandItemRowLabel(commandItems[0], allowActiveState)
     : `${isActive ? "Running" : "Ran"} ${count} commands`;
 
   if (count === 0) {
@@ -292,7 +310,7 @@ function CommandGroupRow({ events }: { events: AgentActivityEvent[] }) {
         ) : (
           <div className={styles.commandItems}>
             {commandItems.map((item) => (
-              <CommandItemRow item={item} key={item.id} />
+              <CommandItemRow allowActiveState={allowActiveState} item={item} key={item.id} />
             ))}
           </div>
         )}
@@ -301,15 +319,21 @@ function CommandGroupRow({ events }: { events: AgentActivityEvent[] }) {
   );
 }
 
-function CommandItemRow({ item }: { item: CommandItem }) {
-  const active = commandItemIsActive(item);
+function CommandItemRow({
+  allowActiveState = false,
+  item
+}: {
+  allowActiveState?: boolean;
+  item: CommandItem;
+}) {
+  const active = allowActiveState && commandItemIsActive(item);
   return (
     <AnimatedDisclosure
       className={styles.commandItemBlock}
       summaryClassName={styles.commandItemSummary}
       summary={
         <>
-          <span className={styles.commandItemLabel} data-active={active ? "true" : "false"}>{commandItemRowLabel(item)}</span>
+          <span className={styles.commandItemLabel} data-active={active ? "true" : "false"}>{commandItemRowLabel(item, allowActiveState)}</span>
           <ChevronRight className={styles.commandItemChevron} size={14} aria-hidden="true" />
         </>
       }
@@ -505,7 +529,7 @@ function titleForReasoningChunk(event: AgentActivityEvent) {
   return pickMeaningfulActivityText(event.title) ?? "Activity update";
 }
 
-function commandItemRowLabel(item?: CommandItem) {
+function commandItemRowLabel(item?: CommandItem, allowActiveState = false) {
   if (!item) {
     return "Ran command";
   }
@@ -517,7 +541,7 @@ function commandItemRowLabel(item?: CommandItem) {
     item.event.title;
   const duration = commandItemDuration(item);
   const cleaned = cleanCommandLabel(preview);
-  const verb = commandItemIsActive(item) ? "Running" : "Ran";
+  const verb = allowActiveState && commandItemIsActive(item) ? "Running" : "Ran";
   return cleaned ? `${verb} ${cleaned}${duration}` : `${verb} command${duration}`;
 }
 

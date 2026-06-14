@@ -9,8 +9,7 @@ import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
 const ACTIVITY_REVEAL_DELAY_MS = 5_000;
-const COMPLETED_WORK_SCROLL_SETTLE_MS = 1_700;
-const FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS = 80;
+const COMPLETED_WORK_ANCHOR_LOCK_MS = 1_700;
 
 type ChatTranscriptProps = {
   activeProject: Project;
@@ -48,8 +47,9 @@ export function ChatTranscript({
   const bottomFollowFrameRef = useRef<number | null>(null);
   const bottomFollowPassesRef = useRef(0);
   const bottomFollowBehaviorRef = useRef<ScrollBehavior>("auto");
-  const bottomSettleFrameRef = useRef<number | null>(null);
-  const bottomSettleUntilRef = useRef(0);
+  const collapseAnchorObserverRef = useRef<ResizeObserver | null>(null);
+  const collapseAnchorTimerRef = useRef<number | null>(null);
+  const collapseAnchorLastHeightRef = useRef(0);
   const [activityDelayElapsed, setActivityDelayElapsed] = useState(false);
   const [revealedAssistantMessageId, setRevealedAssistantMessageId] = useState<string | null>(null);
   const lastMessage = activeSession?.messages.at(-1);
@@ -78,8 +78,7 @@ export function ChatTranscript({
   const activitySignal = `${shouldShowActivityBlock ? "visible" : "hidden"}:${activityEvents.length}:${activeSession?.toolEvents.length ?? 0}`;
   const activityBlock = activeSession && shouldShowActivityBlock ? (
     <AgentActivityBlock
-      autoCollapseCompletedWork={isFinalizingResponse || (!activityIsWorking && assistantRevealComplete)}
-      completedWorkAutoCollapseDelayMs={isFinalizingResponse ? FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS : undefined}
+      autoCollapseCompletedWork={!activityIsWorking && assistantRevealComplete}
       events={activityEvents}
       isWorking={activityIsWorking}
       legacyEvents={activeSession.toolEvents}
@@ -90,7 +89,7 @@ export function ChatTranscript({
   ) : null;
 
   function handleCompletedWorkAutoCollapse() {
-    startBottomSettleFollow(COMPLETED_WORK_SCROLL_SETTLE_MS);
+    startActivityCollapseAnchorLock(COMPLETED_WORK_ANCHOR_LOCK_MS);
   }
 
   const getScrollViewport = () => transcriptRef.current?.parentElement ?? null;
@@ -144,41 +143,62 @@ export function ChatTranscript({
     bottomFollowFrameRef.current = window.requestAnimationFrame(follow);
   };
 
-  const startBottomSettleFollow = (durationMs: number) => {
+  const stopActivityCollapseAnchorLock = () => {
+    collapseAnchorObserverRef.current?.disconnect();
+    collapseAnchorObserverRef.current = null;
+    if (collapseAnchorTimerRef.current !== null) {
+      window.clearTimeout(collapseAnchorTimerRef.current);
+      collapseAnchorTimerRef.current = null;
+    }
+    collapseAnchorLastHeightRef.current = 0;
+  };
+
+  const startActivityCollapseAnchorLock = (durationMs: number) => {
     const scrollViewport = getScrollViewport();
-    if (!scrollViewport) {
+    const transcript = transcriptRef.current;
+    const activityBlock = transcript?.querySelector<HTMLElement>('[data-agent-activity-block="true"]') ?? null;
+    if (!scrollViewport || !transcript || !activityBlock) {
       return;
     }
 
-    const scrollThreshold = typeof bottomClearancePx === "number" ? bottomClearancePx + 160 : 220;
-    if (!isNearBottom(scrollViewport, scrollThreshold)) {
+    const anchorMessage = activityAnchorMessageId
+      ? findMessageElementById(transcript, activityAnchorMessageId)
+      : null;
+    const scrollThreshold = typeof bottomClearancePx === "number" ? bottomClearancePx + 120 : 180;
+    if (
+      !needsBottomSnapRef.current &&
+      !isNearBottom(scrollViewport, scrollThreshold) &&
+      (!anchorMessage || !isElementNearViewport(anchorMessage, scrollViewport, 80))
+    ) {
       return;
     }
 
-    bottomSettleUntilRef.current = Math.max(bottomSettleUntilRef.current, performance.now() + durationMs);
-    if (bottomSettleFrameRef.current !== null) {
-      return;
-    }
+    stopActivityCollapseAnchorLock();
+    collapseAnchorLastHeightRef.current = activityBlock.getBoundingClientRect().height;
 
-    const followSettlingLayout = () => {
-      bottomSettleFrameRef.current = null;
+    const keepOutputTextStable = () => {
       const viewport = getScrollViewport();
-      if (!viewport) {
+      if (!viewport || !activityBlock.isConnected) {
+        stopActivityCollapseAnchorLock();
         return;
       }
 
-      if (!isNearBottom(viewport, scrollThreshold)) {
-        return;
-      }
-
-      scrollToBottom("auto");
-
-      if (performance.now() < bottomSettleUntilRef.current) {
-        bottomSettleFrameRef.current = window.requestAnimationFrame(followSettlingLayout);
+      const nextHeight = activityBlock.getBoundingClientRect().height;
+      const previousHeight = collapseAnchorLastHeightRef.current;
+      const delta = nextHeight - previousHeight;
+      collapseAnchorLastHeightRef.current = nextHeight;
+      if (Math.abs(delta) > 0.1) {
+        viewport.scrollTop = Math.max(0, viewport.scrollTop + delta);
       }
     };
 
-    bottomSettleFrameRef.current = window.requestAnimationFrame(followSettlingLayout);
+    collapseAnchorObserverRef.current = new ResizeObserver(keepOutputTextStable);
+    collapseAnchorObserverRef.current.observe(activityBlock);
+    keepOutputTextStable();
+    collapseAnchorTimerRef.current = window.setTimeout(
+      stopActivityCollapseAnchorLock,
+      durationMs + 180
+    );
   };
 
   useLayoutEffect(() => {
@@ -187,10 +207,7 @@ export function ChatTranscript({
         window.cancelAnimationFrame(bottomFollowFrameRef.current);
         bottomFollowFrameRef.current = null;
       }
-      if (bottomSettleFrameRef.current !== null) {
-        window.cancelAnimationFrame(bottomSettleFrameRef.current);
-        bottomSettleFrameRef.current = null;
-      }
+      stopActivityCollapseAnchorLock();
     };
   }, []);
 
@@ -451,6 +468,18 @@ function shouldShowAgentActivityBlock({
   }
 
   return false;
+}
+
+function findMessageElementById(root: HTMLElement, messageId: string) {
+  return Array.from(root.querySelectorAll<HTMLElement>("[data-chat-message-id]")).find(
+    (element) => element.dataset.chatMessageId === messageId
+  ) ?? null;
+}
+
+function isElementNearViewport(element: HTMLElement, viewport: HTMLElement, marginPx: number) {
+  const elementRect = element.getBoundingClientRect();
+  const viewportRect = viewport.getBoundingClientRect();
+  return elementRect.bottom >= viewportRect.top - marginPx && elementRect.top <= viewportRect.bottom + marginPx;
 }
 
 function isMeaningfulActivityEvent(event: AgentActivityEvent) {

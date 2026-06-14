@@ -27,6 +27,14 @@ export function HermesStatusPanel({
   const sessionCheckedAt = sessionModel?.checkedAt
     ? new Date(sessionModel.checkedAt).toLocaleTimeString()
     : null;
+  // A client selection is applied through Hermes' per-session override, which is
+  // "memory only" and is not confirmed as the model that actually generates the
+  // response. Surface that explicitly instead of implying the route is verified.
+  const softOverrideActive =
+    Boolean(sessionModel) &&
+    status?.reachable === true &&
+    activeModelState?.selectionStatus === "client-selectable" &&
+    (sessionModel?.syncStatus === "synced" || sessionModel?.syncStatus === "turn-ready");
 
   return (
     <section className={styles.section} aria-labelledby="hermes-status-heading">
@@ -56,10 +64,18 @@ export function HermesStatusPanel({
         </div>
         {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
         {sessionModel ? (
-          <div className={styles.syncStrip} data-state={sessionModel.syncStatus}>
+          <div
+            className={styles.syncStrip}
+            data-state={sessionModel.syncStatus}
+            data-unconfirmed={softOverrideActive ? "true" : undefined}
+          >
             <div className={styles.syncTop}>
               <span>Session model pipeline</span>
-              <span className={styles.syncState}>{syncStatusLabel(sessionModel.syncStatus)}</span>
+              <span className={styles.syncState}>
+                {softOverrideActive && sessionModel.syncStatus === "synced"
+                  ? "requested"
+                  : syncStatusLabel(sessionModel.syncStatus)}
+              </span>
             </div>
             <div className={styles.syncPipeline} aria-label="Model sync pipeline">
               <span className={styles.syncNode}>Hermes</span>
@@ -69,14 +85,14 @@ export function HermesStatusPanel({
               <span className={styles.syncNode}>UI</span>
             </div>
             <div className={styles.meta}>
-              {sessionModel.syncStatus === "fallback"
-                ? "Hermes has not created this session yet; using the server default."
-                : sessionModel.syncStatus === "turn-ready"
-                  ? "Requested through Hermes but not verified as the active session model."
-                : sessionCheckedAt
-                  ? `Session verified: ${sessionCheckedAt}`
-                  : "Waiting for Hermes session verification."}
+              {sessionPipelineMeta(sessionModel.syncStatus, sessionCheckedAt, softOverrideActive)}
             </div>
+            {softOverrideActive ? (
+              <div className={styles.caveat}>
+                Applied as a per-session override (memory only). Hermes does not confirm which
+                model actually generates responses — verify in your provider&apos;s logs.
+              </div>
+            ) : null}
             {sessionModel.error ? <div className={styles.error}>{sessionModel.error}</div> : null}
           </div>
         ) : null}
@@ -189,6 +205,28 @@ function statusLabel(status: NormalizedHermesStatus | null, isLoading: boolean) 
     return "Hermes mock mode";
   }
   return "Hermes unreachable";
+}
+
+function sessionPipelineMeta(
+  syncStatus: HermesSessionModelSync["syncStatus"],
+  sessionCheckedAt: string | null,
+  softOverrideActive: boolean
+): string {
+  if (syncStatus === "fallback") {
+    return "Using Hermes server default until the session model is verified.";
+  }
+  if (syncStatus === "turn-ready") {
+    return "Requested through Hermes but not confirmed as the active session model.";
+  }
+  if (syncStatus === "synced") {
+    if (softOverrideActive) {
+      return sessionCheckedAt
+        ? `Hermes accepted this route at ${sessionCheckedAt}.`
+        : "Hermes accepted this route.";
+    }
+    return sessionCheckedAt ? `Session verified: ${sessionCheckedAt}` : "Waiting for Hermes session verification.";
+  }
+  return sessionCheckedAt ? `Session verified: ${sessionCheckedAt}` : "Waiting for Hermes session verification.";
 }
 
 function syncStatusLabel(status: HermesSessionModelSync["syncStatus"]) {

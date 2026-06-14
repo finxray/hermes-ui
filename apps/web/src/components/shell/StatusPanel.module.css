@@ -183,6 +183,23 @@
   color: #f4d7a1;
 }
 
+/* A client-selected model is a soft, memory-only override that Hermes does not
+   confirm as the generating model. Tint the badge as a caution even when the
+   pipeline reports "synced", and never show it as reassuring green. */
+.syncStrip[data-unconfirmed="true"] .syncState {
+  color: #f4d7a1;
+}
+
+.syncStrip[data-unconfirmed="true"] .syncNode {
+  color: var(--text-secondary);
+}
+
+.caveat {
+  color: #f4d7a1;
+  font-size: var(--font-small);
+  line-height: 1.45;
+}
+
 .error {
   padding: 2px 0;
   border: 0;

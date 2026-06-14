@@ -343,29 +343,33 @@ function AnimatedDisclosure({
   type?: string;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
-  const handledAutoCollapseKeyRef = useRef<string | null>(null);
   const onAutoCollapseStartRef = useRef(onAutoCollapseStart);
+  const autoCollapseDelayRef = useRef(autoCollapseDelayMs);
+  autoCollapseDelayRef.current = autoCollapseDelayMs;
 
   useEffect(() => {
     onAutoCollapseStartRef.current = onAutoCollapseStart;
   }, [onAutoCollapseStart]);
 
+  // Fold the disclosure shut once, `autoCollapseDelayMs` after a new
+  // autoCollapseKey appears. Keyed only on autoCollapseKey (delay is read from a
+  // ref) so a later delay change — e.g. the finalizing window ending — cannot
+  // clear the pending timer, and with no "handled" guard so React StrictMode's
+  // mount/unmount/mount cycle reschedules the timer instead of dropping it.
   useEffect(() => {
-    if (
-      !autoCollapseKey ||
-      typeof autoCollapseDelayMs !== "number" ||
-      handledAutoCollapseKeyRef.current === autoCollapseKey
-    ) {
+    if (!autoCollapseKey) {
       return;
     }
-
-    handledAutoCollapseKeyRef.current = autoCollapseKey;
+    const delay = autoCollapseDelayRef.current;
+    if (typeof delay !== "number") {
+      return;
+    }
     const timer = window.setTimeout(() => {
       onAutoCollapseStartRef.current?.();
       setOpen(false);
-    }, autoCollapseDelayMs);
+    }, delay);
     return () => window.clearTimeout(timer);
-  }, [autoCollapseDelayMs, autoCollapseKey]);
+  }, [autoCollapseKey]);
 
   return (
     <div className={className} data-open={open ? "true" : "false"} data-type={type}>

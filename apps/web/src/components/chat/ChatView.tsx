@@ -224,6 +224,13 @@ export function ChatView({
       }));
     };
 
+    const updateResponseTokenUsage = (usage: unknown) => {
+      const normalized = normalizeActivityTokenUsage(usage);
+      responseTokenUsage = annotateTokenUsageRoute(normalized ?? responseTokenUsage, modelRequest);
+      syncLiveTokenUsage(responseTokenUsage);
+      return responseTokenUsage;
+    };
+
     const stopLiveTokenPulse = () => {
       if (liveTokenPulseRef.current !== null) {
         window.clearInterval(liveTokenPulseRef.current);
@@ -462,13 +469,19 @@ export function ChatView({
       cancelPendingFlush();
       const nextCompletion = pendingCompletion;
       pendingCompletion = null;
+      const completionUsage = annotateTokenUsageRoute(nextCompletion.usage ?? responseTokenUsage, modelRequest);
+      responseTokenUsage = completionUsage;
       appendElapsedActivityOnce(completedAt);
       if (!hadStreamError && !stopRequestedRef.current) {
         setIsFinalizingResponse(true);
         await waitForFinalActivityPrefold();
       }
-      completeAssistantMessage(nextCompletion.references, nextCompletion.usage);
-      setIsFinalizingResponse(false);
+      completeAssistantMessage(nextCompletion.references, completionUsage);
+      // Keep isFinalizingResponse true until generation fully ends — the finally
+      // block clears it together with isGenerating. Clearing it here, while
+      // isGenerating is still true, flips activityIsWorking back to true, which
+      // re-shows the live WorkingLog and resets the "Worked for" auto-collapse,
+      // leaving the block stuck open instead of folding shut.
       return true;
     };
 
@@ -522,8 +535,7 @@ export function ChatView({
             completedAssistant = true;
             accumulated = event.message.content || accumulated;
             hermesRunId = event.runId || hermesRunId;
-            responseTokenUsage = normalizeActivityTokenUsage(event.usage) ?? responseTokenUsage;
-            syncLiveTokenUsage(responseTokenUsage);
+            updateResponseTokenUsage(event.usage);
             updateRunRecord({ hermesRunId });
             if (accumulated.trim()) {
               markAssistantHasContent();
@@ -536,8 +548,7 @@ export function ChatView({
               usage: responseTokenUsage
             };
           } else if (event.type === "metadata") {
-            responseTokenUsage = normalizeActivityTokenUsage(event.usage) ?? responseTokenUsage;
-            syncLiveTokenUsage(responseTokenUsage);
+            updateResponseTokenUsage(event.usage);
             if (responseTokenUsage) {
               workspaceActions.updateMessage(session.id, assistantId, accumulated, undefined, undefined, responseTokenUsage);
             }
@@ -614,6 +625,7 @@ export function ChatView({
     await completePendingAssistantMessage(completedAt);
 
     if (!completedAssistant && !hadStreamError && accumulated) {
+      responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
       completeAssistantMessage(["Hermes session stream"], responseTokenUsage);
     } else if (emptyAssistantText) {
       hadStreamError = true;
@@ -628,6 +640,7 @@ export function ChatView({
       markAssistantHasContent();
     }
 
+    responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
     appendElapsedActivityOnce(completedAt);
     updateRunRecord({
       completedAt,
@@ -849,6 +862,83 @@ function assistantSafeId(value: string) {
 
 function canUseRealHermes(status: NormalizedHermesStatus | null) {
   return status?.mode === "real" && status.reachable && status.uiCapabilities.chat.canSend;
+}
+
+function annotateTokenUsageRoute(
+  usage: HermesTokenUsage | undefined,
+  modelRequest: HermesSessionModelSync["modelRequest"]
+): HermesTokenUsage | undefined {
+  const requestedModel = cleanRouteValue(modelRequest?.selectModelId ?? modelRequest?.catalogModelId);
+  const requestedProvider = cleanRouteValue(modelRequest?.provider);
+  if (!usage && !requestedModel && !requestedProvider) {
+    return undefined;
+  }
+
+  const next: HermesTokenUsage = usage ? { ...usage } : {};
+  if (requestedModel) {
+    next.requestedModel = requestedModel;
+  }
+  if (requestedProvider) {
+    next.requestedProvider = requestedProvider;
+  }
+
+  const actualModel = cleanRouteValue(next.upstreamModel) || cleanRouteValue(next.model);
+  const actualProvider = cleanRouteValue(next.provider);
+  const routeVerified = Boolean(actualModel || actualProvider);
+  if (routeVerified) {
+    next.routeVerified = true;
+  }
+
+  const modelMismatch = Boolean(requestedModel && actualModel && !sameRouteModel(requestedModel, actualModel));
+  const providerMismatch = Boolean(
+    requestedProvider &&
+      actualProvider &&
+      !providerRouteMatches(requestedProvider, actualProvider)
+  );
+  if (modelMismatch || providerMismatch) {
+    next.routeMismatch = true;
+  }
+
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function sameRouteModel(requested: string, actual: string) {
+  const requestedVariants = routeModelVariants(requested);
+  const actualVariants = routeModelVariants(actual);
+  return requestedVariants.some((left) => actualVariants.includes(left));
+}
+
+function routeModelVariants(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/^openrouter\//, "");
+  const suffix = normalized.includes("/") ? normalized.split("/").pop() ?? normalized : normalized;
+  return [...new Set([normalized, suffix].map(compactRouteValue).filter(Boolean))];
+}
+
+function providerRouteMatches(requested: string, actual: string) {
+  const requestedProvider = normalizeProviderRoute(requested);
+  const actualProvider = normalizeProviderRoute(actual);
+  if (!requestedProvider || !actualProvider) {
+    return true;
+  }
+  if (requestedProvider === "openrouter") {
+    return true;
+  }
+  if (requestedProvider === "locallmstudio") {
+    return actualProvider === "locallmstudio" || actualProvider === "lmstudio";
+  }
+  return requestedProvider === actualProvider;
+}
+
+function normalizeProviderRoute(value: string) {
+  return compactRouteValue(value.replace(/^local[-_\s]*/, "local"));
+}
+
+function compactRouteValue(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function cleanRouteValue(value?: string | null) {
+  return typeof value === "string" ? value.trim() || undefined : undefined;
 }
 
 function createMessage(

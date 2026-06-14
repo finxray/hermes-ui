@@ -93,6 +93,10 @@
   line-height: 1.35;
 }
 
+.usageMeta[data-tone="warning"] {
+  color: var(--warning);
+}
+
 .messageActions {
   display: inline-flex;
   flex: 0 0 auto;

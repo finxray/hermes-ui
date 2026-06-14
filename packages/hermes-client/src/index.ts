@@ -616,9 +616,12 @@ export async function streamHermesSessionChat(
           context: request.context,
           memory_scope_bridge_enabled: Boolean(request.instructions),
           model_runtime: request.modelRuntime ?? null,
+          model_selection_scope: request.modelSelectionScope ?? null,
           project_id: request.context.project.id,
           project_title: request.context.project.title,
           provider: request.provider ?? null,
+          requested_model: runtimeModelId ?? null,
+          requested_provider: request.provider ?? null,
           studio_session_id: request.context.session.id
         }
       }),
@@ -709,8 +712,9 @@ export function isSessionSelectableCatalogModel(descriptor: HermesModelDescripto
   }
 
   // Most local inference catalogs are not switchable through the HTTP session
-  // model API. LM Studio exposes OpenAI-compatible chat ids that Hermes can
-  // route when supplied per turn in the chat body.
+  // model API. LM Studio is the exception when Hermes itself advertises the
+  // model in /v1/models: use the session select endpoint so the UI can verify
+  // it instead of silently trusting a per-turn hint.
   if (providerKey.startsWith("local-") && !isTurnScopedLocalProvider(providerKey)) {
     return false;
   }
@@ -3776,6 +3780,34 @@ function normalizeTokenUsage(source: Record<string, unknown>): HermesTokenUsage 
     asString(usage.requestId) ||
     asString(source.request_id) ||
     asString(source.requestId);
+  const requestedModel =
+    asString(usage.requested_model) ||
+    asString(usage.requestedModel) ||
+    asString(source.requested_model) ||
+    asString(source.requestedModel) ||
+    asString(metadata?.requested_model) ||
+    asString(metadata?.requestedModel);
+  const requestedProvider =
+    asString(usage.requested_provider) ||
+    asString(usage.requestedProvider) ||
+    asString(source.requested_provider) ||
+    asString(source.requestedProvider) ||
+    asString(metadata?.requested_provider) ||
+    asString(metadata?.requestedProvider);
+  const routeMismatch =
+    booleanValue(usage.route_mismatch) ??
+    booleanValue(usage.routeMismatch) ??
+    booleanValue(source.route_mismatch) ??
+    booleanValue(source.routeMismatch) ??
+    booleanValue(metadata?.route_mismatch) ??
+    booleanValue(metadata?.routeMismatch);
+  const routeVerified =
+    booleanValue(usage.route_verified) ??
+    booleanValue(usage.routeVerified) ??
+    booleanValue(source.route_verified) ??
+    booleanValue(source.routeVerified) ??
+    booleanValue(metadata?.route_verified) ??
+    booleanValue(metadata?.routeVerified);
   const latencyMs =
     finiteNumber(usage.latency_ms) ??
     finiteNumber(usage.latencyMs) ??
@@ -3825,6 +3857,18 @@ function normalizeTokenUsage(source: Record<string, unknown>): HermesTokenUsage 
   }
   if (requestId) {
     normalized.requestId = requestId;
+  }
+  if (requestedModel) {
+    normalized.requestedModel = requestedModel;
+  }
+  if (requestedProvider) {
+    normalized.requestedProvider = requestedProvider;
+  }
+  if (routeMismatch !== undefined) {
+    normalized.routeMismatch = routeMismatch;
+  }
+  if (routeVerified !== undefined) {
+    normalized.routeVerified = routeVerified;
   }
   if (latencyMs !== undefined) {
     normalized.latencyMs = latencyMs;
@@ -3878,6 +3922,10 @@ function normalizeUsageSource(value: string): HermesTokenUsage["source"] | undef
 
 function finiteNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function booleanValue(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function secondsToMs(value: number | undefined): number | undefined {
@@ -4117,7 +4165,7 @@ function modelDescriptors(models: Record<string, unknown> | null): HermesModelDe
       label: modelLabelFromDescriptor(record, id),
       provider: formatHermesProviderLabel(provider) || provider,
       catalogSource: "hermes-config",
-      selectionScope: isTurnScopedLocalProvider(providerKey) ? "turn" : "session",
+      selectionScope: "session",
       providerKey,
       selectModelId: resolveModelSelectId(id, providerKey)
     });

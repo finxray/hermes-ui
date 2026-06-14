@@ -23,15 +23,15 @@ export function buildHermesRuntimeIdentityInstruction({
   const runtimeLines = formatRuntimeLines(modelRuntime);
 
   return [
-    "Runtime model identity for this turn:",
-    `- modelId: ${modelId}`,
-    `- model: ${modelLabel}`,
-    `- provider: ${providerLabel}`,
+    "Requested runtime model route for this turn:",
+    `- requestedModelId: ${modelId}`,
+    `- requestedModel: ${modelLabel}`,
+    `- requestedProvider: ${providerLabel}`,
     ...runtimeLines,
     "",
-    "If the user asks what model, provider, or model specs are being used, answer from this runtime identity.",
-    "Use the provider display name above in user-facing answers; do not mention raw routing keys unless the user explicitly asks for internal routing/debug details.",
-    "Do not claim to be a fallback/default model such as DeepSeek unless the runtime model identity above is DeepSeek.",
+    "This is a requested route, not proof that the backend provider honored it.",
+    "If the user asks what model, provider, or model specs are being used, say this is the requested route unless Hermes/provider usage metadata confirms the actual route.",
+    "Do not claim to actually be a requested fallback/default model such as DeepSeek unless provider usage confirms that route.",
     runtimeLines.length > 0
       ? "The runtime specs above describe the active local serving configuration when supplied by LM Studio; do not infer missing specs."
       : "If detailed model specs are not available in this context, say that Hermes selected the model above but did not expose detailed specs."

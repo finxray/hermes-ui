@@ -48,6 +48,8 @@ expect(
   "Composer send disabled state is tied to canSend while idle."
 );
 expect(composer.includes('type={isGenerating ? "button" : "submit"}'), "Composer uses submit type when idle.");
+expect(composer.includes("function focusComposerInput"), "Composer restores input focus after send.");
+expect(composer.includes("disabled={disabled}") && !composer.includes("disabled={disabled || isGenerating}"), "Composer textarea stays editable while a response is generating.");
 expect(chatView.includes("disabled={!activeSession}"), "ChatView only disables composer without an active session.");
 expect(chatView.includes("composerDraftStorageKey"), "ChatView scopes composer draft persistence by active pane/session.");
 expect(chatView.includes("LIVE_TOKEN_AFTERGLOW_MS = 15_000"), "ChatView keeps live token usage visible briefly after completion.");

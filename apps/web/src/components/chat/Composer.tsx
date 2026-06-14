@@ -250,6 +250,14 @@ export function Composer({
     }
   }
 
+  function focusComposerInput() {
+    const textarea = textareaRef.current;
+    if (!textarea || disabled) {
+      return;
+    }
+    textarea.focus({ preventScroll: true });
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = getTrimmedDraft(textareaRef.current, draft);
@@ -259,6 +267,8 @@ export function Composer({
     }
     clearDraft();
     onSend(message);
+    focusComposerInput();
+    window.requestAnimationFrame(focusComposerInput);
   }
 
   function stopGeneration() {
@@ -369,7 +379,7 @@ export function Composer({
             <textarea
               ref={textareaRef}
               aria-label="Message"
-              disabled={disabled || isGenerating}
+              disabled={disabled}
               placeholder={
                 disabled
                   ? "Create or select a chat to send a message."

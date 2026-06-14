@@ -289,6 +289,10 @@ export type HermesTokenUsage = {
   finishReason?: string;
   latencyMs?: number;
   requestId?: string;
+  requestedModel?: string;
+  requestedProvider?: string;
+  routeMismatch?: boolean;
+  routeVerified?: boolean;
   source?: "provider" | "hermes_usage" | "estimated" | "unavailable";
   timeToFirstTokenMs?: number;
   tokensPerSecond?: number;

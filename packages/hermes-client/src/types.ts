@@ -215,6 +215,16 @@ export type HermesClientConfig = {
   signal?: AbortSignal;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /**
+   * When false, `getHermesStatus` skips the (potentially slow, server-blocking)
+   * `/v1/models` fetch and relies on `injectedModels` for the model catalog.
+   * Reachability is still resolved from the cheap `/health` probe. Defaults to true.
+   */
+  includeModels?: boolean;
+  /** Separate timeout for the `/v1/models` fetch, which can be far slower than `/health`. */
+  modelsTimeoutMs?: number;
+  /** Previously-fetched raw `/v1/models` payload to use when the live fetch is skipped or fails. */
+  injectedModels?: Record<string, unknown> | null;
 };
 
 export type HermesEndpointName = "health" | "healthDetailed" | "capabilities" | "models";

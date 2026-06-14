@@ -1,10 +1,10 @@
-import { getHermesStatus } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { getCoalescedHermesStatus } from "@/lib/server/hermesStatusProbe";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const status = await getHermesStatus({
+  const status = await getCoalescedHermesStatus({
     apiKey: process.env.HERMES_API_KEY,
     baseUrl: process.env.HERMES_API_BASE_URL,
     configuredDefaultModelId: process.env.HERMES_UI_DEFAULT_MODEL_ID,

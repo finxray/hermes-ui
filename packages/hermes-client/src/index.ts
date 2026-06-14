@@ -39,22 +39,10 @@ const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/api/v1/models";
 const LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio";
 const PROJECT_DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
-const PROJECT_DEFAULT_MODEL_LABEL = "DeepSeek V4 Flash";
 const STABLE_HERMES_MODEL_ORDER = [
   PROJECT_DEFAULT_MODEL_ID,
   "gpt-oss-120b",
   "zai-glm-4.7"
-];
-
-const ENDPOINTS: Array<{
-  name: HermesEndpointName;
-  path: string;
-  auth: boolean;
-}> = [
-  { name: "capabilities", path: "/v1/capabilities", auth: true },
-  { name: "health", path: "/health", auth: false },
-  { name: "healthDetailed", path: "/health/detailed", auth: false },
-  { name: "models", path: "/v1/models", auth: true }
 ];
 
 export type {
@@ -187,27 +175,95 @@ export async function getHermesStatus(
   }
 
   const fetchImpl = config.fetchImpl ?? fetch;
-  const results = await Promise.all(
-    ENDPOINTS.map((endpoint) =>
-      fetchEndpoint({
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const includeModels = config.includeModels !== false;
+  const modelsTimeoutMs = config.modelsTimeoutMs ?? timeoutMs;
+
+  // `/health` is cheap and is the single source of truth for reachability. The
+  // expensive `/v1/models` fetch is kept off this critical path: while Hermes is
+  // busy answering `/v1/models` it cannot answer `/health`, so coupling them lets
+  // one slow model listing flip the whole UI to "unreachable".
+  const healthResult = await fetchEndpoint({
+    apiKey: config.apiKey,
+    auth: false,
+    base,
+    fetchImpl,
+    name: "health",
+    path: "/health",
+    timeoutMs
+  });
+
+  if (!healthResult.ok) {
+    return withUiCapabilities(
+      {
+        mode: "error",
+        configured: true,
+        reachable: false,
+        baseUrl: safeDisplayUrl(base),
+        capabilities: null,
+        health: null,
+        models: null,
+        error: healthResult.error ?? {
+          kind: "unknown",
+          message: "Hermes did not return a successful health response."
+        },
+        checkedAt
+      },
+      config
+    );
+  }
+
+  // `/health/detailed` and `/v1/capabilities` are both cheap, so they stay on the
+  // fast path. Only `/v1/models` is slow enough to block Hermes and must be gated.
+  const [healthDetailedResult, capabilitiesResult] = await Promise.all([
+    fetchEndpoint({
+      apiKey: config.apiKey,
+      auth: false,
+      base,
+      fetchImpl,
+      name: "healthDetailed",
+      path: "/health/detailed",
+      timeoutMs
+    }),
+    fetchEndpoint({
+      apiKey: config.apiKey,
+      auth: true,
+      base,
+      fetchImpl,
+      name: "capabilities",
+      path: "/v1/capabilities",
+      timeoutMs
+    })
+  ]);
+
+  const modelsResult = includeModels
+    ? await fetchEndpoint({
         apiKey: config.apiKey,
-        auth: endpoint.auth,
+        auth: true,
         base,
         fetchImpl,
-        name: endpoint.name,
-        path: endpoint.path,
-        timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+        name: "models",
+        path: "/v1/models",
+        timeoutMs: modelsTimeoutMs
       })
-    )
-  );
+    : null;
+
+  const results: HermesEndpointResult[] = [
+    healthResult,
+    healthDetailedResult,
+    capabilitiesResult,
+    ...(modelsResult ? [modelsResult] : [])
+  ];
 
   const capabilities = getData(results, "capabilities");
   const health = {
     basic: getData(results, "health"),
     detailed: getData(results, "healthDetailed")
   };
-  const models = getData(results, "models");
-  const reachable = results.some((result) => result.ok);
+  // Reuse the last-known model catalog when the live fetch was skipped or failed
+  // so the model selector does not blank out on a transient `/v1/models` stall.
+  const models = getData(results, "models") ?? config.injectedModels ?? null;
+  const reachable = healthResult.ok;
 
   if (!reachable) {
     return withUiCapabilities({
@@ -371,10 +427,7 @@ export function normalizeHermesUiCapabilities(
     status,
     options.configuredDefaultModelId
   );
-  const catalogModels = ensureConfiguredDefaultModelDescriptors(
-    modelDescriptors(status.models),
-    configuredDefaultCandidates
-  ).filter((model) => !isPlaceholderHermesModelId(model.id));
+  const catalogModels = modelDescriptors(status.models).filter((model) => !isPlaceholderHermesModelId(model.id));
   const selectableModels = preferPublicProviderCatalogModels(
     catalogModels.filter(isSessionSelectableCatalogModel)
   );
@@ -3986,46 +4039,10 @@ function extractConfiguredDefaultModelIds(
     asString(healthBasic?.default_model),
     asString(healthBasic?.model),
     asString(modelsRoot?.default_model),
-    flaggedDefaultModelId(status.models),
-    PROJECT_DEFAULT_MODEL_ID
+    flaggedDefaultModelId(status.models)
   ].filter((value): value is string => Boolean(value) && !isPlaceholderHermesModelId(value));
 
   return [...new Set(candidates)];
-}
-
-function ensureConfiguredDefaultModelDescriptors(
-  models: HermesModelDescriptor[],
-  configuredDefaults: string[]
-): HermesModelDescriptor[] {
-  const next = [...models];
-  for (const id of configuredDefaults) {
-    if (next.some((model) => sameModelId(model.id, id))) {
-      continue;
-    }
-    const descriptor = defaultModelDescriptor(id);
-    if (descriptor) {
-      next.unshift(descriptor);
-    }
-  }
-  return next;
-}
-
-function defaultModelDescriptor(id: string): HermesModelDescriptor | null {
-  const normalized = normalizeModelIdForCompare(id);
-  if (!normalized.includes("deepseekv4flash")) {
-    return null;
-  }
-  return {
-    id: PROJECT_DEFAULT_MODEL_ID,
-    label: PROJECT_DEFAULT_MODEL_LABEL,
-    provider: "OpenRouter",
-    providerKey: "openrouter",
-    catalogSource: "hermes-config",
-    selectionScope: "session",
-    selectModelId: PROJECT_DEFAULT_MODEL_ID,
-    contextLength: 1_048_576,
-    description: "Project default model. Requires Hermes session verification before the UI treats it as active."
-  };
 }
 
 function flaggedDefaultModelId(models: Record<string, unknown> | null): string {
@@ -5043,7 +5060,7 @@ function normalizeChatFetchError(error: unknown): HermesChatError {
   if (isAbortError(error)) {
     return {
       kind: "timeout",
-      message: "Hermes chat request was cancelled before a stream was opened."
+      message: "Hermes chat stream did not open before the request timeout or was cancelled before streaming began."
     };
   }
 

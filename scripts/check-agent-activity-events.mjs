@@ -889,11 +889,11 @@ function checkDurationFormatting() {
   record(
     "duration-formatting",
     activity.formatActivityDuration(0) === "0s" &&
-      activity.formatActivityDuration(500) === "<1s" &&
+      activity.formatActivityDuration(500) === "1s" &&
       activity.formatActivityDuration(12_000) === "12s" &&
       activity.formatActivityDuration(134_000) === "2m 14s" &&
       activity.formatActivityDuration(3_723_000) === "1h 2m 3s",
-    "duration formatter covers 0s, subsecond, seconds, minutes, and hours."
+    "duration formatter covers 0s, sub-second floored to 1s, seconds, minutes, and hours."
   );
 }
 

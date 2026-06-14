@@ -1295,7 +1295,7 @@ function safeIsoLikeTime(value?: string | null) {
 function formatDuration(durationMs: number) {
   const normalizedMs = Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0;
   if (normalizedMs > 0 && normalizedMs < 1000) {
-    return "<1s";
+    return "1s";
   }
   const seconds = Math.max(0, Math.round(normalizedMs / 1000));
   const hours = Math.floor(seconds / 3600);

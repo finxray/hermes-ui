@@ -156,6 +156,32 @@
   color: var(--text-primary);
 }
 
+/* While a command or tool is still running, animate its label with the same
+   shimmer used for the Thinking/Running status so active work reads as "live". */
+.commandLabel[data-active="true"],
+.commandItemLabel[data-active="true"],
+.toolNoteLine[data-active="true"] {
+  display: inline-block;
+  max-width: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 38%,
+    rgba(255, 255, 255, 0.72) 50%,
+    var(--text-muted) 62%,
+    var(--text-muted) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: activityTextShimmer 0.88s linear infinite;
+}
+
+.commandSummary:hover .commandLabel[data-active="true"] {
+  color: transparent;
+}
+
 .commandIcon {
   position: relative;
   display: inline-block;
@@ -539,7 +565,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .runningText[data-active="true"] {
+  .runningText[data-active="true"],
+  .commandLabel[data-active="true"],
+  .commandItemLabel[data-active="true"],
+  .toolNoteLine[data-active="true"] {
     animation-duration: 1ms;
     background-position: 0 0;
     color: var(--text-secondary);

@@ -238,10 +238,11 @@ function ReasoningChunk({ event }: { event: AgentActivityEvent }) {
     // Render a tool note as a single status-like line ("Used Write File
     // /tmp/...") instead of a title stacked over its target, matching the
     // inline Thinking/Running/Reading status rows.
+    const active = isActiveActivityStatus(event.status);
     return (
       <div className={styles.toolNote}>
         <span className={styles.toolIcon} aria-hidden="true" />
-        <p className={styles.toolNoteLine}>
+        <p className={styles.toolNoteLine} data-active={active ? "true" : "false"}>
           <span className={styles.toolNoteTitle}>{title}</span>
           {showDetail ? <span className={styles.toolNoteTarget}>{detail}</span> : null}
         </p>
@@ -260,9 +261,10 @@ function ReasoningChunk({ event }: { event: AgentActivityEvent }) {
 function CommandGroupRow({ events }: { events: AgentActivityEvent[] }) {
   const commandItems = buildCommandItems(events);
   const count = commandItems.length;
+  const isActive = commandItems.some(commandItemIsActive);
   const label = count === 1
     ? commandItemRowLabel(commandItems[0])
-    : `${commandItems.some(commandItemIsActive) ? "Running" : "Ran"} ${count} commands`;
+    : `${isActive ? "Running" : "Ran"} ${count} commands`;
 
   if (count === 0) {
     return null;
@@ -279,7 +281,7 @@ function CommandGroupRow({ events }: { events: AgentActivityEvent[] }) {
             <span className={styles.commandIconChevron}>&gt;</span>
             <span className={styles.commandIconCursor} />
           </span>
-          <span className={styles.commandLabel}>{label}</span>
+          <span className={styles.commandLabel} data-active={isActive ? "true" : "false"}>{label}</span>
           <ChevronRight className={styles.commandChevron} size={14} aria-hidden="true" />
         </>
       }
@@ -300,13 +302,14 @@ function CommandGroupRow({ events }: { events: AgentActivityEvent[] }) {
 }
 
 function CommandItemRow({ item }: { item: CommandItem }) {
+  const active = commandItemIsActive(item);
   return (
     <AnimatedDisclosure
       className={styles.commandItemBlock}
       summaryClassName={styles.commandItemSummary}
       summary={
         <>
-          <span className={styles.commandItemLabel}>{commandItemRowLabel(item)}</span>
+          <span className={styles.commandItemLabel} data-active={active ? "true" : "false"}>{commandItemRowLabel(item)}</span>
           <ChevronRight className={styles.commandItemChevron} size={14} aria-hidden="true" />
         </>
       }

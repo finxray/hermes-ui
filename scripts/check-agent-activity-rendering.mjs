@@ -355,10 +355,10 @@ async function checkHelperBehavior() {
   const memoryTimeline = await importHelperModule(memoryTimelinePath);
   record(
     "duration-format",
-    activity.formatActivityDuration(500) === "<1s" &&
+    activity.formatActivityDuration(500) === "1s" &&
       activity.formatActivityDuration(73_000) === "1m 13s" &&
       activity.formatActivityDuration(3_723_000) === "1h 2m 3s",
-    "Duration formatter supports subsecond, minute, and hour Worked for style labels."
+    "Duration formatter floors sub-second runs to 1s and supports minute and hour Worked for style labels."
   );
 
   const event = activity.createActivityEventFromHermesToolEvent({

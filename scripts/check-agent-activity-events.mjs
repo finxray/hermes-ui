@@ -43,6 +43,7 @@ checkRunsToolAndApprovalParity();
 checkRunsApprovalSecretRedaction();
 checkRunsCommandParity();
 checkRunsEventIdsUnique();
+checkRepeatedToolStatusEventIdsUnique();
 checkRunsUnknownFallback();
 checkApprovalRequested();
 checkApprovalResponded();
@@ -51,6 +52,7 @@ checkApprovalWithoutId();
 checkErrorEvent();
 checkUnknownRunFallback();
 checkElapsedEvent();
+checkTokenUsageMetadata();
 checkStoppedEvent();
 checkPersistedReplayRedaction();
 checkPersistedReplayBounding();
@@ -341,8 +343,8 @@ function checkRunsReasoningSafe() {
     "runs-reasoning-safe",
     event.type === "reasoning" &&
       event.status === "info" &&
-      event.title === "Thinking signal received" &&
-      event.summary.includes("Reasoning text is not rendered") &&
+      event.title === "Thinking" &&
+      event.summary.includes("Private reasoning text is not rendered") &&
       event.details.text === "[omitted: reasoning text not rendered]" &&
       event.details.nested.reasoning === "[omitted: reasoning text not rendered]" &&
       event.hermes?.eventType === "reasoning.available" &&
@@ -515,6 +517,31 @@ function checkRunsEventIdsUnique() {
   );
 }
 
+function checkRepeatedToolStatusEventIdsUnique() {
+  const baseEvent = {
+    type: "tool_event",
+    name: "search_files",
+    status: "started",
+    payload: {
+      message_id: "msg_repeated_tool_status",
+      preview: "Searching files",
+      run_id: "run-repeated-tool-status"
+    }
+  };
+  const events = [
+    activity.createActivityEventFromHermesStreamEvent(baseEvent, { sequence: 0 }),
+    activity.createActivityEventFromHermesStreamEvent(baseEvent, { sequence: 1 }),
+    activity.createActivityEventFromHermesStreamEvent(baseEvent, { sequence: 2 })
+  ].filter(Boolean);
+  const ids = new Set(events.map((event) => event.id));
+
+  record(
+    "repeated-tool-status-event-ids-unique",
+    events.length === 3 && ids.size === 3,
+    "Repeated same-tool/status activity events for one message use stream sequence as a stable fallback id."
+  );
+}
+
 function checkRunsUnknownFallback() {
   const event = activity.createActivityEventFromHermesRunsEvent({
     event: "run.heartbeat",
@@ -672,6 +699,43 @@ function checkElapsedEvent() {
     "elapsed-event",
     event.type === "elapsed" && event.status === "info" && event.title === "Worked for 1m 3s",
     "elapsed helper formats duration and creates an informational event."
+  );
+}
+
+function checkTokenUsageMetadata() {
+  const usage = activity.normalizeActivityTokenUsage({
+    prompt_tokens: 123,
+    completion_tokens: 456,
+    total_tokens: 579,
+    cached_tokens: 12,
+    reasoning_tokens: 3,
+    cost_usd: 0.0012,
+    provider: "OpenRouter",
+    model: "deepseek-v4-flash",
+    upstream_model: "deepseek/deepseek-v4-flash",
+    generation_id: "gen-activity-usage",
+    finish_reason: "stop",
+    latency_ms: 1200,
+    request_id: "req-activity-usage",
+    source: "provider"
+  });
+
+  record(
+    "token-usage-metadata",
+    usage?.promptTokens === 123 &&
+      usage.completionTokens === 456 &&
+      usage.totalTokens === 579 &&
+      usage.cachedTokens === 12 &&
+      usage.reasoningTokens === 3 &&
+      usage.costUsd === 0.0012 &&
+      usage.provider === "OpenRouter" &&
+      usage.upstreamModel === "deepseek/deepseek-v4-flash" &&
+      usage.generationId === "gen-activity-usage" &&
+      usage.finishReason === "stop" &&
+      usage.latencyMs === 1200 &&
+      usage.requestId === "req-activity-usage" &&
+      usage.source === "provider",
+    "provider token usage metadata is normalized for elapsed activity display."
   );
 }
 

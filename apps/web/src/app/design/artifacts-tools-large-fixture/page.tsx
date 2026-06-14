@@ -77,14 +77,19 @@ export default function ArtifactsToolsLargeFixturePage() {
           activeProject={largeArtifactsToolsProject}
           activeSession={largeArtifactsToolsSession}
           activityEvents={largeActivityEvents}
+          allSessions={[largeArtifactsToolsSession]}
           brainMemoryStatus={null}
+          hermesSessions={[]}
           hermesStatus={null}
           hermesSessionModel={fixtureSessionModel}
           isBrainMemoryStatusLoading={false}
+          isHermesSessionsLoading={false}
           isHermesStatusLoading={false}
           refreshBrainMemoryStatus={noop}
           refreshHermesStatus={noop}
+          refreshHermesSessions={noop}
           tenantScopePosture={null}
+          workspaceActions={{} as never}
         />
       </section>
     </main>

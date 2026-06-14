@@ -8,7 +8,13 @@
   gap: 14px;
   padding: 0 var(--shell-rail-padding-x, 8px);
   color: var(--text-secondary);
-  background: transparent;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 42%,
+    rgba(0, 0, 0, 0.04) 68%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
   border-bottom: 0;
   box-shadow: none;
 }
@@ -79,8 +85,13 @@
   pointer-events: none;
 }
 
-.menuItem:hover,
-.menuItem:focus-visible,
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible:not(:disabled) {
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+}
+
 .iconButton:hover,
 .iconButton:focus-visible {
   outline: 0;
@@ -92,6 +103,7 @@
   outline: 0;
   background: transparent;
   color: var(--text-primary);
+  font-weight: 500;
 }
 
 .iconButton:active {

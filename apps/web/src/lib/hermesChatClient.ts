@@ -11,6 +11,9 @@ type StreamHermesChatHandlers = {
 
 type StreamHermesChatResult = "completed" | "aborted";
 
+const MAX_STREAM_EVENTS_PER_FRAME = 3;
+const MAX_STREAM_DISPATCH_BUDGET_MS = 6;
+
 export async function streamHermesChatFromBff(
   request: HermesChatRequest,
   handlers: StreamHermesChatHandlers
@@ -77,18 +80,20 @@ async function readUiEventStream(
       buffer += decoder.decode(value, { stream: true });
       const frames = buffer.split(/\r?\n\r?\n/);
       buffer = frames.pop() ?? "";
+      const events: HermesChatStreamEvent[] = [];
       for (const frame of frames) {
         const event = parseUiSseFrame(frame);
         if (event) {
-          onEvent(event);
+          events.push(event);
         }
       }
+      await dispatchUiStreamEvents(events, onEvent, signal);
     }
 
     if (buffer.trim()) {
       const event = parseUiSseFrame(buffer);
       if (event) {
-        onEvent(event);
+        await dispatchUiStreamEvents([event], onEvent, signal);
       }
     }
     return "completed";
@@ -107,6 +112,65 @@ async function readUiEventStream(
   } finally {
     reader.releaseLock();
   }
+}
+
+async function dispatchUiStreamEvents(
+  events: HermesChatStreamEvent[],
+  onEvent: (event: HermesChatStreamEvent) => void,
+  signal?: AbortSignal
+) {
+  if (events.length === 0) {
+    return;
+  }
+
+  let eventsSincePaint = 0;
+  let textSincePaint = false;
+  let batchStartedAt = nowMs();
+
+  for (const event of events) {
+    if (signal?.aborted) {
+      return;
+    }
+
+    if (event.type === "message_done" && textSincePaint) {
+      await waitForNextPaint();
+      if (signal?.aborted) {
+        return;
+      }
+      eventsSincePaint = 0;
+      textSincePaint = false;
+      batchStartedAt = nowMs();
+    }
+
+    onEvent(event);
+    eventsSincePaint += 1;
+
+    if (event.type === "message_delta") {
+      textSincePaint = true;
+    }
+
+    const usedBudget = nowMs() - batchStartedAt >= MAX_STREAM_DISPATCH_BUDGET_MS;
+    const usedFrameQuota = eventsSincePaint >= MAX_STREAM_EVENTS_PER_FRAME;
+    if (textSincePaint && (usedBudget || usedFrameQuota)) {
+      await waitForNextPaint();
+      eventsSincePaint = 0;
+      textSincePaint = false;
+      batchStartedAt = nowMs();
+    }
+  }
+}
+
+function waitForNextPaint() {
+  if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+    return new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+function nowMs() {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
 function parseUiSseFrame(frame: string): HermesChatStreamEvent | null {
@@ -162,6 +226,7 @@ function isHermesChatStreamEvent(value: unknown): value is HermesChatStreamEvent
   return (
     type === "message_delta" ||
     type === "message_done" ||
+    type === "metadata" ||
     type === "tool_event" ||
     type === "run_event" ||
     type === "approval_event" ||

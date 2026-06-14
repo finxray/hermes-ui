@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
-import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { HermesModelRuntimeMetadata, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import styles from "./StatusPanel.module.css";
 
 type HermesStatusPanelProps = {
@@ -19,6 +19,9 @@ export function HermesStatusPanel({
   sessionModel = null
 }: HermesStatusPanelProps) {
   const activeModelState = sessionModel?.modelState ?? status?.uiCapabilities.models ?? null;
+  const activeModelDescriptor = activeModelState?.availableModels.find(
+    (model) => model.id === activeModelState.selectedModelId
+  );
   const capabilityRows = getCapabilityRows(status, sessionModel);
   const checkedAt = status?.checkedAt ? new Date(status.checkedAt).toLocaleTimeString() : "Never";
   const sessionCheckedAt = sessionModel?.checkedAt
@@ -69,7 +72,7 @@ export function HermesStatusPanel({
               {sessionModel.syncStatus === "fallback"
                 ? "Hermes has not created this session yet; using the server default."
                 : sessionModel.syncStatus === "turn-ready"
-                  ? "UI OpenRouter model will be sent through Hermes on each turn."
+                  ? "Per-turn catalog model will be sent through Hermes on each turn."
                 : sessionCheckedAt
                   ? `Session verified: ${sessionCheckedAt}`
                   : "Waiting for Hermes session verification."}
@@ -83,6 +86,13 @@ export function HermesStatusPanel({
             <ModelField label="Provider" value={sessionModel?.providerLabel ?? activeModelState.currentProviderLabel} />
             <ModelField label="Selection" value={activeModelState.selectionStatus} />
             <ModelField label="Fast stream" value={activeModelState.fastStreamProfile} />
+            {activeModelDescriptor?.runtime ? (
+              <>
+                <ModelField label="Context" value={formatRuntimeContext(activeModelDescriptor.runtime)} />
+                <ModelField label="Quant" value={formatRuntimeQuantization(activeModelDescriptor.runtime)} />
+                <ModelField label="Runtime" value={formatRuntimeFlags(activeModelDescriptor.runtime)} />
+              </>
+            ) : null}
           </div>
         ) : null}
         {capabilityRows.length > 0 ? (
@@ -118,6 +128,48 @@ function Metric({ label, value }: { label: string; value: string }) {
       <div className={styles.metricLabel}>{label}</div>
     </div>
   );
+}
+
+function formatRuntimeContext(runtime: HermesModelRuntimeMetadata) {
+  const loaded = runtime.loadedContextLength;
+  const max = runtime.maxContextLength;
+  if (typeof loaded === "number" && typeof max === "number" && loaded !== max) {
+    return `${formatCompactContext(loaded)} active / ${formatCompactContext(max)} max`;
+  }
+  if (typeof loaded === "number" || typeof max === "number") {
+    return `${formatCompactContext(loaded ?? max ?? 0)} context`;
+  }
+  return "Unknown";
+}
+
+function formatRuntimeQuantization(runtime: HermesModelRuntimeMetadata) {
+  if (!runtime.quantization) {
+    return "Unknown";
+  }
+  return typeof runtime.quantizationBits === "number"
+    ? `${runtime.quantization} · ${runtime.quantizationBits}-bit`
+    : runtime.quantization;
+}
+
+function formatRuntimeFlags(runtime: HermesModelRuntimeMetadata) {
+  const config = runtime.runtimeConfig;
+  const parts = [
+    config?.offloadKvCacheToGpu ? "GPU KV" : null,
+    config?.flashAttention ? "Flash" : null,
+    typeof config?.evalBatchSize === "number" ? `batch ${config.evalBatchSize}` : null,
+    typeof config?.numExperts === "number" ? `${config.numExperts} experts` : null
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : runtime.state ?? "Unknown";
+}
+
+function formatCompactContext(value: number) {
+  if (value >= 1_000_000) {
+    return `${Math.round(value / 1_000_000)}M`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}K`;
+  }
+  return `${value}`;
 }
 
 function statusLabel(status: NormalizedHermesStatus | null, isLoading: boolean) {

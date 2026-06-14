@@ -49,21 +49,21 @@ export const MessageBubble = memo(function MessageBubble({
             <div className={styles.messageFooter} aria-label="Message actions">
               <span className={styles.messageMeta}>{message.createdAt}</span>
               <div className={styles.messageActions}>
+                <CopyTextButton
+                  className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
+                  label="Copy message"
+                  text={message.content}
+                  variant="icon"
+                />
                 <button
                   aria-label="Edit message coming soon"
-                  className={markdownStyles.iconActionButton}
+                  className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
                   disabled
                   title="Edit message is coming soon."
                   type="button"
                 >
                   <Pencil aria-hidden="true" />
                 </button>
-                <CopyTextButton
-                  className={markdownStyles.iconActionButton}
-                  label="Copy message"
-                  text={message.content}
-                  variant="icon"
-                />
               </div>
             </div>
           ) : null}
@@ -99,7 +99,7 @@ export const MessageBubble = memo(function MessageBubble({
           <div className={`${styles.messageFooter} ${styles.assistantFooter}`} aria-label="Message actions">
             <div className={styles.messageActions}>
               <CopyTextButton
-                className={markdownStyles.iconActionButton}
+                className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
                 label="Copy message"
                 text={message.content}
                 variant="icon"
@@ -124,11 +124,14 @@ function formatUsageParts(usage: ChatMessage["usage"]) {
   }
 
   const parts: Array<{ key: string; label: string }> = [];
+  if (typeof usage.promptTokens === "number") {
+    parts.push({ key: "in", label: `${formatInteger(usage.promptTokens)} in` });
+  }
   if (typeof usage.completionTokens === "number") {
     parts.push({ key: "out", label: `${formatInteger(usage.completionTokens)} out` });
   }
-  if (typeof usage.promptTokens === "number") {
-    parts.push({ key: "in", label: `${formatInteger(usage.promptTokens)} in` });
+  if (typeof usage.tokensPerSecond === "number") {
+    parts.push({ key: "speed", label: `${formatSpeed(usage.tokensPerSecond)} tok/s` });
   }
   if (typeof usage.costUsd === "number") {
     parts.push({ key: "cost", label: formatCost(usage.costUsd) });
@@ -142,4 +145,9 @@ function formatInteger(value: number) {
 
 function formatCost(value: number) {
   return `$${value.toFixed(value < 0.01 ? 4 : 2)}`;
+}
+
+function formatSpeed(value: number) {
+  const safe = Math.max(0, value);
+  return safe >= 100 ? new Intl.NumberFormat().format(Math.round(safe)) : safe.toFixed(1);
 }

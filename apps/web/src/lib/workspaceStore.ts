@@ -30,7 +30,7 @@ type WorkspaceAction =
   | { type: "switchProject"; projectId: string }
   | { type: "switchSession"; sessionId: string }
   | { type: "createProject" }
-  | { type: "createSession" }
+  | { type: "createSession"; activate?: boolean; projectId?: string; sessionId?: string }
   | { type: "renameProject"; projectId: string; name: string }
   | { type: "renameSession"; sessionId: string; title: string }
   | { type: "archiveSession"; sessionId: string }
@@ -44,6 +44,7 @@ type WorkspaceAction =
       content: string;
       status?: ChatMessage["status"];
       references?: string[];
+      usage?: ChatMessage["usage"];
     }
   | { type: "appendToolEvent"; sessionId: string; event: ToolEvent }
   | { type: "loadHermesMessages"; sessionId: string; messages: ChatMessage[] }
@@ -70,7 +71,7 @@ export function workspaceReducer(
     case "createProject":
       return createProject(state);
     case "createSession":
-      return createSession(state);
+      return createSession(state, action);
     case "renameProject":
       return renameProject(state, action.projectId, action.name);
     case "renameSession":
@@ -203,14 +204,18 @@ function createProject(state: WorkspaceState): WorkspaceState {
   };
 }
 
-function createSession(state: WorkspaceState): WorkspaceState {
-  const project = state.projects.find((item) => item.id === state.activeProjectId);
+function createSession(
+  state: WorkspaceState,
+  options: Extract<WorkspaceAction, { type: "createSession" }>
+): WorkspaceState {
+  const projectId = options.projectId ?? state.activeProjectId;
+  const project = state.projects.find((item) => item.id === projectId);
   if (!project) {
     return state;
   }
 
   const now = new Date().toISOString();
-  const id = `session-${crypto.randomUUID()}`;
+  const id = options.sessionId ?? `session-${crypto.randomUUID()}`;
   const hermesSessionId = `hermes-${id}`;
   const title = makeUniqueTitle(
     "New chat",
@@ -241,7 +246,8 @@ function createSession(state: WorkspaceState): WorkspaceState {
 
   return {
     ...touchProject(state, project.id, now),
-    activeSessionId: session.id,
+    activeProjectId: options.activate === false ? state.activeProjectId : project.id,
+    activeSessionId: options.activate === false ? state.activeSessionId : session.id,
     sessions: [session, ...state.sessions]
   };
 }
@@ -433,7 +439,8 @@ function updateMessage(
                     ...message,
                     content: action.content,
                     references: action.references ?? message.references,
-                    status: action.status ?? message.status
+                    status: action.status ?? message.status,
+                    usage: action.usage ?? message.usage
                   }
                 : message
             ),
@@ -621,7 +628,7 @@ function normalizeSessionModelPreference(
 
   const rawCatalogSource = asString(source.catalogSource).trim();
   const catalogSource =
-    rawCatalogSource === "hermes-config" || rawCatalogSource === "ui-openrouter"
+    rawCatalogSource === "hermes-config" || rawCatalogSource === "ui-lmstudio" || rawCatalogSource === "ui-openrouter"
       ? rawCatalogSource
       : undefined;
   const rawSelectionScope = asString(source.selectionScope).trim();

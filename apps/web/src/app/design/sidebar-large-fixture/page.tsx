@@ -65,9 +65,6 @@ export default function SidebarLargeFixturePage() {
           isHydrated
           projects={largeSidebarProjects}
           refreshHermesStatus={noop}
-          hermesSessions={[]}
-          isHermesSessionsLoading={false}
-          refreshHermesSessions={noop}
         />
         <section className={styles.panel} aria-label="Large sidebar measurement panel">
           <div className={styles.panelBody}>

@@ -24,7 +24,32 @@ export type HermesModelSelectionStatus =
 
 export type HermesFastStreamProfile = "normal" | "high-throughput" | "unknown";
 
-export type HermesModelCatalogSource = "hermes-config" | "ui-openrouter";
+export type HermesModelCatalogSource = "hermes-config" | "ui-openrouter" | "ui-lmstudio";
+
+export type HermesModelRuntimeConfig = {
+  contextLength?: number | null;
+  evalBatchSize?: number | null;
+  flashAttention?: boolean | null;
+  kCacheQuantizationType?: string | null;
+  numExperts?: number | null;
+  offloadKvCacheToGpu?: boolean | null;
+  parallel?: number | null;
+  vCacheQuantizationType?: string | null;
+};
+
+export type HermesModelRuntimeMetadata = {
+  architecture?: string | null;
+  format?: string | null;
+  loadedContextLength?: number | null;
+  maxContextLength?: number | null;
+  params?: string | null;
+  quantization?: string | null;
+  quantizationBits?: number | null;
+  runtimeConfig?: HermesModelRuntimeConfig | null;
+  selectedVariant?: string | null;
+  sizeBytes?: number | null;
+  state?: string | null;
+};
 
 export type HermesModelDescriptor = {
   id: string;
@@ -50,6 +75,7 @@ export type HermesModelDescriptor = {
     request?: string | null;
     image?: string | null;
   } | null;
+  runtime?: HermesModelRuntimeMetadata | null;
 };
 
 export type OpenRouterModelCatalogResult = {
@@ -57,6 +83,14 @@ export type OpenRouterModelCatalogResult = {
   models: HermesModelDescriptor[];
   checkedAt: string;
   source: "openrouter";
+  error: HermesStatusError | null;
+};
+
+export type LmStudioModelCatalogResult = {
+  ok: boolean;
+  models: HermesModelDescriptor[];
+  checkedAt: string;
+  source: "lmstudio";
   error: HermesStatusError | null;
 };
 
@@ -231,12 +265,33 @@ export type HermesChatRequest = {
   message: string;
   recentMessages?: HermesChatHistoryMessage[];
   model?: string | null;
+  modelRuntime?: HermesModelRuntimeMetadata | null;
+  modelSelectionScope?: "session" | "turn" | null;
   provider?: string | null;
 };
 
 export type HermesNormalizedMessage = {
   role: "assistant";
   content: string;
+};
+
+export type HermesTokenUsage = {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+  reasoningTokens?: number;
+  costUsd?: number;
+  provider?: string;
+  model?: string;
+  upstreamModel?: string;
+  generationId?: string;
+  finishReason?: string;
+  latencyMs?: number;
+  requestId?: string;
+  source?: "provider" | "hermes_usage" | "estimated" | "unavailable";
+  timeToFirstTokenMs?: number;
+  tokensPerSecond?: number;
 };
 
 export type HermesChatStreamEvent =
@@ -251,6 +306,13 @@ export type HermesChatStreamEvent =
       message: HermesNormalizedMessage;
       messageId?: string;
       runId?: string;
+      usage?: HermesTokenUsage;
+    }
+  | {
+      type: "metadata";
+      messageId?: string;
+      runId?: string;
+      usage?: HermesTokenUsage;
     }
   | {
       type: "tool_event";

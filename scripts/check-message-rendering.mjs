@@ -13,6 +13,11 @@ const files = {
   longFixtureRoute: "apps/web/src/app/design/markdown-long-fixture/page.tsx",
   bubble: "apps/web/src/components/chat/MessageBubble.tsx",
   bubbleCss: "apps/web/src/components/chat/MessageBubble.module.css",
+  chatClient: "apps/web/src/lib/hermesChatClient.ts",
+  hermesClientPackage: "packages/hermes-client/src/index.ts",
+  chatView: "apps/web/src/components/chat/ChatView.tsx",
+  transcript: "apps/web/src/components/chat/ChatTranscript.tsx",
+  streamingBody: "apps/web/src/components/chat/StreamingAssistantBody.tsx",
   markdownSmoke: "scripts/markdown-fixture-smoke.mjs",
   longMarkdownSmoke: "scripts/markdown-long-fixture-smoke.mjs",
   smokeBaseUrl: "scripts/smoke-base-url.mjs",
@@ -34,6 +39,11 @@ const longFixture = read(files.longFixture);
 const longFixtureRoute = read(files.longFixtureRoute);
 const bubble = read(files.bubble);
 const bubbleCss = read(files.bubbleCss);
+const chatClient = read(files.chatClient);
+const hermesClientPackage = read(files.hermesClientPackage);
+const chatView = read(files.chatView);
+const transcript = read(files.transcript);
+const streamingBody = read(files.streamingBody);
 const markdownSmoke = read(files.markdownSmoke);
 const longMarkdownSmoke = read(files.longMarkdownSmoke);
 const smokeBaseUrl = read(files.smokeBaseUrl);
@@ -49,6 +59,7 @@ expect(markdown.includes('target="_blank"'), "Links open externally.");
 expect(markdown.includes("safeHref"), "Links pass through a safe href helper.");
 expect(markdown.includes("CopyTextButton"), "Shared copy button exists.");
 expect(markdown.includes("navigator.clipboard") && markdown.includes("execCommand(\"copy\")"), "Copy handler has Clipboard API and fallback paths.");
+expect(markdown.includes('data-copy-action="true"') && markdownCss.includes('.iconActionButton[data-copy-action="true"]') && markdownCss.includes("--icon-action-glyph: 2.56px"), "Copy glyph is 20% smaller while keeping the shared icon button size.");
 expect(markdown.includes("CodeBlock"), "Fenced code blocks use a dedicated CodeBlock component.");
 expect(markdown.includes("memo(function MessageMarkdown") && markdown.includes("memo(function CodeBlock"), "Markdown renderer and code blocks are memoized.");
 expect(markdown.includes("useMemo") && markdown.includes("rehypePrism"), "Completed code block highlighting uses rehype-prism-plus, memoized by streaming state.");
@@ -60,15 +71,38 @@ expect(markdown.includes("joinHttpMethodPaths"), "HTTP method and path inline co
 expect(markdownCss.includes(".inlineCode") && markdownCss.includes("--markdown-inline-code"), "Inline code uses a global Apple-like blue token.");
 expect(markdown.includes("StatusCheckIcon") && markdown.includes("CHECK_SENTINEL"), "Status checks use one shared green tick icon.");
 expect(markdown.includes("LEADING_CHECK_LINE_PATTERN") && markdown.includes("normalizeInlineStatusChecks"), "Leading check lines normalize to task items; inline checks stay mid-line.");
+expect(markdown.includes("taskCheckNative") && markdownCss.includes(".taskCheckNative") && markdownCss.includes("clip-path: inset(50%)"), "Task checkboxes keep hidden native inputs behind custom icons.");
 expect(!markdownCss.includes("padding-left: 0"), "Task lists keep the same left indent as regular lists.");
 expect(markdownCss.includes(".codeBlock") && markdownCss.includes(".iconActionButton"), "Code block and icon action button styles exist.");
+expect(markdownCss.includes(".codeBlock") && markdownCss.includes("overflow: hidden") && markdownCss.includes("background-clip: padding-box"), "Code block backgrounds are clipped inside rounded corners.");
 expect(markdownCss.includes("overflow-x: auto"), "Long code/table content can scroll horizontally.");
+expect(markdownCss.includes(".tableScroller") && markdownCss.includes("overflow: hidden") && markdownCss.includes("border-collapse: separate"), "GFM table wrappers clip rounded corners while preserving horizontal scroll.");
 expect(markdownCss.includes("overflow-y: auto") && markdownCss.includes("max-height: min(56vh, 520px)"), "Long code blocks have bounded vertical scrolling.");
 expect(markdownCss.includes("overflow-wrap: break-word"), "Long links and inline content can wrap inside message bounds.");
 expect(bubbleCss.includes(".iconActionButton") || markdownCss.includes(".iconActionButton"), "Message actions use icon-only controls.");
 expect(markdownCss.includes(".token.keyword") && markdownCss.includes(".token.string"), "Prism syntax token styles exist for keywords and strings.");
 expect(bubble.includes("memo(function MessageBubble"), "MessageBubble is memoized for unchanged transcript rows.");
-expect(bubble.includes("<MessageMarkdown") && bubble.includes('message.role === "assistant"'), "Assistant messages render through MessageMarkdown.");
+expect(bubble.includes("<StreamingAssistantBody") && bubble.includes('message.role === "assistant"') && streamingBody.includes("<MessageMarkdown"), "Assistant messages render through the buffered streaming body, which finishes the reveal before settling into static markdown.");
+expect(streamingBody.startsWith('"use client"') && streamingBody.includes("useBufferedStreamingContent") && streamingBody.includes("REVEAL_MAX_CHARS_PER_FRAME") && streamingBody.includes("REVEAL_CATCHUP_FRACTION"), "Streaming assistant content uses a frame-paced bounded reveal behind a client boundary.");
+expect(chatClient.includes("MAX_STREAM_EVENTS_PER_FRAME = 3") && chatClient.includes("MAX_STREAM_DISPATCH_BUDGET_MS = 6") && chatClient.includes("waitForNextPaint"), "Hermes chat stream events are dispatched with a tight frame budget so bursty SSE chunks can paint progressively.");
+expect(
+  hermesClientPackage.includes("response.output_text.delta") &&
+    hermesClientPackage.includes("extractResponsesOutputText") &&
+    hermesClientPackage.includes("response.completed") &&
+    hermesClientPackage.includes("writeSyntheticMessageDeltas") &&
+    hermesClientPackage.includes("splitAssistantTextIntoStreamBlocks"),
+  "Hermes client normalizes Responses-style output text and splits final-only assistant text into ordered stream blocks."
+);
+expect(
+  hermesClientPackage.includes("response_reasoning_summary_text_delta") &&
+    hermesClientPackage.includes("public_reasoning_summary") &&
+    hermesClientPackage.includes("isRawReasoningEventName"),
+  "Hermes client normalizes public reasoning-summary stream events without exposing raw reasoning text."
+);
+expect(chatView.includes("completeAssistantMessage") && bubble.includes("isStreaming || message.content") && streamingBody.includes("REVEAL_MAX_CHARS_PER_FRAME"), "Completed assistant text stays mounted in the frame-paced reveal body so final-only or burst-completed messages finish revealing smoothly instead of snapping to full text.");
+expect(chatView.includes('data-chat-scroll-viewport="true"') && streamingBody.includes("findNearBottomScrollViewport") && streamingBody.includes("STREAM_SCROLL_FOLLOW_THRESHOLD_PX = 1_200") && streamingBody.includes("forceFollow") && transcript.includes("!activityIsWorking && !needsBottomSnapRef.current"), "Buffered streaming reveal keeps active generated text pinned while it grows.");
+expect(bubble.includes("emptyAssistantText") && bubble.includes("Hermes completed without returning assistant text."), "Empty completed assistant messages render a visible fallback instead of disappearing.");
+expect(transcript.includes("isStreamingAssistant && activityIsWorking"), "Completed transport reveal does not keep showing an active Thinking/Running status label.");
 expect(bubble.includes("CopyTextButton") && bubble.includes("Copy message"), "Assistant message-level copy action is present.");
 expect(bubble.includes("userBubble") && bubble.includes("messageFooter"), "Messages use a hover footer row for timestamp and actions.");
 expect(!bubble.includes("styles.author") && !bubble.includes('<span className={styles.author}'), "Assistant responses do not render a visible author header.");

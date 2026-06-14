@@ -5,16 +5,20 @@
   height: 100%;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  background: rgba(18, 18, 20, 1);
+  background-color: var(--bg-workspace-solid);
   border-top: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.035);
+  border-left: 0;
 }
 
 .head {
   display: grid;
   gap: 12px;
+  width: 100%;
+  max-width: 483px;
   padding: 20px 20px 0;
-  background: rgba(18, 18, 20, 1);
+  justify-self: center;
+  box-sizing: border-box;
+  background-color: var(--bg-workspace-solid);
 }
 
 .head h2 {
@@ -66,10 +70,14 @@
 .scroll {
   composes: scrollbar-hover-reveal from global;
   min-height: 0;
+  width: 100%;
+  max-width: 483px;
   overflow-x: hidden;
   overflow-y: auto;
+  justify-self: center;
+  box-sizing: border-box;
   padding: 20px;
-  background: rgba(18, 18, 20, 1);
+  background-color: var(--bg-workspace-solid);
 }
 
 .section {
@@ -85,6 +93,40 @@
   color: var(--text-muted);
   font-size: var(--font-small);
   font-weight: 650;
+}
+
+.sectionLabelText {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.sectionRefresh {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.sectionRefresh:hover:not(:disabled),
+.sectionRefresh:focus-visible {
+  outline: 0;
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
+}
+
+.sectionRefresh:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .card {
@@ -153,6 +195,27 @@
   min-width: 0;
   padding: 4px 0 8px;
   border-bottom: 0;
+  animation: railFieldReveal 180ms cubic-bezier(0.22, 0.78, 0.2, 1) both;
+}
+
+.field:nth-child(2) {
+  animation-delay: 20ms;
+}
+
+.field:nth-child(3) {
+  animation-delay: 40ms;
+}
+
+.field:nth-child(4) {
+  animation-delay: 60ms;
+}
+
+.field:nth-child(5) {
+  animation-delay: 80ms;
+}
+
+.field:nth-child(n + 6) {
+  animation-delay: 100ms;
 }
 
 .fieldLabel {
@@ -168,6 +231,18 @@
   color: var(--text-primary);
   font-size: var(--font-small);
   line-height: 1.35;
+}
+
+@keyframes railFieldReveal {
+  from {
+    opacity: 0.62;
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 .pill {
@@ -188,6 +263,158 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.hermesHistoryList {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hermesHistoryItem {
+  min-width: 0;
+}
+
+.hermesHistoryRow {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  border-radius: 11px;
+}
+
+.hermesHistoryRow:hover .hermesHistoryDelete,
+.hermesHistoryRow:focus-within .hermesHistoryDelete {
+  opacity: 1;
+}
+
+.hermesHistoryButton {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 6px 8px 6px 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.hermesHistoryButton:hover:not(:disabled),
+.hermesHistoryButton:focus-visible {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.hermesHistoryButton:disabled {
+  cursor: default;
+  opacity: 0.64;
+}
+
+.hermesHistoryTitle {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-small);
+  line-height: 1.28;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesHistoryMeta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.2;
+}
+
+.hermesHistoryMeta span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.hermesHistoryDelete {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
+}
+
+.hermesHistoryDelete:hover,
+.hermesHistoryDelete:focus-visible {
+  outline: 0;
+  background: rgba(255, 60, 50, 0.12);
+  color: #ff6060;
+  opacity: 1;
+}
+
+.deleteConfirm {
+  display: flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 60, 50, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 60, 50, 0.08);
+}
+
+.deleteConfirmLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteConfirmYes,
+.deleteConfirmNo {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: var(--font-xs);
+}
+
+.deleteConfirmYes {
+  border-color: rgba(255, 60, 50, 0.3);
+  background: rgba(255, 60, 50, 0.2);
+  color: #ff7070;
+}
+
+.deleteConfirmNo {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+}
+
+.emptyText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.35;
 }
 
 .listCard,
@@ -414,5 +641,9 @@
 @media (prefers-reduced-motion: reduce) {
   .rail {
     transition-duration: 1ms;
+  }
+
+  .field {
+    animation: none;
   }
 }

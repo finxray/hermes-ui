@@ -1,5 +1,5 @@
-import { AlertTriangle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
@@ -8,7 +8,8 @@ import {
   computeRunElapsed,
   createActivityEventFromHermesStreamEvent,
   makeElapsedActivityEvent,
-  makeStoppedActivityEvent
+  makeStoppedActivityEvent,
+  normalizeActivityTokenUsage
 } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
 import {
@@ -17,7 +18,7 @@ import {
 } from "@/lib/persistedActivityReplay";
 import { DEFAULT_USER_DISPLAY_NAME, WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
-import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { HermesTokenUsage, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type {
   ChatMessage,
   PersistedActivityEvent,
@@ -29,11 +30,19 @@ import type {
 } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import type { AgentActivityEvent } from "@/types/agentActivity";
+import type { LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
 import styles from "./ChatView.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ActivityRecorder = (sessionId: string, event: AgentActivityEvent) => void;
-const STREAM_FLUSH_INTERVAL_MS = 48;
+const STREAM_FLUSH_INTERVAL_MS = 32;
+const ESTIMATED_CHARS_PER_TOKEN = 4;
+const ESTIMATED_ACTIVITY_CHARS_PER_TOKEN = 6;
+const ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND = 2.5;
+const LIVE_TOKEN_ESTIMATE_INTERVAL_MS = 650;
+const LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS = 512;
+const LIVE_TOKEN_AFTERGLOW_MS = 15_000;
+const FINAL_ACTIVITY_PREFOLD_MS = 1_550;
 
 type ChatViewProps = {
   activeProject: Project;
@@ -42,8 +51,12 @@ type ChatViewProps = {
   createSession: () => void;
   hermesStatus: NormalizedHermesStatus | null;
   isHermesStatusLoading: boolean;
+  isSplitViewOpen?: boolean;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
+  onSplitView?: () => void;
   sessionModel: HermesSessionModelSync;
+  showHeader?: boolean;
+  variant?: "main" | "side";
   workspaceActions: WorkspaceActions;
 };
 
@@ -54,19 +67,32 @@ export function ChatView({
   createSession,
   hermesStatus,
   isHermesStatusLoading,
+  isSplitViewOpen = false,
   onActivityEvent,
+  onSplitView,
   sessionModel,
+  showHeader = true,
+  variant = "main",
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStopRequested, setIsStopRequested] = useState(false);
   const [assistantHasContent, setAssistantHasContent] = useState(false);
+  const [isFinalizingResponse, setIsFinalizingResponse] = useState(false);
+  const [liveTokenUsage, setLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
+  const [visibleLiveTokenUsage, setVisibleLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
+  const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const flushTimeoutRef = useRef<number | null>(null);
   const lastFlushAtRef = useRef(0);
   const assistantHasContentRef = useRef(false);
   const stopRequestedRef = useRef(false);
+  const activitySequenceRef = useRef(0);
+  const authoritativeCompletionTokensRef = useRef(false);
+  const authoritativePromptTokensRef = useRef(false);
+  const liveTokenPulseRef = useRef<number | null>(null);
+  const liveTokenClearTimerRef = useRef<number | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
@@ -75,9 +101,17 @@ export function ChatView({
   useEffect(() => {
     setIsGenerating(false);
     setIsStopRequested(false);
+    setLiveTokenUsage(null);
+    setVisibleLiveTokenUsage(null);
+    setIsFinalizingResponse(false);
+    setGenerationStartedAt(null);
     stopRequestedRef.current = false;
     activeStreamControllerRef.current?.abort();
     activeStreamControllerRef.current = null;
+    if (liveTokenPulseRef.current !== null) {
+      window.clearInterval(liveTokenPulseRef.current);
+      liveTokenPulseRef.current = null;
+    }
     if (flushTimeoutRef.current !== null) {
       window.clearTimeout(flushTimeoutRef.current);
       flushTimeoutRef.current = null;
@@ -87,7 +121,42 @@ export function ChatView({
       flushFrameRef.current = null;
     }
     assistantHasContentRef.current = false;
+    activitySequenceRef.current = 0;
+    authoritativeCompletionTokensRef.current = false;
+    authoritativePromptTokensRef.current = false;
+    if (liveTokenClearTimerRef.current !== null) {
+      window.clearTimeout(liveTokenClearTimerRef.current);
+      liveTokenClearTimerRef.current = null;
+    }
   }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (liveTokenClearTimerRef.current !== null) {
+      window.clearTimeout(liveTokenClearTimerRef.current);
+      liveTokenClearTimerRef.current = null;
+    }
+
+    if (liveTokenUsage) {
+      setVisibleLiveTokenUsage(liveTokenUsage);
+      return;
+    }
+
+    if (!visibleLiveTokenUsage) {
+      return;
+    }
+
+    liveTokenClearTimerRef.current = window.setTimeout(() => {
+      setVisibleLiveTokenUsage(null);
+      liveTokenClearTimerRef.current = null;
+    }, LIVE_TOKEN_AFTERGLOW_MS);
+
+    return () => {
+      if (liveTokenClearTimerRef.current !== null) {
+        window.clearTimeout(liveTokenClearTimerRef.current);
+        liveTokenClearTimerRef.current = null;
+      }
+    };
+  }, [liveTokenUsage, visibleLiveTokenUsage]);
   const providerModelState = sessionModel.modelState;
   const modelLabel = sessionModel.modelLabel;
   const modelSelectError = sessionModel.error;
@@ -131,6 +200,87 @@ export function ChatView({
     let runActivityReplay: PersistedActivityEvent[] = [];
     let runSummary = makeEmptyRunActivitySummary();
     let hermesRunId: string | undefined;
+    let responseTokenUsage: HermesTokenUsage | undefined;
+    let estimatedPromptTokens = 0;
+    let estimatedActivityChars = 0;
+    let accumulated = "";
+    const liveEstimateStartedAtMs = performance.now();
+
+    const nextActivitySequence = () => activitySequenceRef.current++;
+
+    const syncLiveTokenUsage = (usage: HermesTokenUsage | undefined) => {
+      if (!usage) {
+        return;
+      }
+      if (typeof usage.promptTokens === "number") {
+        authoritativePromptTokensRef.current = true;
+      }
+      if (typeof usage.completionTokens === "number") {
+        authoritativeCompletionTokensRef.current = true;
+      }
+      setLiveTokenUsage((current) => ({
+        promptTokens: usage.promptTokens ?? current?.promptTokens,
+        completionTokens: usage.completionTokens ?? current?.completionTokens
+      }));
+    };
+
+    const stopLiveTokenPulse = () => {
+      if (liveTokenPulseRef.current !== null) {
+        window.clearInterval(liveTokenPulseRef.current);
+        liveTokenPulseRef.current = null;
+      }
+    };
+
+    const estimateLiveCompletionTokens = () => {
+      const visibleTextTokens = estimateTokenCount(accumulated);
+      const activityTokens = Math.ceil(estimatedActivityChars / ESTIMATED_ACTIVITY_CHARS_PER_TOKEN);
+      const elapsedTokens = Math.min(
+        LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS,
+        Math.floor(((performance.now() - liveEstimateStartedAtMs) / 1000) * ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND)
+      );
+      return Math.max(visibleTextTokens, activityTokens + elapsedTokens);
+    };
+
+    const syncEstimatedLiveTokenUsage = () => {
+      const completionTokens = estimateLiveCompletionTokens();
+      setLiveTokenUsage((current) => {
+        const nextPromptTokens = authoritativePromptTokensRef.current
+          ? current?.promptTokens
+          : estimatedPromptTokens;
+        const nextCompletionTokens = authoritativeCompletionTokensRef.current
+          ? current?.completionTokens
+          : completionTokens;
+        if (current?.promptTokens === nextPromptTokens && current?.completionTokens === nextCompletionTokens) {
+          return current;
+        }
+        return {
+          promptTokens: nextPromptTokens,
+          completionTokens: nextCompletionTokens
+        };
+      });
+    };
+
+    const startLiveTokenPulse = () => {
+      stopLiveTokenPulse();
+      liveTokenPulseRef.current = window.setInterval(syncEstimatedLiveTokenUsage, LIVE_TOKEN_ESTIMATE_INTERVAL_MS);
+    };
+
+    const addActivityTokenEstimate = (activityEvent: AgentActivityEvent) => {
+      const parts = [
+        activityEvent.title,
+        activityEvent.summary,
+        activityEvent.hermes?.eventType,
+        activityEvent.hermes?.toolName,
+        activityEvent.command?.toolName,
+        activityEvent.command?.command,
+        activityEvent.command?.args?.join(" "),
+        activityEvent.artifact?.title,
+        activityEvent.artifact?.path
+      ].filter(Boolean);
+
+      estimatedActivityChars += Math.min(parts.join("\n").length, 900);
+      syncEstimatedLiveTokenUsage();
+    };
 
     const updateRunRecord = (patch: Partial<RunRecord>) => {
       workspaceActions.updateRunRecord(session.id, runRecordId, patch);
@@ -176,6 +326,10 @@ export function ChatView({
     assistantHasContentRef.current = false;
     setIsGenerating(true);
     generationStarted = true;
+    setGenerationStartedAt(runStartedAt);
+    setLiveTokenUsage(null);
+    authoritativeCompletionTokensRef.current = false;
+    authoritativePromptTokensRef.current = false;
     setIsStopRequested(false);
     stopRequestedRef.current = false;
 
@@ -197,11 +351,30 @@ export function ChatView({
       return;
     }
 
+    estimatedPromptTokens = estimatePromptTokensForRequest({
+      message: content,
+      project: activeProject,
+      recentMessages: session.messages.slice(-12),
+      session
+    });
+    setLiveTokenUsage({
+      completionTokens: 0,
+      promptTokens: estimatedPromptTokens
+    });
+    startLiveTokenPulse();
+    syncEstimatedLiveTokenUsage();
+
     const streamController = new AbortController();
     activeStreamControllerRef.current = streamController;
-    let accumulated = "";
     let completedAssistant = false;
     let hadStreamError = false;
+    let elapsedActivityAppended = false;
+    let pendingCompletion:
+      | {
+          references?: string[];
+          usage?: HermesTokenUsage;
+        }
+      | null = null;
 
     const markAssistantHasContent = () => {
       if (!assistantHasContentRef.current) {
@@ -210,9 +383,33 @@ export function ChatView({
       }
     };
 
-    const flushNow = (status: ChatMessage["status"] = "streaming", references?: string[]) => {
+    const cancelPendingFlush = () => {
+      if (flushFrameRef.current !== null) {
+        window.cancelAnimationFrame(flushFrameRef.current);
+        flushFrameRef.current = null;
+      }
+      if (flushTimeoutRef.current !== null) {
+        window.clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
+      }
+    };
+
+    const commitAssistantMessage = (
+      status: ChatMessage["status"] = "streaming",
+      references?: string[],
+      usage?: HermesTokenUsage
+    ) => {
+      workspaceActions.updateMessage(session.id, assistantId, accumulated, status, references, usage);
+    };
+
+    const flushNow = (
+      status: ChatMessage["status"] = "streaming",
+      references?: string[],
+      usage?: HermesTokenUsage
+    ) => {
       lastFlushAtRef.current = performance.now();
-      workspaceActions.updateMessage(session.id, assistantId, accumulated, status, references);
+      syncEstimatedLiveTokenUsage();
+      commitAssistantMessage(status, references, usage);
     };
 
     const flush = (status: ChatMessage["status"] = "streaming", references?: string[]) => {
@@ -239,6 +436,40 @@ export function ChatView({
           scheduleFrame();
         }, STREAM_FLUSH_INTERVAL_MS - elapsed);
       }
+    };
+
+    const completeAssistantMessage = (references?: string[], usage?: HermesTokenUsage) => {
+      cancelPendingFlush();
+      // Commit the final text immediately. The assistant body keeps its reveal
+      // animation mounted across the streaming -> complete transition and plays
+      // out any remaining buffered characters, so there is no need to hold the
+      // status as "streaming" with an artificial timer here.
+      commitAssistantMessage("complete", references, usage);
+    };
+
+    const appendElapsedActivityOnce = (completedAt: string) => {
+      if (elapsedActivityAppended) {
+        return;
+      }
+      appendElapsedActivityEvent(session.id, runStartedAt, completedAt, recordRunActivity, responseTokenUsage);
+      elapsedActivityAppended = true;
+    };
+
+    const completePendingAssistantMessage = async (completedAt: string) => {
+      if (!pendingCompletion) {
+        return false;
+      }
+      cancelPendingFlush();
+      const nextCompletion = pendingCompletion;
+      pendingCompletion = null;
+      appendElapsedActivityOnce(completedAt);
+      if (!hadStreamError && !stopRequestedRef.current) {
+        setIsFinalizingResponse(true);
+        await waitForFinalActivityPrefold();
+      }
+      completeAssistantMessage(nextCompletion.references, nextCompletion.usage);
+      setIsFinalizingResponse(false);
+      return true;
     };
 
     const streamResult = await streamHermesChatFromBff(
@@ -271,6 +502,8 @@ export function ChatView({
         },
         message: content,
         model: modelRequest?.selectModelId ?? null,
+        modelRuntime: modelRequest?.modelRuntime ?? null,
+        modelSelectionScope: modelRequest?.selectionScope ?? null,
         provider: modelRequest?.provider ?? null,
         recentMessages: session.messages.slice(-12).map((message) => ({
           role: message.role,
@@ -289,35 +522,49 @@ export function ChatView({
             completedAssistant = true;
             accumulated = event.message.content || accumulated;
             hermesRunId = event.runId || hermesRunId;
+            responseTokenUsage = normalizeActivityTokenUsage(event.usage) ?? responseTokenUsage;
+            syncLiveTokenUsage(responseTokenUsage);
             updateRunRecord({ hermesRunId });
             if (accumulated.trim()) {
               markAssistantHasContent();
             }
-            workspaceActions.updateMessage(session.id, assistantId, accumulated, "complete", [
-              "Hermes session stream",
-              activeProject.memoryScope.stableProjectKey
-            ]);
+            pendingCompletion = {
+              references: [
+                "Hermes session stream",
+                activeProject.memoryScope.stableProjectKey
+              ],
+              usage: responseTokenUsage
+            };
+          } else if (event.type === "metadata") {
+            responseTokenUsage = normalizeActivityTokenUsage(event.usage) ?? responseTokenUsage;
+            syncLiveTokenUsage(responseTokenUsage);
+            if (responseTokenUsage) {
+              workspaceActions.updateMessage(session.id, assistantId, accumulated, undefined, undefined, responseTokenUsage);
+            }
           } else if (event.type === "tool_event" || event.type === "run_event" || event.type === "approval_event") {
             const activityEvent = createActivityEventFromHermesStreamEvent(event, {
-              now: new Date().toISOString()
+              now: new Date().toISOString(),
+              sequence: nextActivitySequence()
             });
             if (activityEvent) {
+              addActivityTokenEstimate(activityEvent);
               recordRunActivity(session.id, activityEvent);
               workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
             }
           } else if (event.type === "error") {
             hadStreamError = true;
+            cancelPendingFlush();
             accumulated = event.error.message;
             markAssistantHasContent();
             const activityEvent = createActivityEventFromHermesStreamEvent(event, {
-              now: new Date().toISOString()
+              now: new Date().toISOString(),
+              sequence: nextActivitySequence()
             });
             if (activityEvent) {
+              addActivityTokenEstimate(activityEvent);
               recordRunActivity(session.id, activityEvent);
             }
-            workspaceActions.updateMessage(session.id, assistantId, accumulated, "error", [
-              "Hermes stream error"
-            ]);
+            commitAssistantMessage("error", ["Hermes stream error"]);
           }
         },
         signal: streamController.signal
@@ -339,6 +586,7 @@ export function ChatView({
 
     const completedAt = new Date().toISOString();
     if (streamResult === "aborted" || stopRequestedRef.current) {
+      cancelPendingFlush();
       finalizeStoppedStream(
         session.id,
         assistantId,
@@ -363,12 +611,13 @@ export function ChatView({
 
     const emptyAssistantText = !hadStreamError && !accumulated.trim();
 
+    await completePendingAssistantMessage(completedAt);
+
     if (!completedAssistant && !hadStreamError && accumulated) {
-      workspaceActions.updateMessage(session.id, assistantId, accumulated, "complete", [
-        "Hermes session stream"
-      ]);
+      completeAssistantMessage(["Hermes session stream"], responseTokenUsage);
     } else if (emptyAssistantText) {
       hadStreamError = true;
+      cancelPendingFlush();
       workspaceActions.updateMessage(
         session.id,
         assistantId,
@@ -379,7 +628,7 @@ export function ChatView({
       markAssistantHasContent();
     }
 
-    appendElapsedActivityEvent(session.id, runStartedAt, completedAt, recordRunActivity);
+    appendElapsedActivityOnce(completedAt);
     updateRunRecord({
       completedAt,
       durationMs: computeRunElapsed(runStartedAt, completedAt),
@@ -392,10 +641,14 @@ export function ChatView({
           : "Hermes completed without assistant text."
     });
     } finally {
+      stopLiveTokenPulse();
       if (generationStarted) {
         void sessionModel.refresh();
         setIsGenerating(false);
         setIsStopRequested(false);
+        setLiveTokenUsage(null);
+        setIsFinalizingResponse(false);
+        setGenerationStartedAt(null);
         stopRequestedRef.current = false;
       }
     }
@@ -418,7 +671,8 @@ export function ChatView({
     sessionId: string,
     startedAt: string,
     completedAt: string,
-    recorder: ActivityRecorder = appendActivityEvent
+    recorder: ActivityRecorder = appendActivityEvent,
+    tokenUsage?: HermesTokenUsage
   ) {
     const durationMs = computeRunElapsed(startedAt, completedAt);
     if (typeof durationMs !== "number") {
@@ -430,6 +684,7 @@ export function ChatView({
         completedAt,
         durationMs,
         id: `elapsed-${assistantSafeId(sessionId)}-${completedAt}`,
+        metadata: tokenUsage ? { tokenUsage } : undefined,
         source: "ui",
         startedAt
       })
@@ -469,32 +724,48 @@ export function ChatView({
   }
 
   const activeActivityEvents = activeSession ? activityEvents : [];
+  const bottomFadeStyle = {
+    "--chat-bottom-fade-height": `${Math.max(136, composerClearancePx + 30)}px`
+  } as CSSProperties;
 
   return (
     <section
       className={styles.workspace}
       data-start-state={isStartState ? "true" : "false"}
+      data-show-header={showHeader ? "true" : "false"}
+      data-variant={variant}
       aria-label="Chat workspace"
     >
       {isStartState ? (
         <>
-          <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+          {showHeader ? (
+            <ChatHeader
+              isSplitViewOpen={isSplitViewOpen}
+              onSplitView={onSplitView}
+              title={activeSession?.title ?? "No chat selected"}
+            />
+          ) : null}
           <div className={styles.startStage}>
           <ChatTranscript
             activeProject={activeProject}
             activeSession={activeSession}
             activityEvents={activeActivityEvents}
-            bannerIcon={<AlertTriangle size={15} />}
             createSession={createSession}
+            generationStartedAt={generationStartedAt}
+            isFinalizingResponse={isFinalizingResponse}
+            isGenerating={isGenerating}
             isStartState
+            liveTokenUsage={liveTokenUsage}
           />
           <div ref={composerWrapRef} className={styles.composerAnchor}>
           <Composer
             contextItems={composerContextItems}
+            draftStorageKey={activeSession ? composerDraftStorageKey(variant, activeSession.id) : undefined}
             disabled={!activeSession}
             isGenerating={isGenerating}
             isStopRequested={isStopRequested}
             isStartState
+            liveTokenUsage={visibleLiveTokenUsage}
             modelLabel={modelLabel}
             modelSelectError={modelSelectError}
             modelSelectInProgress={modelSelectInProgress}
@@ -513,30 +784,44 @@ export function ChatView({
           <div
             ref={scrollViewportRef}
             className={styles.scrollViewport}
+            data-chat-scroll-viewport="true"
             aria-label="Chat transcript"
           >
-            <div className={styles.topChrome}>
-              <div className={styles.contentFadeLayer} aria-hidden="true" />
-              <div className={styles.headerLayer}>
-                <ChatHeader title={activeSession?.title ?? "No chat selected"} />
+            {showHeader ? (
+              <div className={styles.topChrome}>
+                <div className={styles.contentFadeLayer} aria-hidden="true" />
+                <div className={styles.headerLayer}>
+                  <ChatHeader
+                    isSplitViewOpen={isSplitViewOpen}
+                    onSplitView={onSplitView}
+                    title={activeSession?.title ?? "No chat selected"}
+                  />
+                </div>
               </div>
-            </div>
+            ) : null}
             <ChatTranscript
               activeProject={activeProject}
               activeSession={activeSession}
               activityEvents={activeActivityEvents}
-              bannerIcon={<AlertTriangle size={15} />}
               bottomClearancePx={composerClearancePx}
               createSession={createSession}
+              generationStartedAt={generationStartedAt}
+              isFinalizingResponse={isFinalizingResponse}
+              isGenerating={isGenerating}
+              liveTokenUsage={liveTokenUsage}
             />
-            <div className={styles.scrollFadeBottom} aria-hidden="true" />
+            <div className={styles.bottomChrome} style={bottomFadeStyle}>
+              <div className={styles.scrollFadeBottom} aria-hidden="true" />
+            </div>
           </div>
           <div ref={composerWrapRef} className={`${styles.composerAnchor} ${styles.composerDock}`}>
             <Composer
               contextItems={composerContextItems}
+              draftStorageKey={activeSession ? composerDraftStorageKey(variant, activeSession.id) : undefined}
               disabled={!activeSession}
               isGenerating={isGenerating}
               isStopRequested={isStopRequested}
+              liveTokenUsage={visibleLiveTokenUsage}
               modelLabel={modelLabel}
               modelSelectError={modelSelectError}
               modelSelectInProgress={modelSelectInProgress}
@@ -639,6 +924,62 @@ function mockUnavailableResponse(
 
 function emptyHermesResponseMessage(modelLabel: string): string {
   return `Hermes completed the turn without returning assistant text for ${modelLabel}. The selected provider may be unavailable or misrouted; try another model or check Hermes provider configuration.`;
+}
+
+function estimatePromptTokensForRequest({
+  message,
+  project,
+  recentMessages,
+  session
+}: {
+  message: string;
+  project: Project;
+  recentMessages: ChatMessage[];
+  session: Session;
+}) {
+  const promptText = [
+    message,
+    project.name,
+    project.memoryScope.stableProjectKey,
+    project.memoryScope.userVisibleSummary,
+    session.title,
+    session.memoryScope.stableSessionKey,
+    session.memoryScope.userVisibleSummary,
+    ...recentMessages.map((item) => item.content)
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return estimateTokenCount(promptText);
+}
+
+function estimateTokenCount(value: string) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  if (!clean) {
+    return 0;
+  }
+  return Math.max(1, Math.ceil(clean.length / ESTIMATED_CHARS_PER_TOKEN));
+}
+
+async function waitForFinalActivityPrefold() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+  await waitForNextPaint();
+  await delay(FINAL_ACTIVITY_PREFOLD_MS);
+}
+
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+function delay(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
+
+function composerDraftStorageKey(variant: ChatViewProps["variant"], sessionId: string) {
+  return `hermes-ui:composer-draft:v1:${variant ?? "main"}:${sessionId}`;
 }
 
 function toToolEvent(event: AgentActivityEvent): ToolEvent {

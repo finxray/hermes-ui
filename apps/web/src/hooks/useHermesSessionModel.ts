@@ -27,6 +27,7 @@ export type OutgoingHermesModelRequest = {
   catalogModelId: string;
   catalogSource?: HermesModelDescriptor["catalogSource"];
   provider: string | null;
+  modelRuntime?: HermesModelDescriptor["runtime"];
   selectionScope?: HermesModelDescriptor["selectionScope"];
   selectModelId: string;
 };
@@ -67,6 +68,7 @@ type SessionModelSnapshot = {
 export function useHermesSessionModel({
   activeSession,
   hermesStatus,
+  lmStudioModels = [],
   modelChoices,
   openRouterModels = [],
   persistSessionModelPreference,
@@ -74,6 +76,7 @@ export function useHermesSessionModel({
 }: {
   activeSession: Session | null;
   hermesStatus: NormalizedHermesStatus | null;
+  lmStudioModels?: HermesModelDescriptor[];
   modelChoices: ModelChoice[];
   openRouterModels?: HermesModelDescriptor[];
   persistSessionModelPreference?: (sessionId: string, preference: SessionModelPreference) => void;
@@ -84,6 +87,7 @@ export function useHermesSessionModel({
   );
   const requestSeqRef = useRef(0);
   const appliedPreferenceKeyRef = useRef<string | null>(null);
+  const missingHermesSessionIdsRef = useRef(new Set<string>());
   const snapshotRef = useRef(snapshot);
 
   useEffect(() => {
@@ -91,8 +95,11 @@ export function useHermesSessionModel({
   }, [snapshot]);
 
   const baseModelState = useMemo(
-    () => mergeOpenRouterModels(getProviderModelState(hermesStatus, modelChoices), openRouterModels),
-    [hermesStatus, modelChoices, openRouterModels]
+    () => mergeLmStudioModels(
+      mergeOpenRouterModels(getProviderModelState(hermesStatus, modelChoices), openRouterModels),
+      lmStudioModels
+    ),
+    [hermesStatus, lmStudioModels, modelChoices, openRouterModels]
   );
 
   const modelState = useMemo(
@@ -123,6 +130,21 @@ export function useHermesSessionModel({
 
       const hermesSessionId = resolveHermesSessionId(session);
       const requestId = ++requestSeqRef.current;
+
+      if (!expected && missingHermesSessionIdsRef.current.has(hermesSessionId)) {
+        setSnapshot((current) => ({
+          ...(current.localSessionId === session.id && current.hermesSessionId === hermesSessionId
+            ? current
+            : emptySnapshot(session.id, hermesSessionId, "fallback")),
+          checkedAt: new Date().toISOString(),
+          error: null,
+          hermesSessionId,
+          localSessionId: session.id,
+          syncStatus: "fallback"
+        }));
+        return null;
+      }
+
       setSnapshot((current) => {
         const sameSession =
           current.localSessionId === session.id &&
@@ -143,8 +165,11 @@ export function useHermesSessionModel({
 
       if (!result.ok) {
         const message = result.error.message;
-        const notFound = result.error.kind === "http_error" && message.includes("HTTP 404");
+        const notFound = isHermesSessionNotFound(result);
         const fallbackOnly = notFound && !expected;
+        if (fallbackOnly) {
+          missingHermesSessionIdsRef.current.add(hermesSessionId);
+        }
         const error = fallbackOnly
           ? null
           : expected
@@ -163,6 +188,7 @@ export function useHermesSessionModel({
         return null;
       }
 
+      missingHermesSessionIdsRef.current.delete(hermesSessionId);
       const next = snapshotFromHermesSession(
         result.session,
         session.id,
@@ -342,6 +368,10 @@ export function useHermesSessionModel({
   };
 }
 
+function isHermesSessionNotFound(result: Awaited<ReturnType<typeof fetchHermesSession>>) {
+  return !result.ok && result.error.kind === "http_error" && result.error.message.includes("HTTP 404");
+}
+
 function resolveHermesSessionId(session: Session): string {
   return session.hermesSessionId || `hermes-${session.id}`;
 }
@@ -439,6 +469,63 @@ function mergeOpenRouterModels(
   };
 }
 
+function mergeLmStudioModels(
+  state: HermesUiCapabilities["models"],
+  lmStudioModels: HermesModelDescriptor[]
+): HermesUiCapabilities["models"] {
+  if (lmStudioModels.length === 0) {
+    return state;
+  }
+
+  const lmStudioById = new Map(lmStudioModels.map((model) => [model.id, model]));
+  const mergedModels = state.availableModels.map((model) => {
+    const metadata = lmStudioById.get(model.id);
+    return metadata ? mergeLmStudioModelMetadata(model, metadata) : model;
+  });
+  const knownIds = new Set(mergedModels.map((model) => model.id));
+  const extras = lmStudioModels.filter((model) => !knownIds.has(model.id));
+
+  if (extras.length === 0 && mergedModels.every((model, index) => model === state.availableModels[index])) {
+    return state;
+  }
+
+  return {
+    ...state,
+    availableModels: [...mergedModels, ...extras],
+    reason:
+      state.reason ||
+      "Hermes configured models are shown with additional UI-provided LM Studio runtime metadata."
+  };
+}
+
+function mergeLmStudioModelMetadata(
+  model: HermesModelDescriptor,
+  metadata: HermesModelDescriptor
+): HermesModelDescriptor {
+  return {
+    ...model,
+    contextLength: metadata.contextLength ?? model.contextLength,
+    description: model.description ?? metadata.description,
+    inputModalities: model.inputModalities?.length ? model.inputModalities : metadata.inputModalities,
+    label: metadata.label || model.label,
+    outputModalities: model.outputModalities?.length ? model.outputModalities : metadata.outputModalities,
+    provider: model.provider ?? metadata.provider,
+    providerKey: model.providerKey ?? metadata.providerKey,
+    runtime: {
+      ...(model.runtime ?? {}),
+      ...(metadata.runtime ?? {})
+    },
+    supportedParameters: mergeModelStringList(model.supportedParameters, metadata.supportedParameters)
+  };
+}
+
+function mergeModelStringList(left?: string[], right?: string[]): string[] | undefined {
+  const merged = [...(left ?? []), ...(right ?? [])]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return merged.length > 0 ? [...new Set(merged)] : undefined;
+}
+
 function resolveOutgoingModelRequest(
   state: HermesUiCapabilities["models"],
   preferredModelId?: string | null
@@ -451,7 +538,14 @@ function resolveOutgoingModelRequest(
   if (!catalogModelId) {
     return null;
   }
-  return resolveModelSelectRequest(catalogModelId, state.availableModels);
+  const request = resolveModelSelectRequest(catalogModelId, state.availableModels);
+  const selectedModel = state.availableModels.find((model) => model.id === catalogModelId);
+  return request
+    ? {
+        ...request,
+        modelRuntime: selectedModel?.runtime ?? null
+      }
+    : null;
 }
 
 function snapshotFromHermesSession(

@@ -1,6 +1,5 @@
 "use client";
 
-import { Brain } from "lucide-react";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { ContextRail } from "@/components/shell/ContextRail";
 import { Sidebar } from "@/components/shell/Sidebar";
@@ -95,16 +94,12 @@ export default function LongSessionFixturePage() {
           isHydrated
           projects={longSessionProjects}
           refreshHermesStatus={noop}
-          hermesSessions={[]}
-          isHermesSessionsLoading={false}
-          refreshHermesSessions={noop}
         />
         <section className={styles.transcriptWrap} aria-label="Chat transcript">
           <ChatTranscript
             activeProject={longSessionActiveProject}
             activeSession={longSessionActiveSession}
             activityEvents={longSessionActivityEvents}
-            bannerIcon={<Brain size={16} />}
             createSession={noop}
           />
         </section>
@@ -112,14 +107,19 @@ export default function LongSessionFixturePage() {
           activeProject={longSessionActiveProject}
           activeSession={longSessionActiveSession}
           activityEvents={longSessionActivityEvents}
+          allSessions={longSessionSessions}
           brainMemoryStatus={null}
+          hermesSessions={[]}
           hermesStatus={null}
           hermesSessionModel={fixtureSessionModel}
           isBrainMemoryStatusLoading={false}
+          isHermesSessionsLoading={false}
           isHermesStatusLoading={false}
           refreshBrainMemoryStatus={noop}
           refreshHermesStatus={noop}
+          refreshHermesSessions={noop}
           tenantScopePosture={null}
+          workspaceActions={fixtureActions as never}
         />
       </section>
     </main>

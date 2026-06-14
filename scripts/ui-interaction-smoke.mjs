@@ -113,6 +113,7 @@ async function main() {
       await checkRailToggles();
       await checkSettingsPopover();
       await checkRightRailTabs();
+      await checkSplitSideChat();
       await checkComposer();
       await checkDisabledPlaceholders();
       await checkNoHorizontalOverflow("final-layout-overflow");
@@ -400,13 +401,12 @@ async function checkRailToggles() {
     "Left sidebar expanded state is reflected on the shell."
   );
 
-  await page.getByRole("button", { name: "Collapse right context panel", exact: true }).click({ timeout: timeoutMs });
   await expectAttribute(
-    "right-rail-collapse",
+    "right-rail-default-collapsed",
     shell,
     "data-right-collapsed",
     "true",
-    "Right rail collapsed state is reflected on the shell."
+    "Right rail starts collapsed by default."
   );
   await checkNoHorizontalOverflow("right-rail-collapse-overflow");
 
@@ -503,6 +503,218 @@ async function checkRightRailTabs() {
       );
     }
   }
+}
+
+async function checkSplitSideChat() {
+  const shell = page.locator("main").first();
+  const rightPanel = page.locator("[data-shell-rail='right']").first();
+  const splitButton = page.getByRole("button", {
+    name: "Split chat and context panels evenly",
+    exact: true
+  });
+
+  await splitButton.click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-side-chat-open",
+    shell,
+    "data-right-collapsed",
+    "false",
+    "Title split control opens the right pane."
+  );
+
+  const sideTab = page.locator("[data-side-chat-tab='true']").first();
+  await expectAttribute(
+    "split-side-chat-active-tab",
+    sideTab,
+    "aria-selected",
+    "true",
+    "Split control activates the side-chat tab."
+  );
+  const sideTabText = await compactText(sideTab);
+  check(
+    "split-side-chat-title-in-tab",
+    sideTabText.length > 0 && sideTabText !== "Side chat",
+    `Side chat tab shows the active chat title inline: "${sideTabText}".`
+  );
+  await expectVisible(
+    "split-side-chat-composer",
+    rightPanel.getByLabel("Message", { exact: true }),
+    "Side chat owns a message composer after splitting."
+  );
+  await expectHidden(
+    "split-side-chat-no-start-hero",
+    rightPanel.getByText("What should Hermes work on?", { exact: true }),
+    "Fresh split side chat does not show the large welcome prompt."
+  );
+  await expectHidden(
+    "split-side-chat-no-start-banner",
+    rightPanel.getByText("Hermes is reached through the BFF when available; offline turns stay local.", { exact: true }),
+    "Fresh split side chat does not show the start-state connection banner."
+  );
+
+  const closeSplitButton = page.getByRole("button", {
+    name: "Return to single chat view",
+    exact: true
+  });
+  await expectAttribute(
+    "split-side-chat-toggle-button-active",
+    closeSplitButton,
+    "aria-pressed",
+    "true",
+    "Title split control exposes an active pressed state while split chat is open."
+  );
+  await closeSplitButton.click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-side-chat-toggle-close",
+    shell,
+    "data-right-collapsed",
+    "true",
+    "Clicking the active title split control collapses back to a single chat."
+  );
+  await splitButton.click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-side-chat-toggle-reopen",
+    shell,
+    "data-right-collapsed",
+    "false",
+    "Clicking the title split control again reopens split chat."
+  );
+  await page.waitForTimeout(520);
+
+  const composerAlignment = await page.evaluate(() => {
+    const textareas = Array.from(document.querySelectorAll("textarea[aria-label='Message']"))
+      .filter((textarea) => textarea instanceof HTMLElement && textarea.offsetParent !== null);
+    const boxes = textareas
+      .map((textarea) => textarea.closest("[class*='box']"))
+      .filter((box) => box instanceof HTMLElement);
+    const bottoms = boxes.map((box) => box.getBoundingClientRect().bottom);
+    const viewportBottom = window.innerHeight;
+    return {
+      bottoms,
+      offsets: bottoms.map((bottom) => Math.round((viewportBottom - bottom) * 10) / 10)
+    };
+  });
+  check(
+    "split-composer-bottom-alignment",
+    composerAlignment.bottoms.length >= 2 &&
+      Math.abs(composerAlignment.bottoms[0] - composerAlignment.bottoms[1]) <= 2 &&
+      composerAlignment.offsets.every((offset) => offset >= 8 && offset <= 12),
+    `Main/right composer bottoms align with 10px viewport offset: offsets=${composerAlignment.offsets.join(", ") || "missing"}.`
+  );
+
+  const splitColumns = await page.evaluate(() => {
+    const mainWindow = document.querySelector("[data-shell-main-window='true']");
+    if (!mainWindow) {
+      return null;
+    }
+    const columns = window.getComputedStyle(mainWindow).gridTemplateColumns
+      .split(" ")
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value));
+    if (columns.length < 2) {
+      return null;
+    }
+    return {
+      chat: columns[0],
+      right: columns[1]
+    };
+  });
+  check(
+    "split-side-chat-even-width",
+    Boolean(splitColumns) && Math.abs(splitColumns.chat - splitColumns.right) <= 4,
+    `Split control sets near-even columns: chat=${splitColumns?.chat ?? "missing"}, right=${splitColumns?.right ?? "missing"}.`
+  );
+
+  await page.locator("[data-side-chat-add='true']").click({ timeout: timeoutMs });
+  await expectVisible(
+    "split-side-chat-menu",
+    page.locator("#studio-side-chat-menu"),
+    "Side chat tab opens the matching session menu."
+  );
+  await expectVisible(
+    "split-side-chat-menu-create",
+    page.getByRole("menuitem", { name: "New side chat", exact: true }),
+    "Side chat menu exposes a new-chat action."
+  );
+
+  const menuItems = page.locator("#studio-side-chat-menu [role='menuitem']");
+  const menuItemCount = await menuItems.count();
+  check(
+    "split-side-chat-menu-existing",
+    menuItemCount > 1,
+    `Side chat menu lists existing project chats; menu item count=${menuItemCount}.`
+  );
+  if (menuItemCount > 1) {
+    await menuItems.nth(menuItemCount - 1).click({ timeout: timeoutMs });
+    await expectHidden(
+      "split-side-chat-menu-select-close",
+      page.locator("#studio-side-chat-menu"),
+      "Selecting an existing chat closes the side-chat menu."
+    );
+  }
+  await expectAttribute(
+    "split-side-chat-selected-remains-active",
+    sideTab,
+    "aria-selected",
+    "true",
+    "Selected chat remains in the active side-chat tab."
+  );
+  const selectedSideTabText = await compactText(sideTab);
+  check(
+    "split-side-chat-selected-title-in-tab",
+    selectedSideTabText.length > 0 && selectedSideTabText !== "Side chat",
+    `Selected existing chat title stays inside the side-chat tab: "${selectedSideTabText}".`
+  );
+
+  await sideTab.click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-side-chat-close",
+    page.getByRole("tab", { name: "Console", exact: true }),
+    "aria-selected",
+    "true",
+    "Clicking the active X side-chat tab closes it back to Console."
+  );
+  await splitButton.click({ timeout: timeoutMs });
+  await page.waitForTimeout(520);
+
+  const consoleTab = page.getByRole("tab", { name: "Console", exact: true });
+  await consoleTab.click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-console-tab-active",
+    consoleTab,
+    "aria-selected",
+    "true",
+    "Console tab can replace the side-chat tab in the right pane."
+  );
+  await expectVisible(
+    "split-console-content",
+    page.getByText("Context console", { exact: true }).first(),
+    "Console content is visible after switching tabs."
+  );
+
+  await page.getByRole("button", { name: "Collapse right context panel", exact: true }).click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-console-collapse",
+    shell,
+    "data-right-collapsed",
+    "true",
+    "Top-right toggle still collapses the right pane after split use."
+  );
+  await page.getByRole("button", { name: "Open right context panel", exact: true }).click({ timeout: timeoutMs });
+  await expectAttribute(
+    "split-console-reopen",
+    shell,
+    "data-right-collapsed",
+    "false",
+    "Top-right toggle reopens the right pane after split use."
+  );
+  await expectAttribute(
+    "split-console-reopen-default",
+    consoleTab,
+    "aria-selected",
+    "true",
+    "Top-right context toggle reopens directly to the console tab."
+  );
 }
 
 async function checkComposer() {

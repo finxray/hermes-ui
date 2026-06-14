@@ -5,33 +5,11 @@
   --sidebar-column-gap: var(--shell-column-gap, 9px);
   --sidebar-meta-column: minmax(28px, auto);
   --sidebar-child-meta-column: minmax(20px, auto);
-  --sidebar-footer-bg: #141214;
-  --sidebar-header-overlap: 64px;
-  --sidebar-fade-lead: 10px;
-  --sidebar-fade-ramp: 24px;
-  --sidebar-fade-start: calc(var(--sidebar-header-overlap) - var(--sidebar-fade-lead));
-  --sidebar-fade-end: calc(var(--sidebar-fade-start) + var(--sidebar-fade-ramp));
-  --sidebar-top-fade-height: var(--sidebar-fade-end);
-  --sidebar-bottom-fade-height: 52px;
-  --sidebar-content-mask: linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent var(--sidebar-fade-start),
-    rgba(0, 0, 0, 0.06) calc(var(--sidebar-fade-start) + 4px),
-    rgba(0, 0, 0, 0.14) calc(var(--sidebar-fade-start) + 8px),
-    rgba(0, 0, 0, 0.24) calc(var(--sidebar-fade-start) + 12px),
-    rgba(0, 0, 0, 0.36) calc(var(--sidebar-fade-start) + 16px),
-    rgba(0, 0, 0, 0.5) calc(var(--sidebar-fade-start) + 19px),
-    rgba(0, 0, 0, 0.64) calc(var(--sidebar-fade-start) + 21px),
-    rgba(0, 0, 0, 0.78) calc(var(--sidebar-fade-start) + 23px),
-    #000 var(--sidebar-fade-end),
-    #000 calc(100% - var(--sidebar-bottom-fade-height)),
-    rgba(0, 0, 0, 0.55) calc(100% - 30px),
-    rgba(0, 0, 0, 0.22) calc(100% - 14px),
-    transparent 100%
-  );
+  --sidebar-footer-bg: transparent;
+  --sidebar-content-mask: linear-gradient(to bottom, #000 0%, #000 100%);
   grid-area: left;
   display: flex;
+  position: relative;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -54,27 +32,17 @@
 
 .scrollBody {
   composes: scrollbar-hover-reveal from global;
-  --sidebar-mask-image-content: var(--sidebar-content-mask);
-  --sidebar-mask-size-content: calc(100% - var(--scrollbar-size)) 100%;
-  --sidebar-mask-image-scrollbar: linear-gradient(#000, #000);
-  --sidebar-mask-size-scrollbar: var(--scrollbar-size) 100%;
   position: relative;
-  z-index: 1;
+  z-index: 3;
   flex: 1 1 auto;
   min-height: 0;
-  margin-top: calc(-1 * var(--sidebar-header-overlap));
-  padding-top: var(--sidebar-top-fade-height);
   overflow: hidden auto;
-  padding-bottom: 28px;
+  padding: 10px 0 6px;
   overscroll-behavior: contain;
-  -webkit-mask-image: var(--sidebar-mask-image-content), var(--sidebar-mask-image-scrollbar);
-  -webkit-mask-size: var(--sidebar-mask-size-content), var(--sidebar-mask-size-scrollbar);
-  -webkit-mask-position: 0 0, 100% 0;
-  -webkit-mask-repeat: no-repeat, no-repeat;
-  mask-image: var(--sidebar-mask-image-content), var(--sidebar-mask-image-scrollbar);
-  mask-size: var(--sidebar-mask-size-content), var(--sidebar-mask-size-scrollbar);
-  mask-position: 0 0, 100% 0;
-  mask-repeat: no-repeat, no-repeat;
+}
+
+.scrollBody > .section:first-child {
+  margin-top: 0;
 }
 
 :global([data-left-collapsed="true"]) .sidebar {
@@ -120,7 +88,7 @@
 }
 
 .quickActions {
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
 .section {
@@ -162,27 +130,55 @@
   list-style: none;
 }
 
-.footerDock {
-  position: relative;
-  flex: 0 0 auto;
-  padding-bottom: 20px;
-  background: linear-gradient(180deg, rgba(20, 18, 20, 0.96) 0%, var(--sidebar-footer-bg) 100%);
+.collapsibleChatList {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 350ms ease;
 }
 
-.scrollFade {
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  left: 0;
-  height: var(--sidebar-bottom-fade-height);
-  pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(20, 18, 20, 0.22) 34%,
-    rgba(20, 18, 20, 0.62) 66%,
-    rgba(20, 18, 20, 0.9) 100%
+.collapsibleChatList[data-expanded="true"] {
+  grid-template-rows: 1fr;
+}
+
+.collapsibleChatListInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.showMoreButton {
+  display: block;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 4px var(--sidebar-row-padding-x) 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--font-small);
+  line-height: 1.25;
+  text-align: left;
+  transition: color 140ms ease;
+}
+
+.showMoreButton[data-depth="1"] {
+  padding-left: calc(
+    var(--sidebar-row-padding-x) + var(--sidebar-icon-column) + var(--sidebar-column-gap)
   );
+}
+
+.showMoreButton:hover,
+.showMoreButton:focus-visible {
+  outline: 0;
+  color: var(--text-secondary);
+}
+
+.footerDock {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+  padding-top: 2px;
+  padding-bottom: 20px;
+  background: transparent;
 }
 
 .footer {
@@ -243,7 +239,7 @@
 .settingsButton:focus-visible,
 .settingsToggle:checked ~ .settingsButton {
   outline: 0;
-  background: rgba(255, 255, 255, 0.052);
+  background: transparent;
   color: var(--text-primary);
 }
 
@@ -329,7 +325,7 @@
 
 .sectionRefresh:hover:not(:disabled) {
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.05);
+  background: transparent;
 }
 
 .sectionRefresh:disabled {
@@ -369,7 +365,7 @@
 
 .hermesSessionButton:hover:not(:disabled),
 .hermesSessionButton:focus-visible {
-  background: rgba(255, 255, 255, 0.052);
+  background: transparent;
   color: var(--text-primary);
   outline: 0;
 }
@@ -499,15 +495,17 @@
 
 @media (prefers-reduced-transparency: reduce) {
   .scrollBody {
-    margin-top: 0;
-    padding-top: 0;
-    -webkit-mask-image: none;
-    mask-image: none;
+    padding-top: 10px;
+    padding-bottom: 6px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .sidebar {
+    transition-duration: 1ms;
+  }
+
+  .collapsibleChatList {
     transition-duration: 1ms;
   }
 }

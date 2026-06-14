@@ -134,6 +134,16 @@ check(
   "Hermes can stream arbitrary OpenRouter ids in the chat body even when session model select rejects models absent from /v1/models."
 );
 check(
+  "streamHermesSessionChat skips session override for turn-scoped model requests",
+  Boolean(
+    typesFile?.includes('modelSelectionScope?: "session" | "turn" | null') &&
+      indexFile?.includes('request.modelSelectionScope !== "turn"') &&
+      indexFile?.includes("model: runtimeModelId || undefined") &&
+      indexFile?.includes("provider: request.provider || undefined")
+  ),
+  "Turn-scoped local or UI catalog models should be sent in the chat stream body without first calling the session model override endpoint."
+);
+check(
   "streamHermesSessionChat emits verified-model fallback for empty assistant completions",
   Boolean(
     indexFile?.includes("emptyAssistantModelFallback") &&
@@ -244,6 +254,25 @@ check(
   "UI-added models should come from a typed server-side OpenRouter catalog client."
 );
 check(
+  "LM Studio chat models from Hermes catalog remain selectable as turn-scoped local models",
+  Boolean(
+    indexFile?.includes('LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio"') &&
+      indexFile?.includes("isTurnScopedLocalProvider(providerKey)") &&
+      indexFile?.includes('selectionScope: isTurnScopedLocalProvider(providerKey) ? "turn" : "session"') &&
+      indexFile?.includes('return "LM Studio"')
+  ),
+  "Hermes can advertise LM Studio models in /v1/models; the UI should show chat ids such as qwen/qwen3.6-35b-a3b while still keeping them turn-scoped."
+);
+check(
+  "Local non-chat models remain filtered",
+  Boolean(
+    indexFile?.includes('id.includes("embed")') &&
+      indexFile?.includes('id.includes(":")') &&
+      indexFile?.includes('providerKey.startsWith("local-") && !isTurnScopedLocalProvider(providerKey)')
+  ),
+  "Embeddings and Ollama-style local tags should not appear in the chat model selector."
+);
+check(
   "normalizeHermesUiCapabilities computes clientSelectable from real model catalog",
   Boolean(indexFile?.includes("availableModels.length > 0") && indexFile?.includes('status.mode === "real"'))
 );
@@ -347,8 +376,19 @@ check(
   Boolean(
     chatStreamRouteFile?.includes("buildHermesRuntimeIdentityInstruction") &&
       chatStreamRouteFile?.includes("joinInstructions") &&
-      chatStreamRouteFile?.includes("model, provider")
+      chatStreamRouteFile?.includes("modelRuntime") &&
+      chatStreamRouteFile?.includes("model, modelRuntime, provider")
   )
+);
+check(
+  "LM Studio catalog metadata stays behind BFF and enriches model runtime",
+  Boolean(
+    readFile("apps/web/src/app/api/model-catalog/lmstudio/route.ts")?.includes("getLmStudioModelCatalog") &&
+      readFile("apps/web/src/hooks/useLmStudioModels.ts")?.includes("fetchLmStudioModels") &&
+      readFile("apps/web/src/hooks/useHermesSessionModel.ts")?.includes("mergeLmStudioModels") &&
+      readFile("apps/web/src/hooks/useHermesSessionModel.ts")?.includes("modelRuntime")
+  ),
+  "The browser should read local-model specs through the Web UI BFF and pass only typed runtime metadata through the session model pipeline."
 );
 
 // --- 5. Composer has conditional model selector ---

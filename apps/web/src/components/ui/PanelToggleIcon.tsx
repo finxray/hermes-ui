@@ -1,8 +1,34 @@
 type PanelToggleIconProps = {
-  side: "left" | "right";
+  side: "left" | "right" | "split";
 };
 
 export function PanelToggleIcon({ side }: PanelToggleIconProps) {
+  if (side === "split") {
+    return (
+      <svg
+        aria-hidden="true"
+        fill="none"
+        focusable="false"
+        viewBox="0 0 20 20"
+      >
+        <rect x="3.5" y="3.5" width="13" height="13" rx="3" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="M10 4.25V15.75"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M6.75 7.5V12.5M13.25 7.5V12.5"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.5"
+          opacity="0.55"
+        />
+      </svg>
+    );
+  }
+
   const isLeft = side === "left";
 
   return (

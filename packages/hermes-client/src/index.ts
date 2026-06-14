@@ -8,7 +8,9 @@ import type {
   HermesClientConfig,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesModelRuntimeMetadata,
   HermesModelDescriptor,
+  LmStudioModelCatalogResult,
   OpenRouterModelCatalogResult,
   HermesModelSelectResult,
   HermesRunApprovalChoice,
@@ -27,12 +29,15 @@ import type {
   HermesSessionMessagesResult,
   HermesSessionSummary,
   HermesStatusError,
+  HermesTokenUsage,
   HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 3500;
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+const LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/api/v1/models";
+const LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio";
 const PROJECT_DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
 const PROJECT_DEFAULT_MODEL_LABEL = "DeepSeek V4 Flash";
 const STABLE_HERMES_MODEL_ORDER = [
@@ -66,6 +71,9 @@ export type {
   HermesFastStreamProfile,
   HermesModelCatalogSource,
   HermesModelDescriptor,
+  HermesModelRuntimeConfig,
+  HermesModelRuntimeMetadata,
+  LmStudioModelCatalogResult,
   OpenRouterModelCatalogResult,
   HermesModelSelectResult,
   HermesModelSelectionStatus,
@@ -85,6 +93,7 @@ export type {
   HermesSessionMessagesResult,
   HermesSessionSummary,
   HermesStatusError,
+  HermesTokenUsage,
   HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
@@ -291,6 +300,67 @@ export async function getOpenRouterModelCatalog(options: {
   }
 }
 
+export async function getLmStudioModelCatalog(options: {
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+} = {}): Promise<LmStudioModelCatalogResult> {
+  const checkedAt = new Date().toISOString();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const endpoint = lmStudioModelsUrl(options.baseUrl);
+  const abort = createLinkedAbortController(options.signal, options.timeoutMs ?? 4_000);
+  const headers = new Headers({
+    Accept: "application/json"
+  });
+  if (options.apiKey?.trim()) {
+    headers.set("Authorization", `Bearer ${options.apiKey.trim()}`);
+  }
+
+  try {
+    const response = await fetchImpl(endpoint, {
+      cache: "no-store",
+      headers,
+      method: "GET",
+      signal: abort.signal
+    });
+
+    if (!response.ok) {
+      const data = await readJsonObject(response);
+      return {
+        ok: false,
+        models: [],
+        checkedAt,
+        source: "lmstudio",
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, "/api/v1/models")
+        }
+      };
+    }
+
+    const data = await readJsonObject(response);
+    return {
+      ok: true,
+      models: normalizeLmStudioModels(data),
+      checkedAt,
+      source: "lmstudio",
+      error: null
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      models: [],
+      checkedAt,
+      source: "lmstudio",
+      error: mapChatErrorToStatusError(normalizeChatFetchError(error))
+    };
+  } finally {
+    abort.cleanup();
+  }
+}
+
 export function normalizeHermesUiCapabilities(
   status: Omit<NormalizedHermesStatus, "uiCapabilities">,
   options: { configuredDefaultModelId?: string | null; memoryScopeBridgeEnabled?: boolean } = {}
@@ -490,7 +560,7 @@ export async function streamHermesSessionChat(
   }
 
   const runtimeModelId = resolveRuntimeModelId(request.model);
-  if (runtimeModelId) {
+  if (runtimeModelId && request.modelSelectionScope !== "turn") {
     const modelResult = await selectHermesModel(config, hermesSessionId, runtimeModelId, {
       expectedProviderKey: request.provider ?? null,
       provider: request.provider ?? null,
@@ -545,6 +615,7 @@ export async function streamHermesSessionChat(
         metadata: {
           context: request.context,
           memory_scope_bridge_enabled: Boolean(request.instructions),
+          model_runtime: request.modelRuntime ?? null,
           project_id: request.context.project.id,
           project_title: request.context.project.title,
           provider: request.provider ?? null,
@@ -627,11 +698,6 @@ export function isSessionSelectableCatalogModel(descriptor: HermesModelDescripto
     return false;
   }
 
-  // Local inference catalogs are not switchable through the HTTP session model API.
-  if (providerKey.startsWith("local-")) {
-    return false;
-  }
-
   // Embedding and other non-chat models.
   if (id.includes("embed") || id.startsWith("text-embedding")) {
     return false;
@@ -639,6 +705,13 @@ export function isSessionSelectableCatalogModel(descriptor: HermesModelDescripto
 
   // Ollama-style runtime tags.
   if (id.includes(":")) {
+    return false;
+  }
+
+  // Most local inference catalogs are not switchable through the HTTP session
+  // model API. LM Studio exposes OpenAI-compatible chat ids that Hermes can
+  // route when supplied per turn in the chat body.
+  if (providerKey.startsWith("local-") && !isTurnScopedLocalProvider(providerKey)) {
     return false;
   }
 
@@ -701,6 +774,9 @@ export function formatHermesProviderLabel(provider: string | null | undefined): 
   if (normalized === "nvidia") {
     return "NVIDIA";
   }
+  if (normalized === LOCAL_LMSTUDIO_PROVIDER_KEY) {
+    return "LM Studio";
+  }
   if (normalized === "anthropic") {
     return "Anthropic";
   }
@@ -732,6 +808,10 @@ function formatModelLabelSegment(segment: string): string {
   const numberWithUnit = segment.match(/^(\d+)([a-z]+)$/i);
   if (numberWithUnit && MODEL_LABEL_UNITS.has(numberWithUnit[2].toLowerCase())) {
     return `${numberWithUnit[1]}${numberWithUnit[2].toUpperCase()}`;
+  }
+  const expertArchitecture = segment.match(/^[a-z]\d+[a-z]$/i);
+  if (expertArchitecture) {
+    return segment.toUpperCase();
   }
   const version = segment.match(/^v(\d+)$/i);
   if (version) {
@@ -2032,13 +2112,75 @@ export function normalizeHermesSseEvent(
   const data = payload ?? {};
   const messageId = asString(data.message_id);
   const runId = asString(data.run_id);
+  const reasoningSummaryEvent = normalizeReasoningSummaryStreamEvent(eventName, data, messageId, runId);
+  if (reasoningSummaryEvent) {
+    return reasoningSummaryEvent;
+  }
+  const reasoningSignalEvent = normalizeReasoningSignalStreamEvent(eventName, data, messageId, runId);
+  if (reasoningSignalEvent) {
+    return reasoningSignalEvent;
+  }
 
   if (eventName === "assistant.delta") {
     const delta = asString(data.delta);
     return delta ? { type: "message_delta", delta, messageId, runId } : null;
   }
 
+  if (eventName === "response.output_text.delta" || eventName === "output_text.delta") {
+    const delta = firstString(data.delta, data.text, data.content, data.output_text);
+    return delta ? { type: "message_delta", delta, messageId, runId } : null;
+  }
+
+  if (eventName === "response.output_text.done" || eventName === "output_text.done") {
+    const content = firstString(data.text, data.content, data.output_text);
+    const usage = normalizeTokenUsage(data);
+    return {
+      type: "message_done",
+      message: {
+        role: "assistant",
+        content
+      },
+      messageId,
+      runId,
+      ...(usage ? { usage } : {})
+    };
+  }
+
+  if (eventName === "response.completed" || eventName === "response.done") {
+    const content = extractResponsesOutputText(data);
+    const usage = normalizeTokenUsage(data);
+    return content || usage
+      ? {
+          type: "message_done",
+          message: {
+            role: "assistant",
+            content
+          },
+          messageId,
+          runId,
+          ...(usage ? { usage } : {})
+        }
+      : null;
+  }
+
+  if (eventName === "message") {
+    return normalizeOpenAiCompatibleStreamEvent(data, messageId, runId);
+  }
+
+  if (eventName === "message.started") {
+    return {
+      type: "run_event",
+      name: "message.started",
+      status: "running",
+      payload: {
+        ...pickStreamCorrelationFields(data, messageId, runId),
+        event: "message.started"
+      }
+    };
+  }
+
   if (eventName === "assistant.completed") {
+    const usage = normalizeTokenUsage(data);
     return {
       type: "message_done",
       message: {
@@ -2046,7 +2188,18 @@ export function normalizeHermesSseEvent(
         content: asString(data.content)
       },
       messageId,
-      runId
+      runId,
+      ...(usage ? { usage } : {})
+    };
+  }
+
+  if (eventName === "metadata" || eventName === "usage" || eventName === "assistant.metadata") {
+    const usage = normalizeTokenUsage(data);
+    return {
+      type: "metadata",
+      messageId,
+      runId,
+      ...(usage ? { usage } : {})
     };
   }
 
@@ -2062,6 +2215,34 @@ export function normalizeHermesSseEvent(
       name: asString(data.tool_name) || "Hermes tool",
       status,
       payload: data
+    };
+  }
+
+  if (eventName === "tool.progress") {
+    const progressEvent = asString(data.event) || asString(data.type) || asString(data.name);
+    if (normalizeName(progressEvent) === "reasoning.available") {
+      const summary = publicReasoningSummaryFromToolProgress(data);
+      return {
+        type: "run_event",
+        name: summary ? "reasoning.summary.delta" : "reasoning.available",
+        status: summary ? "running" : "info",
+        payload: {
+          ...pickStreamCorrelationFields(data, messageId, runId),
+          event: summary ? "reasoning.summary.delta" : "reasoning.available",
+          source_event: eventName,
+          ...(summary ? { public_reasoning_summary: summary } : {})
+        }
+      };
+    }
+
+    return {
+      type: "tool_event",
+      name: asString(data.tool_name) || asString(data.tool) || progressEvent || "Hermes tool progress",
+      status: "started",
+      payload: {
+        ...data,
+        event: progressEvent || eventName
+      }
     };
   }
 
@@ -2098,6 +2279,277 @@ export function normalizeHermesSseEvent(
   }
 
   return null;
+}
+
+function normalizeOpenAiCompatibleStreamEvent(
+  data: Record<string, unknown>,
+  messageId: string | undefined,
+  runId: string | undefined
+): HermesChatStreamEvent | null {
+  const dataType = asString(data.type);
+  const reasoningSummaryEvent = normalizeReasoningSummaryStreamEvent(dataType, data, messageId, runId);
+  if (reasoningSummaryEvent) {
+    return reasoningSummaryEvent;
+  }
+  const reasoningSignalEvent = normalizeReasoningSignalStreamEvent(dataType, data, messageId, runId);
+  if (reasoningSignalEvent) {
+    return reasoningSignalEvent;
+  }
+
+  if (dataType === "response.output_text.delta" || dataType === "output_text.delta") {
+    const delta = firstString(data.delta, data.text, data.content, data.output_text);
+    return delta ? { type: "message_delta", delta, messageId, runId } : null;
+  }
+  if (dataType === "response.output_text.done" || dataType === "output_text.done") {
+    const usage = normalizeTokenUsage(data);
+    return {
+      type: "message_done",
+      message: {
+        role: "assistant",
+        content: firstString(data.text, data.content, data.output_text)
+      },
+      messageId,
+      runId,
+      ...(usage ? { usage } : {})
+    };
+  }
+  if (dataType === "response.completed" || dataType === "response.done") {
+    const content = extractResponsesOutputText(data);
+    const usage = normalizeTokenUsage(data);
+    return content || usage
+      ? {
+          type: "message_done",
+          message: {
+            role: "assistant",
+            content
+          },
+          messageId,
+          runId,
+          ...(usage ? { usage } : {})
+        }
+      : null;
+  }
+
+  const choices = Array.isArray(data.choices)
+    ? data.choices.filter((choice): choice is Record<string, unknown> =>
+        Boolean(choice && typeof choice === "object" && !Array.isArray(choice))
+      )
+    : [];
+  const firstChoice = choices[0];
+  const firstDelta = objectRecord(firstChoice?.delta);
+  const firstMessage = objectRecord(firstChoice?.message);
+  const delta =
+    asString(firstDelta?.content) ||
+    asString(firstDelta?.text) ||
+    asString(firstChoice?.text);
+  if (delta) {
+    return { type: "message_delta", delta, messageId, runId };
+  }
+
+  const content =
+    asString(firstMessage?.content) ||
+    asString(data.content) ||
+    asString(data.output_text);
+  const usage = normalizeTokenUsage(data);
+  const finishReason = firstString(firstChoice?.finish_reason, firstChoice?.finishReason);
+  if (content || finishReason) {
+    return {
+      type: "message_done",
+      message: {
+        role: "assistant",
+        content
+      },
+      messageId,
+      runId,
+      ...(usage ? { usage } : {})
+    };
+  }
+
+  return usage
+    ? {
+        type: "metadata",
+        messageId,
+        runId,
+        usage
+      }
+    : null;
+}
+
+function normalizeReasoningSummaryStreamEvent(
+  eventName: string,
+  data: Record<string, unknown>,
+  messageId: string | undefined,
+  runId: string | undefined
+): HermesChatStreamEvent | null {
+  if (!isReasoningSummaryEventName(eventName)) {
+    return null;
+  }
+  const summary = publicReasoningSummaryFromSummaryEvent(data);
+  const isDone = normalizeName(eventName).includes("done");
+  return {
+    type: "run_event",
+    name: isDone ? "reasoning.summary.done" : "reasoning.summary.delta",
+    status: isDone ? "info" : "running",
+    payload: {
+      ...pickStreamCorrelationFields(data, messageId, runId),
+      event: isDone ? "reasoning.summary.done" : "reasoning.summary.delta",
+      source_event: eventName,
+      ...(summary ? { public_reasoning_summary: summary } : {})
+    }
+  };
+}
+
+function normalizeReasoningSignalStreamEvent(
+  eventName: string,
+  data: Record<string, unknown>,
+  messageId: string | undefined,
+  runId: string | undefined
+): HermesChatStreamEvent | null {
+  if (!isRawReasoningEventName(eventName)) {
+    return null;
+  }
+  return {
+    type: "run_event",
+    name: "reasoning.available",
+    status: "info",
+    payload: {
+      ...pickStreamCorrelationFields(data, messageId, runId),
+      event: "reasoning.available",
+      source_event: eventName
+    }
+  };
+}
+
+function isReasoningSummaryEventName(eventName: string) {
+  const normalized = normalizeName(eventName);
+  return (
+    normalized === "response_reasoning_summary_text_delta" ||
+    normalized === "response_reasoning_summary_text_done" ||
+    normalized === "response_reasoning_summary_delta" ||
+    normalized === "response_reasoning_summary_done" ||
+    normalized === "response_reasoning_summary_part_added" ||
+    normalized === "response_reasoning_summary_part_done" ||
+    normalized === "reasoning_summary_text_delta" ||
+    normalized === "reasoning_summary_text_done" ||
+    normalized === "reasoning_summary_delta" ||
+    normalized === "reasoning_summary_done" ||
+    normalized === "reasoning_summary_part_added" ||
+    normalized === "reasoning_summary_part_done"
+  );
+}
+
+function isRawReasoningEventName(eventName: string) {
+  const normalized = normalizeName(eventName);
+  return (
+    normalized === "response_reasoning_text_delta" ||
+    normalized === "response_reasoning_text_done" ||
+    normalized === "reasoning_text_delta" ||
+    normalized === "reasoning_text_done" ||
+    normalized === "reasoning_available"
+  );
+}
+
+function publicReasoningSummaryFromSummaryEvent(data: Record<string, unknown>) {
+  const part = objectRecord(data.part);
+  const summary = objectRecord(data.summary);
+  return firstString(
+    data.public_reasoning_summary,
+    data.publicReasoningSummary,
+    data.public_summary,
+    data.publicSummary,
+    data.reasoning_summary_text,
+    data.reasoningSummaryText,
+    data.reasoning_summary,
+    data.reasoningSummary,
+    data.delta,
+    data.text,
+    data.content,
+    part?.text,
+    part?.content,
+    part?.summary,
+    summary?.text,
+    summary?.content
+  );
+}
+
+function publicReasoningSummaryFromToolProgress(data: Record<string, unknown>) {
+  const summary = firstString(
+    data.public_reasoning_summary,
+    data.publicReasoningSummary,
+    data.public_summary,
+    data.publicSummary,
+    data.reasoning_summary_text,
+    data.reasoningSummaryText,
+    data.reasoning_summary,
+    data.reasoningSummary
+  );
+  if (summary) {
+    return summary;
+  }
+  const visibility = normalizeName(firstString(data.visibility, data.privacy, data.reasoning_visibility));
+  return visibility === "public" ? firstString(data.summary, data.message, data.detail) : "";
+}
+
+function pickStreamCorrelationFields(
+  data: Record<string, unknown>,
+  messageId: string | undefined,
+  runId: string | undefined
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  const resolvedMessageId = messageId || asString(data.messageId);
+  const resolvedRunId = runId || asString(data.runId);
+  if (resolvedMessageId) {
+    result.message_id = resolvedMessageId;
+  }
+  if (resolvedRunId) {
+    result.run_id = resolvedRunId;
+  }
+  for (const key of ["session_id", "sessionId", "tool_call_id", "toolCallId", "sequence", "seq", "sequence_number", "item_id", "itemId", "output_index", "content_index"]) {
+    if (data[key] !== undefined) {
+      result[key] = data[key];
+    }
+  }
+  return result;
+}
+
+function extractResponsesOutputText(data: Record<string, unknown>): string {
+  const direct = firstString(data.output_text, data.text, data.content);
+  if (direct) {
+    return direct;
+  }
+
+  const response = objectRecord(data.response);
+  if (response) {
+    const fromResponse = extractResponsesOutputText(response);
+    if (fromResponse) {
+      return fromResponse;
+    }
+  }
+
+  const output = Array.isArray(data.output) ? data.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    const record = objectRecord(item);
+    if (!record) {
+      continue;
+    }
+    const itemText = firstString(record.output_text, record.text, record.content);
+    if (itemText) {
+      parts.push(itemText);
+    }
+    const content = Array.isArray(record.content) ? record.content : [];
+    for (const contentItem of content) {
+      const contentRecord = objectRecord(contentItem);
+      if (!contentRecord) {
+        continue;
+      }
+      const text = firstString(contentRecord.text, contentRecord.content, contentRecord.output_text);
+      if (text) {
+        parts.push(text);
+      }
+    }
+  }
+  return parts.join("");
 }
 
 async function checkSessionStreamingCapability(args: {
@@ -3221,6 +3673,217 @@ function objectRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function normalizeTokenUsage(source: Record<string, unknown>): HermesTokenUsage | undefined {
+  const metadata = objectRecord(source.metadata);
+  const usage =
+    objectRecord(source.usage) ??
+    objectRecord(source.token_usage) ??
+    objectRecord(metadata?.usage) ??
+    objectRecord(metadata?.token_usage) ??
+    source;
+  const stats =
+    objectRecord(source.stats) ??
+    objectRecord(usage.stats) ??
+    objectRecord(metadata?.stats) ??
+    objectRecord(metadata?.generation_stats);
+  const promptDetails =
+    objectRecord(usage.prompt_tokens_details) ??
+    objectRecord(usage.promptTokensDetails) ??
+    objectRecord(source.prompt_tokens_details) ??
+    objectRecord(source.promptTokensDetails);
+  const completionDetails =
+    objectRecord(usage.completion_tokens_details) ??
+    objectRecord(usage.completionTokensDetails) ??
+    objectRecord(source.completion_tokens_details) ??
+    objectRecord(source.completionTokensDetails);
+  const promptTokens =
+    finiteNumber(usage.prompt_tokens) ??
+    finiteNumber(usage.promptTokens) ??
+    finiteNumber(usage.input_tokens) ??
+    finiteNumber(usage.inputTokens);
+  const completionTokens =
+    finiteNumber(usage.completion_tokens) ??
+    finiteNumber(usage.completionTokens) ??
+    finiteNumber(usage.output_tokens) ??
+    finiteNumber(usage.outputTokens);
+  const totalTokens =
+    finiteNumber(usage.total_tokens) ??
+    finiteNumber(usage.totalTokens) ??
+    (promptTokens !== undefined || completionTokens !== undefined
+      ? (promptTokens ?? 0) + (completionTokens ?? 0)
+      : undefined);
+  const cachedTokens =
+    finiteNumber(usage.cached_tokens) ??
+    finiteNumber(usage.cachedTokens) ??
+    finiteNumber(promptDetails?.cached_tokens) ??
+    finiteNumber(promptDetails?.cachedTokens);
+  const reasoningTokens =
+    finiteNumber(usage.reasoning_tokens) ??
+    finiteNumber(usage.reasoningTokens) ??
+    finiteNumber(completionDetails?.reasoning_tokens) ??
+    finiteNumber(completionDetails?.reasoningTokens);
+  const costUsd =
+    finiteNumber(usage.cost_usd) ??
+    finiteNumber(usage.costUsd) ??
+    finiteNumber(usage.total_cost) ??
+    finiteNumber(usage.totalCost) ??
+    finiteNumber(usage.cost) ??
+    finiteNumber(source.cost_usd) ??
+    finiteNumber(source.costUsd) ??
+    finiteNumber(source.total_cost) ??
+    finiteNumber(source.totalCost) ??
+    finiteNumber(source.cost);
+  const normalized: HermesTokenUsage = {};
+  if (promptTokens !== undefined) {
+    normalized.promptTokens = promptTokens;
+  }
+  if (completionTokens !== undefined) {
+    normalized.completionTokens = completionTokens;
+  }
+  if (totalTokens !== undefined) {
+    normalized.totalTokens = totalTokens;
+  }
+  if (cachedTokens !== undefined) {
+    normalized.cachedTokens = cachedTokens;
+  }
+  if (reasoningTokens !== undefined) {
+    normalized.reasoningTokens = reasoningTokens;
+  }
+  if (costUsd !== undefined) {
+    normalized.costUsd = costUsd;
+  }
+  const provider = asString(usage.provider) || asString(source.provider);
+  const model = asString(usage.model) || asString(source.model);
+  const upstreamModel =
+    asString(usage.upstream_model) ||
+    asString(usage.upstreamModel) ||
+    asString(source.upstream_model) ||
+    asString(source.upstreamModel);
+  const generationId =
+    asString(usage.generation_id) ||
+    asString(usage.generationId) ||
+    asString(source.generation_id) ||
+    asString(source.generationId) ||
+    (asString(source.object).includes("completion") ? asString(source.id) : "");
+  const finishReason =
+    asString(usage.finish_reason) ||
+    asString(usage.finishReason) ||
+    asString(source.finish_reason) ||
+    asString(source.finishReason) ||
+    firstChoiceString(source.choices, "finish_reason", "finishReason");
+  const requestId =
+    asString(usage.request_id) ||
+    asString(usage.requestId) ||
+    asString(source.request_id) ||
+    asString(source.requestId);
+  const latencyMs =
+    finiteNumber(usage.latency_ms) ??
+    finiteNumber(usage.latencyMs) ??
+    finiteNumber(source.latency_ms) ??
+    finiteNumber(source.latencyMs);
+  const tokensPerSecond =
+    finiteNumber(usage.tokens_per_second) ??
+    finiteNumber(usage.tokensPerSecond) ??
+    finiteNumber(usage.tokens_per_sec) ??
+    finiteNumber(usage.tokensPerSec) ??
+    finiteNumber(source.tokens_per_second) ??
+    finiteNumber(source.tokensPerSecond) ??
+    finiteNumber(stats?.tokens_per_second) ??
+    finiteNumber(stats?.tokensPerSecond) ??
+    finiteNumber(stats?.tokens_per_sec) ??
+    finiteNumber(stats?.tokensPerSec);
+  const timeToFirstTokenMs =
+    finiteNumber(usage.time_to_first_token_ms) ??
+    finiteNumber(usage.timeToFirstTokenMs) ??
+    finiteNumber(source.time_to_first_token_ms) ??
+    finiteNumber(source.timeToFirstTokenMs) ??
+    finiteNumber(stats?.time_to_first_token_ms) ??
+    finiteNumber(stats?.timeToFirstTokenMs) ??
+    secondsToMs(
+      finiteNumber(usage.time_to_first_token_seconds) ??
+        finiteNumber(usage.timeToFirstTokenSeconds) ??
+        finiteNumber(source.time_to_first_token_seconds) ??
+        finiteNumber(source.timeToFirstTokenSeconds) ??
+        finiteNumber(stats?.time_to_first_token_seconds) ??
+        finiteNumber(stats?.timeToFirstTokenSeconds) ??
+        finiteNumber(stats?.ttft_s)
+    );
+  if (provider) {
+    normalized.provider = provider;
+  }
+  if (model) {
+    normalized.model = model;
+  }
+  if (upstreamModel) {
+    normalized.upstreamModel = upstreamModel;
+  }
+  if (generationId) {
+    normalized.generationId = generationId;
+  }
+  if (finishReason) {
+    normalized.finishReason = finishReason;
+  }
+  if (requestId) {
+    normalized.requestId = requestId;
+  }
+  if (latencyMs !== undefined) {
+    normalized.latencyMs = latencyMs;
+  }
+  if (tokensPerSecond !== undefined) {
+    normalized.tokensPerSecond = tokensPerSecond;
+  }
+  if (timeToFirstTokenMs !== undefined) {
+    normalized.timeToFirstTokenMs = timeToFirstTokenMs;
+  }
+  const sourceLabel = normalizeUsageSource(asString(usage.source) || asString(source.source));
+  const hasUsageValues = Object.keys(normalized).length > 0;
+  if (sourceLabel && hasUsageValues) {
+    normalized.source = sourceLabel;
+  } else if (hasUsageValues) {
+    normalized.source = "provider";
+  }
+  return hasUsageValues ? normalized : undefined;
+}
+
+function firstChoiceString(value: unknown, ...keys: string[]): string {
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  for (const item of value) {
+    const choice = objectRecord(item);
+    if (!choice) {
+      continue;
+    }
+    for (const key of keys) {
+      const text = asString(choice[key]);
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return "";
+}
+
+function normalizeUsageSource(value: string): HermesTokenUsage["source"] | undefined {
+  if (
+    value === "provider" ||
+    value === "hermes_usage" ||
+    value === "estimated" ||
+    value === "unavailable"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function secondsToMs(value: number | undefined): number | undefined {
+  return value === undefined ? undefined : Math.round(value * 1000);
+}
+
 function firstString(...values: unknown[]): string {
   for (const value of values) {
     const text = asString(value).trim();
@@ -3454,7 +4117,7 @@ function modelDescriptors(models: Record<string, unknown> | null): HermesModelDe
       label: modelLabelFromDescriptor(record, id),
       provider: formatHermesProviderLabel(provider) || provider,
       catalogSource: "hermes-config",
-      selectionScope: "session",
+      selectionScope: isTurnScopedLocalProvider(providerKey) ? "turn" : "session",
       providerKey,
       selectModelId: resolveModelSelectId(id, providerKey)
     });
@@ -3475,6 +4138,22 @@ function openRouterModelsUrl(baseUrl: string | null | undefined): string {
     return url.toString();
   } catch {
     return OPENROUTER_MODELS_URL;
+  }
+}
+
+function lmStudioModelsUrl(baseUrl: string | null | undefined): string {
+  const raw = baseUrl?.trim();
+  if (!raw) {
+    return LMSTUDIO_MODELS_URL;
+  }
+  try {
+    const url = new URL(raw);
+    if (!url.pathname || url.pathname === "/") {
+      url.pathname = "/api/v1/models";
+    }
+    return url.toString();
+  } catch {
+    return LMSTUDIO_MODELS_URL;
   }
 }
 
@@ -3524,6 +4203,128 @@ function normalizeOpenRouterModels(data: Record<string, unknown> | null): Hermes
   return models.sort((a, b) => a.label.localeCompare(b.label));
 }
 
+function normalizeLmStudioModels(data: Record<string, unknown> | null): HermesModelDescriptor[] {
+  const items = Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data?.models)
+      ? data.models
+      : Array.isArray(data)
+        ? data
+        : [];
+  const models: HermesModelDescriptor[] = [];
+
+  for (const item of items) {
+    const record = objectRecord(item);
+    if (!record) {
+      continue;
+    }
+    const type = asString(record.type).trim().toLowerCase();
+    if (type === "embedding") {
+      continue;
+    }
+
+    const id = asString(record.id) || asString(record.key) || asString(record.model);
+    if (!id || isPlaceholderHermesModelId(id)) {
+      continue;
+    }
+
+    const runtime = normalizeLmStudioRuntime(record);
+    models.push({
+      id,
+      label: asString(record.display_name) || asString(record.displayName) || formatHermesModelLabel(id),
+      provider: "LM Studio",
+      providerKey: LOCAL_LMSTUDIO_PROVIDER_KEY,
+      selectModelId: id,
+      catalogSource: "ui-lmstudio",
+      selectionScope: "turn",
+      contextLength: runtime.loadedContextLength ?? runtime.maxContextLength ?? null,
+      inputModalities: normalizeLmStudioInputModalities(record),
+      outputModalities: ["text"],
+      supportedParameters: normalizeLmStudioSupportedParameters(record),
+      runtime
+    });
+  }
+
+  return models.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function normalizeLmStudioRuntime(record: Record<string, unknown>): HermesModelRuntimeMetadata {
+  const quantization = objectRecord(record.quantization);
+  const loadedInstances = Array.isArray(record.loaded_instances) ? record.loaded_instances : [];
+  const loadedInstance = loadedInstances.map(objectRecord).find(Boolean) ?? null;
+  const config = objectRecord(loadedInstance?.config);
+  const loadedContextLength =
+    numberOrNull(config?.context_length) ??
+    numberOrNull(config?.contextLength) ??
+    numberOrNull(record.loaded_context_length) ??
+    numberOrNull(record.loadedContextLength);
+  const maxContextLength =
+    numberOrNull(record.max_context_length) ??
+    numberOrNull(record.maxContextLength) ??
+    loadedContextLength;
+
+  return pruneRuntimeMetadata({
+    architecture: asString(record.architecture) || null,
+    format: asString(record.format) || asString(record.compatibility_type) || null,
+    loadedContextLength,
+    maxContextLength,
+    params: asString(record.params_string) || asString(record.paramsString) || null,
+    quantization: asString(quantization?.name) || asString(record.quantization) || null,
+    quantizationBits: numberOrNull(quantization?.bits_per_weight) ?? numberOrNull(quantization?.bitsPerWeight),
+    runtimeConfig: pruneRuntimeConfig({
+      contextLength: loadedContextLength,
+      evalBatchSize: numberOrNull(config?.eval_batch_size) ?? numberOrNull(config?.evalBatchSize),
+      flashAttention: optionalBoolean(config?.flash_attention, config?.flashAttention),
+      kCacheQuantizationType:
+        asString(config?.k_cache_quantization_type) ||
+        asString(config?.kCacheQuantizationType) ||
+        null,
+      numExperts: numberOrNull(config?.num_experts) ?? numberOrNull(config?.numExperts),
+      offloadKvCacheToGpu: optionalBoolean(config?.offload_kv_cache_to_gpu, config?.offloadKvCacheToGpu),
+      parallel: numberOrNull(config?.parallel),
+      vCacheQuantizationType:
+        asString(config?.v_cache_quantization_type) ||
+        asString(config?.vCacheQuantizationType) ||
+        null
+    }),
+    selectedVariant: asString(record.selected_variant) || asString(record.selectedVariant) || null,
+    sizeBytes: numberOrNull(record.size_bytes) ?? numberOrNull(record.sizeBytes),
+    state: asString(record.state) || null
+  });
+}
+
+function normalizeLmStudioInputModalities(record: Record<string, unknown>): string[] {
+  const capabilities = objectRecord(record.capabilities);
+  return optionalBoolean(capabilities?.vision) ? ["text", "image"] : ["text"];
+}
+
+function normalizeLmStudioSupportedParameters(record: Record<string, unknown>): string[] {
+  const capabilities = objectRecord(record.capabilities);
+  const parameters = ["stream"];
+  if (optionalBoolean(capabilities?.trained_for_tool_use, capabilities?.trainedForToolUse)) {
+    parameters.push("tools");
+  }
+  if (optionalBoolean(capabilities?.reasoning)) {
+    parameters.push("reasoning");
+  }
+  return parameters;
+}
+
+function pruneRuntimeMetadata(runtime: HermesModelRuntimeMetadata): HermesModelRuntimeMetadata {
+  return Object.fromEntries(
+    Object.entries(runtime).filter(([, value]) => value !== null && value !== undefined)
+  ) as HermesModelRuntimeMetadata;
+}
+
+function pruneRuntimeConfig(
+  config: NonNullable<HermesModelRuntimeMetadata["runtimeConfig"]>
+): NonNullable<HermesModelRuntimeMetadata["runtimeConfig"]> | null {
+  const pruned = Object.fromEntries(
+    Object.entries(config).filter(([, value]) => value !== null && value !== undefined)
+  ) as NonNullable<HermesModelRuntimeMetadata["runtimeConfig"]>;
+  return Object.keys(pruned).length > 0 ? pruned : null;
+}
+
 function preferPublicProviderCatalogModels(models: HermesModelDescriptor[]): HermesModelDescriptor[] {
   const publicProviderAliases = new Set(
     models
@@ -3569,6 +4370,10 @@ function resolveModelSelectId(id: string, _providerKey: string | null): string {
   // Hermes POST /api/sessions/{id}/model expects the catalog id from GET /v1/models.
   // Provider routing is supplied separately via the `provider` field — not `provider:id`.
   return id;
+}
+
+function isTurnScopedLocalProvider(providerKey: string | null | undefined): boolean {
+  return providerKey?.trim().toLowerCase() === LOCAL_LMSTUDIO_PROVIDER_KEY;
 }
 
 function isOpenRouterCatalogProvider(providerKey: string): boolean {
@@ -3905,6 +4710,9 @@ function writeNormalizedFrame(
           }
         };
       }
+      if (normalized.message.content.trim() && streamState && !streamState.hasAssistantText) {
+        writeSyntheticMessageDeltas(controller, encoder, normalized);
+      }
       if (normalized.message.content.trim() && streamState) {
         streamState.hasAssistantText = true;
       }
@@ -3913,9 +4721,105 @@ function writeNormalizedFrame(
       writeEmptyAssistantFallback(controller, encoder, streamState);
     }
     writeUiSse(controller, encoder, normalized);
+    const runUsageMetadata = normalizeRunEventUsageMetadata(normalized);
+    if (runUsageMetadata) {
+      writeUiSse(controller, encoder, runUsageMetadata);
+    }
     return normalized.type === "done";
   }
   return false;
+}
+
+const SYNTHETIC_STREAM_BLOCK_MAX_CHARS = 560;
+
+function writeSyntheticMessageDeltas(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  encoder: TextEncoder,
+  doneEvent: Extract<HermesChatStreamEvent, { type: "message_done" }>
+) {
+  const blocks = splitAssistantTextIntoStreamBlocks(doneEvent.message.content);
+  for (const delta of blocks) {
+    writeUiSse(controller, encoder, {
+      type: "message_delta",
+      delta,
+      messageId: doneEvent.messageId,
+      runId: doneEvent.runId
+    });
+  }
+}
+
+function splitAssistantTextIntoStreamBlocks(content: string) {
+  const text = content.replace(/\r\n/g, "\n");
+  if (!text) {
+    return [];
+  }
+
+  const paragraphParts = text.split(/(\n{2,})/);
+  const units: string[] = [];
+  for (let index = 0; index < paragraphParts.length; index += 2) {
+    const paragraph = paragraphParts[index] ?? "";
+    const separator = paragraphParts[index + 1] ?? "";
+    const unit = `${paragraph}${separator}`;
+    if (unit) {
+      units.push(...splitLongStreamUnit(unit));
+    }
+  }
+
+  const blocks: string[] = [];
+  let block = "";
+  for (const unit of units) {
+    if (block && block.length + unit.length > SYNTHETIC_STREAM_BLOCK_MAX_CHARS) {
+      blocks.push(block);
+      block = "";
+    }
+    if (unit.length > SYNTHETIC_STREAM_BLOCK_MAX_CHARS) {
+      blocks.push(...splitLongStreamUnit(unit));
+      continue;
+    }
+    block += unit;
+  }
+  if (block) {
+    blocks.push(block);
+  }
+  return blocks;
+}
+
+function splitLongStreamUnit(value: string) {
+  if (value.length <= SYNTHETIC_STREAM_BLOCK_MAX_CHARS) {
+    return [value];
+  }
+
+  const blocks: string[] = [];
+  let cursor = 0;
+  while (cursor < value.length) {
+    const maxEnd = Math.min(value.length, cursor + SYNTHETIC_STREAM_BLOCK_MAX_CHARS);
+    const slice = value.slice(cursor, maxEnd);
+    const newlineIndex = slice.lastIndexOf("\n");
+    const spaceIndex = slice.lastIndexOf(" ");
+    const softBreakIndex = Math.max(newlineIndex, spaceIndex);
+    const end = softBreakIndex > 80 && maxEnd < value.length ? cursor + softBreakIndex + 1 : maxEnd;
+    blocks.push(value.slice(cursor, end));
+    cursor = end;
+  }
+  return blocks;
+}
+
+function normalizeRunEventUsageMetadata(event: HermesChatStreamEvent): HermesChatStreamEvent | null {
+  if (event.type !== "run_event") {
+    return null;
+  }
+  const usage = normalizeTokenUsage({
+    ...event.payload,
+    source: "hermes_usage"
+  });
+  return usage
+    ? {
+        type: "metadata",
+        messageId: asString(event.payload.message_id),
+        runId: asString(event.payload.run_id),
+        usage
+      }
+    : null;
 }
 
 function writeEmptyAssistantFallback(

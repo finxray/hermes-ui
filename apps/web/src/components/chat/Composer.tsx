@@ -1,8 +1,9 @@
-import { ArrowUp, Check, ChevronDown, LoaderCircle, Mic, Plus, Search, Square } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, LoaderCircle, Plus, Search, Square } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { CSSProperties } from "react";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
+import { LiveTokenUsageTicker, type LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
 import styles from "./Composer.module.css";
 
 const COMPOSER_CONTENT_INSET_X = 15;
@@ -19,9 +20,11 @@ type ComposerProps = {
     value: string;
   }>;
   disabled?: boolean;
+  draftStorageKey?: string;
   isGenerating?: boolean;
   isStopRequested?: boolean;
   isStartState?: boolean;
+  liveTokenUsage?: LiveTokenUsageSnapshot | null;
   modelLabel?: string;
   modelSelectError?: string | null;
   modelState?: HermesUiCapabilities["models"];
@@ -36,9 +39,11 @@ type ComposerProps = {
 export function Composer({
   contextItems = [],
   disabled = false,
+  draftStorageKey,
   isGenerating = false,
   isStopRequested = false,
   isStartState = false,
+  liveTokenUsage = null,
   modelLabel = "Hermes default",
   modelSelectError = null,
   modelState,
@@ -73,6 +78,9 @@ export function Composer({
     Boolean(onModelSelect) &&
     !modelSelectInProgress;
   const streamBatchingDetail = "Streaming batches deltas with an animation-frame flush, not one React update per token.";
+  const showLiveTokenUsage =
+    typeof liveTokenUsage?.promptTokens === "number" ||
+    typeof liveTokenUsage?.completionTokens === "number";
 
   useLayoutEffect(() => {
     if (!modelMenuMounted) {
@@ -198,6 +206,17 @@ export function Composer({
     };
   }, []);
 
+  useEffect(() => {
+    if (!draftStorageKey) {
+      return;
+    }
+    const savedDraft = readComposerDraft(draftStorageKey);
+    setDraft(savedDraft);
+    if (textareaRef.current) {
+      textareaRef.current.value = savedDraft;
+    }
+  }, [draftStorageKey]);
+
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) {
@@ -216,12 +235,18 @@ export function Composer({
 
   function updateDraft(value: string) {
     setDraft(value);
+    if (draftStorageKey) {
+      writeComposerDraft(draftStorageKey, value);
+    }
   }
 
   function clearDraft() {
     setDraft("");
     if (textareaRef.current) {
       textareaRef.current.value = "";
+    }
+    if (draftStorageKey) {
+      clearComposerDraft(draftStorageKey);
     }
   }
 
@@ -371,41 +396,53 @@ export function Composer({
                 >
                   <Plus size={20} />
                 </button>
-                <div
-                  className={styles.modelControl}
-                  ref={modelControlRef}
-                >
-                  <button
-                    className={styles.modelButton}
-                    ref={modelButtonRef}
-                    type="button"
-                    aria-expanded={canSelectModel ? modelMenuMounted : undefined}
-                    aria-haspopup={canSelectModel ? "listbox" : undefined}
-                    aria-label={modelButtonLabel(modelState, modelOptions.length)}
-                    title={modelSelectorTitle(modelState, modelOptions.length)}
-                    disabled={!canSelectModel}
-                    onClick={toggleModelMenu}
-                  >
-                    <span className={styles.modelButtonText}>
-                      {modelSelectInProgress ? "Selecting..." : modelLabel}
-                    </span>
-                    {modelSelectInProgress ? (
-                      <LoaderCircle className={styles.modelSpinner} size={14} />
-                    ) : canSelectModel ? (
-                      <ChevronDown size={14} />
-                    ) : null}
-                  </button>
+                <div className={styles.modelRow}>
+                  <div className={styles.modelControl} ref={modelControlRef}>
+                    <button
+                      className={styles.modelButton}
+                      ref={modelButtonRef}
+                      type="button"
+                      aria-expanded={canSelectModel ? modelMenuMounted : undefined}
+                      aria-haspopup={canSelectModel ? "listbox" : undefined}
+                      aria-label={modelButtonLabel(modelState, modelOptions.length)}
+                      title={modelSelectorTitle(modelState, modelOptions.length)}
+                      disabled={!canSelectModel}
+                      onClick={toggleModelMenu}
+                    >
+                      <span className={styles.modelButtonText}>
+                        {modelSelectInProgress ? "Selecting..." : modelLabel}
+                      </span>
+                      {modelSelectInProgress ? (
+                        <LoaderCircle className={styles.modelSpinner} size={14} />
+                      ) : canSelectModel ? (
+                        <ChevronDown size={14} />
+                      ) : null}
+                    </button>
+                  </div>
+                  {showLiveTokenUsage ? (
+                    <div className={styles.liveTokenSlot} aria-live="polite">
+                      <LiveTokenUsageTicker
+                        completionTokens={liveTokenUsage?.completionTokens}
+                        promptTokens={liveTokenUsage?.promptTokens}
+                        variant="composer"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className={styles.controlsRight}>
                 <button
-                  className={styles.toolButton}
+                  className={`${styles.toolButton} ${styles.micButton}`}
                   type="button"
                   aria-label="Voice input coming soon"
                   title="Voice input is coming soon."
                   disabled
                 >
-                  <Mic size={16} />
+                  <span className={styles.micIcon} aria-hidden="true">
+                    <span className={styles.micCapsule} />
+                    <span className={styles.micYoke} />
+                    <span className={styles.micStem} />
+                  </span>
                 </button>
                 <button
                   className={[
@@ -434,13 +471,20 @@ export function Composer({
           aria-hidden={showContextPanel ? undefined : "true"}
         >
           <div className={styles.contextPanelInner}>
-            {contextItems.map((item) => (
-              <span className={styles.contextItem} key={`${item.label}:${item.value}`}>
+            {contextItems.map((item, index) => (
+              <span
+                className={styles.contextItem}
+                key={`${item.label}:${item.value}`}
+                style={{ "--context-item-index": index } as CSSProperties}
+              >
                 <span className={styles.contextLabel}>{item.label}</span>
                 <span className={styles.contextValue}>{item.value}</span>
               </span>
             ))}
-            <span className={styles.contextItem}>
+            <span
+              className={styles.contextItem}
+              style={{ "--context-item-index": contextItems.length } as CSSProperties}
+            >
               <span className={styles.contextLabel}>Model</span>
               <span className={styles.contextValue}>{modelLabel}</span>
             </span>
@@ -505,10 +549,7 @@ function ModelSection({
               >
                 <span className={styles.modelOptionText}>
                   <span className={styles.modelOptionLabel}>{model.label}</span>
-                  <span className={styles.modelOptionProvider}>
-                    {model.provider ?? "Provider inherited"}
-                    {model.contextLength ? ` · ${formatContextLength(model.contextLength)}` : ""}
-                  </span>
+                  <span className={styles.modelOptionProvider}>{modelProviderSummary(model)}</span>
                 </span>
                 {isSelected ? <Check size={15} /> : null}
               </button>
@@ -536,6 +577,13 @@ function groupModelOptions(
       model.id,
       model.provider,
       model.description,
+      model.runtime?.architecture,
+      model.runtime?.format,
+      model.runtime?.params,
+      model.runtime?.quantization,
+      model.runtime?.selectedVariant,
+      model.runtime?.runtimeConfig?.kCacheQuantizationType,
+      model.runtime?.runtimeConfig?.vCacheQuantizationType,
       ...(model.supportedParameters ?? [])
     ]
       .filter(Boolean)
@@ -560,8 +608,66 @@ function formatContextLength(value: number) {
   return `${value} context`;
 }
 
+function modelProviderSummary(model: HermesUiCapabilities["models"]["availableModels"][number]) {
+  const parts = [model.provider ?? "Provider inherited"];
+  const runtime = model.runtime;
+  if (runtime?.loadedContextLength && runtime.maxContextLength && runtime.loadedContextLength !== runtime.maxContextLength) {
+    parts.push(`${formatContextWindow(runtime.loadedContextLength)} active / ${formatContextWindow(runtime.maxContextLength)} max`);
+  } else if (model.contextLength) {
+    parts.push(formatContextLength(model.contextLength));
+  }
+  if (runtime?.quantization) {
+    parts.push(runtime.quantization);
+  }
+  if (runtime?.runtimeConfig?.offloadKvCacheToGpu) {
+    parts.push("GPU KV");
+  }
+  if (runtime?.runtimeConfig?.flashAttention) {
+    parts.push("Flash");
+  }
+  return parts.join(" · ");
+}
+
+function formatContextWindow(value: number) {
+  if (value >= 1_000_000) {
+    return `${Math.round(value / 1_000_000)}M`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}K`;
+  }
+  return `${value}`;
+}
+
 function getTrimmedDraft(textarea: HTMLTextAreaElement | null, draft: string) {
   return (textarea?.value ?? draft).trim();
+}
+
+function readComposerDraft(key: string) {
+  try {
+    return window.localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeComposerDraft(key: string, value: string) {
+  try {
+    if (value.length === 0) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Composer drafts are best-effort UI state only.
+  }
+}
+
+function clearComposerDraft(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Composer drafts are best-effort UI state only.
+  }
 }
 
 function modelButtonLabel(state?: HermesUiCapabilities["models"], optionCount = 0) {

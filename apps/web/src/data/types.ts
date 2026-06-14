@@ -46,6 +46,26 @@ export type ChatMessage = {
   content: string;
   references?: string[];
   status?: "complete" | "streaming" | "error" | "mock";
+  usage?: ChatUsageMetadata;
+};
+
+export type ChatUsageMetadata = {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+  reasoningTokens?: number;
+  costUsd?: number;
+  provider?: string;
+  model?: string;
+  upstreamModel?: string;
+  generationId?: string;
+  finishReason?: string;
+  latencyMs?: number;
+  requestId?: string;
+  source?: "provider" | "hermes_usage" | "estimated" | "unavailable";
+  timeToFirstTokenMs?: number;
+  tokensPerSecond?: number;
 };
 
 export type MemoryEvidence = {
@@ -244,7 +264,7 @@ export type ModelChoice = {
 
 export type SessionModelPreference = {
   catalogModelId: string;
-  catalogSource?: "hermes-config" | "ui-openrouter";
+  catalogSource?: "hermes-config" | "ui-lmstudio" | "ui-openrouter";
   label?: string;
   provider: string | null;
   selectedAt: string;

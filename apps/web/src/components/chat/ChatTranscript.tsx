@@ -10,6 +10,7 @@ import styles from "./ChatView.module.css";
 
 const ACTIVITY_REVEAL_DELAY_MS = 5_000;
 const COMPLETED_WORK_SCROLL_SETTLE_MS = 1_700;
+const FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS = 80;
 
 type ChatTranscriptProps = {
   activeProject: Project;
@@ -19,6 +20,7 @@ type ChatTranscriptProps = {
   bottomClearancePx?: number;
   createSession: () => void;
   generationStartedAt?: string | null;
+  isFinalizingResponse?: boolean;
   isGenerating?: boolean;
   isStartState?: boolean;
   liveTokenUsage?: LiveTokenUsageSnapshot | null;
@@ -32,6 +34,7 @@ export function ChatTranscript({
   bottomClearancePx,
   createSession,
   generationStartedAt = null,
+  isFinalizingResponse = false,
   isGenerating = false,
   isStartState = false,
   liveTokenUsage = null
@@ -57,16 +60,17 @@ export function ChatTranscript({
   const activityAnchorMessageId = activityAnchorMessage?.id;
   const assistantRevealComplete =
     !activityAnchorMessage?.content || revealedAssistantMessageId === activityAnchorMessageId;
+  const activityIsWorking = isGenerating && !isFinalizingResponse;
   const isStreamingAssistant =
     lastMessage?.role === "assistant" && lastMessage.status === "streaming";
   const streamStatusLabel =
-    isStreamingAssistant && isGenerating ? resolveStreamStatusLabel(activityEvents) : null;
+    isStreamingAssistant && activityIsWorking ? resolveStreamStatusLabel(activityEvents) : null;
   const shouldShowActivityBlock = activeSession
     ? shouldShowAgentActivityBlock({
         activityDelayElapsed,
         assistantContent: activityAnchorMessage?.content ?? "",
         events: activityEvents,
-        isGenerating,
+        isGenerating: activityIsWorking,
         legacyEventCount: activeSession.toolEvents.length,
         liveTokenUsage
       })
@@ -74,9 +78,10 @@ export function ChatTranscript({
   const activitySignal = `${shouldShowActivityBlock ? "visible" : "hidden"}:${activityEvents.length}:${activeSession?.toolEvents.length ?? 0}`;
   const activityBlock = activeSession && shouldShowActivityBlock ? (
     <AgentActivityBlock
-      autoCollapseCompletedWork={!isGenerating && assistantRevealComplete}
+      autoCollapseCompletedWork={isFinalizingResponse || (!activityIsWorking && assistantRevealComplete)}
+      completedWorkAutoCollapseDelayMs={isFinalizingResponse ? FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS : undefined}
       events={activityEvents}
-      isWorking={isGenerating}
+      isWorking={activityIsWorking}
       legacyEvents={activeSession.toolEvents}
       liveTokenUsage={liveTokenUsage}
       onCompletedWorkAutoCollapse={handleCompletedWorkAutoCollapse}
@@ -194,13 +199,13 @@ export function ChatTranscript({
   }, [activeSession?.id]);
 
   useEffect(() => {
-    if (isGenerating) {
+    if (activityIsWorking) {
       setRevealedAssistantMessageId(null);
     }
-  }, [isGenerating, lastMessage?.id]);
+  }, [activityIsWorking, lastMessage?.id]);
 
   useEffect(() => {
-    if (!isGenerating || !generationStartedAt) {
+    if (!activityIsWorking || !generationStartedAt) {
       setActivityDelayElapsed(false);
       return;
     }
@@ -220,7 +225,7 @@ export function ChatTranscript({
     setActivityDelayElapsed(false);
     const timer = window.setTimeout(() => setActivityDelayElapsed(true), remainingMs);
     return () => window.clearTimeout(timer);
-  }, [generationStartedAt, isGenerating]);
+  }, [activityIsWorking, generationStartedAt]);
 
   useLayoutEffect(() => {
     if (isStartState || !activeSession) {
@@ -301,7 +306,7 @@ export function ChatTranscript({
       previousActivitySignal === "" || previousActivitySignal.includes("hidden");
     if (blockJustAppeared) {
       scheduleBottomFollow("smooth", 4);
-    } else if (isGenerating) {
+    } else if (activityIsWorking) {
       // A new activity row was appended mid-run. Its height is allocated
       // immediately (the reveal only animates opacity/clip), so a single smooth
       // scroll eases the shift into view instead of snapping the transcript.
@@ -313,7 +318,7 @@ export function ChatTranscript({
     activeSession?.id,
     activitySignal,
     bottomClearancePx,
-    isGenerating,
+    activityIsWorking,
     isStartState,
     messageCount,
     shouldShowActivityBlock
@@ -340,7 +345,7 @@ export function ChatTranscript({
     }
 
     const scrollThreshold = typeof bottomClearancePx === "number" ? bottomClearancePx + 80 : 120;
-    if (!isGenerating && !needsBottomSnapRef.current && !isNearBottom(scrollViewport, scrollThreshold)) {
+    if (!activityIsWorking && !needsBottomSnapRef.current && !isNearBottom(scrollViewport, scrollThreshold)) {
       return;
     }
 
@@ -353,6 +358,7 @@ export function ChatTranscript({
     scheduleBottomFollow(firstTokensArrived && !prefersReducedMotion ? "smooth" : "auto", firstTokensArrived ? 4 : 2);
   }, [
     activeSession?.id,
+    activityIsWorking,
     bottomClearancePx,
     isStartState,
     isStreamingAssistant,

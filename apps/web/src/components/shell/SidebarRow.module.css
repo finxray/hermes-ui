@@ -26,13 +26,14 @@
 .row:hover,
 .row:focus-visible {
   outline: 0;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.055);
   color: var(--text-primary);
 }
 
 .row.active {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.075);
   color: var(--text-primary);
+  font-weight: 560;
 }
 
 .row.muted {
@@ -95,7 +96,7 @@
   align-items: center;
   justify-content: flex-end;
   padding-left: 12px;
-  background: linear-gradient(90deg, transparent, rgba(16, 15, 18, 0.96) 34%);
+  background: transparent;
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -128,7 +129,7 @@
 .actionButton:hover,
 .actionButton:focus-visible {
   outline: 0;
-  background: var(--bg-control-hover);
+  background: transparent;
   color: var(--text-primary);
 }
 

@@ -72,6 +72,8 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
   const message = cleanText(input.message, MAX_MESSAGE_CHARS);
   const context = readContext(input.context);
   const model = cleanOptionalString(input.model, 128);
+  const modelRuntime = readModelRuntime(input.modelRuntime);
+  const modelSelectionScope = readModelSelectionScope(input.modelSelectionScope);
   const provider = cleanOptionalString(input.provider, 128);
 
   if (!message) {
@@ -86,11 +88,13 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
     request: {
       context,
       instructions: joinInstructions(
-        buildHermesRuntimeIdentityInstruction({ model, provider }),
+        buildHermesRuntimeIdentityInstruction({ model, modelRuntime, provider }),
         isMemoryScopeBridgeEnabled() ? buildMemoryScopeBridgeInstruction(context) : null
       ),
       message,
       provider,
+      modelRuntime,
+      modelSelectionScope,
       model,
       recentMessages: readRecentMessages(input.recentMessages)
     }
@@ -125,6 +129,50 @@ function cleanOptionalString(value: unknown, maxLength: number): string | null {
   return typeof value === "string"
     ? value.replace(/[\r\n\x00]/g, " ").trim().slice(0, maxLength) || null
     : null;
+}
+
+function readModelSelectionScope(value: unknown): HermesChatRequest["modelSelectionScope"] {
+  return value === "session" || value === "turn" ? value : null;
+}
+
+function readModelRuntime(value: unknown): HermesChatRequest["modelRuntime"] {
+  const runtime = readObject(value);
+  if (!runtime) {
+    return null;
+  }
+  const runtimeConfig = readObject(runtime.runtimeConfig);
+  return {
+    architecture: cleanOptionalString(runtime.architecture, 80),
+    format: cleanOptionalString(runtime.format, 40),
+    loadedContextLength: cleanOptionalNumber(runtime.loadedContextLength),
+    maxContextLength: cleanOptionalNumber(runtime.maxContextLength),
+    params: cleanOptionalString(runtime.params, 40),
+    quantization: cleanOptionalString(runtime.quantization, 40),
+    quantizationBits: cleanOptionalNumber(runtime.quantizationBits),
+    runtimeConfig: runtimeConfig
+      ? {
+          contextLength: cleanOptionalNumber(runtimeConfig.contextLength),
+          evalBatchSize: cleanOptionalNumber(runtimeConfig.evalBatchSize),
+          flashAttention: cleanOptionalBoolean(runtimeConfig.flashAttention),
+          kCacheQuantizationType: cleanOptionalString(runtimeConfig.kCacheQuantizationType, 40),
+          numExperts: cleanOptionalNumber(runtimeConfig.numExperts),
+          offloadKvCacheToGpu: cleanOptionalBoolean(runtimeConfig.offloadKvCacheToGpu),
+          parallel: cleanOptionalNumber(runtimeConfig.parallel),
+          vCacheQuantizationType: cleanOptionalString(runtimeConfig.vCacheQuantizationType, 40)
+        }
+      : null,
+    selectedVariant: cleanOptionalString(runtime.selectedVariant, 160),
+    sizeBytes: cleanOptionalNumber(runtime.sizeBytes),
+    state: cleanOptionalString(runtime.state, 40)
+  };
+}
+
+function cleanOptionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function cleanOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function joinInstructions(...parts: Array<string | null>): string | null {

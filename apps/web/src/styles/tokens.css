@@ -9,9 +9,11 @@
   --bg-surface: #15171b;
   --bg-surface-2: #1a1d21;
   --bg-elevated: #22262b;
-  --bg-workspace: #0f0f0f;
-  --bg-workspace-solid: #0f0f0f;
-  --border-window-outline: rgba(255, 255, 255, 0.13);
+  --bg-workspace: #0e0e0f;
+  --bg-workspace-solid: #0e0e0f;
+  --border-window-outline: rgba(255, 255, 255, 0.2);
+  --border-window-separator: rgba(255, 255, 255, 0.16);
+  --border-window-outline-width: 1px;
   --bg-control-hover: rgba(255, 255, 255, 0.055);
   --bg-control-active: rgba(255, 255, 255, 0.082);
   --bg-user-bubble: rgba(28, 30, 35, 0.9);
@@ -52,11 +54,14 @@
 
   /* Z-index scale: keep transient overlays above clipped app panels. */
   --z-floating: 1000;
-  --scrollbar-size: 10px;
-  --scrollbar-thumb-border: 3px;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.18);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+  --scrollbar-size: 17.28px;
+  --scrollbar-thumb-border: 3.6px;
+  --scrollbar-thumb-min-height: 43.2px;
+  --scrollbar-thumb: rgba(180, 176, 183, 0.32);
+  --scrollbar-thumb-hover: rgba(207, 204, 210, 0.46);
   --scrollbar-track: transparent;
+  --scrollbar-track-hover: transparent;
+  --scrollbar-fade-duration: 1600ms;
 
   /* Activity shimmer keyframes are defined per-component */
 }

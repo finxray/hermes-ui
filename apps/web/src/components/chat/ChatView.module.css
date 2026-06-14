@@ -1,5 +1,7 @@
 .workspace {
-  --chat-fade-bg: rgba(18, 18, 20, 1);
+  --chat-fade-bg: var(--bg-workspace-solid);
+  --chat-top-overlay-height: 95px;
+  --chat-transcript-top-margin: 50px;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -7,13 +9,17 @@
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: var(--chat-fade-bg);
+  background-color: var(--bg-workspace-solid);
   box-shadow: none;
 }
 
 .workspace[data-start-state="true"] {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.workspace[data-start-state="true"][data-show-header="false"] {
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .scrollViewport {
@@ -28,9 +34,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   box-sizing: border-box;
-  scrollbar-gutter: stable;
   pointer-events: auto;
-  background: var(--chat-fade-bg);
+  background-color: var(--bg-workspace-solid);
 }
 
 .topChrome {
@@ -57,6 +62,17 @@
   pointer-events: none;
 }
 
+.bottomChrome {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  flex: none;
+  width: 100%;
+  height: var(--chat-bottom-fade-height, 156px);
+  margin-top: calc(-1 * var(--chat-bottom-fade-height, 156px));
+  pointer-events: none;
+}
+
 .contentFadeLayer {
   position: absolute;
   top: 0;
@@ -64,39 +80,34 @@
   left: 0;
   z-index: 1;
   width: 100%;
-  height: var(--chat-top-overlay-height, 108px);
+  height: var(--chat-top-overlay-height, 95px);
   margin-top: 0;
   background: linear-gradient(
     to bottom,
     var(--chat-fade-bg) 0%,
-    rgba(18, 18, 20, 0.92) 14%,
-    rgba(18, 18, 20, 0.68) 32%,
-    rgba(18, 18, 20, 0.38) 52%,
-    rgba(18, 18, 20, 0.16) 72%,
-    rgba(18, 18, 20, 0.04) 88%,
+    rgba(14, 14, 15, 0.99) 24%,
+    rgba(14, 14, 15, 0.9) 42%,
+    rgba(14, 14, 15, 0.55) 62%,
+    rgba(14, 14, 15, 0.18) 82%,
     transparent 100%
   );
 }
 
 .scrollFadeBottom {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 4;
-  height: var(--chat-bottom-fade-height, 72px);
+  inset: 0;
   background: linear-gradient(
     to top,
     var(--chat-fade-bg) 0%,
-    rgba(18, 18, 20, 0.9) 16%,
-    rgba(18, 18, 20, 0.58) 38%,
-    rgba(18, 18, 20, 0.24) 64%,
-    rgba(18, 18, 20, 0.06) 86%,
+    rgba(14, 14, 15, 0.99) 24%,
+    rgba(14, 14, 15, 0.9) 42%,
+    rgba(14, 14, 15, 0.55) 62%,
+    rgba(14, 14, 15, 0.18) 82%,
     transparent 100%
   );
 }
 
-.scrollViewport > *:not(.topChrome):not(.scrollFadeBottom) {
+.scrollViewport > *:not(.topChrome):not(.bottomChrome) {
   pointer-events: auto;
 }
 
@@ -104,11 +115,14 @@
   position: relative;
   z-index: 5;
   display: flex;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 clamp(20px, 4vw, 52px) 14px;
+  padding: 0 clamp(20px, 2vw, 36px) 1px;
   pointer-events: none;
+  gap: 0;
 }
 
 .composerAnchor > * {
@@ -119,12 +133,24 @@
 
 .composerDock {
   position: absolute;
-  right: 10px;
+  right: 0;
   bottom: 0;
   left: 0;
   width: auto;
   z-index: 5;
-  align-items: flex-end;
+  align-items: center;
+}
+
+.workspace[data-variant="side"] .composerDock {
+  right: 0;
+}
+
+.workspace[data-variant="side"] .startStage {
+  padding-top: 0;
+}
+
+.workspace[data-variant="side"][data-show-header="false"] .startStage {
+  padding-top: 0;
 }
 
 .header {
@@ -145,6 +171,9 @@
 
 .headerTitle {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
   margin: 0;
   background: transparent;
@@ -152,6 +181,7 @@
 }
 
 .header h1 {
+  max-width: 150px;
   margin: 0;
   overflow: hidden;
   color: var(--text-primary);
@@ -161,15 +191,49 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-shadow:
-    0 0 18px rgba(18, 18, 20, 0.92),
-    0 1px 10px rgba(18, 18, 20, 0.78);
+    0 0 18px rgba(14, 14, 15, 0.92),
+    0 1px 10px rgba(14, 14, 15, 0.78);
+}
+
+.headerSplitButton {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.headerSplitButton:hover,
+.headerSplitButton:focus-visible {
+  outline: 0;
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
+}
+
+.headerSplitButton:active {
+  transform: scale(0.98);
+}
+
+.headerSplitButton svg {
+  width: var(--icon-md);
+  height: var(--icon-md);
 }
 
 .transcript {
   flex: 1 0 auto;
   min-width: 0;
   overflow: visible;
-  padding: 2px clamp(20px, 4vw, 52px) 0;
+  padding: var(--chat-transcript-top-margin, 50px) clamp(20px, 2vw, 36px) 0;
   background: transparent;
 }
 
@@ -196,29 +260,6 @@
 
 .transcript[data-start-state="true"] .transcriptInner {
   gap: 14px;
-  justify-items: center;
-}
-
-/* Lightweight informational notice — not alarming */
-.mockBanner {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 3px 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--notice);
-  font-size: var(--font-xs);
-  line-height: 1.45;
-  border: 0;
-}
-
-.mockBanner svg {
-  flex: 0 0 auto;
-  color: var(--notice);
-  opacity: 0.88;
 }
 
 .startStage {
@@ -232,29 +273,7 @@
   gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: clamp(20px, 6vh, 56px) clamp(20px, 4vw, 52px) 12px;
-}
-
-.startHero {
-  display: grid;
-  justify-items: center;
-  gap: 9px;
-  text-align: center;
-}
-
-.startEyebrow {
-  color: var(--text-muted);
-  font-size: var(--font-small);
-  line-height: 1.2;
-}
-
-.startHero h2 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: clamp(26px, 3.2vw, 38px);
-  font-weight: 560;
-  letter-spacing: 0;
-  line-height: 1.14;
+  padding: clamp(20px, 6vh, 56px) clamp(20px, 2vw, 36px) 0;
 }
 
 @media (prefers-reduced-transparency: reduce) {

@@ -24,18 +24,26 @@ export async function GET(
   );
 
   if (!result.ok) {
+    if (isHermesSessionNotFound(result)) {
+      return NextResponse.json(result, {
+        headers: { "Cache-Control": "no-store" }
+      });
+    }
+
     const status =
       result.error.kind === "network" || result.error.kind === "timeout"
         ? 502
-        : result.error.kind === "http_error" && result.error.message.includes("HTTP 404")
-          ? 404
-          : 400;
+        : 400;
     return NextResponse.json(result, { status });
   }
 
   return NextResponse.json(result, {
     headers: { "Cache-Control": "no-store" }
   });
+}
+
+function isHermesSessionNotFound(result: Awaited<ReturnType<typeof getHermesSession>>) {
+  return !result.ok && result.error.kind === "http_error" && result.error.message.includes("HTTP 404");
 }
 
 export async function DELETE(

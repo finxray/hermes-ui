@@ -49,6 +49,7 @@ checkMemoryScopeBridgeTenant();
 checkNormalizationFillsMemoryScopes();
 checkNormalizationFillsTitleMetadata();
 checkRunRecordPersistence();
+checkMessageUsageMetadataPersistence();
 checkRunsReplayPreviewHydrationPersistence();
 checkSessionExportPreview();
 checkSessionModelPreferencePersistence();
@@ -525,6 +526,69 @@ function checkRunRecordPersistence() {
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].status, "info");
   assert.equal(normalizedMalformed.sessions[0].runRecords[0].activityReplay[0].sourceChannel, "telegram");
   assert(!JSON.stringify(normalizedMalformed.sessions[0].runRecords[0].activityReplay).includes("abc123"));
+}
+
+function checkMessageUsageMetadataPersistence() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+
+  state = workspaceReducer(state, {
+    type: "appendMessage",
+    sessionId: session.id,
+    message: {
+      id: "msg-usage-check",
+      role: "assistant",
+      author: "Hermes",
+      createdAt: "12:05",
+      content: "",
+      status: "streaming"
+    }
+  });
+
+  state = workspaceReducer(state, {
+    type: "updateMessage",
+    sessionId: session.id,
+    messageId: "msg-usage-check",
+    content: "Usage metadata is available.",
+    status: "complete",
+    usage: {
+      promptTokens: 123,
+      completionTokens: 456,
+      totalTokens: 579,
+      cachedTokens: 12,
+      reasoningTokens: 3,
+      costUsd: 0.0012,
+      provider: "OpenRouter",
+      model: "deepseek-v4-flash",
+      upstreamModel: "deepseek/deepseek-v4-flash",
+      generationId: "gen-usage-check",
+      finishReason: "stop",
+      latencyMs: 1200,
+      requestId: "req-usage-check",
+      source: "provider"
+    }
+  });
+
+  let updated = state.sessions
+    .find((item) => item.id === session.id)
+    ?.messages.find((message) => message.id === "msg-usage-check");
+  assert.equal(updated?.usage?.totalTokens, 579);
+  assert.equal(updated?.usage?.costUsd, 0.0012);
+  assert.equal(updated?.usage?.generationId, "gen-usage-check");
+
+  state = workspaceReducer(state, {
+    type: "updateMessage",
+    sessionId: session.id,
+    messageId: "msg-usage-check",
+    content: "Usage metadata remains available.",
+    status: "complete"
+  });
+
+  updated = state.sessions
+    .find((item) => item.id === session.id)
+    ?.messages.find((message) => message.id === "msg-usage-check");
+  assert.equal(updated?.usage?.totalTokens, 579);
+  assert.equal(updated?.usage?.generationId, "gen-usage-check");
 }
 
 function checkRunsReplayPreviewHydrationPersistence() {

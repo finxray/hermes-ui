@@ -81,11 +81,34 @@ export const MessageMarkdown = memo(function MessageMarkdown({
           return <input {...props} checked={checked} disabled={disabled} type={type} />;
         }
 
+        const nativeCheckbox = (
+          <input
+            {...props}
+            aria-hidden="true"
+            checked={Boolean(checked)}
+            className={styles.taskCheckNative}
+            disabled={disabled}
+            readOnly
+            tabIndex={-1}
+            type="checkbox"
+          />
+        );
+
         if (!checked) {
-          return <span className={styles.taskCheckTodo} aria-hidden="true" />;
+          return (
+            <>
+              {nativeCheckbox}
+              <span className={styles.taskCheckTodo} aria-hidden="true" />
+            </>
+          );
         }
 
-        return <StatusCheckIcon className={styles.statusCheckList} />;
+        return (
+          <>
+            {nativeCheckbox}
+            <StatusCheckIcon className={styles.statusCheckList} />
+          </>
+        );
       }
     }),
     [isStreaming]
@@ -137,11 +160,12 @@ export function CopyTextButton({
     <button
       aria-label={copied ? "Copied" : label}
       className={buttonClassName}
+      data-copy-action="true"
       onClick={handleCopy}
       title={copied ? "Copied" : label}
       type="button"
     >
-      <DisplayIcon size={16} aria-hidden="true" />
+      <DisplayIcon aria-hidden="true" />
       {variant === "pill" ? <span>{copied ? "Copied" : label}</span> : null}
     </button>
   );

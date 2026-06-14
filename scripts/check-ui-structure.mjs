@@ -5,6 +5,9 @@ const root = process.cwd();
 const requiredFiles = [
   "apps/web/src/components/shell/AppShell.tsx",
   "apps/web/src/components/shell/AppShell.module.css",
+  "apps/web/src/components/shell/SplitPane.tsx",
+  "apps/web/src/components/shell/SplitPane.module.css",
+  "apps/web/src/components/shell/Sidebar.tsx",
   "apps/web/src/components/shell/SidebarRow.tsx",
   "apps/web/src/components/shell/SidebarRow.module.css",
   "apps/web/src/components/chat/Composer.module.css",
@@ -89,8 +92,14 @@ for (const token of [
   "studio-right-rail-toggle",
   "const [leftCollapsed, setLeftCollapsed]",
   "const [rightCollapsed, setRightCollapsed]",
+  "const [rightPaneMode, setRightPaneMode]",
+  "const [sideSessionId, setSideSessionId]",
+  "useState(true)",
+  "checked={leftCollapsed}",
+  "checked={rightCollapsed}",
   "setLeftCollapsed(event.currentTarget.checked)",
-  "setRightCollapsed(event.currentTarget.checked)"
+  "const collapsed = event.currentTarget.checked",
+  "createSessionForProject"
 ]) {
   if (!appShell.includes(token)) {
     failures.push(`AppShell is missing ${token}`);
@@ -117,12 +126,14 @@ const appShellCss = readFileSync(join(root, "apps/web/src/components/shell/AppSh
 const mainWindowCssForChecks = existsSync(join(root, "apps/web/src/components/shell/MainWindow.module.css"))
   ? readFileSync(join(root, "apps/web/src/components/shell/MainWindow.module.css"), "utf8")
   : "";
+const sidebarSource = readFileSync(join(root, "apps/web/src/components/shell/Sidebar.tsx"), "utf8");
 const sidebarCssForChecks = readFileSync(join(root, "apps/web/src/components/shell/Sidebar.module.css"), "utf8");
 const topBarCssForChecks = readFileSync(join(root, "apps/web/src/components/shell/TopBar.module.css"), "utf8");
 for (const token of [
   '.shell[data-left-collapsed="true"]',
   ".shell:has(.leftToggle:checked)",
-  "transition: grid-template-columns 180ms",
+  "transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1)",
+  ':global(body[data-shell-resizing="true"]) .shell',
   ':global([data-shell-rail="left"])',
   '"left main-window"'
 ]) {
@@ -134,7 +145,8 @@ for (const token of [
   "main-window",
   "data-right-collapsed",
   "grid-template-columns: minmax(0, 1fr) minmax(0, var(--rail-width-right))",
-  "transition: grid-template-columns 180ms"
+  "transition: grid-template-columns var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1)",
+  ':global(body[data-shell-resizing="true"]) .mainWindow'
 ]) {
   if (!mainWindowCssForChecks.includes(token)) {
     failures.push(`Main window CSS contract is missing ${token}`);
@@ -143,15 +155,25 @@ for (const token of [
 
 const chatViewVisualCss = readFileSync(join(root, "apps/web/src/components/chat/ChatView.module.css"), "utf8");
 const chatViewVisualSource = readFileSync(join(root, "apps/web/src/components/chat/ChatView.tsx"), "utf8");
+const chatHeaderSource = readFileSync(join(root, "apps/web/src/components/chat/ChatHeader.tsx"), "utf8");
 const chatTranscriptVisualSource = readFileSync(join(root, "apps/web/src/components/chat/ChatTranscript.tsx"), "utf8");
 const composerVisualSource = readFileSync(join(root, "apps/web/src/components/chat/Composer.tsx"), "utf8");
 const composerVisualCss = readFileSync(join(root, "apps/web/src/components/chat/Composer.module.css"), "utf8");
+const contextRailSource = readFileSync(join(root, "apps/web/src/components/shell/ContextRail.tsx"), "utf8");
 const contextRailVisualCss = readFileSync(join(root, "apps/web/src/components/shell/ContextRail.module.css"), "utf8");
+const splitPaneSource = readFileSync(join(root, "apps/web/src/components/shell/SplitPane.tsx"), "utf8");
+const splitPaneCss = readFileSync(join(root, "apps/web/src/components/shell/SplitPane.module.css"), "utf8");
+const agentActivityBlockSource = readFileSync(join(root, "apps/web/src/components/chat/AgentActivityBlock.tsx"), "utf8");
+const agentActivityBlockCss = readFileSync(join(root, "apps/web/src/components/chat/AgentActivityBlock.module.css"), "utf8");
 
 for (const token of [
   "data-start-state",
+  "data-show-header",
+  "data-variant",
   "startStage",
   "isStartState",
+  "composerClearancePx + 30",
+  "--chat-bottom-fade-height",
   "showContextPanel={false}"
 ]) {
   if (!chatViewVisualSource.includes(token)) {
@@ -160,9 +182,8 @@ for (const token of [
 }
 
 for (const token of [
-  "What should Hermes work on?",
-  "Hermes is reached through the BFF",
-  "data-start-state"
+  "data-start-state",
+  "!isStartState ?"
 ]) {
   if (!chatTranscriptVisualSource.includes(token)) {
     failures.push(`ChatTranscript empty-start contract is missing ${token}`);
@@ -183,9 +204,15 @@ for (const token of [
 for (const token of [
   "background: transparent",
   "transcriptBottomSpacer",
-  ".startStage",
-  ".startHero",
-  "color: var(--notice)"
+  "height: var(--chat-top-overlay-height, 95px)",
+  "--chat-transcript-top-margin: 50px",
+  "rgba(14, 14, 15, 0.99) 24%",
+  "height: var(--chat-bottom-fade-height, 156px)",
+  ".bottomChrome",
+  "margin-top: calc(-1 * var(--chat-bottom-fade-height, 156px))",
+  "rgba(14, 14, 15, 0.18) 82%",
+  "max-width: 150px",
+  ".startStage"
 ]) {
   if (!chatViewVisualCss.includes(token)) {
     failures.push(`ChatView visual CSS contract is missing ${token}`);
@@ -199,6 +226,7 @@ const collapsibleUserMessageSource = existsSync(
   ? readFileSync(join(root, "apps/web/src/components/chat/CollapsibleUserMessage.tsx"), "utf8")
   : "";
 const messageBubbleCss = readFileSync(join(root, "apps/web/src/components/chat/MessageBubble.module.css"), "utf8");
+const messageMarkdownCss = readFileSync(join(root, "apps/web/src/components/chat/MessageMarkdown.module.css"), "utf8");
 const chatTranscriptSource = readFileSync(join(root, "apps/web/src/components/chat/ChatTranscript.tsx"), "utf8");
 const useHermesStatusSource = readFileSync(join(root, "apps/web/src/hooks/useHermesStatus.ts"), "utf8");
 
@@ -216,6 +244,18 @@ for (const token of [".userExpandButton", ".userContentWrap", "data-expanded"]) 
   if (!messageBubbleCss.includes(token)) {
     failures.push(`Long user message collapse CSS is missing ${token}`);
   }
+}
+for (const token of [
+  "data-footer-always",
+  ".message[data-role=\"assistant\"][data-footer-always=\"true\"] .messageFooter",
+  "color: var(--text-muted)"
+]) {
+  if (!messageBubbleCss.includes(token)) {
+    failures.push(`Assistant response footer visibility must pin only the latest reply: missing ${token}`);
+  }
+}
+if (!messageMarkdownCss.includes("color: currentColor")) {
+  failures.push("Message action icons must inherit the timestamp/action color.");
 }
 
 for (const token of ["scrollToBottom", "scrollTo"]) {
@@ -235,8 +275,20 @@ if (!chatViewVisualCss.includes("max-width: var(--composer-width)")) {
 if (!chatViewVisualCss.includes("max-width: calc(var(--composer-width) + 20px)")) {
   failures.push("Composer surface must stay 20px wider than the transcript/content column.");
 }
-if (!appShellCss.includes("clamp(581px, 50.9%, 781px)")) {
-  failures.push("Composer width must be 13% wider than the prior clamp(514px, 45%, 691px).");
+for (const token of [
+  "onSplitView",
+  "Split chat and context panels evenly",
+  '<PanelToggleIcon side="split" />'
+]) {
+  if (!chatHeaderSource.includes(token) && !chatViewVisualSource.includes(token) && !appShellSource.includes(token)) {
+    failures.push(`Chat title split-view control contract is missing ${token}.`);
+  }
+}
+if (!chatViewVisualCss.includes(".headerSplitButton")) {
+  failures.push("Chat title split-view button styling is missing.");
+}
+if (!appShellCss.includes("--content-width: 972px") || !appShellCss.includes("--composer-width: 781px")) {
+  failures.push("Chat content/composer widths must stay fixed so window resizing preserves the conversation context width.");
 }
 
 for (const token of [
@@ -263,12 +315,15 @@ if (!chatViewVisualCss.includes(".scrollViewport > *") || !chatViewVisualCss.inc
 if (!chatViewVisualCss.includes(".composerAnchor")) {
   failures.push("Composer must use a centered anchor aligned with transcript content width.");
 }
+if (!chatViewVisualCss.includes("padding: 0 clamp(20px, 2vw, 36px) 1px")) {
+  failures.push("Main and split chat composers must share the 10px visual bottom anchor.");
+}
 if (chatViewVisualCss.includes("max-width: var(--composer-width)") && chatViewVisualCss.includes("margin: 0 auto") && chatViewVisualCss.match(/\.headerTitle[\s\S]{0,120}margin:\s*0 auto/)) {
   failures.push("Header title must align to the window edge, not the centered content column.");
 }
 
 if (appShellCss.includes("--composer-width: var(--content-width)")) {
-  failures.push("Composer width must be narrower than content width (~73% scale).");
+  failures.push("Composer width must remain narrower than the content context width.");
 }
 
 if (chatViewVisualCss.includes("backdrop-filter: blur(18px)")) {
@@ -296,16 +351,43 @@ if (!messageBubbleCss.includes("mask-image: linear-gradient")) {
 }
 
 const tokensCss = readFileSync(join(root, "apps/web/src/styles/tokens.css"), "utf8");
-if (!tokensCss.includes("--bg-workspace-solid: #0f0f0f")) {
-  failures.push("Main workspace solid token must use opaque #0f0f0f (rgba(15,15,15,1)).");
+if (!tokensCss.includes("--bg-workspace-solid: #0e0e0f")) {
+  failures.push("Main workspace solid token must use opaque #0e0e0f (rgba(14,14,15,1)).");
+}
+if (!tokensCss.includes("--scrollbar-fade-duration: 1600ms")) {
+  failures.push("Scrollbar hover reveal must fade in/out over 1600ms.");
+}
+if (!tokensCss.includes("--scrollbar-size: 17.28px")) {
+  failures.push("Scrollbar size must be globally 20% larger than the previous 14.4px width.");
+}
+if (!tokensCss.includes("--border-window-outline: rgba(255, 255, 255, 0.2)")) {
+  failures.push("Window outline border must use the lighter full-opacity outline token.");
+}
+if (!tokensCss.includes("--border-window-separator: rgba(255, 255, 255, 0.16)")) {
+  failures.push("Window separator border must use the same color at 0.8 opacity.");
 }
 if (
-  appShellCss.includes("gradient(") ||
   appShellCss.includes("@keyframes") ||
   appShellCss.includes("ambientCanvasShift") ||
   appShellCss.includes("shellAmbient")
 ) {
-  failures.push("Shell canvas must not use ambient gradients or animated background layers.");
+  failures.push("Shell canvas must not use ambient animation keyframes or animated background layers.");
+}
+for (const token of [
+  "radial-gradient(",
+  "circle at 0% 0%, rgba(0, 0, 0, 0.2) 0%",
+  "circle at 100% 0%, rgba(0, 0, 0, 0.2) 0%",
+  "circle at 0% 100%, rgba(0, 0, 0, 0.2) 0%",
+  "circle at 100% 100%, rgba(0, 0, 0, 0.2) 0%",
+  "ellipse 460px 880px at var(--rail-width-left) 54%",
+  "rgba(69, 21, 32, 0.36) 0%",
+  "rgba(48, 15, 23, 0.25) 40%",
+  "rgba(21, 12, 16, 0.13) 64%",
+  "linear-gradient(90deg, #1f1f20 0%, #1a1618 47%, #22141b 88%, #161618 100%)"
+]) {
+  if (!appShellCss.includes(token)) {
+    failures.push(`Shell canvas must use the approved static Studio gradient: missing ${token}.`);
+  }
 }
 if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes("border: 1px solid")) {
   if (messageBubbleCss.match(/\.userExpandButton[\s\S]{0,400}border:\s*1px/)) {
@@ -326,17 +408,48 @@ if (!appShellSource.includes("mainWindowStyles.mainWindow")) {
 if (!appShellSource.includes("mainWindowStyles.chatPane")) {
   failures.push("Chat view must sit in a dedicated chat pane.");
 }
+for (const token of [
+  "leftRailWidth",
+  "rightRailWidth",
+  "rightPaneMode",
+  "sideSessionModel",
+  "startLeftResize",
+  "startRightResize",
+  "splitMainWindowEvenly",
+  "createSideSession",
+  "Resize left sidebar",
+  "Resize right context panel"
+]) {
+  if (!appShellSource.includes(token)) {
+    failures.push(`Resizable panel source contract is missing ${token}.`);
+  }
+}
+for (const token of [
+  "computeRightPanelTransition",
+  "--rail-right-transition-duration",
+  "setRightPaneMode(\"chat\")",
+  "setRightPaneMode(\"console\")",
+  "actions.createSessionForProject(activeProject.id, { activate: false })",
+  "<SplitPane"
+]) {
+  if (!appShellSource.includes(token)) {
+    failures.push(`Split side-chat source contract is missing ${token}.`);
+  }
+}
 if (appShellSource.includes("ChatDepthField")) {
   failures.push("Chat depth background must not be mounted in AppShell.");
 }
 if (mainWindowCssForChecks.includes(".chatPane::before") || mainWindowCssForChecks.includes(".chatPane::after")) {
   failures.push("Chat pane must stay a plain dark surface without pseudo-layer gradients.");
 }
-if (!mainWindowCssForChecks.includes("box-shadow:")) {
-  failures.push("Main window must keep a subtle edge shadow around the chat surface.");
+if (!mainWindowCssForChecks.includes("box-shadow: none")) {
+  failures.push("Main window must not draw a shadow around the chat surface.");
 }
-if (!mainWindowCssForChecks.includes("border: 1px solid var(--border-window-outline)")) {
-  failures.push("Main window outline border is missing.");
+if (!mainWindowCssForChecks.includes("border: var(--border-window-outline-width) solid var(--border-window-outline)")) {
+  failures.push("Main window must keep a subtle outline border.");
+}
+if (!mainWindowCssForChecks.includes("border-right: 0")) {
+  failures.push("Main window must remove the far-right context-panel edge border.");
 }
 for (const [label, css, tokens] of [
   [
@@ -352,7 +465,13 @@ for (const [label, css, tokens] of [
   [
     "Top bar",
     topBarCssForChecks,
-    ["background: transparent", "border-bottom: 0", "box-shadow: none", ".menuItem.active"]
+    [
+      "rgba(0, 0, 0, 0.1) 100%",
+      "transparent 42%",
+      "border-bottom: 0",
+      "box-shadow: none",
+      ".menuItem.active"
+    ]
   ]
 ]) {
   for (const token of tokens) {
@@ -361,13 +480,88 @@ for (const [label, css, tokens] of [
     }
   }
 }
-for (const token of ["border-right: 0", "border-bottom: 0", "-18px 0 44px rgba(0, 0, 0, 0.34)"]) {
+for (const token of ["border: var(--border-window-outline-width) solid var(--border-window-outline)", "border-right: 0", "box-shadow: none", "transition: grid-template-columns var(--rail-right-transition-duration, 280ms)"]) {
   if (!mainWindowCssForChecks.includes(token)) {
-    failures.push(`Main window must keep restored historical edge treatment: missing ${token}.`);
+    failures.push(`Main window must keep subtle border and smooth toggle treatment: missing ${token}.`);
   }
+}
+if (!appShellCss.includes(".leftResizeHandle")) {
+  failures.push("Left sidebar resize handle CSS is missing.");
+}
+if (!mainWindowCssForChecks.includes(".rightResizeHandle")) {
+  failures.push("Right context rail resize handle CSS is missing.");
+}
+for (const token of ["max-width: 483px", "justify-self: center"]) {
+  if (!contextRailVisualCss.includes(token)) {
+    failures.push(`Context rail content must center within extra width: missing ${token}.`);
+  }
+}
+if (!splitPaneCss.includes("border-left: var(--border-window-outline-width) solid var(--border-window-separator)")) {
+  failures.push("Split pane must keep a subtle separator from the chat window.");
+}
+if (!contextRailVisualCss.includes("border-left: 0")) {
+  failures.push("Context rail child must not draw a second separator inside the split pane.");
+}
+for (const token of [
+  "HermesHistorySection",
+  "fetchHermesSessionMessages",
+  "deleteHermesSessionBff",
+  "Hermes history"
+]) {
+  if (!contextRailSource.includes(token)) {
+    failures.push(`Context console must own Hermes history: missing ${token}.`);
+  }
+}
+if (sidebarSource.includes("Hermes history") || sidebarSource.includes("hermesSessions")) {
+  failures.push("Left sidebar must not render Hermes history; it belongs in the context console.");
 }
 if (contextRailVisualCss.includes("transform: translateX(100%)")) {
   failures.push("Context rail must not slide independently; it should collapse with the main window grid.");
+}
+for (const token of [
+  "Side chat",
+  "Console",
+  "New side chat",
+  "closeSideSession",
+  "data-side-chat-tab=\"true\"",
+  "data-side-chat-add=\"true\"",
+  "showHeader={false}",
+  "variant=\"side\"",
+  "PanelToggleIcon",
+  "<PanelToggleIcon side=\"split\" />",
+  "availableSessions.map",
+  "data-active-pane",
+  "data-shell-rail=\"right\"",
+  "ChatView",
+  "ContextRail"
+]) {
+  if (!splitPaneSource.includes(token)) {
+    failures.push(`Split pane side-chat/tab contract is missing ${token}.`);
+  }
+}
+for (const token of [
+  ".splitPane",
+  ".toolbar",
+  "z-index: 8",
+  "transform: translateY(4px)",
+  "color: var(--text-muted)",
+  "border-bottom: 0",
+  ".addButton",
+  ".closeGlyph",
+  ".closeGlyph::before",
+  ".closeGlyph::after",
+  "translate(-50%, -50%) rotate(45deg)",
+  "width: 14.4px",
+  "rgba(155, 155, 162, 1)",
+  "background-color 300ms ease",
+  "max-width: min(116px, 26vw)",
+  ".sessionMenu",
+  ".pane[hidden]",
+  "background-color: var(--bg-workspace-solid)"
+]) {
+  if (!splitPaneCss.includes(token)) {
+    failures.push(`Split pane side-chat/tab CSS contract is missing ${token}.`);
+  }
 }
 
 for (const token of [
@@ -375,6 +569,13 @@ for (const token of [
   "box-shadow:",
   "position: fixed",
   "z-index",
+  ".micIcon",
+  ".micCapsule",
+  ".micYoke",
+  ".micStem",
+  "transform: scale(0.7)",
+  ".contextPanel[data-visible=\"false\"]",
+  "display: none",
   ".contextPanel[data-visible=\"true\"]",
   "@media (prefers-reduced-motion: reduce)"
 ]) {
@@ -659,6 +860,7 @@ const hermesRunsStopProbeScript = existsSync(join(root, "scripts/hermes-runs-sto
   ? readFileSync(join(root, "scripts/hermes-runs-stop-probe.mjs"), "utf8")
   : "";
 const hermesClientSource = readFileSync(join(root, "packages/hermes-client/src/index.ts"), "utf8");
+const hermesClientTypesSource = readFileSync(join(root, "packages/hermes-client/src/types.ts"), "utf8");
 const agentActivityEventsSource = readFileSync(
   join(root, "apps/web/src/lib/agentActivityEvents.ts"),
   "utf8"
@@ -2265,10 +2467,11 @@ if (hermesRunsProductionRouteGuardScript) {
 for (const token of [
   "createActivityEventFromHermesRunsEvent",
   "normalizeHermesRunsEventType",
+  "normalizeActivityTokenUsage",
   "summarizeHermesRunsEvent",
   "eventType === \"message.delta\"",
   "eventType === \"reasoning.available\"",
-  "Thinking signal received",
+  "title: \"Thinking\"",
   "[omitted: reasoning text not rendered]",
   "titleFromHermesRunsEvent",
   "hermesRunsToolStatus"
@@ -2276,6 +2479,56 @@ for (const token of [
   if (!agentActivityEventsSource.includes(token)) {
     failures.push(`Agent activity Runs normalizer is missing token: ${token}`);
   }
+}
+
+for (const token of [
+  "responseTokenUsage",
+  "normalizeActivityTokenUsage(event.usage)",
+  "metadata: tokenUsage ? { tokenUsage } : undefined"
+]) {
+  if (!chatViewVisualSource.includes(token)) {
+    failures.push(`ChatView token usage activity contract is missing ${token}`);
+  }
+}
+for (const token of [
+  "HermesTokenUsage",
+  "usage?: HermesTokenUsage",
+  "promptTokens",
+  "completionTokens",
+  "totalTokens",
+  "generationId",
+  "hermes_usage"
+]) {
+  if (!hermesClientTypesSource.includes(token)) {
+    failures.push(`Hermes stream token usage type contract is missing ${token}`);
+  }
+}
+for (const token of [
+  "normalizeTokenUsage(data)",
+  "normalizeOpenAiCompatibleStreamEvent",
+  "normalizeRunEventUsageMetadata",
+  "eventName === \"message\"",
+  "usage ? { usage } : {}",
+  "finiteNumber(usage.total_tokens)",
+  "normalizeUsageSource"
+]) {
+  if (!hermesClientSource.includes(token)) {
+    failures.push(`Hermes stream token usage normalizer is missing ${token}`);
+  }
+}
+for (const token of [
+  "tokenParts",
+  "formatTokenUsageParts",
+  "buildActivitySections",
+  "WorkedRow",
+  "Assistant response completed."
+]) {
+  if (!agentActivityBlockSource.includes(token)) {
+    failures.push(`Agent activity worked-details display is missing ${token}`);
+  }
+}
+if (!agentActivityBlockCss.includes(".tokenPart") || !agentActivityBlockCss.includes('data-kind="in"') || !agentActivityBlockCss.includes('data-kind="out"')) {
+  failures.push("Agent activity worked token in/out styling is missing.");
 }
 
 

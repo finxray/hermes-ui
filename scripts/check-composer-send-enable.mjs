@@ -32,6 +32,9 @@ expect(composer.includes('const [draft, setDraft] = useState("")'), "Composer ke
 expect(composer.includes("textareaRef"), "Composer reads draft from textarea ref as well as state.");
 expect(composer.includes("function getTrimmedDraft"), "Composer resolves trimmed draft from DOM/state.");
 expect(composer.includes("function updateDraft(value: string)"), "Composer centralizes draft updates.");
+expect(composer.includes("draftStorageKey"), "Composer accepts a scoped draft storage key.");
+expect(composer.includes("readComposerDraft") && composer.includes("writeComposerDraft"), "Composer persists unsent draft text.");
+expect(composer.includes("clearComposerDraft"), "Composer clears persisted draft text after send.");
 expect(composer.includes("onChange={(event) => updateDraft(event.currentTarget.value)}"), "Composer textarea onChange updates draft.");
 expect(composer.includes("onInput={(event) => updateDraft(event.currentTarget.value)}"), "Composer textarea onInput mirrors draft for native typing.");
 expect(
@@ -46,6 +49,17 @@ expect(
 );
 expect(composer.includes('type={isGenerating ? "button" : "submit"}'), "Composer uses submit type when idle.");
 expect(chatView.includes("disabled={!activeSession}"), "ChatView only disables composer without an active session.");
+expect(chatView.includes("composerDraftStorageKey"), "ChatView scopes composer draft persistence by active pane/session.");
+expect(chatView.includes("LIVE_TOKEN_AFTERGLOW_MS = 15_000"), "ChatView keeps live token usage visible briefly after completion.");
+expect(
+  composer.includes("LiveTokenUsageTicker") && composer.includes("liveTokenUsage"),
+  "Composer renders live token usage inline with the model control."
+);
+expect(
+  chatView.includes("liveTokenUsage={visibleLiveTokenUsage}"),
+  "ChatView passes visible live token usage into the composer."
+);
+expect(!chatView.includes("liveTokenDock"), "Live token usage must not render in a separate dock above the composer.");
 expect(!chatView.includes("disabled={!canUseRealHermes"), "ChatView must not disable composer from Hermes reachability.");
 expect(
   composerCss.includes('.sendButton[data-ready="true"]:not(:disabled)'),

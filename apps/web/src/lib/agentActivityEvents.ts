@@ -1,4 +1,4 @@
-import type { HermesChatStreamEvent } from "@hermes-ui/hermes-client";
+import type { HermesChatStreamEvent, HermesTokenUsage } from "@hermes-ui/hermes-client";
 import type {
   AgentActivityEvent,
   AgentActivitySource,
@@ -9,6 +9,7 @@ import type {
 type ActivityOptions = {
   id?: string;
   now?: string;
+  sequence?: number;
 };
 
 type HermesRunsEvent = Record<string, unknown>;
@@ -57,6 +58,7 @@ export function createActivityEventFromHermesStreamEvent(
     };
   }
   if (event.type === "message_done") {
+    const tokenUsage = normalizeActivityTokenUsage(event.usage);
     return {
       id: makeActivityId("stream", "message_done", { message_id: event.messageId, run_id: event.runId }, options),
       type: "stream",
@@ -69,7 +71,8 @@ export function createActivityEventFromHermesStreamEvent(
         eventType: "message_done",
         messageId: event.messageId,
         runId: event.runId
-      }
+      },
+      metadata: tokenUsage ? { tokenUsage } : undefined
     };
   }
   return null;
@@ -111,21 +114,8 @@ export function createActivityEventFromHermesRunsEvent(
     }, options);
   }
 
-  if (eventType === "reasoning.available") {
-    const occurredAt = getPayloadTime(event) ?? options.now;
-    return {
-      id: makeActivityId("reasoning", `${eventType}-info`, event, options),
-      type: "reasoning",
-      status: "info",
-      title: "Thinking signal received",
-      summary: "Hermes emitted a public reasoning availability signal. Reasoning text is not rendered.",
-      completedAt: occurredAt,
-      collapsedByDefault: true,
-      details: redactHermesRunsActivityDetails(event, eventType),
-      source: "hermes",
-      hermes: getHermesRunsCorrelation(event, eventType),
-      metadata: getHermesRunsMetadata(event, eventType, false)
-    };
+  if (isPublicReasoningEventType(eventType)) {
+    return createReasoningActivityEvent(event, eventType, hermesRunsStatus(eventType, event), options);
   }
 
   const status = hermesRunsStatus(eventType, event);
@@ -177,6 +167,13 @@ export function summarizeHermesRunsEvent(event: HermesRunsEvent): {
       activityEvent: true,
       eventType,
       policy: "public signal only; reasoning text omitted"
+    };
+  }
+  if (isPublicReasoningEventType(eventType)) {
+    return {
+      activityEvent: true,
+      eventType,
+      policy: "public reasoning summary only; raw reasoning text omitted"
     };
   }
   return {
@@ -243,6 +240,9 @@ export function createActivityEventFromHermesRunEvent(
   const payload = event.payload ?? {};
   const eventType = asString(payload.event) || event.name;
   const status = normalizeApprovalStatus(eventType, event.status) ?? normalizeActivityStatus(event.status || event.name);
+  if (isPublicReasoningEventType(eventType)) {
+    return createReasoningActivityEvent(payload, eventType, status, options);
+  }
   const occurredAt = getPayloadTime(payload) ?? options.now;
   const type = activityTypeForRunEvent(eventType, status);
   const artifact = getArtifactData(payload, status);
@@ -331,6 +331,7 @@ export function makeElapsedActivityEvent(args: {
   durationMs: number;
   source?: AgentActivitySource;
   hermes?: AgentActivityEvent["hermes"];
+  metadata?: AgentActivityEvent["metadata"];
 }): AgentActivityEvent {
   return {
     id: args.id ?? `elapsed-${args.startedAt}-${args.completedAt}`,
@@ -342,8 +343,105 @@ export function makeElapsedActivityEvent(args: {
     durationMs: args.durationMs,
     collapsedByDefault: true,
     source: args.source ?? "ui",
-    hermes: args.hermes
+    hermes: args.hermes,
+    metadata: args.metadata
   };
+}
+
+export function normalizeActivityTokenUsage(value: unknown): HermesTokenUsage | undefined {
+  const usage = objectRecord(value);
+  if (!usage) {
+    return undefined;
+  }
+  const promptTokens = finiteTokenCount(usage.promptTokens) ?? finiteTokenCount(usage.prompt_tokens);
+  const completionTokens = finiteTokenCount(usage.completionTokens) ?? finiteTokenCount(usage.completion_tokens);
+  const stats = objectRecord(usage.stats) ?? objectRecord(usage.generation_stats);
+  const totalTokens =
+    finiteTokenCount(usage.totalTokens) ??
+    finiteTokenCount(usage.total_tokens) ??
+    (promptTokens !== undefined || completionTokens !== undefined
+      ? (promptTokens ?? 0) + (completionTokens ?? 0)
+      : undefined);
+  const normalized: HermesTokenUsage = {};
+  if (promptTokens !== undefined) {
+    normalized.promptTokens = promptTokens;
+  }
+  if (completionTokens !== undefined) {
+    normalized.completionTokens = completionTokens;
+  }
+  if (totalTokens !== undefined) {
+    normalized.totalTokens = totalTokens;
+  }
+  const cachedTokens = finiteTokenCount(usage.cachedTokens) ?? finiteTokenCount(usage.cached_tokens);
+  const reasoningTokens = finiteTokenCount(usage.reasoningTokens) ?? finiteTokenCount(usage.reasoning_tokens);
+  const costUsd = finiteOptionalNumber(usage.costUsd) ?? finiteOptionalNumber(usage.cost_usd);
+  if (cachedTokens !== undefined) {
+    normalized.cachedTokens = cachedTokens;
+  }
+  if (reasoningTokens !== undefined) {
+    normalized.reasoningTokens = reasoningTokens;
+  }
+  if (costUsd !== undefined) {
+    normalized.costUsd = costUsd;
+  }
+  for (const [targetKey, sourceKeys] of Object.entries({
+    provider: ["provider"],
+    model: ["model"],
+    upstreamModel: ["upstreamModel", "upstream_model"],
+    generationId: ["generationId", "generation_id"],
+    finishReason: ["finishReason", "finish_reason"],
+    requestId: ["requestId", "request_id"],
+    source: ["source"]
+  }) as Array<[keyof HermesTokenUsage, string[]]>) {
+    const text = sourceKeys.map((key) => asString(usage[key])).find(Boolean);
+    if (text) {
+      normalized[targetKey] = text as never;
+    }
+  }
+  const latencyMs = finiteOptionalNumber(usage.latencyMs) ?? finiteOptionalNumber(usage.latency_ms);
+  if (latencyMs !== undefined) {
+    normalized.latencyMs = latencyMs;
+  }
+  const tokensPerSecond =
+    finiteOptionalNumber(usage.tokensPerSecond) ??
+    finiteOptionalNumber(usage.tokens_per_second) ??
+    finiteOptionalNumber(usage.tokensPerSec) ??
+    finiteOptionalNumber(usage.tokens_per_sec) ??
+    finiteOptionalNumber(stats?.tokensPerSecond) ??
+    finiteOptionalNumber(stats?.tokens_per_second) ??
+    finiteOptionalNumber(stats?.tokensPerSec) ??
+    finiteOptionalNumber(stats?.tokens_per_sec);
+  if (tokensPerSecond !== undefined) {
+    normalized.tokensPerSecond = tokensPerSecond;
+  }
+  const timeToFirstTokenMs =
+    finiteOptionalNumber(usage.timeToFirstTokenMs) ??
+    finiteOptionalNumber(usage.time_to_first_token_ms) ??
+    finiteOptionalNumber(stats?.timeToFirstTokenMs) ??
+    finiteOptionalNumber(stats?.time_to_first_token_ms) ??
+    secondsToMs(
+      finiteOptionalNumber(usage.timeToFirstTokenSeconds) ??
+        finiteOptionalNumber(usage.time_to_first_token_seconds) ??
+        finiteOptionalNumber(stats?.timeToFirstTokenSeconds) ??
+        finiteOptionalNumber(stats?.time_to_first_token_seconds) ??
+        finiteOptionalNumber(stats?.ttft_s)
+    );
+  if (timeToFirstTokenMs !== undefined) {
+    normalized.timeToFirstTokenMs = timeToFirstTokenMs;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function finiteTokenCount(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : undefined;
+}
+
+function finiteOptionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function secondsToMs(value: number | undefined): number | undefined {
+  return value === undefined ? undefined : Math.round(value * 1000);
 }
 
 export function makeStoppedActivityEvent(args: {
@@ -551,6 +649,40 @@ function activityTitleForTool(
   return toolName || "Hermes tool";
 }
 
+function createReasoningActivityEvent(
+  event: HermesRunsEvent,
+  eventType: string,
+  status: AgentActivityStatus,
+  options: ActivityOptions
+): AgentActivityEvent {
+  const occurredAt = getPayloadTime(event) ?? options.now;
+  const publicSummary = getPublicReasoningSummary(event);
+  const normalizedStatus = status === "completed" || status === "cancelled" || status === "failed"
+    ? status
+    : publicSummary && eventType !== "reasoning.summary.done"
+      ? "running"
+      : "info";
+
+  return {
+    id: makeActivityId("reasoning", `${eventType}-${normalizedStatus}`, event, options),
+    type: "reasoning",
+    status: normalizedStatus,
+    title: "Thinking",
+    summary: publicSummary || "Hermes emitted a reasoning progress signal. Private reasoning text is not rendered.",
+    startedAt: normalizedStatus === "running" ? occurredAt : undefined,
+    completedAt: normalizedStatus === "info" || normalizedStatus === "completed" ? occurredAt : undefined,
+    collapsedByDefault: true,
+    details: redactHermesRunsActivityDetails(event, eventType),
+    source: "hermes",
+    hermes: getHermesRunsCorrelation(event, eventType),
+    metadata: getHermesRunsMetadata(event, eventType, false)
+  };
+}
+
+function isPublicReasoningEventType(eventType: string) {
+  return eventType === "reasoning.available" || eventType.startsWith("reasoning.summary.");
+}
+
 function activityTypeForRunEvent(eventType: string, status: AgentActivityStatus): AgentActivityType {
   const normalized = normalizeName(eventType);
   if (normalized.includes("approval")) {
@@ -698,7 +830,7 @@ function redactHermesRunsActivityDetails(event: HermesRunsEvent, eventType: stri
   if (!redacted) {
     return redacted;
   }
-  if (eventType !== "reasoning.available") {
+  if (!isPublicReasoningEventType(eventType)) {
     return redacted;
   }
   return omitReasoningText(redacted);
@@ -785,6 +917,25 @@ function getPayloadSummary(payload: Record<string, unknown>) {
     const value = payload[key];
     if (typeof value === "string" && value.trim()) {
       return redactText(value.trim());
+    }
+  }
+  return undefined;
+}
+
+function getPublicReasoningSummary(payload: Record<string, unknown>) {
+  for (const key of [
+    "public_reasoning_summary",
+    "publicReasoningSummary",
+    "public_summary",
+    "publicSummary",
+    "reasoning_summary_text",
+    "reasoningSummaryText",
+    "reasoning_summary",
+    "reasoningSummary"
+  ]) {
+    const value = asString(payload[key]).trim();
+    if (value) {
+      return redactText(value);
     }
   }
   return undefined;
@@ -1066,16 +1217,40 @@ function makeActivityId(
   if (options.id) {
     return options.id;
   }
-  const stable =
+  const explicit =
     asString(payload.event_id) ||
-    asString(payload.id) ||
     asString(payload.tool_call_id) ||
+    asString(payload.toolCallId) ||
+    asString(payload.invocation_id) ||
+    asString(payload.invocationId) ||
+    asString(payload.call_id) ||
+    asString(payload.callId);
+  if (explicit) {
+    return `activity-${type}-${normalizeName(name) || "event"}-${explicit}`;
+  }
+
+  const occurrence =
+    asString(payload.sequence) ||
+    asString(payload.seq) ||
+    asString(payload.event_index) ||
+    asString(payload.eventIndex) ||
+    asString(payload.created_at) ||
+    asString(payload.createdAt) ||
+    asString(payload.timestamp) ||
+    (typeof options.sequence === "number" ? options.sequence.toString() : undefined);
+  const correlation =
+    asString(payload.id) ||
     asString(payload.message_id) ||
-    asString(payload.seq);
+    asString(payload.messageId) ||
+    asString(payload.run_id) ||
+    asString(payload.runId) ||
+    asString(payload.session_id) ||
+    asString(payload.sessionId);
+  const stable = correlation && occurrence ? `${correlation}-${occurrence}` : occurrence ?? correlation;
   if (stable) {
     return `activity-${type}-${normalizeName(name) || "event"}-${stable}`;
   }
-  const suffix = options.now ?? Date.now().toString(36);
+  const suffix = options.now ?? "unsequenced";
   return `activity-${type}-${normalizeName(name) || "event"}-${suffix}`;
 }
 

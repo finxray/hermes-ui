@@ -1,34 +1,44 @@
 "use client";
 
-import { Activity, Database, FileText, FolderGit2, KeyRound, ShieldCheck, Terminal } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Activity, Clock, Cpu, Database, FileText, FolderGit2, KeyRound, RefreshCw, Server, ShieldCheck, Terminal, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesStatusPanel } from "@/components/shell/HermesStatusPanel";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import { computeActivityDuration, extractCommandDetails, formatActivityDuration } from "@/lib/agentActivityEvents";
+import { fetchHermesSessionMessages, deleteHermesSessionBff } from "@/lib/hermesSessionsClient";
 import { createSessionExportPreview } from "@/lib/persistedActivityReplay";
 import { buildTenantScopeDiagnostics, type TenantScopeDiagnostics } from "@/lib/tenantScopeDiagnostics";
+import { formatSessionUpdatedAt } from "@/lib/workspaceStore";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
-import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import type { Project, Session } from "@/data/types";
+import type { HermesSessionMessage, HermesSessionSummary, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { ChatMessage, Project, Session } from "@/data/types";
+import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ContextRail.module.css";
+
+type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 
 type ContextRailProps = {
   activeProject: Project;
   activeSession: Session | null;
   activityEvents: AgentActivityEvent[];
+  allSessions: Session[];
   brainMemoryStatus: NormalizedBrainMemoryStatus | null;
+  hermesSessions: HermesSessionSummary[];
   hermesStatus: NormalizedHermesStatus | null;
   hermesSessionModel: HermesSessionModelSync;
   isBrainMemoryStatusLoading: boolean;
+  isHermesSessionsLoading: boolean;
   isHermesStatusLoading: boolean;
   isHermesStatusRefreshing?: boolean;
   refreshBrainMemoryStatus: () => void;
   refreshHermesStatus: () => void;
+  refreshHermesSessions: () => void;
   tenantScopePosture: TenantScopeDiagnostics["redactedPosture"] | null;
+  workspaceActions: WorkspaceActions;
 };
 
 type PanelTab = "context" | "memory" | "tools" | "files";
@@ -51,15 +61,20 @@ export function ContextRail({
   activeProject,
   activeSession,
   activityEvents,
+  allSessions,
   brainMemoryStatus,
+  hermesSessions,
   hermesStatus,
   hermesSessionModel,
   isBrainMemoryStatusLoading,
+  isHermesSessionsLoading,
   isHermesStatusLoading,
   isHermesStatusRefreshing = false,
   refreshBrainMemoryStatus,
   refreshHermesStatus,
-  tenantScopePosture
+  refreshHermesSessions,
+  tenantScopePosture,
+  workspaceActions
 }: ContextRailProps) {
   const [activeTab, setActiveTab] = useState<PanelTab>("context");
   const memoryEvidence = activeSession?.memoryEvidence ?? [];
@@ -99,6 +114,13 @@ export function ContextRail({
               }}
               sessionModel={hermesSessionModel}
               status={hermesStatus}
+            />
+            <HermesHistorySection
+              allSessions={allSessions}
+              hermesSessions={hermesSessions}
+              isLoading={isHermesSessionsLoading}
+              onRefresh={refreshHermesSessions}
+              workspaceActions={workspaceActions}
             />
             <ActiveContextSection activeProject={activeProject} activeSession={activeSession} />
             <TenantScopeDiagnosticsSection
@@ -244,6 +266,194 @@ function TabButton({
   );
 }
 
+function HermesHistorySection({
+  allSessions,
+  hermesSessions,
+  isLoading,
+  onRefresh,
+  workspaceActions
+}: {
+  allSessions: Session[];
+  hermesSessions: HermesSessionSummary[];
+  isLoading: boolean;
+  onRefresh: () => void;
+  workspaceActions: WorkspaceActions;
+}) {
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const pendingRestoreRef = useRef<{
+    hermesSessionId: string;
+    title: string;
+    messages: ChatMessage[];
+  } | null>(null);
+
+  useEffect(() => {
+    const pending = pendingRestoreRef.current;
+    if (!pending) {
+      return;
+    }
+    const newSession = allSessions.find(
+      (session) => !session.archivedAt && session.messages.length === 0 && session.hermesSessionId !== pending.hermesSessionId
+    );
+    if (!newSession) {
+      return;
+    }
+    pendingRestoreRef.current = null;
+    workspaceActions.renameSession(newSession.id, pending.title || "Restored session");
+    if (pending.messages.length > 0) {
+      workspaceActions.loadHermesMessages(newSession.id, pending.messages);
+    }
+  }, [allSessions, workspaceActions]);
+
+  const handleRestoreSession = useCallback(
+    async (summary: HermesSessionSummary) => {
+      if (restoringId === summary.id) {
+        return;
+      }
+
+      const existingSession = allSessions.find(
+        (session) => session.hermesSessionId === summary.id && !session.archivedAt
+      );
+
+      if (existingSession) {
+        workspaceActions.switchSession(existingSession.id);
+        if (existingSession.messages.length === 0) {
+          setRestoringId(summary.id);
+          const result = await fetchHermesSessionMessages(summary.id);
+          setRestoringId(null);
+          if (result.ok && result.messages.length > 0) {
+            workspaceActions.loadHermesMessages(existingSession.id, normalizeHermesMessages(result.messages));
+          }
+        }
+        return;
+      }
+
+      setRestoringId(summary.id);
+      const result = await fetchHermesSessionMessages(summary.id);
+      setRestoringId(null);
+      pendingRestoreRef.current = {
+        hermesSessionId: summary.id,
+        title: summary.title || "Restored session",
+        messages: result.ok ? normalizeHermesMessages(result.messages) : []
+      };
+      workspaceActions.createSession();
+    },
+    [allSessions, restoringId, workspaceActions]
+  );
+
+  const handleDeleteHermesSession = useCallback(
+    async (sessionId: string) => {
+      setDeleteConfirmId(null);
+      await deleteHermesSessionBff(sessionId);
+      onRefresh();
+    },
+    [onRefresh]
+  );
+
+  const knownHermesIds = new Set(allSessions.map((session) => session.hermesSessionId).filter(Boolean));
+  const unmappedHermesSessions = hermesSessions.filter((session) => !knownHermesIds.has(session.id));
+
+  if (hermesSessions.length === 0 && !isLoading) {
+    return null;
+  }
+
+  return (
+    <section className={styles.section} aria-labelledby="hermes-history-heading">
+      <div className={styles.sectionLabel} id="hermes-history-heading">
+        <span className={styles.sectionLabelText}>
+          <Server size={13} aria-hidden="true" />
+          Hermes history
+        </span>
+        <button
+          aria-label="Refresh Hermes sessions"
+          className={styles.sectionRefresh}
+          disabled={isLoading}
+          onClick={onRefresh}
+          title="Refresh"
+          type="button"
+        >
+          <RefreshCw size={13} />
+        </button>
+      </div>
+      {isLoading && hermesSessions.length === 0 ? (
+        <p className={styles.emptyText}>Loading Hermes sessions...</p>
+      ) : (
+        <ul className={styles.hermesHistoryList}>
+          {unmappedHermesSessions.slice(0, 12).map((summary) => {
+            const isRestoring = restoringId === summary.id;
+            const isConfirming = deleteConfirmId === summary.id;
+            return (
+              <li className={styles.hermesHistoryItem} key={`hermes-history-${summary.id}`}>
+                {isConfirming ? (
+                  <div className={styles.deleteConfirm}>
+                    <span className={styles.deleteConfirmLabel}>Delete session?</span>
+                    <button
+                      className={styles.deleteConfirmYes}
+                      onClick={() => void handleDeleteHermesSession(summary.id)}
+                      type="button"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      className={styles.deleteConfirmNo}
+                      onClick={() => setDeleteConfirmId(null)}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.hermesHistoryRow}>
+                    <button
+                      className={styles.hermesHistoryButton}
+                      disabled={isRestoring}
+                      onClick={() => void handleRestoreSession(summary)}
+                      title={`Restore: ${summary.title}`}
+                      type="button"
+                    >
+                      <span className={styles.hermesHistoryTitle}>
+                        {isRestoring ? "Restoring..." : summary.title}
+                      </span>
+                      <span className={styles.hermesHistoryMeta}>
+                        {summary.model ? (
+                          <span title={`Model: ${summary.model}`}>
+                            <Cpu size={13} aria-hidden="true" />
+                          </span>
+                        ) : null}
+                        {summary.startedAt ? (
+                          <span title={new Date(summary.startedAt).toLocaleString()}>
+                            <Clock size={13} aria-hidden="true" />
+                            {formatSessionUpdatedAt(summary.startedAt)}
+                          </span>
+                        ) : null}
+                        {typeof summary.messageCount === "number" ? (
+                          <span title={`${summary.messageCount} messages`}>{summary.messageCount}msg</span>
+                        ) : null}
+                      </span>
+                    </button>
+                    <button
+                      aria-label={`Delete Hermes session ${summary.title}`}
+                      className={styles.hermesHistoryDelete}
+                      onClick={() => setDeleteConfirmId(summary.id)}
+                      title="Delete session"
+                      type="button"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+          {unmappedHermesSessions.length === 0 && hermesSessions.length > 0 ? (
+            <li className={styles.emptyText}>All Hermes sessions are already in Studio chats.</li>
+          ) : null}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function ActiveContextSection({
   activeProject,
   activeSession
@@ -272,6 +482,19 @@ function ActiveContextSection({
       </div>
     </section>
   );
+}
+
+function normalizeHermesMessages(messages: HermesSessionMessage[]): ChatMessage[] {
+  return messages
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .map((message) => ({
+      id: message.id,
+      role: message.role as "user" | "assistant",
+      author: message.role === "user" ? "You" : "Hermes",
+      content: message.content,
+      createdAt: message.createdAt ?? new Date().toISOString(),
+      status: "complete" as const
+    }));
 }
 
 function ContextContractSection({

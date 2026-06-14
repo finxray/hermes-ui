@@ -100,9 +100,15 @@ async function checkPlainShellCanvas() {
     `Shell must not mount an ambient pseudo-layer (::before content is ${layer?.beforeContent || "missing"}).`
   );
   check(
-    "shell-plain-background",
-    layer?.shellBackgroundImage === "none",
-    `Shell background must be a plain color, found background-image ${layer?.shellBackgroundImage || "missing"}.`
+    "shell-static-historical-gradient",
+    Boolean(layer?.shellBackgroundImage) &&
+      layer.shellBackgroundImage.includes("radial-gradient") &&
+      layer.shellBackgroundImage.includes("linear-gradient") &&
+      layer.shellBackgroundImage.includes("rgba(69, 21, 32, 0.36)") &&
+      layer.shellBackgroundImage.includes("rgb(31, 31, 32)") &&
+      layer.shellBackgroundImage.includes("rgb(34, 20, 27)") &&
+      layer.shellBackgroundImage.includes("rgb(22, 22, 24)"),
+    `Shell background must use the approved static Studio gradient, found ${layer?.shellBackgroundImage || "missing"}.`
   );
   check(
     "shell-not-animated",
@@ -118,6 +124,7 @@ async function checkMainWindowSurface() {
     const chatPane = document.querySelector("[class*='chatPane']");
     const chatWorkspace = document.querySelector("[class*='workspace']");
     const composerBox = document.querySelector("[class*='box']");
+    const rightPanel = document.querySelector("[data-shell-rail='right']");
     const contextRail = document.querySelector("[class*='rail']");
     const contextHead = contextRail?.querySelector("[class*='head']");
     const contextScroll = contextRail?.querySelector("[class*='scroll']");
@@ -127,10 +134,14 @@ async function checkMainWindowSurface() {
       chatWorkspaceBackground: chatWorkspace ? window.getComputedStyle(chatWorkspace).backgroundColor : null,
       composerBoxShadow: composerBox ? window.getComputedStyle(composerBox).boxShadow : null,
       contextRailBackground: contextRail ? window.getComputedStyle(contextRail).backgroundColor : null,
+      contextRailBorderLeftColor: rightPanel ? window.getComputedStyle(rightPanel).borderLeftColor : null,
+      contextRailBorderLeftWidth: rightPanel ? window.getComputedStyle(rightPanel).borderLeftWidth : null,
       contextRailHeadBackground: contextHead ? window.getComputedStyle(contextHead).backgroundColor : null,
       contextRailScrollBackground: contextScroll ? window.getComputedStyle(contextScroll).backgroundColor : null,
       mainWindowBackground: mainWindow ? window.getComputedStyle(mainWindow).backgroundColor : null,
       mainWindowBorderColor: mainWindow ? window.getComputedStyle(mainWindow).borderTopColor : null,
+      mainWindowBorderRightColor: mainWindow ? window.getComputedStyle(mainWindow).borderRightColor : null,
+      mainWindowBorderRightWidth: mainWindow ? window.getComputedStyle(mainWindow).borderRightWidth : null,
       mainWindowBorderWidth: mainWindow ? window.getComputedStyle(mainWindow).borderTopWidth : null,
       mainWindowBoxShadow: mainWindow ? window.getComputedStyle(mainWindow).boxShadow : null,
       userBubbleBoxShadow: userBubble ? window.getComputedStyle(userBubble).boxShadow : null
@@ -140,19 +151,21 @@ async function checkMainWindowSurface() {
 
   check(
     "main-window-solid-surface",
-    surface.mainWindowBackground === "rgb(15, 15, 15)" &&
-      surface.chatPaneBackground === "rgb(15, 15, 15)" &&
-      surface.chatWorkspaceBackground === "rgb(18, 18, 20)" &&
-      surface.contextRailBackground === "rgb(18, 18, 20)" &&
-      surface.contextRailHeadBackground === "rgb(18, 18, 20)" &&
-      surface.contextRailScrollBackground === "rgb(18, 18, 20)" &&
-      surface.mainWindowBorderColor === "rgba(255, 255, 255, 0.13)" &&
+    surface.mainWindowBackground === "rgb(14, 14, 15)" &&
+      surface.chatPaneBackground === "rgb(14, 14, 15)" &&
+      surface.chatWorkspaceBackground === "rgb(14, 14, 15)" &&
+      surface.contextRailBackground === "rgb(14, 14, 15)" &&
+      surface.contextRailBorderLeftColor === "rgba(255, 255, 255, 0.16)" &&
+      surface.contextRailBorderLeftWidth === "1px" &&
+      surface.contextRailHeadBackground === "rgb(14, 14, 15)" &&
+      surface.contextRailScrollBackground === "rgb(14, 14, 15)" &&
+      surface.mainWindowBorderColor === "rgba(255, 255, 255, 0.2)" &&
+      surface.mainWindowBorderRightWidth === "0px" &&
       surface.mainWindowBorderWidth === "1px" &&
-      surface.mainWindowBoxShadow.includes("-18px") &&
-      surface.mainWindowBoxShadow.includes("44px") &&
+      surface.mainWindowBoxShadow === "none" &&
       surface.composerBoxShadow === "none" &&
       (!surface.userBubbleBoxShadow || surface.userBubbleBoxShadow === "none"),
-    `Main window=${surface.mainWindowBackground || "missing"}, chat pane=${surface.chatPaneBackground || "missing"}, chat workspace=${surface.chatWorkspaceBackground || "missing"}, context rail=${surface.contextRailBackground || "missing"}, context head=${surface.contextRailHeadBackground || "missing"}, context scroll=${surface.contextRailScrollBackground || "missing"}, main border=${surface.mainWindowBorderWidth || "missing"} ${surface.mainWindowBorderColor || "missing"}, main shadow=${surface.mainWindowBoxShadow || "missing"}, composer shadow=${surface.composerBoxShadow || "missing"}, bubble shadow=${surface.userBubbleBoxShadow || "missing"}.`
+    `Main window=${surface.mainWindowBackground || "missing"}, chat pane=${surface.chatPaneBackground || "missing"}, chat workspace=${surface.chatWorkspaceBackground || "missing"}, context rail=${surface.contextRailBackground || "missing"}, context head=${surface.contextRailHeadBackground || "missing"}, context scroll=${surface.contextRailScrollBackground || "missing"}, main border=${surface.mainWindowBorderWidth || "missing"} ${surface.mainWindowBorderColor || "missing"}, main right border=${surface.mainWindowBorderRightWidth || "missing"} ${surface.mainWindowBorderRightColor || "missing"}, main shadow=${surface.mainWindowBoxShadow || "missing"}, composer shadow=${surface.composerBoxShadow || "missing"}, bubble shadow=${surface.userBubbleBoxShadow || "missing"}.`
   );
 }
 
@@ -187,10 +200,12 @@ async function checkPanelHierarchy() {
       panels.sidebarBorderWidth === "0px" &&
       panels.sidebarBoxShadow === "none" &&
       panels.topbarBackground === "rgba(0, 0, 0, 0)" &&
-      panels.topbarBackgroundImage === "none" &&
+      panels.topbarBackgroundImage.includes("linear-gradient") &&
+      panels.topbarBackgroundImage.includes("rgba(0, 0, 0, 0.1)") &&
       panels.topbarBorderWidth === "0px" &&
       panels.topbarBoxShadow === "none" &&
-      panels.activeTopItemBackground === "rgba(0, 0, 0, 0)",
+      (panels.activeTopItemBackground === "rgba(0, 0, 0, 0)" ||
+        panels.activeTopItemBackground === "transparent"),
     `Sidebar bg=${panels.sidebarBackground || "missing"}, image=${panels.sidebarBackgroundImage || "missing"}, border=${panels.sidebarBorderWidth || "missing"} ${panels.sidebarBorderColor || "missing"}, shadow=${panels.sidebarBoxShadow || "missing"}; topbar bg=${panels.topbarBackground || "missing"}, image=${panels.topbarBackgroundImage || "missing"}, border=${panels.topbarBorderWidth || "missing"} ${panels.topbarBorderColor || "missing"}, shadow=${panels.topbarBoxShadow || "missing"}, active=${panels.activeTopItemBackground || "missing"}.`
   );
 }
@@ -214,15 +229,30 @@ async function checkInteractionPolish() {
 
     return {
       childRowHeight: childRow ? childRow.getBoundingClientRect().height : null,
+      leftResizeHandle: document.querySelector("[aria-label='Resize left sidebar']") !== null,
       parentRowHeight: parentRow ? parentRow.getBoundingClientRect().height : null,
-      rowHoverMatchesActive:
-        /__row:hover,[^{]*__row:focus-visible\s*\{[^}]*background:\s*rgba\(255, 255, 255, 0\.07\)/.test(styles) &&
-        /__row\.[^{]*__active\s*\{[^}]*background:\s*rgba\(255, 255, 255, 0\.07\)/.test(styles),
+      rightResizeHandle: document.querySelector("[aria-label='Resize right context panel']") !== null,
+      rowHoverMatchesActive: (() => {
+        const activeRow = document.querySelector("[data-shell-rail='left'] [class*='active']");
+        if (!activeRow) {
+          return false;
+        }
+        const activeBg = window.getComputedStyle(activeRow).backgroundColor;
+        const activeColor = window.getComputedStyle(activeRow).color;
+        return (
+          activeBg === "rgba(255, 255, 255, 0.075)" &&
+          activeColor === "rgb(244, 244, 245)"
+        );
+      })(),
       scrollHoverRevealRule:
-        /:hover::-webkit-scrollbar-thumb[^{]*\{[^}]*background-color:(?!\s*transparent)/.test(styles),
+        /:hover::-webkit-scrollbar-thumb[^{]*\{[^}]*background-color:\s*var\(--scrollbar-thumb\)/.test(styles) ||
+        /:focus-within::-webkit-scrollbar-thumb[^{]*\{[^}]*background-color:\s*var\(--scrollbar-thumb\)/.test(styles),
       scrollPointerEvents: scrollViewport ? window.getComputedStyle(scrollViewport).pointerEvents : null,
       scrollThumbBackground: scrollViewport
         ? window.getComputedStyle(scrollViewport, "::-webkit-scrollbar-thumb").backgroundColor
+        : null,
+      scrollThumbTransition: scrollViewport
+        ? window.getComputedStyle(scrollViewport, "::-webkit-scrollbar-thumb").transitionDuration
         : null,
       scrollWidth: scrollViewport ? window.getComputedStyle(scrollViewport, "::-webkit-scrollbar").width : null
     };
@@ -232,11 +262,17 @@ async function checkInteractionPolish() {
   check(
     "main-chat-scrollbar-hover-reveal",
     polish.scrollPointerEvents === "auto" &&
-      (polish.scrollWidth === "10px" || polish.scrollWidth === "auto") &&
-      (polish.scrollThumbBackground === "rgba(0, 0, 0, 0)" ||
-        polish.scrollThumbBackground === "transparent") &&
-      polish.scrollHoverRevealRule === true,
-    `Main chat scrollbar pointer-events=${polish.scrollPointerEvents || "missing"}, width=${polish.scrollWidth || "missing"}, resting thumb=${polish.scrollThumbBackground || "missing"}, hover reveal rule=${polish.scrollHoverRevealRule}.`
+      (polish.scrollWidth === "17px" || polish.scrollWidth === "17.28px" || polish.scrollWidth === "auto") &&
+      polish.scrollThumbBackground === "rgba(255, 255, 255, 0)" &&
+      polish.scrollHoverRevealRule === true &&
+      typeof polish.scrollThumbTransition === "string" &&
+      /1600ms|1\.6s/.test(polish.scrollThumbTransition),
+    `Main chat scrollbar pointer-events=${polish.scrollPointerEvents || "missing"}, width=${polish.scrollWidth || "missing"}, resting thumb background=${polish.scrollThumbBackground || "missing"}, transition=${polish.scrollThumbTransition || "missing"}, hover reveal rule=${polish.scrollHoverRevealRule}.`
+  );
+  check(
+    "panel-resize-handles-present",
+    polish.leftResizeHandle === true && polish.rightResizeHandle === true,
+    `Left resize handle=${polish.leftResizeHandle}, right resize handle=${polish.rightResizeHandle}.`
   );
   check(
     "sidebar-row-height-consistent",
@@ -248,7 +284,7 @@ async function checkInteractionPolish() {
   check(
     "sidebar-hover-selected-match",
     polish.rowHoverMatchesActive === true,
-    "Sidebar hover/focus background matches the selected row background."
+    "Sidebar active row uses the visible Codex-like selected pill and primary text color."
   );
 }
 

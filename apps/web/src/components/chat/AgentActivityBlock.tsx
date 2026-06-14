@@ -15,6 +15,7 @@ import styles from "./AgentActivityBlock.module.css";
 
 type AgentActivityBlockProps = {
   autoCollapseCompletedWork?: boolean;
+  completedWorkAutoCollapseDelayMs?: number;
   events: AgentActivityEvent[];
   isWorking?: boolean;
   legacyEvents?: ToolEvent[];
@@ -28,7 +29,7 @@ type AgentActivityBlockProps = {
 // the whole activity block — and any thinking/command rows under it — vanish the
 // moment a short run completed.
 const WORKED_LABEL_MIN_DURATION_MS = 0;
-const COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 250;
+const COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 900;
 const EMPTY_ACTIVITY_ID_SET: ReadonlySet<string> = new Set();
 
 type CommandGroup = {
@@ -56,6 +57,7 @@ type ActivityTimelineItem =
 
 export const AgentActivityBlock = memo(function AgentActivityBlock({
   autoCollapseCompletedWork = false,
+  completedWorkAutoCollapseDelayMs = COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS,
   events,
   isWorking = false,
   legacyEvents = [],
@@ -111,7 +113,7 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
         <WorkingLog items={sections.liveTimelineItems} label={workingLabel} liveTokenUsage={liveTokenUsage} />
       ) : showWorked ? (
         <WorkedRow
-          autoCollapseDelayMs={shouldAutoCollapseCompletedWork ? COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS : null}
+          autoCollapseDelayMs={shouldAutoCollapseCompletedWork ? completedWorkAutoCollapseDelayMs : null}
           autoCollapseKey={shouldAutoCollapseCompletedWork ? completedWorkCollapseKey : null}
           initiallyOpen={completedFromWorking || Boolean(completedWorkCollapseKey)}
           items={sections.timelineItems}
@@ -179,7 +181,7 @@ function WorkedRow({
   items: ActivityTimelineItem[];
   label: string;
   onAutoCollapseStart?: () => void;
-  tokenParts: Array<{ key: string; kind: "in" | "out" | "total"; label: string }>;
+  tokenParts: Array<{ key: string; kind: "in" | "out" | "speed" | "total"; label: string }>;
 }) {
   return (
     <AnimatedDisclosure
@@ -640,26 +642,35 @@ function isCommandDetails(value?: AgentActivityEvent["command"]): value is NonNu
 function extractTokenUsage(event?: AgentActivityEvent) {
   const usage = event?.metadata?.tokenUsage;
   return usage && typeof usage === "object" && !Array.isArray(usage)
-    ? (usage as { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown })
+    ? (usage as { promptTokens?: unknown; completionTokens?: unknown; tokensPerSecond?: unknown; totalTokens?: unknown })
     : undefined;
 }
 
-function formatTokenUsageParts(usage?: { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown }) {
+function formatTokenUsageParts(usage?: { promptTokens?: unknown; completionTokens?: unknown; tokensPerSecond?: unknown; totalTokens?: unknown }) {
   const totalTokens = finiteNumber(usage?.totalTokens);
   const promptTokens = finiteNumber(usage?.promptTokens);
   const completionTokens = finiteNumber(usage?.completionTokens);
+  const tokensPerSecond = finiteNumber(usage?.tokensPerSecond);
   const formatter = new Intl.NumberFormat();
-  const parts: Array<{ key: string; kind: "in" | "out" | "total"; label: string }> = [];
+  const parts: Array<{ key: string; kind: "in" | "out" | "speed" | "total"; label: string }> = [];
   if (promptTokens !== undefined) {
     parts.push({ key: "in", kind: "in", label: `${formatter.format(promptTokens)} in` });
   }
   if (completionTokens !== undefined) {
     parts.push({ key: "out", kind: "out", label: `${formatter.format(completionTokens)} out` });
   }
+  if (tokensPerSecond !== undefined) {
+    parts.push({ key: "speed", kind: "speed", label: `${formatSpeed(tokensPerSecond)} tok/s` });
+  }
   if (parts.length === 0 && totalTokens !== undefined) {
     parts.push({ key: "total", kind: "total", label: `${formatter.format(totalTokens)} tokens` });
   }
   return parts;
+}
+
+function formatSpeed(value: number) {
+  const safe = Math.max(0, value);
+  return safe >= 100 ? new Intl.NumberFormat().format(Math.round(safe)) : safe.toFixed(1);
 }
 
 function finiteNumber(value: unknown) {

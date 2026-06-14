@@ -71,6 +71,19 @@ export function useWorkspaceState() {
       archiveSession: (sessionId: string) => dispatch({ type: "archiveSession", sessionId }),
       createProject: () => dispatch({ type: "createProject" }),
       createSession: () => dispatch({ type: "createSession" }),
+      createSessionForProject: (
+        projectId: string,
+        options: { activate?: boolean; sessionId?: string } = {}
+      ) => {
+        const sessionId = options.sessionId ?? `session-${crypto.randomUUID()}`;
+        dispatch({
+          type: "createSession",
+          activate: options.activate,
+          projectId,
+          sessionId
+        });
+        return sessionId;
+      },
       dispatch: (action: WorkspaceAction) => dispatch(action),
       renameProject: (projectId: string, name: string) =>
         dispatch({ type: "renameProject", projectId, name }),
@@ -86,7 +99,8 @@ export function useWorkspaceState() {
         messageId: string,
         content: string,
         status?: Extract<WorkspaceAction, { type: "updateMessage" }>["status"],
-        references?: string[]
+        references?: string[],
+        usage?: ChatMessage["usage"]
       ) =>
         dispatch({
           type: "updateMessage",
@@ -94,7 +108,8 @@ export function useWorkspaceState() {
           messageId,
           content,
           references,
-          status
+          status,
+          usage
         }),
       loadHermesMessages: (sessionId: string, messages: ChatMessage[]) =>
         dispatch({ type: "loadHermesMessages", sessionId, messages }),

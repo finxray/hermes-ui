@@ -89,8 +89,10 @@ export function HermesStatusPanel({
             </div>
             {softOverrideActive ? (
               <div className={styles.caveat}>
-                Applied as a per-session override (memory only). Hermes does not confirm which
-                model actually generates responses — verify in your provider&apos;s logs.
+                Hermes stores this as a per-session override but does not report which model
+                actually generates the response — some providers may be ignored and fall back to
+                the server default. If replies don&apos;t match, set the model with the Telegram
+                &ldquo;/model&rdquo; command (persistent) and confirm in your provider&apos;s logs.
               </div>
             ) : null}
             {sessionModel.error ? <div className={styles.error}>{sessionModel.error}</div> : null}

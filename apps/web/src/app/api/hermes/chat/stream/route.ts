@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       baseUrl: process.env.HERMES_API_BASE_URL,
       enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
       signal: request.signal,
-      timeoutMs: 10_000
+      timeoutMs: 60_000
     },
     parsed.request
   );

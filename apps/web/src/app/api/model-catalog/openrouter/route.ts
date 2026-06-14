@@ -12,7 +12,10 @@ export async function GET() {
 
   return NextResponse.json(result, {
     headers: {
-      "Cache-Control": result.ok ? "public, max-age=300, stale-while-revalidate=900" : "no-store"
+      // Keep the catalog fresh so newly launched OpenRouter models (e.g. new
+      // DeepSeek/Kimi SKUs) surface quickly, while still allowing a brief
+      // stale-while-revalidate window to absorb bursts.
+      "Cache-Control": result.ok ? "public, max-age=60, stale-while-revalidate=300" : "no-store"
     },
     status: result.ok ? 200 : 502
   });

@@ -43,6 +43,7 @@ export type HermesSessionModelSync = {
   modelSelectInProgress: boolean;
   modelState: HermesUiCapabilities["models"];
   providerLabel: string;
+  markStreamSucceeded: () => void;
   refresh: () => Promise<void>;
   selectModel: (modelId: string) => Promise<void>;
   sessionId: string | null;
@@ -90,6 +91,7 @@ export function useHermesSessionModel({
   const selectionSeqRef = useRef(0);
   const appliedPreferenceKeyRef = useRef<string | null>(null);
   const missingHermesSessionIdsRef = useRef(new Set<string>());
+  const streamSucceededSessionIdsRef = useRef(new Set<string>());
   const snapshotRef = useRef(snapshot);
 
   useEffect(() => {
@@ -116,7 +118,8 @@ export function useHermesSessionModel({
   const loadSessionModel = useCallback(
     async (
       phase: Extract<HermesSessionModelSyncStatus, "loading" | "verifying"> = "loading",
-      expected?: ExpectedSelection
+      expected?: ExpectedSelection,
+      options: { force?: boolean } = {}
     ) => {
       const session = activeSession;
       const canReadHermesSession =
@@ -132,6 +135,25 @@ export function useHermesSessionModel({
 
       const hermesSessionId = resolveHermesSessionId(session);
       const requestId = ++requestSeqRef.current;
+
+      if (options.force) {
+        streamSucceededSessionIdsRef.current.delete(hermesSessionId);
+      }
+
+      if (!expected && !options.force && streamSucceededSessionIdsRef.current.has(hermesSessionId)) {
+        setSnapshot((current) => ({
+          ...(current.localSessionId === session.id && current.hermesSessionId === hermesSessionId
+            ? current
+            : emptySnapshot(session.id, hermesSessionId, "fallback")),
+          checkedAt: new Date().toISOString(),
+          error: null,
+          errorModelId: null,
+          hermesSessionId,
+          localSessionId: session.id,
+          syncStatus: "fallback"
+        }));
+        return null;
+      }
 
       if (!expected && missingHermesSessionIdsRef.current.has(hermesSessionId)) {
         setSnapshot((current) => ({
@@ -194,6 +216,7 @@ export function useHermesSessionModel({
       }
 
       missingHermesSessionIdsRef.current.delete(hermesSessionId);
+      streamSucceededSessionIdsRef.current.delete(hermesSessionId);
       const next = snapshotFromHermesSession(
         result.session,
         session.id,
@@ -222,6 +245,7 @@ export function useHermesSessionModel({
       }
 
       const selectionRequestId = ++selectionSeqRef.current;
+      streamSucceededSessionIdsRef.current.delete(resolveHermesSessionId(activeSession));
       const isCurrentSelectionRequest = () => selectionSeqRef.current === selectionRequestId;
       const selectedModel = baseModelState.availableModels.find(
         (model) => model.id === selectRequest.catalogModelId
@@ -379,8 +403,35 @@ export function useHermesSessionModel({
       }
     }
 
-    await loadSessionModel("loading");
+    await loadSessionModel("loading", undefined, { force: true });
   }, [activeSession, applySessionModelSelection, baseModelState, loadSessionModel]);
+
+  const markStreamSucceeded = useCallback(() => {
+    if (!activeSession) {
+      return;
+    }
+
+    const hermesSessionId = resolveHermesSessionId(activeSession);
+    streamSucceededSessionIdsRef.current.add(hermesSessionId);
+    setSnapshot((current) => {
+      const sameSession =
+        current.localSessionId === activeSession.id &&
+        current.hermesSessionId === hermesSessionId;
+      const currentStatus = sameSession ? current.syncStatus : "fallback";
+      return {
+        ...(sameSession ? current : emptySnapshot(activeSession.id, hermesSessionId, "fallback")),
+        checkedAt: new Date().toISOString(),
+        error: null,
+        errorModelId: null,
+        hermesSessionId,
+        localSessionId: activeSession.id,
+        syncStatus:
+          currentStatus === "synced" || currentStatus === "turn-ready"
+            ? currentStatus
+            : "fallback"
+      };
+    });
+  }, [activeSession]);
 
   const scopedError =
     !snapshot.error ||
@@ -399,6 +450,7 @@ export function useHermesSessionModel({
     modelSelectInProgress: snapshot.syncStatus === "verifying",
     modelState,
     providerLabel,
+    markStreamSucceeded,
     refresh: refreshModel,
     selectModel,
     sessionId: snapshot.localSessionId,
@@ -493,19 +545,51 @@ function mergeOpenRouterModels(
     return state;
   }
 
-  const knownIds = new Set(state.availableModels.map((model) => model.id));
-  const extras = openRouterModels.filter((model) => !knownIds.has(model.id));
-  if (extras.length === 0) {
+  const openRouterById = new Map(openRouterModels.map((model) => [model.id, model]));
+  const mergedModels = state.availableModels.map((model) => {
+    const metadata = openRouterById.get(model.id);
+    if (!metadata || !isOpenRouterCatalogProvider(model.providerKey ?? model.provider ?? "")) {
+      return model;
+    }
+    return mergeOpenRouterModelMetadata(model, metadata);
+  });
+  const knownIds = new Set(mergedModels.map((model) => model.id));
+  const hiddenExternalCount = openRouterModels.filter((model) => !knownIds.has(model.id)).length;
+  const unchanged = mergedModels.every((model, index) => model === state.availableModels[index]);
+  if (unchanged && hiddenExternalCount === 0) {
     return state;
   }
 
   return {
     ...state,
-    availableModels: [...state.availableModels, ...extras],
+    availableModels: mergedModels,
     reason:
       state.reason ||
-      "Hermes configured models are shown with additional UI-provided OpenRouter catalog models."
+      (hiddenExternalCount > 0
+        ? "Hermes controls runtime model switching; public OpenRouter-only models stay hidden until Hermes advertises them through /v1/models."
+        : "Hermes configured OpenRouter models are enriched with public catalog metadata.")
   };
+}
+
+function mergeOpenRouterModelMetadata(
+  model: HermesModelDescriptor,
+  metadata: HermesModelDescriptor
+): HermesModelDescriptor {
+  return {
+    ...model,
+    contextLength: model.contextLength ?? metadata.contextLength,
+    created: model.created ?? metadata.created,
+    description: model.description ?? metadata.description,
+    inputModalities: model.inputModalities?.length ? model.inputModalities : metadata.inputModalities,
+    outputModalities: model.outputModalities?.length ? model.outputModalities : metadata.outputModalities,
+    pricing: model.pricing ?? metadata.pricing,
+    supportedParameters: mergeModelStringList(model.supportedParameters, metadata.supportedParameters)
+  };
+}
+
+function isOpenRouterCatalogProvider(providerKey: string): boolean {
+  const normalized = providerKey.trim().toLowerCase();
+  return normalized === "openrouter" || normalized.startsWith("openrouter-");
 }
 
 function mergeLmStudioModels(
@@ -619,6 +703,9 @@ function applySessionSelectedModel(
   selectedModelId: string | null,
   effectiveProvider: string | null
 ): HermesUiCapabilities["models"] {
+  if (!canApplySessionSelectedModel(state)) {
+    return state;
+  }
   const runtimeModelId = resolveRuntimeModelId(selectedModelId, state.availableModels);
   if (!runtimeModelId) {
     return state;
@@ -627,16 +714,31 @@ function applySessionSelectedModel(
   return {
     ...state,
     currentModelLabel: selected?.label ?? runtimeModelId,
-    // Keep the user-facing provider aligned with the catalog/provider the user
-    // selected. Hermes may report a lower-level backend route such as NVIDIA
-    // for OpenRouter catalog models, but that should not replace the public
-    // provider in the Composer or right rail.
-    currentProviderLabel:
-      selected?.provider ||
-      formatHermesProviderLabel(effectiveProvider) ||
-      state.currentProviderLabel,
+    currentProviderLabel: selectedProviderLabel(selected, effectiveProvider, state.currentProviderLabel),
     selectedModelId: runtimeModelId
   };
+}
+
+function selectedProviderLabel(
+  selected: HermesModelDescriptor | undefined,
+  effectiveProvider: string | null,
+  fallbackProviderLabel: string
+): string {
+  const verifiedProvider = formatHermesProviderLabel(effectiveProvider) || null;
+  if (selected?.selectModelId && selected.selectModelId !== selected.id && verifiedProvider) {
+    return verifiedProvider;
+  }
+  // Keep the user-facing provider aligned with the catalog/provider the user
+  // selected. Provider mismatches are rejected by the select pipeline; the
+  // readback provider only replaces the label for alias-backed selections.
+  return selected?.provider || verifiedProvider || fallbackProviderLabel;
+}
+
+function canApplySessionSelectedModel(state: HermesUiCapabilities["models"]): boolean {
+  return (
+    state.clientSelectable ||
+    (state.selectionStatus === "server-configured" && state.availableModels.length > 0)
+  );
 }
 
 function modelLabelForState(state: HermesUiCapabilities["models"]) {

@@ -61,7 +61,7 @@ export type HermesModelDescriptor = {
   selectModelId?: string;
   /** Where the UI discovered this model. */
   catalogSource?: HermesModelCatalogSource;
-  /** Whether selection can be persisted through Hermes session model override or sent per turn. */
+  /** Whether selection can be verified through Hermes' session model override. */
   selectionScope?: "session" | "turn";
   description?: string | null;
   contextLength?: number | null;
@@ -76,6 +76,13 @@ export type HermesModelDescriptor = {
     image?: string | null;
   } | null;
   runtime?: HermesModelRuntimeMetadata | null;
+  /**
+   * Local-runtime availability. "not-loaded" means the model is installed in the
+   * runtime (e.g. LM Studio) but is not currently loaded, so it cannot serve a
+   * request and must be surfaced as a disabled row rather than a selectable one.
+   * Undefined/"ready" means the model can be selected normally.
+   */
+  availability?: "ready" | "not-loaded";
 };
 
 export type OpenRouterModelCatalogResult = {
@@ -276,6 +283,7 @@ export type HermesChatRequest = {
   recentMessages?: HermesChatHistoryMessage[];
   model?: string | null;
   modelRuntime?: HermesModelRuntimeMetadata | null;
+  /** Legacy wire metadata only; selected models are still verified through Hermes session override. */
   modelSelectionScope?: "session" | "turn" | null;
   provider?: string | null;
 };

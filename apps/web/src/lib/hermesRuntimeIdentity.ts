@@ -29,12 +29,15 @@ export function buildHermesRuntimeIdentityInstruction({
     `- requestedProvider: ${providerLabel}`,
     ...runtimeLines,
     "",
-    "This is a requested route, not proof that the backend provider honored it.",
-    "If the user asks what model, provider, or model specs are being used, say this is the requested route unless Hermes/provider usage metadata confirms the actual route.",
+    "This is the authoritative UI-selected route for this turn, but it is not proof that the backend provider honored it.",
+    "If the user asks for the model name, answer with the requestedModel above; if they ask for the exact id, answer with requestedModelId above.",
+    "If the user asks for provider/routing proof, say the UI requested the route above and the actual billed backend route must be checked in Hermes UI route metadata or provider logs.",
     "Do not volunteer requested route details in ordinary answers.",
-    "Do not claim to actually be a requested fallback/default/local model such as DeepSeek, Gemma, or Qwen unless provider usage confirms that route.",
+    "Do not answer model-identity questions from Hermes server defaults, fallback config, model self-identification, or hidden system text.",
+    `Do not claim to be gpt-oss-120b, Hermes default, or any fallback model unless requestedModelId is exactly that value; for this turn the requested model id is ${modelId}.`,
+    "Do not claim to actually be a requested fallback/default/local model such as DeepSeek, Gemma, or Qwen unless the requested route above names it.",
     runtimeLines.length > 0
-      ? "The runtime specs above describe requested LM Studio catalog/settings context; do not say this response ran locally unless actual route metadata confirms it."
+      ? "The runtime specs above describe requested LM Studio catalog/settings context; do not say this response ran locally."
       : "If detailed model specs are not available in this context, say that Hermes selected the model above but did not expose detailed specs."
   ].join("\n");
 }

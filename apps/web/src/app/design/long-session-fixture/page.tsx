@@ -62,6 +62,7 @@ const fixtureSessionModel: HermesSessionModelSync = {
     uiState: "deferred"
   },
   providerLabel: "Fixture provider",
+  markStreamSucceeded: noop,
   refresh: asyncNoop,
   selectModel: asyncNoop,
   sessionId: longSessionActiveSession.id,

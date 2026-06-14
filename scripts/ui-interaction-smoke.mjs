@@ -585,7 +585,7 @@ async function checkSplitSideChat() {
     const textareas = Array.from(document.querySelectorAll("textarea[aria-label='Message']"))
       .filter((textarea) => textarea instanceof HTMLElement && textarea.offsetParent !== null);
     const boxes = textareas
-      .map((textarea) => textarea.closest("[class*='box']"))
+      .map((textarea) => textarea.closest("[data-composer-box]"))
       .filter((box) => box instanceof HTMLElement);
     const bottoms = boxes.map((box) => box.getBoundingClientRect().bottom);
     const viewportBottom = window.innerHeight;

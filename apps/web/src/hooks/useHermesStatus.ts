@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import { fetchHermesStatus } from "@/lib/hermesStatusClient";
 
-const POLL_INTERVAL_MS = 8_000;
+const POLL_INTERVAL_MS = 12_000;
+const POLL_INTERVAL_ERROR_MS = 30_000;
 
 type HermesStatusState = {
   status: NormalizedHermesStatus | null;
@@ -51,9 +52,16 @@ export function useHermesStatus() {
     mountedRef.current = true;
     void refresh();
 
-    intervalRef.current = setInterval(() => {
-      void refresh();
-    }, POLL_INTERVAL_MS);
+    const schedulePoll = (intervalMs: number) => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+      }
+      intervalRef.current = setInterval(() => {
+        void refresh();
+      }, intervalMs);
+    };
+
+    schedulePoll(POLL_INTERVAL_MS);
 
     return () => {
       mountedRef.current = false;
@@ -63,6 +71,18 @@ export function useHermesStatus() {
       }
     };
   }, [refresh]);
+
+  useEffect(() => {
+    if (intervalRef.current === null) {
+      return;
+    }
+    const intervalMs =
+      state.status?.reachable === true ? POLL_INTERVAL_MS : POLL_INTERVAL_ERROR_MS;
+    clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      void refresh();
+    }, intervalMs);
+  }, [refresh, state.status?.reachable]);
 
   return {
     isLoading: state.isInitialLoading,
@@ -85,10 +105,7 @@ function preserveKnownModelOnTransientFailure(
     (previousModels.selectionStatus === "server-configured" ||
       previousModels.selectionStatus === "client-selectable") &&
     Boolean(previousModels.currentModelLabel) &&
-    (next.mode === "error" ||
-      !next.reachable ||
-      next.uiCapabilities.models.selectionStatus === "unavailable" ||
-      next.uiCapabilities.models.selectionStatus === "unknown");
+    (next.mode === "error" || !next.reachable);
 
   if (!shouldPreserveModel) {
     return next;

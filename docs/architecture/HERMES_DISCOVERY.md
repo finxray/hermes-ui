@@ -229,14 +229,29 @@ Current source inspection confirms model names are advertised via `/v1/models` a
 - Treat `GET /api/sessions/{session_id}` fields such as `effective_model` and `effective_provider` as the session truth after a selection.
 - Current live examples:
   - `gpt-oss-120b` and `zai-glm-4.7` advertise `owned_by: cerebras-gpt-oss-120b`; the Web UI should display this provider family as `Cerebras`.
-  - `moonshotai/kimi-k2.6` advertises `owned_by: openrouter`, but Hermes may verify the effective session provider as `nvidia`; the Web UI should accept the verified model readback, keep user-facing provider display as `OpenRouter`, and treat `nvidia` as an internal route detail.
+  - `moonshotai/kimi-k2.6` advertises `owned_by: openrouter`, but current local Hermes HTTP session-model resolution can resolve the same id as `nvidia` because the HTTP path does not pass `provider` as `explicit_provider`. The Web UI must not offer or accept this ambiguous route through the HTTP selector; use Hermes provider-aware `/model --provider openrouter` or a future provider-aware HTTP endpoint instead.
   - Claude models may appear twice, for example `anthropic/claude-sonnet-4.6` via `openrouter` and `claude-sonnet-4-6` via direct `anthropic`. If both are present, the Web UI should prefer the routed public OpenRouter catalog entry and hide the direct duplicate alias from the Composer.
   - `qwen/qwen3.7-max` advertises and self-reports cleanly through `OpenRouter`.
 - Browser code must still send model selection through the BFF only. The BFF should preserve raw routing keys for Hermes requests, while user-facing UI should display the catalog provider family labels such as `Cerebras` and `OpenRouter`.
-- The Web UI may provide additional OpenRouter catalog models beyond Hermes' configured `/v1/models` list. These are UI-discovered choices only. Hermes' session model endpoint rejects models absent from `/v1/models`, but the Hermes session chat stream can route those OpenRouter IDs when `model` and `provider: openrouter` are supplied in the request body.
-- UI-provided OpenRouter models are therefore per-turn overrides, not persisted Hermes session overrides, until Hermes exposes a registration/allowlist or broader session model endpoint.
-- OpenRouter catalog lookup uses the OpenRouter `GET https://openrouter.ai/api/v1/models` endpoint through the Web UI BFF. Browser code must not call OpenRouter directly or receive `OPENROUTER_API_KEY`.
-- Hermes Configured model ordering is deterministic in the Web UI. The project default `DeepSeek V4 Flash` is synthesized at the top when Hermes does not advertise it in `/v1/models`; then `GPT OSS 120B` and `Zai GLM 4.7` follow in stable order.
+- The Web UI may fetch the public OpenRouter catalog only as metadata for models Hermes already advertises through `/v1/models`. Public OpenRouter-only models must stay hidden from runtime selection until Hermes advertises or accepts them through a verified HTTP model-selection path.
+- The current Hermes API-server chat paths do not prove per-turn provider routing from the request body. The browser and BFF must not treat `model` plus `provider: openrouter` in a chat body as a standard routing override unless Hermes exposes and verifies that capability.
+- OpenRouter catalog lookup uses the OpenRouter `GET https://openrouter.ai/api/v1/models` endpoint through the Web UI BFF. Browser code must not call OpenRouter directly or receive `OPENROUTER_API_KEY`; the BFF must not use the catalog to bypass Hermes' advertised runtime surface.
+- Hermes Configured model ordering is deterministic in the Web UI. `DeepSeek V4 Flash`, `GPT OSS 120B`, and `Zai GLM 4.7` keep stable ordering when Hermes actually advertises those model ids, but the UI must not synthesize an unavailable model into the live server-configured state.
+
+2026-06-14 live model-selection note:
+
+- OpenRouter and Cerebras both use the OpenAI-compatible chat-completions shape where the request body carries the `model` id. OpenRouter also supports provider-routing preferences. The Web UI must still send model choices only through Hermes/BFF, never directly from the browser.
+- The community `nesquena/hermes-webui` Gateway bridge posts `model` and optional `provider` to `/v1/chat/completions`; its legacy runtime stores `model_provider` in the WebUI session. Current local Hermes source inspection shows this project cannot rely on that pattern for `/api/sessions/{session_id}/chat/stream`, because the API-server path does not use the chat body `provider` as a routing override.
+- Current local Hermes (`127.0.0.1:8642`) exposes `session_model_override.supported: true` and accepts session-scoped overrides through `POST /api/sessions/{session_id}/model`.
+- Current local Hermes source inspection shows `POST /api/sessions/{session_id}/model` reads `model`, calls `switch_model(raw_input=...)`, and does not pass the HTTP body `provider` as `explicit_provider`. Telegram `/model` does pass an explicit provider through a separate code path, so provider disambiguation exists in Hermes but is not exposed by this HTTP endpoint.
+- `/v1/chat/completions` and `/api/sessions/{session_id}/chat/stream` read request-body `model` mainly as request/session metadata in the current API-server path; they do not create a provider-routed agent from arbitrary public catalog entries.
+- Live verification and Hermes journal logs found `deepseek/deepseek-v4-flash` is rejected by the standard HTTP session-model endpoint, while the bare alias `deepseek-v4-flash` routes to the direct `deepseek` provider and fails with the configured direct DeepSeek key (`HTTP 401`). The Web UI must not map the OpenRouter catalog id to that bare alias.
+- DeepSeek V4 Flash through OpenRouter should become selectable only when Hermes advertises it through `/v1/models` with a route the HTTP session-model endpoint can verify, or when Hermes exposes provider-aware HTTP model selection equivalent to Telegram `/model --provider openrouter`.
+
+2026-06-15 live model-routing update:
+
+- Hermes journal verification showed selecting `moonshotai/kimi-k2.6` from the Web UI's OpenRouter catalog resolved to `provider=nvidia base_url=https://integrate.api.nvidia.com/v1 model=moonshotai/kimi-k2.6` and failed with a NVIDIA 401. The Web UI must therefore hide Kimi from HTTP-session selection and fail loudly if a direct BFF call detects this mismatch.
+- User OpenRouter logs confirmed `qwen/qwen3.7-max` requests were actually billed by OpenRouter, even when the assistant self-reported a fallback/default identity. The UI must treat assistant self-identification as untrusted and display only requested route plus provider-log/route-metadata evidence.
 
 ## Stable Enough To Build Against
 

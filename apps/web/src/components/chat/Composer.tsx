@@ -547,19 +547,38 @@ function ModelSection({
         {models.length > 0 ? (
           models.map((model) => {
             const isSelected = model.id === selectedModelId;
+            const isLocalManaged = model.catalogSource === "ui-lmstudio";
+            const notLoaded = model.availability === "not-loaded";
+            const disabled = notLoaded;
             return (
               <button
-                className={styles.modelOption}
+                className={[styles.modelOption, disabled ? styles.modelOptionDisabled : ""]
+                  .filter(Boolean)
+                  .join(" ")}
                 type="button"
                 role="option"
                 aria-selected={isSelected}
+                aria-disabled={disabled || undefined}
+                disabled={disabled}
                 key={`${model.catalogSource ?? "model"}:${model.id}`}
-                onClick={() => onSelect(model.id)}
-                title={model.provider ? `${model.id} (${model.provider})` : model.id}
+                onClick={disabled ? undefined : () => onSelect(model.id)}
+                title={
+                  disabled
+                    ? `${model.id} - not loaded in LM Studio`
+                    : model.provider
+                      ? `${model.id} (${model.provider})`
+                      : model.id
+                }
               >
                 <span className={styles.modelOptionText}>
                   <span className={styles.modelOptionLabel}>{model.label}</span>
-                  <span className={styles.modelOptionProvider}>{modelProviderSummary(model)}</span>
+                  <span className={styles.modelOptionProvider}>
+                    {notLoaded
+                      ? "Not loaded in LM Studio"
+                      : isLocalManaged
+                        ? "LM Studio"
+                        : modelProviderSummary(model)}
+                  </span>
                 </span>
                 {isSelected ? <Check size={15} /> : null}
               </button>

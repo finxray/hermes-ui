@@ -75,17 +75,17 @@ Hermes Web UI model switching allows users to select among configured Hermes mod
 | **Invalid model** | Rejected with 400 |
 | **Secrets** | Never returned in status or model select responses |
 | **Provider display** | Raw routing keys are preserved for Hermes, but UI displays the selected catalog provider family such as `Cerebras` or `OpenRouter` |
-| **Provider truth** | After selection, `effective_model` from Hermes session detail is authoritative; `effective_provider` may be a lower-level backend route |
-| **UI-provided models** | Additional OpenRouter models are discovered through the Web UI BFF and sent through Hermes as per-turn OpenRouter overrides |
+| **Provider truth** | After selection, `effective_model` from Hermes session detail is authoritative for the model id; `effective_provider` must still match the requested provider family for HTTP-session selection to be considered safe |
+| **UI-provided models** | Public OpenRouter models discovered through the Web UI BFF are metadata only unless Hermes also advertises them through `/v1/models` |
 
 ### Provider Resolution Notes
 
-Live Hermes may resolve a model through a provider that differs from the `/v1/models[*].owned_by` catalog owner. The Web UI must not treat that as a failure when Hermes verifies the requested `effective_model`.
+Live Hermes may list a model under a catalog owner that differs from where `switch_model(raw_input=...)` resolves it. Because the HTTP session-model endpoint currently does not pass the request-body `provider` as Hermes' explicit provider, the Web UI must reject ambiguous provider mismatches instead of treating them as internal routing details.
 
 Observed examples:
 
 - `gpt-oss-120b` and `zai-glm-4.7` advertise `owned_by: cerebras-gpt-oss-120b`, but user-facing UI should show provider `Cerebras`.
-- `moonshotai/kimi-k2.6` can advertise `owned_by: openrouter` while session detail verifies `effective_provider: nvidia`. This should settle as `Kimi K2.6 / OpenRouter` in user-facing UI, not flash a failed OpenRouter warning.
+- `moonshotai/kimi-k2.6` can advertise `owned_by: openrouter` while session detail verifies `effective_provider: nvidia`. This is not a safe OpenRouter selection through the HTTP API. The Composer hides Kimi and the BFF rejects direct Kimi selection with a provider verification error.
 - Claude models can appear as both routed OpenRouter ids such as `anthropic/claude-sonnet-4.6` and direct Anthropic aliases such as `claude-sonnet-4-6`. When both are present, the Composer should keep the OpenRouter entry and hide the direct duplicate alias.
 - `qwen/qwen3.7-max` verifies cleanly through `OpenRouter`.
 
@@ -96,11 +96,15 @@ The Composer model control opens a large tinted glass model browser instead of a
 - `Hermes config`: models returned by Hermes `/v1/models`.
 - `UI OpenRouter catalog`: models returned by the Web UI BFF route `/api/model-catalog/openrouter`, backed by OpenRouter `/api/v1/models`.
 
-`Hermes config` order is stable: `DeepSeek V4 Flash` is first as the project default, followed by `GPT OSS 120B`, then `Zai GLM 4.7`, then the remaining configured models by label/id. DeepSeek is synthesized into this section if Hermes does not advertise it in `/v1/models`; it still routes through OpenRouter as a per-turn model when used.
+`Hermes config` order is stable for models Hermes actually advertises: `DeepSeek V4 Flash`, `GPT OSS 120B`, then `Zai GLM 4.7`, followed by the remaining configured models by label/id. The UI must not synthesize DeepSeek into the live server-configured state when Hermes does not advertise that id.
 
 Selecting a Hermes-configured model uses the full session path: Composer -> Web UI BFF -> Hermes session model select -> Hermes session readback.
 
-Selecting a UI OpenRouter catalog model uses a turn-scoped path because Hermes currently rejects non-`/v1/models` entries from `/api/sessions/{session_id}/model`: Composer -> Web UI BFF -> Hermes session chat stream with `model` and `provider: openrouter` in the body. The browser never calls OpenRouter or Hermes directly.
+The `UI OpenRouter catalog` group must not add standalone runtime choices. It may enrich matching Hermes-advertised OpenRouter models with public metadata, but public-only OpenRouter entries stay hidden from selection until Hermes exposes them through `/v1/models` or a provider-aware HTTP selection endpoint. Current local Hermes source shows request-body `provider` is not a reliable chat-stream routing override.
+
+DeepSeek V4 Flash is a concrete guard case: `deepseek/deepseek-v4-flash` is not advertised by the current local Hermes `/v1/models`, and mapping it to bare `deepseek-v4-flash` routes to the direct DeepSeek provider, which fails with the configured direct-provider key. The Web UI must fail honestly instead of aliasing that OpenRouter id to a different provider route.
+
+Kimi K2.6 is a second guard case: Hermes logs on 2026-06-15 showed `moonshotai/kimi-k2.6` resolving to NVIDIA despite the UI-requested OpenRouter route. The HTTP selector must hide Kimi/NVIDIA/Nous routes until Hermes exposes provider-aware HTTP model switching equivalent to Telegram `/model --provider ...`.
 
 ---
 

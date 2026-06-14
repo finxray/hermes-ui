@@ -317,13 +317,16 @@ if (!chatViewVisualCss.includes(".composerAnchor")) {
 }
 if (
   !composerVisualCss.includes(".modelSelectError") ||
-  !composerVisualCss.includes("margin: 6px auto 0") ||
+  !composerVisualCss.includes("position: absolute") ||
+  !composerVisualCss.includes("bottom: calc(100% + 6px)") ||
+  !composerVisualCss.includes("margin: 0 auto") ||
   !composerVisualCss.includes("text-align: center") ||
-  !composerVisualCss.includes("text-wrap: balance")
+  !composerVisualCss.includes("text-wrap: balance") ||
+  !composerVisualCss.includes("pointer-events: none")
 ) {
-  failures.push("Composer model-select error text must be centered to the composer surface.");
+  failures.push("Composer model-select error text must be centered above the composer without shifting its bottom anchor.");
 }
-if (!chatViewVisualCss.includes("padding: 0 clamp(20px, 2vw, 36px) 1px")) {
+if (!chatViewVisualCss.includes("padding: 0 clamp(20px, 2vw, 36px) 10px")) {
   failures.push("Main and split chat composers must share the 10px visual bottom anchor.");
 }
 if (chatViewVisualCss.includes("max-width: var(--composer-width)") && chatViewVisualCss.includes("margin: 0 auto") && chatViewVisualCss.match(/\.headerTitle[\s\S]{0,120}margin:\s*0 auto/)) {

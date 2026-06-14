@@ -123,12 +123,13 @@ check(
   "streamHermesSessionChat forwards selected model in chat stream body",
   Boolean(
     indexFile?.includes("/api/sessions/${encodeURIComponent(hermesSessionId)}/chat/stream") &&
+      indexFile?.includes("Current Hermes API-server routing is verified through the session") &&
       indexFile?.includes("model: runtimeModelId || undefined") &&
       indexFile?.includes("provider: request.provider || undefined") &&
       indexFile?.includes("requested_model: runtimeModelId ?? null") &&
       indexFile?.includes("model_selection_scope: request.modelSelectionScope ?? null")
   ),
-  "Hermes session stream must receive the selected model and route metadata; a pre-stream override alone can still fall back to the default model."
+  "The chat body may carry selected-model metadata, but routing must have been verified through the session model endpoint first."
 );
 check(
   "streamHermesSessionChat does not silently fall back to unverified OpenRouter routing",
@@ -140,14 +141,15 @@ check(
   "If Hermes rejects a model selection, the UI must fail loudly instead of continuing on the server default model."
 );
 check(
-  "streamHermesSessionChat only skips session override for explicit turn-scope requests",
+  "streamHermesSessionChat does not skip session override for turn-scope requests",
   Boolean(
     typesFile?.includes('modelSelectionScope?: "session" | "turn" | null') &&
-      indexFile?.includes('request.modelSelectionScope !== "turn"') &&
+      !indexFile?.includes('request.modelSelectionScope !== "turn"') &&
+      indexFile?.includes("if (runtimeModelId)") &&
       indexFile?.includes("model: runtimeModelId || undefined") &&
       indexFile?.includes("provider: request.provider || undefined")
   ),
-  "The low-level API keeps a compatibility escape hatch, but UI catalog models should require session verification."
+  "Even legacy turn-scoped requests must fail honestly if Hermes cannot verify the selected model for the session."
 );
 check(
   "streamHermesSessionChat emits verified-model fallback for empty assistant completions",
@@ -178,13 +180,21 @@ check(
   "Legacy placeholder ids such as hermes-agent must never be sent to session model override"
 );
 check(
-  "model select uses catalog ids with separate provider field",
+  "model select keeps Hermes catalog ids unchanged",
   Boolean(
     indexFile?.includes("export function resolveModelSelectRequest") &&
       indexFile?.includes("selectModelId: resolveModelSelectId(id, providerKey)") &&
       indexFile?.includes("return id;")
   ),
-  "Hermes rejects provider:id strings; send GET /v1/models id plus provider in POST body"
+  "Hermes session selection should send the GET /v1/models id and never rewrite it into a provider-native alias."
+);
+check(
+  "OpenRouter DeepSeek V4 Flash is not translated to a direct-provider alias",
+  Boolean(
+    !indexFile?.includes('return "deepseek-v4-flash"') &&
+      indexFile?.includes("Do not translate aggregator ids into provider-native aliases")
+  ),
+  "The bare deepseek-v4-flash alias routes to the direct DeepSeek provider in current Hermes, so the UI must not use it for OpenRouter."
 );
 check(
   "dedicated provider misroutes are surfaced after model select",
@@ -194,15 +204,15 @@ check(
   )
 );
 check(
-  "OpenRouter catalog provider mismatches are accepted as internal routes",
+  "OpenRouter catalog provider mismatches fail loudly instead of misrouting",
   Boolean(
-    indexFile?.includes("OpenRouter catalog ids can be resolved by Hermes through provider-specific") &&
-      indexFile?.includes("return null;")
+    indexFile?.includes("Hermes resolved this OpenRouter catalog model through") &&
+      indexFile?.includes("did not verify the requested OpenRouter provider")
   ),
-  "Kimi can be advertised as OpenRouter but verified by Hermes through NVIDIA; the UI should not flash a false failure or replace the public provider."
+  "Kimi can be advertised as OpenRouter but verified by Hermes through NVIDIA; the UI must fail loudly instead of continuing on the wrong provider."
 );
 check(
-  "session model select requests session-scoped overrides with provider disambiguation",
+  "session model select requests session-scoped overrides and verifies readback",
   Boolean(
     indexFile?.includes('scope: "session"') &&
       indexFile?.includes("effective_provider") &&
@@ -210,14 +220,16 @@ check(
   )
 );
 check(
-  "configured default model is preferred over placeholder catalog ids",
+  "configured default model must come from Hermes status, not a hardcoded fallback",
   Boolean(
-    indexFile?.includes("extractConfiguredDefaultModelIds") &&
+      indexFile?.includes("extractConfiguredDefaultModelIds") &&
       indexFile?.includes("gateway_model_defaults") &&
-      indexFile?.includes("PROJECT_DEFAULT_MODEL_ID") &&
-      indexFile?.includes("DeepSeek V4 Flash")
+      !indexFile?.includes("function defaultModelDescriptor") &&
+      !indexFile?.includes("function ensureConfiguredDefaultModelDescriptors") &&
+      !indexFile?.includes("flaggedDefaultModelId(status.models),\n    PROJECT_DEFAULT_MODEL_ID") &&
+      !indexFile?.includes("ensureConfiguredDefaultModelDescriptors(\n    modelDescriptors(status.models)")
   ),
-  "UI should default to Hermes config model such as DeepSeek v4 Flash instead of hermes-agent"
+  "The UI must not invent DeepSeek V4 Flash as an available/selectable model when Hermes did not advertise that model."
 );
 check(
   "Hermes configured model order is stable with project default first",
@@ -260,33 +272,51 @@ check(
   "UI-added models should come from a typed server-side OpenRouter catalog client."
 );
 check(
-  "LM Studio chat models from Hermes catalog use verified session selection",
+  "Loaded LM Studio models are session-selectable while unsafe local runtimes stay filtered",
   Boolean(
     indexFile?.includes('LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio"') &&
-      indexFile?.includes("isTurnScopedLocalProvider(providerKey)") &&
-      indexFile?.includes('selectionScope: "session"') &&
-      indexFile?.includes("use the session select endpoint so the UI can verify") &&
+      indexFile?.includes('providerKey.includes("lmstudio")') &&
+      indexFile?.includes('providerKey.startsWith("local-") && !isLmStudioProvider') &&
+      indexFile?.includes('"ollama-local"') &&
       indexFile?.includes('return "LM Studio"')
   ),
-  "Hermes-advertised LM Studio chat ids such as qwen/qwen3.6-35b-a3b should be verified through the session model endpoint when Hermes can select them."
+  "LM Studio models should be selectable through the provider-aware Hermes API; unverified local/Ollama providers should stay hidden."
 );
 check(
-  "Local non-chat models remain filtered",
+  "ambiguous NVIDIA/Nous routes are excluded from session-selectable catalog",
+  Boolean(
+    indexFile?.includes("UNSAFE_HTTP_SESSION_PROVIDER_KEYS") &&
+      indexFile?.includes('"nvidia"') &&
+      indexFile?.includes('"nous"') &&
+      !indexFile?.includes("UNSAFE_HTTP_SESSION_MODEL_IDS")
+  ),
+  "Hermes' HTTP model switch path resolves ambiguous ids without explicit provider, so NVIDIA/Nous must stay out while OpenRouter Kimi is allowed and verified."
+);
+check(
+  "direct Cerebras entries are excluded from session-selectable catalog",
+  Boolean(
+    indexFile?.includes('providerKey.startsWith("cerebras")') &&
+      indexFile?.includes("Cerebras has been removed from the local Hermes config")
+  ),
+  "Cerebras should not be offered after being removed from the local Hermes config."
+);
+check(
+  "Embeddings, Ollama tags, and non-LM Studio local models remain filtered",
   Boolean(
     indexFile?.includes('id.includes("embed")') &&
       indexFile?.includes('id.includes(":")') &&
-      indexFile?.includes('providerKey.startsWith("local-") && !isTurnScopedLocalProvider(providerKey)')
+      indexFile?.includes('providerKey.startsWith("local-") && !isLmStudioProvider')
   ),
-  "Embeddings and Ollama-style local tags should not appear in the chat model selector."
+  "Embeddings, Ollama-style tags, and unverified local providers should not appear as selectable chat models."
 );
 check(
-  "LM Studio UI catalog exposes only loaded chat models",
+  "LM Studio UI catalog tags unloaded chat models as not-loaded",
   Boolean(
     indexFile?.includes("const loadedInstances = Array.isArray(record.loaded_instances)") &&
-      indexFile?.includes("loadedInstances.length === 0") &&
+      indexFile?.includes('loadedInstances.length === 0 ? "not-loaded" : "ready"') &&
       indexFile?.includes('type === "embedding"')
   ),
-  "Installed but unloaded LM Studio models must not look selectable in Composer."
+  "Installed-but-unloaded LM Studio models must be surfaced with availability so the Composer can disable them."
 );
 check(
   "normalizeHermesUiCapabilities computes clientSelectable from real model catalog",
@@ -382,8 +412,10 @@ check(
   Boolean(
     runtimeIdentityFile?.includes("buildHermesRuntimeIdentityInstruction") &&
       runtimeIdentityFile?.includes("Requested runtime model route for this turn") &&
-      runtimeIdentityFile?.includes("This is a requested route, not proof") &&
-      runtimeIdentityFile?.includes("provider usage metadata confirms the actual route")
+      runtimeIdentityFile?.includes("authoritative UI-selected route") &&
+      runtimeIdentityFile?.includes("answer with the requestedModel above") &&
+      runtimeIdentityFile?.includes("actual billed backend route must be checked in Hermes UI route metadata or provider logs") &&
+      runtimeIdentityFile?.includes("Do not answer model-identity questions from Hermes server defaults")
   ),
   "Assistant replies must not self-report a requested route as the actual billed provider/model without usage confirmation."
 );
@@ -451,6 +483,16 @@ check(
   "Composer surfaces model select errors",
   Boolean(composerFile?.includes("modelSelectError") && composerFile?.includes('role="alert"'))
 );
+check(
+  "Composer disables only unloaded LM Studio models",
+  Boolean(
+    composerFile?.includes('model.catalogSource === "ui-lmstudio"') &&
+      composerFile?.includes("const disabled = notLoaded") &&
+      composerFile?.includes("disabled={disabled}") &&
+      composerFile?.includes('"LM Studio"')
+  ),
+  "Loaded LM Studio models should be selectable; installed-but-unloaded rows should remain disabled."
+);
 
 // --- 6. Session model pipeline feeds Composer and rail ---
 const chatViewFile = readFile("apps/web/src/components/chat/ChatView.tsx");
@@ -473,12 +515,14 @@ check(
   "Composer selection must POST then read Hermes session truth before updating shared state"
 );
 check(
-  "useHermesSessionModel keeps catalog provider as public Provider label",
+  "useHermesSessionModel keeps provider display override scoped to verified aliases",
   Boolean(
-    sessionModelHookFile?.includes("selected?.provider ||") &&
-      sessionModelHookFile?.includes("lower-level backend route such as NVIDIA")
+    sessionModelHookFile?.includes("Provider mismatches are rejected by the select pipeline") &&
+      sessionModelHookFile?.includes("selected.selectModelId !== selected.id") &&
+      sessionModelHookFile?.includes("return verifiedProvider;") &&
+      sessionModelHookFile?.includes("return selected?.provider || verifiedProvider || fallbackProviderLabel;")
   ),
-  "Kimi K2.6 may verify through NVIDIA internally, but the Composer and right rail should still show OpenRouter."
+  "Provider mismatches such as OpenRouter -> NVIDIA must be rejected; readback labels only override alias-backed selections."
 );
 check(
   "useHermesSessionModel posts selected model through BFF route",
@@ -489,20 +533,23 @@ check(
   )
 );
 check(
-  "useHermesSessionModel merges UI OpenRouter catalog models into the shared pipeline",
+  "useHermesSessionModel keeps public OpenRouter-only models out of runtime selection",
   Boolean(
     sessionModelHookFile?.includes("openRouterModels") &&
       sessionModelHookFile?.includes("mergeOpenRouterModels") &&
-      sessionModelHookFile?.includes("availableModels: [...state.availableModels, ...extras]")
+      sessionModelHookFile?.includes("public OpenRouter-only models stay hidden") &&
+      !sessionModelHookFile?.includes("availableModels: [...state.availableModels, ...extras]")
   ),
-  "UI-provided OpenRouter models must use the same Composer -> Hermes verification path as Hermes-configured models."
+  "Only models advertised by Hermes /v1/models may be selectable; the public OpenRouter catalog is metadata only."
 );
 check(
-  "UI-provided OpenRouter and LM Studio models require session verification",
+  "UI-provided catalogs do not become unverified per-turn routes",
   Boolean(
     indexFile?.includes('catalogSource: "ui-openrouter"') &&
       indexFile?.includes('catalogSource: "ui-lmstudio"') &&
-      countOccurrences(indexFile ?? "", 'selectionScope: "session"') >= 4 &&
+      countOccurrences(indexFile ?? "", 'selectionScope: "session"') >= 3 &&
+      /catalogSource:\s*"ui-openrouter",\s*selectionScope:\s*"session"/s.test(indexFile ?? "") &&
+      /catalogSource:\s*"ui-lmstudio",\s*selectionScope:\s*"session"/s.test(indexFile ?? "") &&
       !indexFile?.includes('catalogSource: "ui-openrouter",\n      selectionScope: "turn"') &&
       !indexFile?.includes('catalogSource: "ui-lmstudio",\n      selectionScope: "turn"')
   ),
@@ -572,9 +619,72 @@ check(
   )
 );
 check(
+  "successful Hermes streams clear stale session model pipeline errors",
+  Boolean(
+    sessionModelHookFile?.includes("markStreamSucceeded") &&
+      sessionModelHookFile?.includes("streamSucceededSessionIdsRef") &&
+      sessionModelHookFile?.includes("error: null") &&
+      chatViewFile?.includes("streamCompletedSuccessfully") &&
+      chatViewFile?.includes("sessionModel.markStreamSucceeded()")
+  ),
+  "A completed assistant stream proves Hermes is reachable and must not leave an old timeout/attention message in the right rail."
+);
+check(
+  "ChatView does not immediately refresh session model after a successful stream",
+  Boolean(
+    chatViewFile?.includes("if (streamCompletedSuccessfully)") &&
+      chatViewFile?.includes("sessionModel.markStreamSucceeded();") &&
+      chatViewFile?.includes("} else {\n          void sessionModel.refresh();")
+  ),
+  "A flaky post-run session readback must not overwrite a successful chat stream with false unavailable/attention UI."
+);
+check(
+  "useHermesSessionModel suppresses automatic post-stream readback but keeps forced verification",
+  Boolean(
+    sessionModelHookFile?.includes("!expected && !options.force && streamSucceededSessionIdsRef.current.has(hermesSessionId)") &&
+      sessionModelHookFile?.includes("streamSucceededSessionIdsRef.current.add(hermesSessionId)") &&
+      sessionModelHookFile?.includes("streamSucceededSessionIdsRef.current.delete(hermesSessionId)") &&
+      sessionModelHookFile?.includes('await loadSessionModel("loading", undefined, { force: true })')
+  ),
+  "Workspace state updates after a successful stream must not re-fetch session detail and repaint stale timeout errors, while manual refresh still verifies."
+);
+check(
   "useHermesStatus preserves known model during transient refresh failures",
   Boolean(readFile("apps/web/src/hooks/useHermesStatus.ts")?.includes("preserveKnownModelOnTransientFailure")),
   "Polling must not reset composer model to unknown when Hermes was previously connected"
+);
+check(
+  "useHermesStatus does not preserve stale model when reachable status says unavailable",
+  Boolean(
+    hookFile?.includes('next.mode === "error" || !next.reachable') &&
+      !hookFile?.includes('next.uiCapabilities.models.selectionStatus === "unavailable"') &&
+      !hookFile?.includes('next.uiCapabilities.models.selectionStatus === "unknown"')
+  ),
+  "A valid reachable status must be allowed to clear a model that Hermes no longer advertises."
+);
+check(
+  "useHermesSessionModel does not display saved model preference while Hermes model state is unverified",
+  (() => {
+    const guard = sessionModelHookFile?.match(/function canApplySessionSelectedModel[\s\S]*?\n}/)?.[0] ?? "";
+    return Boolean(
+      sessionModelHookFile?.includes("!canApplySessionSelectedModel(state)") &&
+        guard.includes("state.clientSelectable ||") &&
+        guard.includes('state.selectionStatus === "server-configured"') &&
+        guard.includes("state.availableModels.length > 0") &&
+        !guard.includes('state.selectionStatus === "unknown"') &&
+        !guard.includes('state.selectionStatus === "unavailable"')
+    );
+  })(),
+  "A persisted OpenRouter/DeepSeek preference must not override the Composer label while Hermes is unavailable or model status is unknown."
+);
+check(
+  "useHermesSessionModel keeps provider display override scoped to alias-backed selections",
+  Boolean(
+    sessionModelHookFile?.includes("function selectedProviderLabel") &&
+      sessionModelHookFile?.includes("selected.selectModelId !== selected.id") &&
+      sessionModelHookFile?.includes("return verifiedProvider;")
+  ),
+  "When a public catalog id is selected through a Hermes alias, the UI must display the provider Hermes actually verified."
 );
 
 // --- 7a. New: Explicit session model override capability ---

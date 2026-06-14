@@ -57,6 +57,29 @@ export function useOpenRouterModels() {
     };
   }, [refresh]);
 
+  // Re-pull the catalog when the user returns to the tab so a long-open session
+  // picks up models launched on OpenRouter since load, without polling on a timer.
+  useEffect(() => {
+    let lastRefreshAt = Date.now();
+    const MIN_REFRESH_INTERVAL_MS = 60_000;
+    const maybeRefresh = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      if (Date.now() - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) {
+        return;
+      }
+      lastRefreshAt = Date.now();
+      void refresh();
+    };
+    window.addEventListener("focus", maybeRefresh);
+    document.addEventListener("visibilitychange", maybeRefresh);
+    return () => {
+      window.removeEventListener("focus", maybeRefresh);
+      document.removeEventListener("visibilitychange", maybeRefresh);
+    };
+  }, [refresh]);
+
   return {
     ...state,
     refresh

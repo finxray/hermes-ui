@@ -166,6 +166,15 @@ function checkComponentSource() {
     "Transcript delays noisy live activity, but shows live token usage immediately when available."
   );
   record(
+    "transcript-activity-run-anchor",
+    chatTranscript.includes("resolveActivityAnchorRun") &&
+      chatTranscript.includes("assistantMessageId") &&
+      chatTranscript.includes("activityEventsForRun") &&
+      chatTranscript.includes("restoreActivityEventFromPersisted") &&
+      chatTranscript.includes("activityBlockLegacyEvents = activityAnchorRun ? []"),
+    "Transcript anchors Worked/activity blocks to the run assistant instead of inserting stale session activity before the newest assistant reply."
+  );
+  record(
     "worked-static-token-footer-size",
     css.includes(".tokenPart") &&
       css.includes("font-size: var(--font-xs)") &&

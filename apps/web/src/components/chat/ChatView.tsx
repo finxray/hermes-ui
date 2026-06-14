@@ -203,6 +203,7 @@ export function ChatView({
     let estimatedPromptTokens = 0;
     let estimatedActivityChars = 0;
     let accumulated = "";
+    let streamCompletedSuccessfully = false;
     const liveEstimateStartedAtMs = performance.now();
 
     const nextActivitySequence = () => activitySequenceRef.current++;
@@ -388,6 +389,8 @@ export function ChatView({
       });
       return;
     }
+
+    sessionModel.markStreamSucceeded();
 
     estimatedPromptTokens = estimatePromptTokensForRequest({
       message: content,
@@ -692,10 +695,15 @@ export function ChatView({
           ? summarizeRunPrompt(accumulated)
           : "Hermes completed without assistant text."
     });
+    streamCompletedSuccessfully = !hadStreamError && !emptyAssistantText && !stopRequestedRef.current;
     } finally {
       stopLiveTokenPulse();
       if (generationStarted) {
-        void sessionModel.refresh();
+        if (streamCompletedSuccessfully) {
+          sessionModel.markStreamSucceeded();
+        } else {
+          void sessionModel.refresh();
+        }
         setIsGenerating(false);
         setIsStopRequested(false);
         setLiveTokenUsage(null);
@@ -923,14 +931,17 @@ function annotateTokenUsageRoute(
 
   const actualModel = cleanRouteValue(next.upstreamModel) || cleanRouteValue(next.model);
   const actualProvider = cleanRouteValue(next.provider);
-  const routeVerified = Boolean(actualModel || actualProvider);
+  const routeVerified = hasAuthoritativeRouteEvidence(next);
   if (routeVerified) {
     next.routeVerified = true;
   }
 
-  const modelMismatch = Boolean(requestedModel && actualModel && !sameRouteModel(requestedModel, actualModel));
+  const modelMismatch = Boolean(
+    routeVerified && requestedModel && actualModel && !sameRouteModel(requestedModel, actualModel)
+  );
   const providerMismatch = Boolean(
-    requestedProvider &&
+    routeVerified &&
+      requestedProvider &&
       actualProvider &&
       !providerRouteMatches(requestedProvider, actualProvider)
   );
@@ -939,6 +950,17 @@ function annotateTokenUsageRoute(
   }
 
   return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function hasAuthoritativeRouteEvidence(usage: HermesTokenUsage) {
+  if (usage.routeVerified === true) {
+    return true;
+  }
+  return Boolean(
+    cleanRouteValue(usage.upstreamModel) ||
+      cleanRouteValue(usage.generationId) ||
+      cleanRouteValue(usage.requestId)
+  );
 }
 
 function sameRouteModel(requested: string, actual: string) {
@@ -954,6 +976,9 @@ function routeModelVariants(value: string) {
 }
 
 function providerRouteMatches(requested: string, actual: string) {
+  if (isOpenRouterRoute(requested)) {
+    return true;
+  }
   const requestedProvider = normalizeProviderRoute(requested);
   const actualProvider = normalizeProviderRoute(actual);
   if (!requestedProvider || !actualProvider) {
@@ -966,6 +991,11 @@ function providerRouteMatches(requested: string, actual: string) {
     return actualProvider === "locallmstudio" || actualProvider === "lmstudio";
   }
   return requestedProvider === actualProvider;
+}
+
+function isOpenRouterRoute(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === "openrouter" || normalized.startsWith("openrouter-");
 }
 
 function normalizeProviderRoute(value: string) {

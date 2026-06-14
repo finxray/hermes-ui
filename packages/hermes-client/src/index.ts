@@ -39,6 +39,7 @@ const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/api/v1/models";
 const LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio";
 const PROJECT_DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
+const UNSAFE_HTTP_SESSION_PROVIDER_KEYS = new Set(["nvidia", "nous", "ollama", "ollama-local"]);
 const STABLE_HERMES_MODEL_ORDER = [
   PROJECT_DEFAULT_MODEL_ID,
   "gpt-oss-120b",
@@ -613,7 +614,7 @@ export async function streamHermesSessionChat(
   }
 
   const runtimeModelId = resolveRuntimeModelId(request.model);
-  if (runtimeModelId && request.modelSelectionScope !== "turn") {
+  if (runtimeModelId) {
     const modelResult = await selectHermesModel(config, hermesSessionId, runtimeModelId, {
       expectedProviderKey: request.provider ?? null,
       provider: request.provider ?? null,
@@ -657,6 +658,9 @@ export async function streamHermesSessionChat(
         conversation_history: request.recentMessages ?? [],
         input: request.message,
         instructions: request.instructions || undefined,
+        // Current Hermes API-server routing is verified through the session
+        // model endpoint above. These fields are preserved for diagnostics and
+        // for future Hermes versions that may expose provider-aware chat routes.
         model: runtimeModelId || undefined,
         provider: request.provider || undefined,
         metadata: {
@@ -737,6 +741,19 @@ export function isSessionSelectableCatalogModel(descriptor: HermesModelDescripto
     return false;
   }
 
+  // Do not offer provider families known to misroute or reject this HTTP
+  // selector. OpenRouter and LM Studio providers are allowed and verified after
+  // selection by validateDedicatedProviderSelect.
+  if (UNSAFE_HTTP_SESSION_PROVIDER_KEYS.has(providerKey)) {
+    return false;
+  }
+
+  // Cerebras has been removed from the local Hermes config; keep stale direct
+  // entries out if a cached/provider catalog still advertises them.
+  if (providerKey.startsWith("cerebras")) {
+    return false;
+  }
+
   // Embedding and other non-chat models.
   if (id.includes("embed") || id.startsWith("text-embedding")) {
     return false;
@@ -747,11 +764,11 @@ export function isSessionSelectableCatalogModel(descriptor: HermesModelDescripto
     return false;
   }
 
-  // Most local inference catalogs are not switchable through the HTTP session
-  // model API. LM Studio is the exception when Hermes itself advertises the
-  // model in /v1/models: use the session select endpoint so the UI can verify
-  // it instead of silently trusting a per-turn hint.
-  if (providerKey.startsWith("local-") && !isTurnScopedLocalProvider(providerKey)) {
+  // LM Studio local providers are selectable through the provider-aware Hermes
+  // session-model endpoint. Other local runtimes stay out until they are
+  // verified through the same path.
+  const isLmStudioProvider = providerKey === "lmstudio" || providerKey.includes("lmstudio");
+  if (providerKey.startsWith("local-") && !isLmStudioProvider) {
     return false;
   }
 
@@ -805,7 +822,7 @@ export function formatHermesProviderLabel(provider: string | null | undefined): 
   if (normalized.startsWith("cerebras")) {
     return "Cerebras";
   }
-  if (normalized === "openrouter") {
+  if (normalized === "openrouter" || normalized.startsWith("openrouter-")) {
     return "OpenRouter";
   }
   if (normalized === "nous") {
@@ -814,7 +831,7 @@ export function formatHermesProviderLabel(provider: string | null | undefined): 
   if (normalized === "nvidia") {
     return "NVIDIA";
   }
-  if (normalized === LOCAL_LMSTUDIO_PROVIDER_KEY) {
+  if (normalized === "lmstudio" || normalized === LOCAL_LMSTUDIO_PROVIDER_KEY || normalized.startsWith("local-lmstudio")) {
     return "LM Studio";
   }
   if (normalized === "anthropic") {
@@ -4158,7 +4175,7 @@ function modelDescriptors(models: Record<string, unknown> | null): HermesModelDe
     if (!id) {
       continue;
     }
-    const providerKey = asString(record.owned_by) || null;
+    const providerKey = selectionProviderKeyForModel(id, asString(record.owned_by) || null);
     const provider = providerKey || providerFromModelId(id);
     descriptors.push({
       id,
@@ -4270,15 +4287,18 @@ function normalizeLmStudioModels(data: Record<string, unknown> | null): HermesMo
     if (type === "embedding") {
       continue;
     }
-    const loadedInstances = Array.isArray(record.loaded_instances) ? record.loaded_instances : [];
-    if (loadedInstances.length === 0) {
-      continue;
-    }
 
     const id = asString(record.id) || asString(record.key) || asString(record.model);
     if (!id || isPlaceholderHermesModelId(id)) {
       continue;
     }
+
+    // An installed-but-unloaded model cannot serve a request, but hiding it
+    // entirely is confusing ("why is qwen not even in the menu?"). Surface it
+    // with a "not-loaded" availability so the Composer can render it as a
+    // disabled row with a "load in LM Studio" hint instead of dropping it.
+    const loadedInstances = Array.isArray(record.loaded_instances) ? record.loaded_instances : [];
+    const availability = loadedInstances.length === 0 ? "not-loaded" : "ready";
 
     const runtime = normalizeLmStudioRuntime(record);
     models.push({
@@ -4289,6 +4309,7 @@ function normalizeLmStudioModels(data: Record<string, unknown> | null): HermesMo
       selectModelId: id,
       catalogSource: "ui-lmstudio",
       selectionScope: "session",
+      availability,
       contextLength: runtime.loadedContextLength ?? runtime.maxContextLength ?? null,
       inputModalities: normalizeLmStudioInputModalities(record),
       outputModalities: ["text"],
@@ -4418,19 +4439,32 @@ function providerFromModelId(id: string): string | null {
   return formatHermesProviderLabel(prefix);
 }
 
-function resolveModelSelectId(id: string, _providerKey: string | null): string {
-  // Hermes POST /api/sessions/{id}/model expects the catalog id from GET /v1/models.
-  // Provider routing is supplied separately via the `provider` field — not `provider:id`.
-  return id;
+function selectionProviderKeyForModel(id: string, providerKey: string | null): string | null {
+  const normalizedProvider = providerKey?.trim().toLowerCase() ?? "";
+  if (normalizedProvider !== "lmstudio") {
+    return providerKey;
+  }
+  const normalizedId = id.trim().toLowerCase();
+  if (normalizedId === "qwen/qwen3.6-35b-a3b") {
+    return "local-lmstudio-qwen36";
+  }
+  if (normalizedId === "google/gemma-4-26b-a4b") {
+    return LOCAL_LMSTUDIO_PROVIDER_KEY;
+  }
+  return providerKey;
 }
 
-function isTurnScopedLocalProvider(providerKey: string | null | undefined): boolean {
-  return providerKey?.trim().toLowerCase() === LOCAL_LMSTUDIO_PROVIDER_KEY;
+function resolveModelSelectId(id: string, _providerKey: string | null): string {
+  // Hermes POST /api/sessions/{id}/model expects the catalog id from GET /v1/models.
+  // Do not translate aggregator ids into provider-native aliases here: this
+  // endpoint may ignore the separate provider field, and a bare alias can route
+  // to a different direct provider.
+  return id;
 }
 
 function isOpenRouterCatalogProvider(providerKey: string): boolean {
   const normalized = providerKey.trim().toLowerCase();
-  return normalized === "openrouter" || normalized === "nous";
+  return normalized === "openrouter" || normalized.startsWith("openrouter-");
 }
 
 function validateDedicatedProviderSelect(
@@ -4443,19 +4477,25 @@ function validateDedicatedProviderSelect(
 
   const resolvedProvider = result.provider?.trim().toLowerCase() ?? "";
   const expected = expectedProviderKey.trim().toLowerCase();
+  const selectedModel = result.selectedModel?.trim() ?? "";
   if (!resolvedProvider) {
     return null;
   }
 
   if (isOpenRouterCatalogProvider(expectedProviderKey)) {
-    // OpenRouter catalog ids can be resolved by Hermes through provider-specific
-    // backends such as NVIDIA. Hermes' effective provider readback is the source
-    // of truth; the UI should not reject a verified model just because the
-    // catalog owner was OpenRouter.
-    return null;
+    if (isOpenRouterCatalogProvider(resolvedProvider)) {
+      return null;
+    }
+    const resolvedLabel = result.provider || selectedModel || "another provider";
+    return {
+      kind: "http_error",
+      message:
+        `Hermes resolved this OpenRouter catalog model through ${resolvedLabel}. ` +
+        "The HTTP session model route did not verify the requested OpenRouter provider family; " +
+        "use a non-ambiguous model or set the provider with Hermes /model if the provider family cannot be verified."
+    };
   }
 
-  const selectedModel = result.selectedModel?.trim() ?? "";
   const misroutedThroughOpenRouter =
     resolvedProvider === "openrouter" || resolvedProvider === "nous";
   const providerMismatch =
@@ -4470,7 +4510,7 @@ function validateDedicatedProviderSelect(
       kind: "http_error",
       message:
         `Hermes routed this model through ${resolvedLabel} instead of ${expectedProviderKey}. ` +
-        "Telegram /model can disambiguate providers; the HTTP session model API needs both `model`, `provider`, and `scope: session`. " +
+        "Telegram /model can disambiguate providers; this HTTP session model route did not verify that provider path. " +
         "Verify the provider API key and endpoint in Hermes (`hermes model`) and config.yaml."
     };
   }

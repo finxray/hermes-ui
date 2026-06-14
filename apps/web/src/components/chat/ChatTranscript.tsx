@@ -2,9 +2,10 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AgentActivityBlock } from "@/components/chat/AgentActivityBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MessageBubble } from "@/components/chat/MessageBubble";
+import { restoreActivityEventFromPersisted } from "@/lib/persistedActivityReplay";
 import { resolveStreamStatusLabel } from "@/lib/streamStatus";
 import type { LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
-import type { Project, Session } from "@/data/types";
+import type { Project, RunRecord, Session } from "@/data/types";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
@@ -54,13 +55,30 @@ export function ChatTranscript({
   const [revealedAssistantMessageId, setRevealedAssistantMessageId] = useState<string | null>(null);
   const lastMessage = activeSession?.messages.at(-1);
   const messageCount = activeSession?.messages.length ?? 0;
-  const activityAnchorMessage = activeSession
-    ? [...activeSession.messages].reverse().find((message) => message.role === "assistant")
-    : undefined;
+  const activityAnchorRun = activeSession
+    ? resolveActivityAnchorRun({
+        activityEvents,
+        generationStartedAt,
+        isGenerating,
+        liveTokenUsage,
+        session: activeSession
+      })
+    : null;
+  const activityAnchorMessage = activityAnchorRun?.assistantMessageId && activeSession
+    ? activeSession.messages.find((message) => message.id === activityAnchorRun.assistantMessageId)
+    : activeSession && !activeSession.runRecords.length
+      ? [...activeSession.messages].reverse().find((message) => message.role === "assistant")
+      : undefined;
   const activityAnchorMessageId = activityAnchorMessage?.id;
-  const assistantRevealComplete =
-    !activityAnchorMessage?.content || revealedAssistantMessageId === activityAnchorMessageId;
+  const activityBlockEvents = activityAnchorRun
+    ? activityEventsForRun(activityAnchorRun, activityEvents)
+    : activityEvents;
+  const activityBlockLegacyEvents = activityAnchorRun ? [] : activeSession?.toolEvents ?? [];
   const activityIsWorking = isGenerating && !isFinalizingResponse;
+  const assistantRevealComplete =
+    !activityAnchorMessage?.content ||
+    !activityIsWorking ||
+    revealedAssistantMessageId === activityAnchorMessageId;
   const isStreamingAssistant =
     lastMessage?.role === "assistant" && lastMessage.status === "streaming";
   const streamStatusLabel =
@@ -69,19 +87,19 @@ export function ChatTranscript({
     ? shouldShowAgentActivityBlock({
         activityDelayElapsed,
         assistantContent: activityAnchorMessage?.content ?? "",
-        events: activityEvents,
+        events: activityBlockEvents,
         isGenerating: activityIsWorking,
-        legacyEventCount: activeSession.toolEvents.length,
+        legacyEventCount: activityBlockLegacyEvents.length,
         liveTokenUsage
       })
     : false;
-  const activitySignal = `${shouldShowActivityBlock ? "visible" : "hidden"}:${activityEvents.length}:${activeSession?.toolEvents.length ?? 0}`;
+  const activitySignal = `${activityAnchorRun?.id ?? "legacy"}:${shouldShowActivityBlock ? "visible" : "hidden"}:${activityBlockEvents.length}:${activityBlockLegacyEvents.length}`;
   const activityBlock = activeSession && shouldShowActivityBlock ? (
     <AgentActivityBlock
       autoCollapseCompletedWork={!activityIsWorking && assistantRevealComplete}
-      events={activityEvents}
+      events={activityBlockEvents}
       isWorking={activityIsWorking}
-      legacyEvents={activeSession.toolEvents}
+      legacyEvents={activityBlockLegacyEvents}
       liveTokenUsage={liveTokenUsage}
       onCompletedWorkAutoCollapse={handleCompletedWorkAutoCollapse}
       startedAt={generationStartedAt}
@@ -435,6 +453,87 @@ export function ChatTranscript({
       </div>
     </div>
   );
+}
+
+function resolveActivityAnchorRun({
+  activityEvents,
+  generationStartedAt,
+  isGenerating,
+  liveTokenUsage,
+  session
+}: {
+  activityEvents: AgentActivityEvent[];
+  generationStartedAt: string | null;
+  isGenerating: boolean;
+  liveTokenUsage: LiveTokenUsageSnapshot | null;
+  session: Session;
+}) {
+  if (isGenerating) {
+    const runningRun = findCurrentRun(session, generationStartedAt);
+    if (runningRun) {
+      return runningRun;
+    }
+  }
+
+  const liveEventIds = new Set(activityEvents.map((event) => event.id));
+  const hasLiveTokenUsage =
+    typeof liveTokenUsage?.promptTokens === "number" ||
+    typeof liveTokenUsage?.completionTokens === "number";
+
+  for (const run of [...session.runRecords].reverse()) {
+    if (!run.assistantMessageId || !session.messages.some((message) => message.id === run.assistantMessageId)) {
+      continue;
+    }
+    if (hasRunDisplayActivity(run, liveEventIds) || (run.status === "running" && hasLiveTokenUsage)) {
+      return run;
+    }
+  }
+
+  return null;
+}
+
+function findCurrentRun(session: Session, generationStartedAt: string | null) {
+  const runningRun = [...session.runRecords].reverse().find((run) => run.status === "running");
+  if (runningRun) {
+    return runningRun;
+  }
+
+  if (!generationStartedAt) {
+    return null;
+  }
+
+  return [...session.runRecords].reverse().find((run) => run.startedAt === generationStartedAt) ?? null;
+}
+
+function hasRunDisplayActivity(run: RunRecord, liveEventIds: Set<string>) {
+  return (
+    run.activityReplay.length > 0 ||
+    run.activityEventIds.some((eventId) => liveEventIds.has(eventId))
+  );
+}
+
+function activityEventsForRun(run: RunRecord, liveEvents: AgentActivityEvent[]) {
+  const liveById = new Map(liveEvents.map((event) => [event.id, event]));
+  const replayIds = new Set<string>();
+  const replayEvents = run.activityReplay.map((event) => {
+    replayIds.add(event.id);
+    return liveById.get(event.id) ?? restoreActivityEventFromPersisted(event);
+  });
+
+  const replayOrLiveEvents = replayEvents.length > 0
+    ? replayEvents
+    : run.activityEventIds
+        .map((eventId) => liveById.get(eventId))
+        .filter((event): event is AgentActivityEvent => Boolean(event));
+
+  const liveOnlyEvents = run.activityEventIds
+    .filter((eventId) => !replayIds.has(eventId))
+    .map((eventId) => liveById.get(eventId))
+    .filter((event): event is AgentActivityEvent => Boolean(event));
+
+  return replayEvents.length > 0
+    ? [...replayOrLiveEvents, ...liveOnlyEvents]
+    : replayOrLiveEvents;
 }
 
 function shouldShowAgentActivityBlock({

@@ -116,6 +116,20 @@ export function redactPersistedActivityEvent(
   return redactValue(event) as PersistedActivityEvent;
 }
 
+// Event types that carry the actual story of a run and must survive the per-run
+// cap. Lower-value bookkeeping (stream/status markers) is dropped first so a run
+// with many command/progress frames never evicts its early reasoning or
+// commands — which previously made reasoning vanish or reorder after a reload.
+const HIGH_VALUE_PERSISTED_TYPES: ReadonlySet<PersistedActivityEvent["type"]> = new Set([
+  "reasoning",
+  "command",
+  "tool",
+  "memory",
+  "approval",
+  "error",
+  "elapsed"
+]);
+
 export function limitPersistedActivityEvents(
   events: PersistedActivityEvent[],
   maxPerRun = MAX_PERSISTED_ACTIVITY_EVENTS_PER_RUN
@@ -125,7 +139,27 @@ export function limitPersistedActivityEvents(
   for (const event of events) {
     deduped.set(event.id, event);
   }
-  return Array.from(deduped.values()).slice(-limit);
+  const ordered = Array.from(deduped.values());
+  if (ordered.length <= limit) {
+    return ordered;
+  }
+
+  // Over the cap: keep every high-value event, then fill the remaining budget
+  // with the most recent low-value events, preserving chronological order.
+  const keep = new Set<PersistedActivityEvent>();
+  for (const event of ordered) {
+    if (HIGH_VALUE_PERSISTED_TYPES.has(event.type)) {
+      keep.add(event);
+    }
+  }
+  const lowValue = ordered.filter((event) => !keep.has(event));
+  const lowValueBudget = Math.max(0, limit - keep.size);
+  for (const event of lowValue.slice(-lowValueBudget)) {
+    keep.add(event);
+  }
+  // If high-value events alone exceed the cap, keep the most recent of them.
+  const kept = ordered.filter((event) => keep.has(event));
+  return kept.length > limit ? kept.slice(-limit) : kept;
 }
 
 export function restoreActivityEventFromPersisted(

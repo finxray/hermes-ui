@@ -125,6 +125,7 @@ async function dispatchUiStreamEvents(
 
   let eventsSincePaint = 0;
   let textSincePaint = false;
+  let usageSincePaint = false;
   let batchStartedAt = nowMs();
 
   for (const event of events) {
@@ -139,6 +140,7 @@ async function dispatchUiStreamEvents(
       }
       eventsSincePaint = 0;
       textSincePaint = false;
+      usageSincePaint = false;
       batchStartedAt = nowMs();
     }
 
@@ -148,16 +150,31 @@ async function dispatchUiStreamEvents(
     if (event.type === "message_delta") {
       textSincePaint = true;
     }
+    if (streamEventHasTokenUsage(event)) {
+      usageSincePaint = true;
+    }
 
     const usedBudget = nowMs() - batchStartedAt >= MAX_STREAM_DISPATCH_BUDGET_MS;
     const usedFrameQuota = eventsSincePaint >= MAX_STREAM_EVENTS_PER_FRAME;
-    if (textSincePaint && (usedBudget || usedFrameQuota)) {
+    if (usageSincePaint || (textSincePaint && (usedBudget || usedFrameQuota))) {
       await waitForNextPaint();
       eventsSincePaint = 0;
       textSincePaint = false;
+      usageSincePaint = false;
       batchStartedAt = nowMs();
     }
   }
+}
+
+function streamEventHasTokenUsage(event: HermesChatStreamEvent) {
+  if (event.type !== "message_done" && event.type !== "metadata") {
+    return false;
+  }
+  const usage = event.usage;
+  return (
+    Boolean(usage) &&
+    (typeof usage?.promptTokens === "number" || typeof usage?.completionTokens === "number")
+  );
 }
 
 function waitForNextPaint() {

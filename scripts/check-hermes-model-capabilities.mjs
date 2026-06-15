@@ -569,6 +569,18 @@ check(
   "Refreshing the page must restore the last verified model selected in Composer, while failed selections must not poison session preference."
 );
 check(
+  "useHermesSessionModel reapplies saved preference after Hermes reconnects",
+  Boolean(
+    sessionModelHookFile?.includes("needsReconnectRefresh") &&
+      sessionModelHookFile?.includes('currentSnapshot.syncStatus === "unavailable"') &&
+      sessionModelHookFile?.includes('currentSnapshot.syncStatus === "fallback"') &&
+      sessionModelHookFile?.includes('currentSnapshot.syncStatus === "error"') &&
+      sessionModelHookFile?.includes("hermesStatus?.reachable") &&
+      sessionModelHookFile?.includes("appliedPreferenceKeyRef.current === preferenceKey && !needsReconnectRefresh")
+  ),
+  "Composer should not stay on Hermes unavailable after the status hook observes a reconnect."
+);
+check(
   "useHermesSessionModel refresh reapplies persisted Composer selection through verification",
   Boolean(
     sessionModelHookFile?.includes("const refreshModel = useCallback") &&

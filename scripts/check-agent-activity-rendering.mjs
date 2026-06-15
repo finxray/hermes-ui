@@ -20,6 +20,7 @@ const streamStatusPath = resolve(root, "apps/web/src/lib/streamStatus.ts");
 const appShellPath = resolve(root, "apps/web/src/components/shell/AppShell.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
 const tokenUsageAggregatorPath = resolve(root, "apps/web/src/lib/tokenUsageAggregator.ts");
+const hermesChatClientPath = resolve(root, "apps/web/src/lib/hermesChatClient.ts");
 const hermesClientPackagePath = resolve(root, "packages/hermes-client/src/index.ts");
 const replayHelperPath = resolve(root, "apps/web/src/lib/persistedActivityReplay.ts");
 const memoryTimelinePath = resolve(root, "apps/web/src/lib/memoryTimeline.ts");
@@ -66,6 +67,7 @@ function checkComponentSource() {
   const persistedReplay = readFileSync(replayHelperPath, "utf8");
   const css = readFileSync(cssPath, "utf8");
   const agentActivity = readFileSync(helperPath, "utf8");
+  const hermesChatClient = readFileSync(hermesChatClientPath, "utf8");
   const hermesClientPackage = readFileSync(hermesClientPackagePath, "utf8");
 
   record(
@@ -130,7 +132,7 @@ function checkComponentSource() {
       !chatTranscript.includes("FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS") &&
       !chatView.includes("FINAL_ACTIVITY_PREFOLD_MS") &&
       chatView.includes("completePendingAssistantMessage") &&
-      css.includes("grid-template-rows 1400ms") &&
+      css.includes("grid-template-rows 700ms") &&
       css.includes("cubic-bezier(0.42, 0, 0.2, 1)") &&
       css.includes("ease-in-out") &&
       chatTranscript.includes("startActivityCollapseAnchorLock(COMPLETED_WORK_ANCHOR_LOCK_MS)") &&
@@ -239,6 +241,14 @@ function checkComponentSource() {
     "Live token usage is visible in the activity strip and estimated output advances during thinking/tool activity until authoritative usage arrives."
   );
   record(
+    "live-token-usage-frames-paint",
+    hermesChatClient.includes("streamEventHasTokenUsage") &&
+      hermesChatClient.includes("usageSincePaint") &&
+      hermesChatClient.includes("typeof usage?.promptTokens === \"number\"") &&
+      hermesChatClient.includes("await waitForNextPaint()"),
+    "Usage-only stream frames yield to paint so authoritative prompt/input tokens update live instead of waiting for final text or completion."
+  );
+  record(
     "token-usage-summed-across-requests",
     chatView.includes("createTokenUsageAccumulator") &&
       chatView.includes("usageAccumulator.add(normalized)") &&
@@ -254,14 +264,17 @@ function checkComponentSource() {
     "The live Working block keeps token/header state while rendering bounded Codex-like progress blocks."
   );
   record(
-    "public-reasoning-summary-events",
+    "reasoning-text-events",
     agentActivity.includes("isPublicReasoningEventType") &&
       agentActivity.includes("public_reasoning_summary") &&
+      agentActivity.includes("getRawReasoningText") &&
       agentActivity.includes("rawReasoningTextRendered: includesReasoningText") &&
       hermesClientPackage.includes("reasoning.summary.delta") &&
+      hermesClientPackage.includes("reasoning.delta") &&
+      hermesClientPackage.includes("rawReasoningTextFromEvent") &&
       hermesClientPackage.includes("publicReasoningSummaryFromSummaryEvent") &&
       hermesClientPackage.includes("pickStreamCorrelationFields"),
-    "Public reasoning-summary events are normalized into ordered Thinking blocks while raw reasoning remains omitted."
+    "Reasoning events (raw text and summaries) are normalized into ordered Thinking blocks."
   );
   record(
     "informative-live-command-labels",
@@ -455,7 +468,7 @@ async function checkHelperBehavior() {
   const runsReasoning = activity.createActivityEventFromHermesRunsEvent({
     event: "reasoning.available",
     run_id: "run-render-runs",
-    text: "do not render reasoning text"
+    text: "render this reasoning text"
   }, { id: "render-runs-reasoning" });
   const serializedReasoning = JSON.stringify(runsReasoning);
 
@@ -464,10 +477,10 @@ async function checkHelperBehavior() {
     runsDelta === null &&
       runsReasoning.type === "reasoning" &&
       runsReasoning.title === "Thinking" &&
-      runsReasoning.summary === "Hermes emitted a reasoning progress signal. Private reasoning text is not rendered." &&
-      runsReasoning.details.text === "[omitted: reasoning text not rendered]" &&
-      !serializedReasoning.includes("do not render reasoning text"),
-    "Runs event helper suppresses message deltas and renders reasoning progress as a safe public signal."
+      runsReasoning.summary === "render this reasoning text" &&
+      runsReasoning.details.text === "render this reasoning text" &&
+      serializedReasoning.includes("render this reasoning text"),
+    "Runs event helper suppresses message deltas and renders reasoning text into a Thinking block."
   );
 
   const command = activity.createActivityEventFromHermesToolEvent({

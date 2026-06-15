@@ -2403,6 +2403,23 @@ function normalizeOpenAiCompatibleStreamEvent(
     return { type: "message_delta", delta, messageId, runId };
   }
 
+  // Providers such as DeepSeek stream chain-of-thought in a separate
+  // `reasoning_content` (or `reasoning`) delta field before the answer text.
+  const reasoningDelta = asString(firstDelta?.reasoning_content) || asString(firstDelta?.reasoning);
+  if (reasoningDelta) {
+    return {
+      type: "run_event",
+      name: "reasoning.delta",
+      status: "running",
+      payload: {
+        ...pickStreamCorrelationFields(data, messageId, runId),
+        event: "reasoning.delta",
+        source_event: "message",
+        reasoning_text: reasoningDelta
+      }
+    };
+  }
+
   const content =
     asString(firstMessage?.content) ||
     asString(data.content) ||
@@ -2465,16 +2482,56 @@ function normalizeReasoningSignalStreamEvent(
   if (!isRawReasoningEventName(eventName)) {
     return null;
   }
+  const text = rawReasoningTextFromEvent(data);
+  const isDone = normalizeName(eventName).includes("done");
+  // No readable reasoning text in this frame: keep the bare progress signal so
+  // the UI can still show that the model is thinking.
+  if (!text) {
+    return {
+      type: "run_event",
+      name: "reasoning.available",
+      status: "info",
+      payload: {
+        ...pickStreamCorrelationFields(data, messageId, runId),
+        event: "reasoning.available",
+        source_event: eventName
+      }
+    };
+  }
+  // Surface the raw reasoning text as an ordered reasoning delta/done so the UI
+  // can accumulate it into a "Thinking" block alongside summaries.
   return {
     type: "run_event",
-    name: "reasoning.available",
-    status: "info",
+    name: isDone ? "reasoning.done" : "reasoning.delta",
+    status: isDone ? "info" : "running",
     payload: {
       ...pickStreamCorrelationFields(data, messageId, runId),
-      event: "reasoning.available",
-      source_event: eventName
+      event: isDone ? "reasoning.done" : "reasoning.delta",
+      source_event: eventName,
+      reasoning_text: text
     }
   };
+}
+
+function rawReasoningTextFromEvent(data: Record<string, unknown>): string {
+  const part = objectRecord(data.part);
+  const delta = objectRecord(data.delta);
+  return firstString(
+    data.reasoning_text,
+    data.reasoningText,
+    data.reasoning,
+    data.reasoning_content,
+    data.reasoningContent,
+    data.delta,
+    data.text,
+    data.content,
+    part?.text,
+    part?.content,
+    delta?.reasoning_content,
+    delta?.reasoning,
+    delta?.text,
+    delta?.content
+  );
 }
 
 function isReasoningSummaryEventName(eventName: string) {

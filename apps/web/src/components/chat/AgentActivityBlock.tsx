@@ -266,12 +266,27 @@ function ReasoningChunk({
     );
   }
 
+  // Once reasoning text is being surfaced, the text itself communicates the
+  // activity — drop the "Thinking" header and render only the reasoning prose.
+  // "Thinking" is reserved for the bare signal (model is thinking, no text yet).
+  if (event.type === "reasoning" && hasRenderedReasoningText(event) && showDetail) {
+    return (
+      <div className={styles.reasoningChunk}>
+        <p className={styles.reasoningLine}>{detail}</p>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.reasoningChunk}>
       <p className={styles.reasoningTitle}>{title}</p>
       {showDetail ? <p className={styles.reasoningLine}>{detail}</p> : null}
     </div>
   );
+}
+
+function hasRenderedReasoningText(event: AgentActivityEvent) {
+  return event.metadata?.rawReasoningTextRendered === true && Boolean(pickMeaningfulActivityText(event.summary));
 }
 
 function CommandGroupRow({
@@ -310,7 +325,7 @@ function CommandGroupRow({
     >
       <div className={styles.expandedBody}>
         {count === 1 ? (
-          <CommandDetail item={commandItems[0]} />
+          <CommandDetail allowActiveState={allowActiveState} item={commandItems[0]} />
         ) : (
           <div className={styles.commandItems}>
             {commandItems.map((item) => (
@@ -343,7 +358,7 @@ function CommandItemRow({
       }
     >
       <div className={styles.commandItemDetail}>
-        <CommandDetail item={item} />
+        <CommandDetail allowActiveState={allowActiveState} item={item} />
       </div>
     </AnimatedDisclosure>
   );
@@ -416,10 +431,10 @@ function AnimatedDisclosure({
   );
 }
 
-function CommandDetail({ item }: { item: CommandItem }) {
+function CommandDetail({ allowActiveState = false, item }: { allowActiveState?: boolean; item: CommandItem }) {
   const detail = commandDetailData(item);
   const preview = commandDetailPreview(detail);
-  const status = commandDetailStatus(item);
+  const status = commandDetailStatus(item, allowActiveState);
 
   return (
     <div className={styles.commandDetailPanel}>
@@ -607,17 +622,22 @@ function commandDetailPreview(detail: ReturnType<typeof commandDetailData>) {
   return lines.join("\n");
 }
 
-function commandDetailStatus(item: CommandItem) {
+function commandDetailStatus(item: CommandItem, allowActiveState = false) {
   const events = [item.event, ...item.relatedEvents];
   const exitCode = events.map((event) => extractCommandDetails(event)?.exitCode).find(finiteNumber);
   if (events.some((event) => event.status === "failed") || (typeof exitCode === "number" && exitCode !== 0)) {
     return { kind: "failed", label: typeof exitCode === "number" ? `exit ${exitCode}` : "Failed" };
   }
-  if (events.some((event) => event.status === "running")) {
-    return { kind: "running", label: "Running" };
-  }
   if (events.some((event) => event.status === "completed") || typeof exitCode === "number") {
     return { kind: "completed", label: "Success" };
+  }
+  // A still-"running" command only reads as Running while the run is live. Once
+  // the run is over (completed block), the command finished — never leave a
+  // stale "Running" badge; show success since there was no failure evidence.
+  if (events.some((event) => event.status === "running")) {
+    return allowActiveState
+      ? { kind: "running", label: "Running" }
+      : { kind: "completed", label: "Success" };
   }
   return null;
 }
@@ -876,9 +896,12 @@ function buildTimelineItems(events: AgentActivityEvent[], fallbackDetails: Agent
       continue;
     }
     flushCommands();
-    const title = titleForReasoningChunk(event);
-    const lastNote = [...items].reverse().find((item): item is Extract<ActivityTimelineItem, { kind: "note" }> => item.kind === "note");
-    if (lastNote && isSameActivityLabel(titleForReasoningChunk(lastNote.event), title)) {
+    // Only collapse a note when it duplicates the note immediately before it
+    // (same title AND body). A reasoning note must not be dropped just because
+    // an earlier "Thinking" block — possibly separated by a command — shared the
+    // same title; distinct reasoning segments carry distinct text.
+    const previous = items[items.length - 1];
+    if (previous && previous.kind === "note" && isDuplicateNoteEvent(previous.event, event)) {
       continue;
     }
     items.push({
@@ -895,9 +918,8 @@ function buildTimelineItems(events: AgentActivityEvent[], fallbackDetails: Agent
 
   const fallbackItems: ActivityTimelineItem[] = [];
   for (const event of fallbackDetails) {
-    const title = titleForReasoningChunk(event);
-    const lastNote = [...fallbackItems].reverse().find((item): item is Extract<ActivityTimelineItem, { kind: "note" }> => item.kind === "note");
-    if (lastNote && isSameActivityLabel(titleForReasoningChunk(lastNote.event), title)) {
+    const previous = fallbackItems[fallbackItems.length - 1];
+    if (previous && previous.kind === "note" && isDuplicateNoteEvent(previous.event, event)) {
       continue;
     }
     fallbackItems.push({
@@ -907,6 +929,15 @@ function buildTimelineItems(events: AgentActivityEvent[], fallbackDetails: Agent
     });
   }
   return fallbackItems;
+}
+
+function isDuplicateNoteEvent(left: AgentActivityEvent, right: AgentActivityEvent) {
+  if (!isSameActivityLabel(titleForReasoningChunk(left), titleForReasoningChunk(right))) {
+    return false;
+  }
+  const leftDetail = summarizeWorkedDetail(left) ?? "";
+  const rightDetail = summarizeWorkedDetail(right) ?? "";
+  return isSameActivityLabel(leftDetail, rightDetail);
 }
 
 function isCommandLikeEvent(event: AgentActivityEvent) {

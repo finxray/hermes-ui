@@ -35,7 +35,7 @@ checkCommandSourceChannel();
 checkArtifactPayload();
 checkRunEvent();
 checkRunsMessageDeltaIgnored();
-checkRunsReasoningSafe();
+checkRunsReasoningRendered();
 checkRunsCompletedStatus();
 checkRunsStoppedStatus();
 checkRunsInterruptedStatus();
@@ -327,30 +327,23 @@ function checkRunsMessageDeltaIgnored() {
   );
 }
 
-function checkRunsReasoningSafe() {
+function checkRunsReasoningRendered() {
   const event = activity.createActivityEventFromHermesRunsEvent({
     event: "reasoning.available",
     run_id: "run-runs-reasoning",
-    text: "private reasoning should not render",
-    nested: {
-      reasoning: "nested reasoning should not render"
-    },
+    text: "the model is tracing the token path",
     timestamp: "2026-05-31T00:00:00.000Z"
-  }, { id: "runs-reasoning-safe" });
-  const serialized = JSON.stringify(event);
+  }, { id: "runs-reasoning-rendered" });
 
   record(
-    "runs-reasoning-safe",
+    "runs-reasoning-rendered",
     event.type === "reasoning" &&
-      event.status === "info" &&
       event.title === "Thinking" &&
-      event.summary.includes("Private reasoning text is not rendered") &&
-      event.details.text === "[omitted: reasoning text not rendered]" &&
-      event.details.nested.reasoning === "[omitted: reasoning text not rendered]" &&
+      event.summary === "the model is tracing the token path" &&
+      event.details.text === "the model is tracing the token path" &&
       event.hermes?.eventType === "reasoning.available" &&
-      event.metadata?.rawReasoningTextRendered === false &&
-      !serialized.includes("private reasoning should not render"),
-    "Runs reasoning.available maps to a safe public signal without rendering raw reasoning text."
+      event.metadata?.rawReasoningTextRendered === true,
+    "Runs reasoning events render the reasoning text into a Thinking block."
   );
 }
 

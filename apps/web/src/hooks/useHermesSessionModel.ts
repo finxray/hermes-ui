@@ -356,12 +356,23 @@ export function useHermesSessionModel({
     }
 
     const preferenceKey = modelPreferenceKey(activeSession.id, preference);
-    if (appliedPreferenceKeyRef.current === preferenceKey) {
+    const currentSnapshot = snapshotRef.current;
+    const sameSession =
+      currentSnapshot.localSessionId === activeSession.id &&
+      currentSnapshot.hermesSessionId === resolveHermesSessionId(activeSession);
+    const needsReconnectRefresh =
+      hermesStatus?.mode === "real" &&
+      hermesStatus.reachable &&
+      (!sameSession ||
+        currentSnapshot.syncStatus === "unavailable" ||
+        currentSnapshot.syncStatus === "fallback" ||
+        currentSnapshot.syncStatus === "error");
+    if (appliedPreferenceKeyRef.current === preferenceKey && !needsReconnectRefresh) {
       return;
     }
 
     void applySessionModelSelection(selectRequest, false);
-  }, [activeSession, applySessionModelSelection, baseModelState, loadSessionModel]);
+  }, [activeSession, applySessionModelSelection, baseModelState, hermesStatus?.mode, hermesStatus?.reachable, loadSessionModel]);
 
   const selectModel = useCallback(
     async (modelId: string) => {

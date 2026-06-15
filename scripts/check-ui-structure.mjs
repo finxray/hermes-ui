@@ -2483,7 +2483,7 @@ for (const token of [
   "eventType === \"message.delta\"",
   "eventType === \"reasoning.available\"",
   "title: \"Thinking\"",
-  "[omitted: reasoning text not rendered]",
+  "getRawReasoningText",
   "titleFromHermesRunsEvent",
   "hermesRunsToolStatus"
 ]) {

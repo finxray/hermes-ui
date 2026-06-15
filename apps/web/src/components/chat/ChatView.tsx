@@ -37,6 +37,9 @@ import styles from "./ChatView.module.css";
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ActivityRecorder = (sessionId: string, event: AgentActivityEvent) => void;
 const STREAM_FLUSH_INTERVAL_MS = 32;
+// Reasoning can stream token-by-token; throttle store writes for the growing
+// "Thinking" block while always persisting the final text when it closes.
+const REASONING_FLUSH_INTERVAL_MS = 120;
 const ESTIMATED_CHARS_PER_TOKEN = 4;
 const ESTIMATED_ACTIVITY_CHARS_PER_TOKEN = 6;
 const ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND = 2.5;
@@ -206,6 +209,17 @@ export function ChatView({
     let estimatedActivityChars = 0;
     let accumulated = "";
     let streamCompletedSuccessfully = false;
+    // Reasoning arrives as many small deltas. Accumulate each contiguous run of
+    // reasoning into one "Thinking" block under a stable segment id so the
+    // timeline shows coherent paragraphs (command -> reasoning -> command)
+    // instead of one row per token. A non-reasoning event closes the segment.
+    let reasoningSegmentId: string | null = null;
+    let reasoningSegmentText = "";
+    let reasoningSegmentStartedAt: string | null = null;
+    let reasoningSegmentEvent: AgentActivityEvent | null = null;
+    let reasoningSegmentSeq = 0;
+    let reasoningSegmentRecordedText = "";
+    let lastReasoningFlushMs = 0;
     const liveEstimateStartedAtMs = performance.now();
 
     const nextActivitySequence = () => activitySequenceRef.current++;
@@ -353,6 +367,96 @@ export function ChatView({
         activitySummary: runSummary,
         hermesRunId
       });
+    };
+
+    const flushReasoningSegment = (status: "running" | "completed", completedAt?: string) => {
+      if (!reasoningSegmentEvent) {
+        return;
+      }
+      // A "running" flush is only worth a store write when the text actually
+      // grew; a "completed" flush always records so the final text is persisted.
+      if (status === "running" && reasoningSegmentText === reasoningSegmentRecordedText) {
+        return;
+      }
+      const flushed: AgentActivityEvent = {
+        ...reasoningSegmentEvent,
+        status,
+        summary: reasoningSegmentText || reasoningSegmentEvent.summary,
+        completedAt: status === "completed" ? completedAt ?? new Date().toISOString() : undefined
+      };
+      reasoningSegmentEvent = flushed;
+      reasoningSegmentRecordedText = reasoningSegmentText;
+      lastReasoningFlushMs = performance.now();
+      recordRunActivity(session.id, flushed);
+      workspaceActions.appendToolEvent(session.id, toToolEvent(flushed));
+    };
+
+    const closeReasoningSegment = () => {
+      if (reasoningSegmentEvent && reasoningSegmentEvent.status === "running") {
+        flushReasoningSegment("completed");
+      }
+      reasoningSegmentId = null;
+      reasoningSegmentText = "";
+      reasoningSegmentRecordedText = "";
+      reasoningSegmentStartedAt = null;
+      reasoningSegmentEvent = null;
+      reasoningSegmentSeq += 1;
+    };
+
+    const handleReasoningStreamEvent = (eventName: string, base: AgentActivityEvent) => {
+      const isDone = eventName === "reasoning.done" || eventName === "reasoning.summary.done";
+      const hasText = base.metadata?.rawReasoningTextRendered === true;
+      const deltaText = hasText ? (base.summary ?? "") : "";
+      const now = new Date().toISOString();
+
+      // A bare progress signal (no text) only matters when no segment is open:
+      // record it so the live status can show "Thinking" without forcing a block.
+      if (!deltaText && !reasoningSegmentId) {
+        addActivityTokenEstimate(base);
+        recordRunActivity(session.id, base);
+        workspaceActions.appendToolEvent(session.id, toToolEvent(base));
+        return;
+      }
+
+      if (!reasoningSegmentId) {
+        reasoningSegmentId = `reasoning-${runRecordId}-${reasoningSegmentSeq}`;
+        reasoningSegmentText = "";
+        reasoningSegmentRecordedText = "";
+        reasoningSegmentStartedAt = now;
+        lastReasoningFlushMs = 0;
+      }
+      if (isDone) {
+        // Some providers send the full text in the *.done frame; keep the longer.
+        if (deltaText.length > reasoningSegmentText.length) {
+          reasoningSegmentText = deltaText;
+        }
+      } else if (deltaText) {
+        reasoningSegmentText += deltaText;
+      }
+
+      // Keep the in-memory segment current every delta; the live token estimate
+      // tracks the growing text, but persist to the store on a throttle (and
+      // always on the closing frame) to avoid a store write per reasoning token.
+      reasoningSegmentEvent = {
+        ...base,
+        id: reasoningSegmentId,
+        type: "reasoning",
+        title: "Thinking",
+        status: "running",
+        summary: reasoningSegmentText || base.summary,
+        startedAt: reasoningSegmentStartedAt ?? base.startedAt,
+        completedAt: undefined
+      };
+      estimatedActivityChars += Math.min(deltaText.length, 900);
+
+      if (isDone) {
+        flushReasoningSegment("completed", now);
+        closeReasoningSegment();
+        return;
+      }
+      if (performance.now() - lastReasoningFlushMs >= REASONING_FLUSH_INTERVAL_MS) {
+        flushReasoningSegment("running");
+      }
     };
 
     workspaceActions.appendMessage(session.id, userMessage);
@@ -579,10 +683,13 @@ export function ChatView({
           if (event.type === "message_delta") {
             accumulated += event.delta;
             if (event.delta.trim()) {
+              // Real answer text ends the current reasoning segment.
+              closeReasoningSegment();
               markAssistantHasContent();
             }
             flush("streaming");
           } else if (event.type === "message_done") {
+            closeReasoningSegment();
             completedAssistant = true;
             accumulated = event.message.content || accumulated;
             hermesRunId = event.runId || hermesRunId;
@@ -609,11 +716,19 @@ export function ChatView({
               sequence: nextActivitySequence()
             });
             if (activityEvent) {
-              addActivityTokenEstimate(activityEvent);
-              recordRunActivity(session.id, activityEvent);
-              workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
+              if (event.type === "run_event" && isReasoningRunEventName(event.name)) {
+                handleReasoningStreamEvent(event.name, activityEvent);
+              } else {
+                // Any other activity ends the current reasoning segment, giving
+                // the command -> reasoning -> command ordering of the timeline.
+                closeReasoningSegment();
+                addActivityTokenEstimate(activityEvent);
+                recordRunActivity(session.id, activityEvent);
+                workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
+              }
             }
           } else if (event.type === "error") {
+            closeReasoningSegment();
             hadStreamError = true;
             cancelPendingFlush();
             accumulated = event.error.message;
@@ -941,6 +1056,15 @@ export function ChatView({
 
 function resolveHermesSessionId(session: Session): string {
   return session.hermesSessionId || `hermes-${session.id}`;
+}
+
+function isReasoningRunEventName(name: string): boolean {
+  return (
+    name === "reasoning.delta" ||
+    name === "reasoning.done" ||
+    name === "reasoning.available" ||
+    name.startsWith("reasoning.summary.")
+  );
 }
 
 function assistantSafeId(value: string) {

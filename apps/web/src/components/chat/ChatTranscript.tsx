@@ -11,7 +11,7 @@ import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
 const ACTIVITY_REVEAL_DELAY_MS = 5_000;
-const COMPLETED_WORK_ANCHOR_LOCK_MS = 1_700;
+const COMPLETED_WORK_ANCHOR_LOCK_MS = 900;
 
 type ChatTranscriptProps = {
   activeProject: Project;
@@ -628,26 +628,40 @@ function hasRunDisplayActivity(run: RunRecord, liveEventIds: Set<string>) {
 
 function activityEventsForRun(run: RunRecord, liveEvents: AgentActivityEvent[]) {
   const liveById = new Map(liveEvents.map((event) => [event.id, event]));
-  const replayIds = new Set<string>();
-  const replayEvents = run.activityReplay.map((event) => {
-    replayIds.add(event.id);
-    return liveById.get(event.id) ?? restoreActivityEventFromPersisted(event);
-  });
+  const replayById = new Map(
+    (run.activityReplay ?? []).map((event) => [event.id, restoreActivityEventFromPersisted(event)] as const)
+  );
 
-  const replayOrLiveEvents = replayEvents.length > 0
-    ? replayEvents
-    : run.activityEventIds
-        .map((eventId) => liveById.get(eventId))
-        .filter((event): event is AgentActivityEvent => Boolean(event));
+  // Drive ordering from activityEventIds, which is the chronological id list.
+  // Prefer the richer live event, fall back to the persisted replay. This keeps
+  // reasoning interleaved exactly where it occurred (command -> reasoning ->
+  // command) instead of appending replay/live leftovers after the commands.
+  const orderedIds =
+    run.activityEventIds && run.activityEventIds.length > 0
+      ? run.activityEventIds
+      : (run.activityReplay ?? []).map((event) => event.id);
 
-  const liveOnlyEvents = run.activityEventIds
-    .filter((eventId) => !replayIds.has(eventId))
-    .map((eventId) => liveById.get(eventId))
-    .filter((event): event is AgentActivityEvent => Boolean(event));
+  const seen = new Set<string>();
+  const events: AgentActivityEvent[] = [];
+  for (const id of orderedIds) {
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    const event = liveById.get(id) ?? replayById.get(id);
+    if (event) {
+      events.push(event);
+    }
+  }
 
-  const events = replayEvents.length > 0
-    ? [...replayOrLiveEvents, ...liveOnlyEvents]
-    : replayOrLiveEvents;
+  // Defensive: include any replay-only events whose ids fell out of the ordered
+  // list so persisted history never silently loses a row.
+  for (const [id, event] of replayById) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      events.push(event);
+    }
+  }
 
   if (!events.some((event) => event.type === "elapsed")) {
     const elapsed = makeRunElapsedActivityEvent(run);
@@ -750,14 +764,33 @@ function shouldShowAgentActivityBlock({
     return hasLiveTokenUsage || (activityDelayElapsed && (legacyEventCount > 1 || hasLiveActivity || hasSubstantialContent));
   }
 
-  if (legacyEventCount > 0 || events.some(isMeaningfulActivityEvent)) {
+  // Completed runs only keep a "Worked for…" summary when the turn actually did
+  // work: at least one command/tool/memory/approval/error, or a substantial
+  // chunk of reasoning text. A plain reply ("Hey!"), however long, gets no
+  // summary. Legacy fixture tool events still surface for design/mock paths.
+  if (legacyEventCount > 0) {
     return true;
   }
 
-  if (hasSubstantialContent && events.length > 0) {
+  return events.some(isWorthwhileActivityEvent);
+}
+
+const SIGNIFICANT_REASONING_MIN_CHARS = 80;
+
+function isWorthwhileActivityEvent(event: AgentActivityEvent) {
+  if (
+    event.type === "command" ||
+    event.command ||
+    event.type === "tool" ||
+    event.type === "memory" ||
+    event.type === "approval" ||
+    event.type === "error"
+  ) {
     return true;
   }
-
+  if (event.type === "reasoning") {
+    return (event.summary?.trim().length ?? 0) >= SIGNIFICANT_REASONING_MIN_CHARS;
+  }
   return false;
 }
 

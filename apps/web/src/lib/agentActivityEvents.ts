@@ -166,14 +166,14 @@ export function summarizeHermesRunsEvent(event: HermesRunsEvent): {
     return {
       activityEvent: true,
       eventType,
-      policy: "public signal only; reasoning text omitted"
+      policy: "reasoning progress signal; no text in this frame"
     };
   }
   if (isPublicReasoningEventType(eventType)) {
     return {
       activityEvent: true,
       eventType,
-      policy: "public reasoning summary only; raw reasoning text omitted"
+      policy: "reasoning text rendered (raw and summaries)"
     };
   }
   return {
@@ -670,10 +670,11 @@ function createReasoningActivityEvent(
   options: ActivityOptions
 ): AgentActivityEvent {
   const occurredAt = getPayloadTime(event) ?? options.now;
-  const publicSummary = getPublicReasoningSummary(event);
+  const reasoningText = getReasoningText(event);
+  const isStreamingDelta = eventType === "reasoning.delta" || eventType === "reasoning.summary.delta";
   const normalizedStatus = status === "completed" || status === "cancelled" || status === "failed"
     ? status
-    : publicSummary && eventType !== "reasoning.summary.done"
+    : reasoningText && isStreamingDelta
       ? "running"
       : "info";
 
@@ -682,19 +683,38 @@ function createReasoningActivityEvent(
     type: "reasoning",
     status: normalizedStatus,
     title: "Thinking",
-    summary: publicSummary || "Hermes emitted a reasoning progress signal. Private reasoning text is not rendered.",
+    summary: reasoningText || "Hermes emitted a reasoning progress signal.",
     startedAt: normalizedStatus === "running" ? occurredAt : undefined,
     completedAt: normalizedStatus === "info" || normalizedStatus === "completed" ? occurredAt : undefined,
     collapsedByDefault: true,
     details: redactHermesRunsActivityDetails(event, eventType),
     source: "hermes",
     hermes: getHermesRunsCorrelation(event, eventType),
-    metadata: getHermesRunsMetadata(event, eventType, false)
+    metadata: getHermesRunsMetadata(event, eventType, Boolean(reasoningText))
   };
 }
 
+function getReasoningText(event: HermesRunsEvent) {
+  return getPublicReasoningSummary(event) || getRawReasoningText(event);
+}
+
+function getRawReasoningText(payload: Record<string, unknown>) {
+  for (const key of ["reasoning_text", "reasoningText", "reasoning", "reasoning_content", "reasoningContent", "text", "content", "delta"]) {
+    const value = asString(payload[key]).trim();
+    if (value) {
+      return redactText(value);
+    }
+  }
+  return undefined;
+}
+
 function isPublicReasoningEventType(eventType: string) {
-  return eventType === "reasoning.available" || eventType.startsWith("reasoning.summary.");
+  return (
+    eventType === "reasoning.available" ||
+    eventType === "reasoning.delta" ||
+    eventType === "reasoning.done" ||
+    eventType.startsWith("reasoning.summary.")
+  );
 }
 
 function activityTypeForRunEvent(eventType: string, status: AgentActivityStatus): AgentActivityType {
@@ -840,32 +860,10 @@ function getRunDurationMs(event: HermesRunsEvent) {
 }
 
 function redactHermesRunsActivityDetails(event: HermesRunsEvent, eventType: string) {
-  const redacted = objectRecord(redactActivityDetails(event));
-  if (!redacted) {
-    return redacted;
-  }
-  if (!isPublicReasoningEventType(eventType)) {
-    return redacted;
-  }
-  return omitReasoningText(redacted);
-}
-
-function omitReasoningText(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(omitReasoningText);
-  }
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-  const result: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(value)) {
-    if (/^(text|content|delta|reasoning|reasoning_text|thoughts|chain_of_thought)$/i.test(key)) {
-      result[key] = "[omitted: reasoning text not rendered]";
-    } else {
-      result[key] = omitReasoningText(child);
-    }
-  }
-  return result;
+  // Reasoning text is intentionally surfaced (raw + summaries). Secrets are
+  // still scrubbed by redactActivityDetails; we no longer blank reasoning bodies.
+  void eventType;
+  return objectRecord(redactActivityDetails(event));
 }
 
 function titleFromEventType(eventType: string, type: AgentActivityType): string {

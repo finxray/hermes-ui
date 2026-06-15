@@ -83,10 +83,21 @@ export function AppShell() {
   }
 
   function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
-    setActivityEventsBySession((current) => ({
-      ...current,
-      [sessionId]: [...(current[sessionId] ?? []), event].slice(-80)
-    }));
+    setActivityEventsBySession((current) => {
+      const list = current[sessionId] ?? [];
+      // Upsert by id so a growing event (e.g. an accumulating reasoning block
+      // re-recorded under a stable segment id) replaces its prior version in
+      // place instead of appending a duplicate row.
+      const existingIndex = list.findIndex((existing) => existing.id === event.id);
+      const next =
+        existingIndex >= 0
+          ? [...list.slice(0, existingIndex), event, ...list.slice(existingIndex + 1)]
+          : [...list, event];
+      return {
+        ...current,
+        [sessionId]: next.slice(-80)
+      };
+    });
   }
 
   function startLeftResize(event: ReactPointerEvent<HTMLButtonElement>) {

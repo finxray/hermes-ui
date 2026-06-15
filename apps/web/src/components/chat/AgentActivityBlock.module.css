@@ -273,10 +273,13 @@
 }
 
 .workedBlock[data-type="completed-work"] .disclosureBody {
+  /* ~2x faster than before (was 1400ms). The transcript ResizeObserver
+     compensates scroll for the height removed during this fold, so the answer
+     text stays put while the block collapses. */
   transition:
-    grid-template-rows 1400ms cubic-bezier(0.42, 0, 0.2, 1),
-    opacity 1400ms ease-in-out,
-    clip-path 1400ms cubic-bezier(0.42, 0, 0.2, 1);
+    grid-template-rows 700ms cubic-bezier(0.42, 0, 0.2, 1),
+    opacity 560ms ease-in-out,
+    clip-path 700ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
 .disclosureInner {

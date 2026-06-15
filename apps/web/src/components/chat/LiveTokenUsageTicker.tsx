@@ -178,5 +178,22 @@ function useAnimatedNumber(target: number) {
 }
 
 function formatTokenCount(value: number) {
-  return new Intl.NumberFormat().format(Math.max(0, Math.round(value)));
+  const safe = Math.max(0, Math.round(value));
+  if (safe >= 1_000_000) {
+    return `${formatCompactTokenValue(safe / 1_000_000)}m`;
+  }
+  if (safe >= 1_000) {
+    return `${formatCompactTokenValue(safe / 1_000)}k`;
+  }
+  return new Intl.NumberFormat().format(safe);
+}
+
+function formatCompactTokenValue(value: number) {
+  if (value >= 100) {
+    return String(Math.round(value));
+  }
+  if (value >= 10) {
+    return value.toFixed(1).replace(/\.0$/, "");
+  }
+  return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1");
 }

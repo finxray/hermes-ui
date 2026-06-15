@@ -96,12 +96,17 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
   );
 
   const sections = useMemo(
-    () => buildActivitySections(displayEvents, liveBaselineIds),
-    [displayEvents, liveBaselineIds]
+    () => buildActivitySections(displayEvents, liveBaselineIds, isWorking),
+    [displayEvents, isWorking, liveBaselineIds]
   );
   const workingLabel = useWorkingLabel(isWorking, startedAt, displayEvents);
-  const showWorked = Boolean(sections.workedLabel);
-  const showCommands = sections.commandGroups.length > 0;
+  const completedSummaryLabel =
+    sections.workedLabel ??
+    (!isWorking && (sections.timelineItems.length > 0 || sections.commandGroups.length > 0)
+      ? "Worked"
+      : null);
+  const showWorked = Boolean(completedSummaryLabel);
+  const showCommands = !showWorked && sections.commandGroups.length > 0;
 
   if (!workingLabel && !showWorked && !showCommands) {
     return null;
@@ -117,7 +122,7 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
           autoCollapseKey={shouldAutoCollapseCompletedWork ? completedWorkCollapseKey : null}
           initiallyOpen={completedFromWorking || Boolean(completedWorkCollapseKey)}
           items={sections.timelineItems}
-          label={sections.workedLabel!}
+          label={completedSummaryLabel!}
           onAutoCollapseStart={onCompletedWorkAutoCollapse}
           tokenParts={sections.tokenParts}
         />
@@ -183,15 +188,18 @@ function WorkedRow({
   onAutoCollapseStart?: () => void;
   tokenParts: Array<{ key: string; kind: "in" | "out" | "speed" | "total"; label: string }>;
 }) {
+  const hasDetails = items.length > 0;
+  const openInitially = hasDetails && initiallyOpen;
+
   return (
     <AnimatedDisclosure
-      autoCollapseDelayMs={autoCollapseDelayMs}
-      autoCollapseKey={autoCollapseKey}
+      autoCollapseDelayMs={hasDetails ? autoCollapseDelayMs : null}
+      autoCollapseKey={hasDetails ? autoCollapseKey : null}
       className={styles.workedBlock}
-      initiallyOpen={initiallyOpen}
+      initiallyOpen={openInitially}
       onAutoCollapseStart={onAutoCollapseStart}
       summaryClassName={styles.workedSummary}
-      type={initiallyOpen ? "completed-work" : undefined}
+      type={openInitially ? "completed-work" : undefined}
       summary={
         <>
           <span className={styles.workedLabel}>{label}</span>
@@ -205,11 +213,7 @@ function WorkedRow({
       }
     >
       <div className={styles.expandedBody}>
-        {items.length > 0 ? (
-          <ActivityTimeline items={items} />
-        ) : (
-          <p className={styles.reasoningEmpty}>Assistant response completed.</p>
-        )}
+        {hasDetails ? <ActivityTimeline items={items} /> : null}
       </div>
     </AnimatedDisclosure>
   );
@@ -432,10 +436,11 @@ function CommandDetail({ item }: { item: CommandItem }) {
 
 function buildActivitySections(
   events: AgentActivityEvent[],
-  liveBaselineIds: ReadonlySet<string> = EMPTY_ACTIVITY_ID_SET
+  liveBaselineIds: ReadonlySet<string> = EMPTY_ACTIVITY_ID_SET,
+  isWorking = false
 ) {
   const elapsed = [...events].reverse().find((event) => event.type === "elapsed");
-  const workedLabel = resolveWorkedLabel(events, elapsed);
+  const workedLabel = resolveWorkedLabel(events, elapsed) ?? (!isWorking ? resolveFallbackWorkedLabel(events) : null);
   const commandGroups = groupCommandEvents(events);
   const tokenParts = formatTokenUsageParts(extractTokenUsage(elapsed) ?? extractTokenUsage([...events].reverse().find((event) => Boolean(extractTokenUsage(event)))));
   const meaningfulEvents = events.filter(isMeaningfulTimelineEvent);
@@ -682,21 +687,41 @@ function formatTokenUsageParts(usage?: { promptTokens?: unknown; completionToken
   const promptTokens = finiteNumber(usage?.promptTokens);
   const completionTokens = finiteNumber(usage?.completionTokens);
   const tokensPerSecond = finiteNumber(usage?.tokensPerSecond);
-  const formatter = new Intl.NumberFormat();
   const parts: Array<{ key: string; kind: "in" | "out" | "speed" | "total"; label: string }> = [];
   if (promptTokens !== undefined) {
-    parts.push({ key: "in", kind: "in", label: `${formatter.format(promptTokens)} in` });
+    parts.push({ key: "in", kind: "in", label: `${formatCompactTokenCount(promptTokens)} in` });
   }
   if (completionTokens !== undefined) {
-    parts.push({ key: "out", kind: "out", label: `${formatter.format(completionTokens)} out` });
+    parts.push({ key: "out", kind: "out", label: `${formatCompactTokenCount(completionTokens)} out` });
   }
   if (tokensPerSecond !== undefined) {
     parts.push({ key: "speed", kind: "speed", label: `${formatSpeed(tokensPerSecond)} tok/s` });
   }
   if (parts.length === 0 && totalTokens !== undefined) {
-    parts.push({ key: "total", kind: "total", label: `${formatter.format(totalTokens)} tokens` });
+    parts.push({ key: "total", kind: "total", label: `${formatCompactTokenCount(totalTokens)} tokens` });
   }
   return parts;
+}
+
+function formatCompactTokenCount(value: number) {
+  const safe = Math.max(0, Math.round(value));
+  if (safe >= 1_000_000) {
+    return `${formatCompactTokenValue(safe / 1_000_000)}m`;
+  }
+  if (safe >= 1_000) {
+    return `${formatCompactTokenValue(safe / 1_000)}k`;
+  }
+  return new Intl.NumberFormat().format(safe);
+}
+
+function formatCompactTokenValue(value: number) {
+  if (value >= 100) {
+    return String(Math.round(value));
+  }
+  if (value >= 10) {
+    return value.toFixed(1).replace(/\.0$/, "");
+  }
+  return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1");
 }
 
 function formatSpeed(value: number) {
@@ -774,6 +799,19 @@ function resolveWorkedLabel(events: AgentActivityEvent[], elapsed?: AgentActivit
   }
 
   return null;
+}
+
+function resolveFallbackWorkedLabel(events: AgentActivityEvent[]) {
+  if (!events.some(isMeaningfulTimelineEvent)) {
+    return null;
+  }
+  const startedAt = events.find((event) => event.startedAt)?.startedAt;
+  const completedAt = [...events].reverse().find((event) => event.completedAt)?.completedAt;
+  const durationMs = computeRunElapsed(startedAt, completedAt);
+  if (typeof durationMs === "number" && durationMs >= WORKED_LABEL_MIN_DURATION_MS) {
+    return `Worked for ${formatActivityDuration(durationMs)}`;
+  }
+  return "Worked";
 }
 
 function groupCommandEvents(events: AgentActivityEvent[]): CommandGroup[] {

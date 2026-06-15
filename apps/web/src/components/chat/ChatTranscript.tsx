@@ -2,10 +2,11 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AgentActivityBlock } from "@/components/chat/AgentActivityBlock";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MessageBubble } from "@/components/chat/MessageBubble";
+import { computeRunElapsed, makeElapsedActivityEvent } from "@/lib/agentActivityEvents";
 import { restoreActivityEventFromPersisted } from "@/lib/persistedActivityReplay";
 import { resolveStreamStatusLabel } from "@/lib/streamStatus";
 import type { LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
-import type { Project, RunRecord, Session } from "@/data/types";
+import type { ChatMessage, Project, RunRecord, Session } from "@/data/types";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
@@ -64,14 +65,18 @@ export function ChatTranscript({
         session: activeSession
       })
     : null;
-  const activityAnchorMessage = activityAnchorRun?.assistantMessageId && activeSession
-    ? activeSession.messages.find((message) => message.id === activityAnchorRun.assistantMessageId)
-    : activeSession && !activeSession.runRecords.length
-      ? [...activeSession.messages].reverse().find((message) => message.role === "assistant")
-      : undefined;
+  const activityAnchorMessage = activeSession
+    ? resolveActivityAnchorMessageForDisplay(activityAnchorRun, activeSession)
+    : undefined;
   const activityAnchorMessageId = activityAnchorMessage?.id;
+  const messageElapsedFallbackEvent =
+    !activityAnchorRun && activityAnchorMessage
+      ? makeMessageElapsedActivityEvent(activityAnchorMessage)
+      : null;
   const activityBlockEvents = activityAnchorRun
     ? activityEventsForRun(activityAnchorRun, activityEvents)
+    : messageElapsedFallbackEvent
+      ? [...activityEvents, messageElapsedFallbackEvent]
     : activityEvents;
   const activityBlockLegacyEvents = activityAnchorRun ? [] : activeSession?.toolEvents ?? [];
   const activityIsWorking = isGenerating && !isFinalizingResponse;
@@ -94,17 +99,56 @@ export function ChatTranscript({
       })
     : false;
   const activitySignal = `${activityAnchorRun?.id ?? "legacy"}:${shouldShowActivityBlock ? "visible" : "hidden"}:${activityBlockEvents.length}:${activityBlockLegacyEvents.length}`;
-  const activityBlock = activeSession && shouldShowActivityBlock ? (
-    <AgentActivityBlock
-      autoCollapseCompletedWork={!activityIsWorking && assistantRevealComplete}
-      events={activityBlockEvents}
-      isWorking={activityIsWorking}
-      legacyEvents={activityBlockLegacyEvents}
-      liveTokenUsage={liveTokenUsage}
-      onCompletedWorkAutoCollapse={handleCompletedWorkAutoCollapse}
-      startedAt={generationStartedAt}
-    />
-  ) : null;
+
+  function activityBlockForMessage(message: ChatMessage) {
+    if (!activeSession || message.role !== "assistant") {
+      return null;
+    }
+
+    const run = resolveRunForAssistantMessage(activeSession, message.id, activityAnchorRun);
+    const isCurrentAnchor = message.id === activityAnchorMessageId;
+    const isCurrentRun = Boolean(run && activityAnchorRun && run.id === activityAnchorRun.id);
+    const runEvents = run ? activityEventsForRun(run, activityEvents) : [];
+    const messageFallbackEvent = makeMessageElapsedActivityEvent(message);
+    const events = runEvents.length > 0
+      ? runEvents
+      : messageFallbackEvent
+        ? [messageFallbackEvent]
+        : isCurrentAnchor
+          ? activityBlockEvents
+          : [];
+    const legacyEvents = !run && isCurrentAnchor ? activityBlockLegacyEvents : [];
+    const isWorking = isCurrentRun && activityIsWorking;
+    const showBlock = shouldShowAgentActivityBlock({
+      activityDelayElapsed: isCurrentAnchor ? activityDelayElapsed : true,
+      assistantContent: message.content,
+      events,
+      isGenerating: isWorking,
+      legacyEventCount: legacyEvents.length,
+      liveTokenUsage: isCurrentAnchor ? liveTokenUsage : null
+    });
+
+    if (!showBlock) {
+      return null;
+    }
+
+    const revealComplete =
+      message.id === activityAnchorMessageId
+        ? assistantRevealComplete
+        : true;
+
+    return (
+      <AgentActivityBlock
+        autoCollapseCompletedWork={isCurrentAnchor && !isWorking && revealComplete}
+        events={events}
+        isWorking={isWorking}
+        legacyEvents={legacyEvents}
+        liveTokenUsage={isCurrentAnchor ? liveTokenUsage : null}
+        onCompletedWorkAutoCollapse={isCurrentAnchor ? handleCompletedWorkAutoCollapse : undefined}
+        startedAt={isCurrentAnchor ? generationStartedAt : null}
+      />
+    );
+  }
 
   function handleCompletedWorkAutoCollapse() {
     startActivityCollapseAnchorLock(COMPLETED_WORK_ANCHOR_LOCK_MS);
@@ -414,7 +458,7 @@ export function ChatTranscript({
           activeSession.messages.length > 0 ? (
             activeSession.messages.map((message) => (
               <Fragment key={message.id}>
-                {message.id === activityAnchorMessageId ? activityBlock : null}
+                {activityBlockForMessage(message)}
                 <MessageBubble
                   message={message}
                   onRevealComplete={
@@ -480,8 +524,12 @@ function resolveActivityAnchorRun({
     typeof liveTokenUsage?.promptTokens === "number" ||
     typeof liveTokenUsage?.completionTokens === "number";
 
-  for (const run of [...session.runRecords].reverse()) {
-    if (!run.assistantMessageId || !session.messages.some((message) => message.id === run.assistantMessageId)) {
+  // runRecords is stored newest-first (appendRunRecord prepends), so iterate in
+  // natural order to anchor the block to the most recent qualifying run. Do NOT
+  // reverse here — reversing returns the oldest run with activity, which made the
+  // latest run's "Worked for" summary vanish the instant a turn completed.
+  for (const run of session.runRecords) {
+    if (!resolveAssistantMessageForRun(run, session)) {
       continue;
     }
     if (hasRunDisplayActivity(run, liveEventIds) || (run.status === "running" && hasLiveTokenUsage)) {
@@ -489,11 +537,72 @@ function resolveActivityAnchorRun({
     }
   }
 
+  if (!isGenerating) {
+    return session.runRecords.find((run) => resolveAssistantMessageForRun(run, session)) ?? null;
+  }
+
   return null;
 }
 
+function resolveActivityAnchorMessageForDisplay(run: RunRecord | null, session: Session) {
+  if (run) {
+    return resolveAssistantMessageForRun(run, session);
+  }
+
+  const latestGeneratedAssistant = [...session.messages]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.status !== "streaming" && Boolean(message.usage));
+  if (latestGeneratedAssistant) {
+    return latestGeneratedAssistant;
+  }
+
+  return [...session.messages].reverse().find((message) => message.role === "assistant");
+}
+
+function resolveAssistantMessageForRun(run: RunRecord, session: Session) {
+  if (run.assistantMessageId) {
+    const assistantMessage = session.messages.find((message) => message.id === run.assistantMessageId);
+    if (assistantMessage) {
+      return assistantMessage;
+    }
+  }
+
+  if (run.userMessageId) {
+    const userIndex = session.messages.findIndex((message) => message.id === run.userMessageId);
+    if (userIndex >= 0) {
+      const assistantAfterUser = session.messages
+        .slice(userIndex + 1)
+        .find((message) => message.role === "assistant");
+      if (assistantAfterUser) {
+        return assistantAfterUser;
+      }
+    }
+  }
+
+  return [...session.messages].reverse().find((message) => message.role === "assistant");
+}
+
+function resolveRunForAssistantMessage(
+  session: Session,
+  messageId: string,
+  preferredRun: RunRecord | null
+) {
+  if (preferredRun && resolveAssistantMessageForRun(preferredRun, session)?.id === messageId) {
+    return preferredRun;
+  }
+
+  const directRun = session.runRecords.find((run) => run.assistantMessageId === messageId);
+  if (directRun) {
+    return directRun;
+  }
+
+  return session.runRecords.find((run) => resolveAssistantMessageForRun(run, session)?.id === messageId) ?? null;
+}
+
 function findCurrentRun(session: Session, generationStartedAt: string | null) {
-  const runningRun = [...session.runRecords].reverse().find((run) => run.status === "running");
+  // newest-first order (see resolveActivityAnchorRun): prefer the most recent
+  // running run / the run started for the active generation.
+  const runningRun = session.runRecords.find((run) => run.status === "running");
   if (runningRun) {
     return runningRun;
   }
@@ -502,10 +611,15 @@ function findCurrentRun(session: Session, generationStartedAt: string | null) {
     return null;
   }
 
-  return [...session.runRecords].reverse().find((run) => run.startedAt === generationStartedAt) ?? null;
+  return session.runRecords.find((run) => run.startedAt === generationStartedAt) ?? null;
 }
 
 function hasRunDisplayActivity(run: RunRecord, liveEventIds: Set<string>) {
+  // A real completed/stopped run always persists its elapsed event into
+  // activityReplay, so replay/live activity is the qualifier. Do NOT qualify a
+  // run by completedAt alone: an unreachable-Hermes/mock fallback turn is marked
+  // completed with an empty replay, and must not steal the anchor from the prior
+  // run that actually did work.
   return (
     run.activityReplay.length > 0 ||
     run.activityEventIds.some((eventId) => liveEventIds.has(eventId))
@@ -531,9 +645,83 @@ function activityEventsForRun(run: RunRecord, liveEvents: AgentActivityEvent[]) 
     .map((eventId) => liveById.get(eventId))
     .filter((event): event is AgentActivityEvent => Boolean(event));
 
-  return replayEvents.length > 0
+  const events = replayEvents.length > 0
     ? [...replayOrLiveEvents, ...liveOnlyEvents]
     : replayOrLiveEvents;
+
+  if (!events.some((event) => event.type === "elapsed")) {
+    const elapsed = makeRunElapsedActivityEvent(run);
+    if (elapsed) {
+      return [...events, elapsed];
+    }
+  }
+
+  return events;
+}
+
+function makeRunElapsedActivityEvent(run: RunRecord): AgentActivityEvent | null {
+  if (!run.completedAt) {
+    return null;
+  }
+  const durationMs =
+    typeof run.durationMs === "number" && Number.isFinite(run.durationMs)
+      ? run.durationMs
+      : computeRunElapsed(run.startedAt, run.completedAt);
+  if (typeof durationMs !== "number") {
+    return null;
+  }
+  return makeElapsedActivityEvent({
+    completedAt: run.completedAt,
+    durationMs,
+    id: `elapsed-${run.id}-${run.completedAt}`,
+    metadata: run.metadata,
+    source: "ui",
+    startedAt: run.startedAt
+  });
+}
+
+function makeMessageElapsedActivityEvent(message: ChatMessage): AgentActivityEvent | null {
+  const durationMs = resolveMessageDurationMs(message);
+  if (typeof durationMs !== "number") {
+    return null;
+  }
+  const completedAtMs = Date.UTC(2000, 0, 1, 0, 0, 0, 0);
+  return makeElapsedActivityEvent({
+    completedAt: new Date(completedAtMs).toISOString(),
+    durationMs,
+    id: `elapsed-message-${message.id}`,
+    metadata: message.usage ? { tokenUsage: message.usage } : undefined,
+    source: "ui",
+    startedAt: new Date(completedAtMs - durationMs).toISOString()
+  });
+}
+
+function resolveMessageDurationMs(message: ChatMessage) {
+  const usage = message.usage;
+  if (!usage) {
+    return undefined;
+  }
+  const latencyMs = finitePositiveNumber(usage.latencyMs);
+  if (latencyMs !== undefined) {
+    return latencyMs;
+  }
+  const timeToFirstTokenMs = finitePositiveNumber(usage.timeToFirstTokenMs) ?? 0;
+  const completionTokens = finitePositiveNumber(usage.completionTokens);
+  const tokensPerSecond = finitePositiveNumber(usage.tokensPerSecond);
+  if (completionTokens !== undefined && tokensPerSecond !== undefined) {
+    return Math.max(1000, Math.round(timeToFirstTokenMs + (completionTokens / tokensPerSecond) * 1000));
+  }
+  if (timeToFirstTokenMs > 0) {
+    return Math.max(1000, Math.round(timeToFirstTokenMs));
+  }
+  if (completionTokens !== undefined || finitePositiveNumber(usage.promptTokens) !== undefined) {
+    return 1000;
+  }
+  return undefined;
+}
+
+function finitePositiveNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 function shouldShowAgentActivityBlock({
@@ -563,6 +751,10 @@ function shouldShowAgentActivityBlock({
   }
 
   if (legacyEventCount > 0 || events.some(isMeaningfulActivityEvent)) {
+    return true;
+  }
+
+  if (hasSubstantialContent && events.length > 0) {
     return true;
   }
 

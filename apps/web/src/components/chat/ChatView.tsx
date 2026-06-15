@@ -12,6 +12,7 @@ import {
   normalizeActivityTokenUsage
 } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
+import { createTokenUsageAccumulator } from "@/lib/tokenUsageAggregator";
 import {
   createPersistedActivityEvent,
   limitPersistedActivityEvents
@@ -200,6 +201,7 @@ export function ChatView({
     let runSummary = makeEmptyRunActivitySummary();
     let hermesRunId: string | undefined;
     let responseTokenUsage: HermesTokenUsage | undefined;
+    const usageAccumulator = createTokenUsageAccumulator();
     let estimatedPromptTokens = 0;
     let estimatedActivityChars = 0;
     let accumulated = "";
@@ -229,8 +231,12 @@ export function ChatView({
     };
 
     const updateResponseTokenUsage = (usage: unknown) => {
+      // Sum usage across every upstream request in this run (deduped by request
+      // id) instead of replacing it with the latest sample, so multi-request
+      // runs report the run total rather than one request's `in`/`out` counts.
       const normalized = normalizeActivityTokenUsage(usage);
-      responseTokenUsage = annotateTokenUsageRoute(normalized ?? responseTokenUsage, modelRequest);
+      const aggregate = usageAccumulator.add(normalized);
+      responseTokenUsage = annotateTokenUsageRoute(aggregate ?? responseTokenUsage, modelRequest);
       syncLiveTokenUsage(responseTokenUsage);
       return responseTokenUsage;
     };
@@ -250,6 +256,12 @@ export function ChatView({
         Math.floor(((performance.now() - liveEstimateStartedAtMs) / 1000) * ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND)
       );
       return Math.max(visibleTextTokens, activityTokens + elapsedTokens);
+    };
+
+    const estimateLivePromptTokens = () => {
+      const activityPromptTokens = Math.ceil(estimatedActivityChars / ESTIMATED_CHARS_PER_TOKEN);
+      const generatedContextTokens = Math.ceil(accumulated.length / ESTIMATED_CHARS_PER_TOKEN);
+      return Math.max(0, estimatedPromptTokens + activityPromptTokens + generatedContextTokens);
     };
 
     const withEstimatedTokenFallback = (usage: HermesTokenUsage | undefined) => {
@@ -281,11 +293,12 @@ export function ChatView({
     };
 
     const syncEstimatedLiveTokenUsage = () => {
+      const promptTokens = estimateLivePromptTokens();
       const completionTokens = estimateLiveCompletionTokens();
       setLiveTokenUsage((current) => {
         const nextPromptTokens = authoritativePromptTokensRef.current
-          ? current?.promptTokens
-          : estimatedPromptTokens;
+          ? Math.max(current?.promptTokens ?? 0, promptTokens)
+          : promptTokens;
         const nextCompletionTokens = authoritativeCompletionTokensRef.current
           ? current?.completionTokens
           : completionTokens;
@@ -504,7 +517,9 @@ export function ChatView({
       const nextCompletion = pendingCompletion;
       pendingCompletion = null;
       const completionUsage = withEstimatedTokenFallback(
-        annotateTokenUsageRoute(nextCompletion.usage ?? responseTokenUsage, modelRequest)
+        // Prefer the live run aggregate so usage that arrived after message_done
+        // (trailing metadata / run-usage events) is still folded into the total.
+        annotateTokenUsageRoute(responseTokenUsage ?? nextCompletion.usage, modelRequest)
       );
       responseTokenUsage = completionUsage;
       syncLiveTokenUsage(responseTokenUsage);
@@ -706,7 +721,32 @@ export function ChatView({
         }
         setIsGenerating(false);
         setIsStopRequested(false);
-        setLiveTokenUsage(null);
+        // Commit the final authoritative totals to the visible ticker before
+        // clearing live state. The last syncLiveTokenUsage (carrying the final
+        // request's prompt/completion) otherwise batches with setLiveTokenUsage(
+        // null) below, so React coalesces them and the afterglow keeps the
+        // stale next-to-last value — e.g. the composer "in" stuck one request
+        // behind the real total.
+        const finalPromptTokens = responseTokenUsage?.promptTokens;
+        const finalCompletionTokens = responseTokenUsage?.completionTokens;
+        if (typeof finalPromptTokens === "number" || typeof finalCompletionTokens === "number") {
+          const finalLiveTokenUsage = {
+            promptTokens: finalPromptTokens,
+            completionTokens: finalCompletionTokens
+          };
+          setLiveTokenUsage(finalLiveTokenUsage);
+          setVisibleLiveTokenUsage(finalLiveTokenUsage);
+          window.setTimeout(() => {
+            setLiveTokenUsage((current) =>
+              current?.promptTokens === finalLiveTokenUsage.promptTokens &&
+              current?.completionTokens === finalLiveTokenUsage.completionTokens
+                ? null
+                : current
+            );
+          }, 0);
+        } else {
+          setLiveTokenUsage(null);
+        }
         setIsFinalizingResponse(false);
         setGenerationStartedAt(null);
         stopRequestedRef.current = false;

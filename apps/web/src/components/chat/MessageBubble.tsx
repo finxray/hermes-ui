@@ -138,14 +138,31 @@ function formatUsageParts(usage: ChatMessage["usage"]) {
   const parts: UsagePart[] = [];
   const usageTitle = usage.source === "estimated" ? "Estimated token usage." : "Provider or Hermes reported usage.";
   if (typeof usage.promptTokens === "number") {
-    parts.push({ key: "in", label: `${formatInteger(usage.promptTokens)} in`, title: usageTitle });
+    parts.push({ key: "in", label: `${formatCompactTokenCount(usage.promptTokens)} in`, title: usageTitle });
   }
   if (typeof usage.completionTokens === "number") {
-    parts.push({ key: "out", label: `${formatInteger(usage.completionTokens)} out`, title: usageTitle });
+    parts.push({ key: "out", label: `${formatCompactTokenCount(usage.completionTokens)} out`, title: usageTitle });
   }
   return parts;
 }
 
-function formatInteger(value: number) {
-  return new Intl.NumberFormat().format(Math.max(0, Math.round(value)));
+function formatCompactTokenCount(value: number) {
+  const safe = Math.max(0, Math.round(value));
+  if (safe >= 1_000_000) {
+    return `${formatCompactTokenValue(safe / 1_000_000)}m`;
+  }
+  if (safe >= 1_000) {
+    return `${formatCompactTokenValue(safe / 1_000)}k`;
+  }
+  return new Intl.NumberFormat().format(safe);
+}
+
+function formatCompactTokenValue(value: number) {
+  if (value >= 100) {
+    return String(Math.round(value));
+  }
+  if (value >= 10) {
+    return value.toFixed(1).replace(/\.0$/, "");
+  }
+  return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1");
 }

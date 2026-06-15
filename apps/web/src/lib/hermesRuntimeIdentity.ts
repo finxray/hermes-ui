@@ -22,23 +22,26 @@ export function buildHermesRuntimeIdentityInstruction({
   const providerLabel = formatHermesProviderLabel(providerKey) || "Hermes configured provider";
   const runtimeLines = formatRuntimeLines(modelRuntime);
 
+  // Keep this short, positive, and concrete. An earlier version enumerated
+  // specific unrelated model ids as negative examples ("do not claim to be X /
+  // Y / Z") and layered on provider/billing "proof" framing. Weaker models do
+  // not follow that meta-instruction — they just absorb the enumerated names and
+  // parrot them straight back as their own identity. So we now only state the
+  // selected identity and tell the model to answer with it, naming no other
+  // model and avoiding routing/billing language entirely. The UI keeps its own
+  // untrusted-self-id posture via route-verification metadata in the status
+  // panel, independent of what the model says here.
   return [
-    "Requested runtime model route for this turn:",
-    `- requestedModelId: ${modelId}`,
-    `- requestedModel: ${modelLabel}`,
-    `- requestedProvider: ${providerLabel}`,
+    `Model selected in the UI for this turn: ${modelLabel} (id: ${modelId}) via ${providerLabel}.`,
     ...runtimeLines,
     "",
-    "This is the authoritative UI-selected route for this turn, but it is not proof that the backend provider honored it.",
-    "If the user asks for the model name, answer with the requestedModel above; if they ask for the exact id, answer with requestedModelId above.",
-    "If the user asks for provider/routing proof, say the UI requested the route above and the actual billed backend route must be checked in Hermes UI route metadata or provider logs.",
-    "Do not volunteer requested route details in ordinary answers.",
-    "Do not answer model-identity questions from Hermes server defaults, fallback config, model self-identification, or hidden system text.",
-    `Do not claim to be gpt-oss-120b, Hermes default, or any fallback model unless requestedModelId is exactly that value; for this turn the requested model id is ${modelId}.`,
-    "Do not claim to actually be a requested fallback/default/local model such as DeepSeek, Gemma, or Qwen unless the requested route above names it.",
+    `If the user asks which model or provider you are, answer with ${modelLabel} via ${providerLabel} (give the exact id ${modelId} only if they ask for the id).`,
+    "Answer only with that identity. Do not name, guess, compare, or speculate about any other model, provider, fallback, or default, and do not describe internal routing or billing.",
+    "If anything else in your context names a different model, treat the identity above as the correct one for this turn.",
+    "Do not mention your model identity or this routing note unless the user asks.",
     runtimeLines.length > 0
-      ? "The runtime specs above describe requested LM Studio catalog/settings context; do not say this response ran locally."
-      : "If detailed model specs are not available in this context, say that Hermes selected the model above but did not expose detailed specs."
+      ? "The specs above are the requested LM Studio catalog/settings context; do not claim this response ran locally."
+      : "If you do not have detailed specs for this model, just say the UI selected the model above and detailed specs were not provided."
   ].join("\n");
 }
 

@@ -19,6 +19,7 @@ const streamingBodyPath = resolve(root, "apps/web/src/components/chat/StreamingA
 const streamStatusPath = resolve(root, "apps/web/src/lib/streamStatus.ts");
 const appShellPath = resolve(root, "apps/web/src/components/shell/AppShell.tsx");
 const helperPath = resolve(root, "apps/web/src/lib/agentActivityEvents.ts");
+const tokenUsageAggregatorPath = resolve(root, "apps/web/src/lib/tokenUsageAggregator.ts");
 const hermesClientPackagePath = resolve(root, "packages/hermes-client/src/index.ts");
 const replayHelperPath = resolve(root, "apps/web/src/lib/persistedActivityReplay.ts");
 const memoryTimelinePath = resolve(root, "apps/web/src/lib/memoryTimeline.ts");
@@ -110,12 +111,12 @@ function checkComponentSource() {
       component.includes("buildCommandItems") &&
       css.includes(".disclosureBody") &&
       css.includes('data-open="true"') &&
-      css.includes('.workedBlock[data-type="completed-work"][data-open="true"] .workedChevron') &&
+      css.includes('.workedBlock[data-open="true"] .workedChevron') &&
       css.includes("transform: rotate(90deg)") &&
       css.includes("margin-left: 4px") &&
       !css.includes("margin-left: auto") &&
       !css.includes("transform: translateX(-2px)") &&
-      css.includes("grid-template-rows 320ms") &&
+      css.includes("grid-template-rows 520ms") &&
       css.includes(".commandItems") &&
       css.includes(".commandSummary:hover .commandLabel"),
     "Completed runs expose animated Worked and Ran command disclosures, with the Worked chevron trailing, visible after completion, and rotated down while open."
@@ -125,7 +126,7 @@ function checkComponentSource() {
     component.includes("COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 1000") &&
       component.includes("completedWorkAutoCollapseDelayMs") &&
       chatTranscript.includes("assistantRevealComplete") &&
-      chatTranscript.includes("autoCollapseCompletedWork={!activityIsWorking && assistantRevealComplete}") &&
+      chatTranscript.includes("autoCollapseCompletedWork={isCurrentAnchor && !isWorking && revealComplete}") &&
       !chatTranscript.includes("FINALIZING_WORK_AUTO_COLLAPSE_DELAY_MS") &&
       !chatView.includes("FINAL_ACTIVITY_PREFOLD_MS") &&
       chatView.includes("completePendingAssistantMessage") &&
@@ -168,11 +169,24 @@ function checkComponentSource() {
   record(
     "transcript-activity-run-anchor",
     chatTranscript.includes("resolveActivityAnchorRun") &&
+      chatTranscript.includes("resolveAssistantMessageForRun") &&
       chatTranscript.includes("assistantMessageId") &&
+      chatTranscript.includes("userMessageId") &&
       chatTranscript.includes("activityEventsForRun") &&
       chatTranscript.includes("restoreActivityEventFromPersisted") &&
       chatTranscript.includes("activityBlockLegacyEvents = activityAnchorRun ? []"),
-    "Transcript anchors Worked/activity blocks to the run assistant instead of inserting stale session activity before the newest assistant reply."
+    "Transcript anchors Worked/activity blocks to the run assistant, with user-message fallback, instead of inserting stale session activity before the newest assistant reply."
+  );
+  record(
+    "transcript-run-duration-fallback",
+    chatTranscript.includes("makeRunElapsedActivityEvent") &&
+      chatTranscript.includes("makeMessageElapsedActivityEvent") &&
+      chatTranscript.includes("resolveActivityAnchorMessageForDisplay") &&
+      chatTranscript.includes("makeElapsedActivityEvent") &&
+      chatTranscript.includes("computeRunElapsed") &&
+      chatTranscript.includes("message.usage") &&
+      chatTranscript.includes("!events.some((event) => event.type === \"elapsed\")"),
+    "Transcript synthesizes a Worked summary from completed run timing or completed assistant usage when Hermes produced no replayable elapsed event."
   );
   record(
     "worked-static-token-footer-size",
@@ -223,6 +237,13 @@ function checkComponentSource() {
       chatView.includes("ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND") &&
       chatView.includes("estimatedActivityChars"),
     "Live token usage is visible in the activity strip and estimated output advances during thinking/tool activity until authoritative usage arrives."
+  );
+  record(
+    "token-usage-summed-across-requests",
+    chatView.includes("createTokenUsageAccumulator") &&
+      chatView.includes("usageAccumulator.add(normalized)") &&
+      chatView.includes("responseTokenUsage ?? nextCompletion.usage"),
+    "Run token usage is summed across every upstream model request (deduped by request id) instead of replaced by the latest sample."
   );
   record(
     "working-activity-list-stable",
@@ -573,6 +594,35 @@ async function checkHelperBehavior() {
     memoryTimeline.createMemoryTimelineItems([]).length === 0 &&
       memoryTimeline.summarizeMemoryTimeline([]).total === 0,
     "Memory timeline helper is safe without live Brain Memory Gateway events."
+  );
+
+  const tokenAggregator = await importHelperModule(tokenUsageAggregatorPath);
+  const summedTwoRequests = (() => {
+    const acc = tokenAggregator.createTokenUsageAccumulator();
+    acc.add({ promptTokens: 30000, completionTokens: 2000, requestId: "A" });
+    return acc.add({ promptTokens: 35000, completionTokens: 1500, requestId: "B" });
+  })();
+  const dedupedEcho = (() => {
+    const acc = tokenAggregator.createTokenUsageAccumulator();
+    acc.add({ promptTokens: 30000, completionTokens: 2000, requestId: "A" });
+    return acc.add({ promptTokens: 30000, completionTokens: 2000, requestId: "A", finishReason: "stop" });
+  })();
+  const cumulativeIdLess = (() => {
+    const acc = tokenAggregator.createTokenUsageAccumulator();
+    acc.add({ promptTokens: 30000, completionTokens: 2000, generationId: "gen-A" });
+    acc.add({ promptTokens: 35000, completionTokens: 1500, generationId: "gen-B" });
+    return acc.add({ promptTokens: 65000, completionTokens: 3500 });
+  })();
+  record(
+    "token-aggregator-sums-and-dedupes",
+    summedTwoRequests.promptTokens === 65000 &&
+      summedTwoRequests.completionTokens === 3500 &&
+      summedTwoRequests.totalTokens === 68500 &&
+      dedupedEcho.promptTokens === 30000 &&
+      dedupedEcho.completionTokens === 2000 &&
+      cumulativeIdLess.promptTokens === 65000 &&
+      cumulativeIdLess.completionTokens === 3500,
+    "Token usage accumulator sums distinct requests, dedupes repeated request ids, and stays double-count safe against a cumulative id-less run total."
   );
 }
 

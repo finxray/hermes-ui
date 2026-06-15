@@ -411,13 +411,15 @@ check(
   "Runtime identity instruction builder exists",
   Boolean(
     runtimeIdentityFile?.includes("buildHermesRuntimeIdentityInstruction") &&
-      runtimeIdentityFile?.includes("Requested runtime model route for this turn") &&
-      runtimeIdentityFile?.includes("authoritative UI-selected route") &&
-      runtimeIdentityFile?.includes("answer with the requestedModel above") &&
-      runtimeIdentityFile?.includes("actual billed backend route must be checked in Hermes UI route metadata or provider logs") &&
-      runtimeIdentityFile?.includes("Do not answer model-identity questions from Hermes server defaults")
+      runtimeIdentityFile?.includes("Model selected in the UI for this turn") &&
+      runtimeIdentityFile?.includes("answer with ${modelLabel} via ${providerLabel}") &&
+      runtimeIdentityFile?.includes("treat the identity above as the correct one for this turn") &&
+      // Foot-guns that primed weaker models to parrot a wrong identity must stay gone:
+      !runtimeIdentityFile?.includes("gpt-oss-120b") &&
+      !runtimeIdentityFile?.includes("DeepSeek, Gemma, or Qwen") &&
+      !runtimeIdentityFile?.includes("billed backend route")
   ),
-  "Assistant replies must not self-report a requested route as the actual billed provider/model without usage confirmation."
+  "Runtime identity instruction states the selected model plainly and must not enumerate wrong model names or billing-proof framing that weaker models parrot back."
 );
 check(
   "Chat stream route includes selected runtime identity in instructions",

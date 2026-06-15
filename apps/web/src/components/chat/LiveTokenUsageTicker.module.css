@@ -1,7 +1,7 @@
 .ticker {
   --token-digit-size: 11px;
   --token-digit-width: 1ch;
-  --token-separator-width: 0.34em;
+  --token-separator-width: 0.46em;
 
   display: flex;
   width: 100%;

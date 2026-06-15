@@ -110,14 +110,15 @@
   margin-left: 4px;
   color: var(--text-muted);
   opacity: 1;
+  /* Collapsed: point right. Open rotates it down, matching command rows. */
   transform: rotate(0deg);
   transition:
     opacity 180ms ease,
-    transform 180ms ease,
+    transform 260ms cubic-bezier(0.22, 0.78, 0.2, 1),
     color 120ms ease;
 }
 
-.workedBlock[data-type="completed-work"][data-open="true"] .workedChevron {
+.workedBlock[data-open="true"] .workedChevron {
   transform: rotate(90deg);
 }
 
@@ -259,9 +260,9 @@
   clip-path: inset(0 0 100% 0);
   pointer-events: none;
   transition:
-    grid-template-rows 320ms cubic-bezier(0.22, 0.78, 0.2, 1),
-    opacity 220ms ease,
-    clip-path 320ms cubic-bezier(0.22, 0.78, 0.2, 1);
+    grid-template-rows 520ms cubic-bezier(0.22, 0.78, 0.2, 1),
+    opacity 360ms ease,
+    clip-path 520ms cubic-bezier(0.22, 0.78, 0.2, 1);
 }
 
 .disclosureBody[data-open="true"] {

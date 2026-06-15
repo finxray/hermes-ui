@@ -56,6 +56,7 @@
     "smoke:ui:replay:headed": "node scripts/ui-interaction-smoke.mjs --replay-test --require-hermes --headed",
     "smoke:status-pipeline": "node scripts/status-pipeline-success-smoke.mjs",
     "smoke:activity-anchor": "node scripts/activity-anchor-order-smoke.mjs",
+    "smoke:worked-summary": "node scripts/worked-summary-persist-smoke.mjs",
     "typecheck": "npm run typecheck -w @hermes-ui/web"
   },
   "overrides": {

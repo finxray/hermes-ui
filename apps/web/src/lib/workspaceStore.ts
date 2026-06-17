@@ -1003,6 +1003,7 @@ function normalizeOptionalCount(value: unknown) {
 function normalizePersistedActivityType(value: unknown): PersistedActivityEvent["type"] {
   const normalized = asString(value).trim().toLowerCase();
   if (
+    normalized === "narration" ||
     normalized === "reasoning" ||
     normalized === "command" ||
     normalized === "tool" ||

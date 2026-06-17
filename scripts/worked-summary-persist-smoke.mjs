@@ -43,6 +43,7 @@ try {
     state: "visible",
     timeout: timeoutMs
   });
+  const baselineActivityBlocks = await page.locator('[data-agent-activity-block="true"]').count();
 
   await page.getByLabel("Message", { exact: true }).fill(sendMarker, { timeout: timeoutMs });
   await page.waitForFunction(() => {
@@ -50,6 +51,17 @@ try {
     return button instanceof HTMLButtonElement && !button.disabled;
   }, null, { timeout: timeoutMs });
   await page.getByRole("button", { name: "Send message", exact: true }).click({ timeout: timeoutMs });
+
+  await page.waitForFunction(
+    (baseline) => {
+      const activityCount = document.querySelectorAll('[data-agent-activity-block="true"]').length;
+      const liveTicker = document.querySelector('[aria-label="Live token usage"]');
+      const pageText = document.body.textContent || "";
+      return Boolean(liveTicker) && pageText.includes("Thinking") && activityCount === baseline;
+    },
+    baselineActivityBlocks,
+    { timeout: timeoutMs }
+  );
 
   // Wait for the streamed answer to fully land (run completed).
   await page.getByText(answerMarker, { exact: false }).waitFor({ state: "visible", timeout: timeoutMs });
@@ -65,6 +77,11 @@ try {
     const order = nodes.map((node, index) => {
       const isBlock = node instanceof HTMLElement && node.dataset.agentActivityBlock === "true";
       const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+      const progressText = isBlock && node instanceof HTMLElement
+        ? Array.from(node.querySelectorAll('[data-kind="narration"], [data-kind="reasoning"]'))
+            .map((progressNode) => (progressNode.textContent || "").replace(/\s+/g, " ").trim())
+            .join(" ")
+        : text;
       return {
         index,
         type: isBlock ? "activity" : "message",
@@ -73,6 +90,25 @@ try {
         visible: node instanceof HTMLElement ? node.getClientRects().length > 0 : false,
         text: text.slice(0, 120),
         hasMarker: text.includes(marker),
+        hasNarration:
+          progressText.includes("Checking the local environment before continuing") ||
+          progressText.includes("Verifying the local environment before continuing") ||
+          progressText.includes("verify shell access") ||
+          progressText.includes("local tools") ||
+          progressText.includes("Summarize the result"),
+        hasRawNarration:
+          progressText.includes("**Plan:**") ||
+          progressText.includes("`pwd`") ||
+          progressText.includes("pwd -") ||
+          progressText.includes("whoami -") ||
+          progressText.includes("Key configs:") ||
+          progressText.includes("Python 3.11.15: Fallback") ||
+          progressText.includes("fatal: not a git repository") ||
+          progressText.includes("Progress notes:") ||
+          progressText.includes("Reasoning steps:") ||
+          progressText.includes("All commands returned clean results"),
+        hasEmptyHermesFallback:
+          text.includes("Hermes completed the turn without returning assistant text"),
         hasWorkedFor: /Worked for/i.test(text)
       };
     });
@@ -108,7 +144,9 @@ try {
         userMessageId: run.userMessageId ?? null,
         activityEventIds: run.activityEventIds || [],
         activityReplayCount: (run.activityReplay || []).length,
-        activityReplayTypes: (run.activityReplay || []).map((e) => e.type)
+        activityReplayTypes: (run.activityReplay || []).map((e) => e.type),
+        narrationCount: (run.activityReplay || []).filter((e) => e.type === "narration").length,
+        reasoningCount: (run.activityReplay || []).filter((e) => e.type === "reasoning").length
       }))
       };
     } catch (error) {
@@ -139,6 +177,14 @@ try {
   assert(
     snapshot.newRunBlock.hasWorkedFor,
     `New run activity block is missing the "Worked for" summary after completion.\n${diagnostic}`
+  );
+  assert(
+    !snapshot.newRunBlock.hasNarration,
+    `Intermediate assistant narration must never be surfaced in the activity flow.\n${diagnostic}`
+  );
+  assert(
+    !snapshot.newRunBlock.hasRawNarration,
+    `No raw intermediate/reasoning text may appear in the activity flow.\n${diagnostic}`
   );
 
   // The completed block auto-collapses ~1s after the run ends, so by now it is
@@ -182,6 +228,23 @@ try {
   );
 
   const newAssistant = snapshot.order[snapshot.newAssistantIndex];
+  assert(
+    !newAssistant.hasNarration,
+    `Intermediate assistant narration leaked into the final answer body instead of the activity block.\n${diagnostic}`
+  );
+  assert(
+    !newAssistant.hasEmptyHermesFallback,
+    `Final answer was replaced by the empty-Hermes fallback.\n${diagnostic}`
+  );
+  const completedRun = snapshot.runRecords?.runs?.find((run) => run.assistantMessageId === newAssistant.id);
+  assert(
+    completedRun?.narrationCount === 0 && completedRun?.reasoningCount === 0,
+    `Completed run must not persist any intermediate narration/reasoning events.\n${diagnostic}`
+  );
+  assert(
+    (completedRun?.activityReplayTypes || []).some((type) => type === "command" || type === "tool"),
+    `Completed run should persist the command/tool activity flow.\n${diagnostic}`
+  );
   console.log("Worked summary persist smoke passed.");
   console.log(JSON.stringify({
     newRunBlock: snapshot.newRunBlock,
@@ -280,12 +343,56 @@ function frame(event) {
 function streamedChatBody() {
   // Three upstream generations (tool loop) then the final answer, matching the
   // user's OpenRouter logs (3 requests, distinct request ids).
+  const firstNarration = [
+    "Progress notes:",
+    "",
+    "Need to verify shell access before answering.",
+    "Check whether the model can use the local tools.",
+    "Keep the user-facing update short and readable rather than dumping every stream chunk."
+  ].join("\n");
+  const secondNarration = [
+    "**Plan:**",
+    "",
+    "- Run `pwd` to identify the environment.",
+    "- Summarize the result for the user.",
+    "- Avoid repeating raw shell output in the public progress note."
+  ].join("\n");
+  const publicReasoning = [
+    "Reasoning steps:",
+    "Identity and location checks first",
+    "Clock verification",
+    "All commands returned clean results."
+  ].join("\n");
+  const commandDump = [
+    "Key configs: .hermes/ (timestamp 23:14, current session), .cursor/, .claude/, .codex/, hermes - webui/. Standard permissions, no anomalies.",
+    "python --version || python3 --version - Python 3.11.15: Fallback",
+    "git status --short || true - \"fatal: not a git repository\": Expected in home directory."
+  ].join("\n");
+  const initialUsageFrames = Array.from({ length: 8 }, (_value, index) =>
+    frame({
+      type: "metadata",
+      usage: {
+        promptTokens: 4_000 + index * 1_200,
+        completionTokens: 0,
+        source: "provider",
+        requestId: "req-1"
+      }
+    })
+  );
   return [
     frame({ type: "run_event", name: "message.started", status: "running", payload: { event: "message.started" } }),
+    ...initialUsageFrames,
+    frame({ type: "run_event", name: "reasoning.delta", status: "running", payload: { event: "reasoning.delta", text: publicReasoning, run_id: "r1" } }),
+    frame({ type: "run_event", name: "reasoning.done", status: "completed", payload: { event: "reasoning.done", text: publicReasoning, run_id: "r1" } }),
+    frame({ type: "message_delta", delta: firstNarration, messageId: "m1", runId: "r1" }),
+    frame({ type: "message_done", message: { role: "assistant", content: firstNarration }, messageId: "m1", runId: "r1", usage: { promptTokens: 29041, completionTokens: 493, source: "provider", requestId: "req-1" } }),
     frame({ type: "tool_event", name: "memory_search", status: "completed", payload: { query: "model identity", project_key: "p", session_key: "s" } }),
-    frame({ type: "message_done", message: { role: "assistant", content: "" }, messageId: "m1", runId: "r1", usage: { promptTokens: 29041, completionTokens: 493, source: "provider", requestId: "req-1" } }),
+    frame({ type: "message_delta", delta: secondNarration, messageId: "m1", runId: "r1" }),
+    frame({ type: "message_done", message: { role: "assistant", content: secondNarration }, messageId: "m1", runId: "r1", usage: { promptTokens: 29797, completionTokens: 24, source: "provider", requestId: "req-2" } }),
     frame({ type: "tool_event", name: "run_command", status: "completed", payload: { command: "uname -a", cwd: "/repo", exitCode: 0, stdout: "Linux" } }),
-    frame({ type: "message_done", message: { role: "assistant", content: "" }, messageId: "m1", runId: "r1", usage: { promptTokens: 29797, completionTokens: 24, source: "provider", requestId: "req-2" } }),
+    frame({ type: "message_delta", delta: commandDump, messageId: "m1", runId: "r1" }),
+    frame({ type: "message_done", message: { role: "assistant", content: commandDump }, messageId: "m1", runId: "r1", usage: { promptTokens: 29797, completionTokens: 24, source: "provider", requestId: "req-2" } }),
+    frame({ type: "tool_event", name: "run_command", status: "completed", payload: { command: "git status --short || true", cwd: "/repo", exitCode: 0, stdout: "fatal: not a git repository" } }),
     frame({ type: "message_delta", delta: "I am Kimi K2.6 via OpenRouter. ", messageId: "m1", runId: "r1" }),
     frame({ type: "message_delta", delta: answerMarker, messageId: "m1", runId: "r1" }),
     frame({ type: "message_done", message: { role: "assistant", content: `I am Kimi K2.6 via OpenRouter. ${answerMarker}` }, messageId: "m1", runId: "r1", usage: { promptTokens: 29821, completionTokens: 282, source: "provider", requestId: "req-3" } }),

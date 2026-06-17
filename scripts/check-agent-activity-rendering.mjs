@@ -125,7 +125,7 @@ function checkComponentSource() {
   );
   record(
     "worked-auto-collapse-after-final-reveal",
-    component.includes("COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 1000") &&
+    component.includes("COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 2000") &&
       component.includes("completedWorkAutoCollapseDelayMs") &&
       chatTranscript.includes("assistantRevealComplete") &&
       chatTranscript.includes("autoCollapseCompletedWork={isCurrentAnchor && !isWorking && revealComplete}") &&
@@ -138,7 +138,7 @@ function checkComponentSource() {
       chatTranscript.includes("startActivityCollapseAnchorLock(COMPLETED_WORK_ANCHOR_LOCK_MS)") &&
       chatTranscript.includes("ResizeObserver") &&
       chatTranscript.includes("viewport.scrollTop = Math.max(0, viewport.scrollTop + delta)"),
-    "Completed Worked details wait for the assistant reveal to finish, then fold after 1s with ease-in-out motion while the transcript compensates height loss above the answer."
+    "Completed Worked details wait for the assistant reveal to finish, then fold after 2s with ease-in-out motion while the transcript compensates height loss above the answer."
   );
   record(
     "transcript-session-bottom-snap",
@@ -155,18 +155,18 @@ function checkComponentSource() {
       chatTranscript.includes("bottomFollowPassesRef") &&
       chatTranscript.includes("window.requestAnimationFrame(follow)") &&
       chatTranscript.includes("shouldShowAgentActivityBlock") &&
-      chatTranscript.includes("hasSubstantialAssistantContent"),
-    "Transcript delays activity rows until meaningful data and follows bottom layout changes on animation frames."
+      chatTranscript.includes("hasLiveActivity"),
+    "Transcript waits for meaningful activity rows and follows bottom layout changes on animation frames."
   );
   record(
-    "transcript-activity-reveal-delay",
-      chatTranscript.includes("ACTIVITY_REVEAL_DELAY_MS = 5_000") &&
-      chatTranscript.includes("activityDelayElapsed") &&
-      chatTranscript.includes("commandStartCount >= 2") &&
+    "transcript-thinking-first-worklog-later",
+      !chatTranscript.includes("ACTIVITY_REVEAL_DELAY_MS") &&
+      !chatTranscript.includes("activityDelayElapsed") &&
+      chatTranscript.includes("commandStartCount >= 1") &&
+      chatTranscript.includes("Token usage alone should not steal the first visible state") &&
       chatTranscript.includes("isRunLifecycleNoiseEvent") &&
-      component.includes("function isRunLifecycleNoiseEvent") &&
-      chatTranscript.includes("hasLiveTokenUsage"),
-    "Transcript delays noisy live activity, but shows live token usage immediately when available."
+      component.includes("function isRunLifecycleNoiseEvent"),
+    "Transcript shows Thinking first, then mounts Working for only after progress or tool activity exists."
   );
   record(
     "transcript-activity-run-anchor",
@@ -260,8 +260,34 @@ function checkComponentSource() {
     component.includes("function WorkingLog") &&
       component.includes("LiveTokenUsageTicker") &&
       component.includes("liveProgressBody") &&
-      component.includes("buildLiveTimelineItems"),
-    "The live Working block keeps token/header state while rendering bounded Codex-like progress blocks."
+      component.includes("buildLiveTimelineItems") &&
+      !component.includes(".slice(-8)"),
+    "The live Working block keeps token/header state while rendering stable Codex-like progress blocks without dropping rows mid-run."
+  );
+  record(
+    "intermediate-text-not-surfaced",
+    chatView.includes("discardIntermediateTurn") &&
+      chatView.includes("streamCurrentTurnAsAnswer") &&
+      chatView.includes("finalizeCurrentTurnAsAnswer") &&
+      !chatView.includes("summarizePublicProgressNarration") &&
+      !chatView.includes("buildLiveNarrationEvent") &&
+      !chatView.includes("polishNarrationWithUtilityModel") &&
+      component.includes("Reasoning and narration are intermediate text"),
+    "Intermediate assistant narration/reasoning is never surfaced: intermediate turns are discarded and only the final turn reaches the answer body."
+  );
+  record(
+    "tool-notes-group-by-kind",
+    component.includes("function NoteGroupRow") &&
+      component.includes('kind: "notes"') &&
+      component.includes("isSameActivityLabel(previous.title, title)"),
+    "Consecutive same-kind tool notes collapse into one expandable row; a different kind starts a new row."
+  );
+  record(
+    "command-shell-completion-check",
+    component.includes("import { Check, ChevronRight }") &&
+      component.includes("styles.commandResultIcon") &&
+      css.includes(".commandResultIcon"),
+    "Completed shell cards use a real check icon in the command detail status instead of pseudo-content."
   );
   record(
     "reasoning-text-events",
@@ -315,7 +341,8 @@ function checkComponentSource() {
   );
   record(
     "stream-delta-batching",
-    chatView.includes("accumulated += event.delta") &&
+    chatView.includes("currentTurnText += event.delta") &&
+      chatView.includes("accumulated = currentTurnText") &&
       chatView.includes("window.requestAnimationFrame") &&
       composer.includes("not one React update per token"),
     "Chat view buffers deltas and flushes assistant text on animation frames."

@@ -37,15 +37,16 @@ import styles from "./ChatView.module.css";
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ActivityRecorder = (sessionId: string, event: AgentActivityEvent) => void;
 const STREAM_FLUSH_INTERVAL_MS = 32;
-// Reasoning can stream token-by-token; throttle store writes for the growing
-// "Thinking" block while always persisting the final text when it closes.
-const REASONING_FLUSH_INTERVAL_MS = 120;
 const ESTIMATED_CHARS_PER_TOKEN = 4;
 const ESTIMATED_ACTIVITY_CHARS_PER_TOKEN = 6;
 const ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND = 2.5;
 const LIVE_TOKEN_ESTIMATE_INTERVAL_MS = 650;
 const LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS = 512;
 const LIVE_TOKEN_AFTERGLOW_MS = 15_000;
+// How many completed tool cycles it takes for the live "in" estimate to climb
+// all the way to the prior turn's prompt total (a tool loop re-sends the full
+// context each request, so prompt grows roughly per cycle).
+const PROMPT_CLIMB_EXPECTED_CYCLES = 6;
 
 type ChatViewProps = {
   activeProject: Project;
@@ -207,19 +208,23 @@ export function ChatView({
     const usageAccumulator = createTokenUsageAccumulator();
     let estimatedPromptTokens = 0;
     let estimatedActivityChars = 0;
+    // The visible text is a tiny fraction of the real prompt — most of it is the
+    // context Hermes injects server-side (memory, tool defs, system) and, in a
+    // tool loop, the full conversation re-sent each request. The client can't see
+    // that, so the live "in" estimate climbs toward the prior turn's prompt total
+    // (a good proxy, since context carries forward) as command cycles complete,
+    // instead of sitting flat at the visible-text estimate and snapping at the end.
+    const priorTurnPromptTokens = recentAuthoritativePromptTokens(session.messages);
+    let toolCycleCount = 0;
     let accumulated = "";
+    // Assistant text arrives one turn at a time. We hold each turn rather than
+    // streaming it immediately: if tool/command activity follows, the turn was
+    // intermediate working text and is discarded; only the final turn (nothing
+    // follows it) is committed to the answer body. Reasoning text is never
+    // surfaced at all.
+    let currentTurnText = "";
+    let lastAnswerCandidateText = "";
     let streamCompletedSuccessfully = false;
-    // Reasoning arrives as many small deltas. Accumulate each contiguous run of
-    // reasoning into one "Thinking" block under a stable segment id so the
-    // timeline shows coherent paragraphs (command -> reasoning -> command)
-    // instead of one row per token. A non-reasoning event closes the segment.
-    let reasoningSegmentId: string | null = null;
-    let reasoningSegmentText = "";
-    let reasoningSegmentStartedAt: string | null = null;
-    let reasoningSegmentEvent: AgentActivityEvent | null = null;
-    let reasoningSegmentSeq = 0;
-    let reasoningSegmentRecordedText = "";
-    let lastReasoningFlushMs = 0;
     const liveEstimateStartedAtMs = performance.now();
 
     const nextActivitySequence = () => activitySequenceRef.current++;
@@ -275,7 +280,17 @@ export function ChatView({
     const estimateLivePromptTokens = () => {
       const activityPromptTokens = Math.ceil(estimatedActivityChars / ESTIMATED_CHARS_PER_TOKEN);
       const generatedContextTokens = Math.ceil(accumulated.length / ESTIMATED_CHARS_PER_TOKEN);
-      return Math.max(0, estimatedPromptTokens + activityPromptTokens + generatedContextTokens);
+      const visibleEstimate = estimatedPromptTokens + activityPromptTokens + generatedContextTokens;
+      // Climb toward the prior turn's prompt total as tool cycles complete, so a
+      // multi-request run's "in" rises during streaming instead of snapping at the
+      // end. Stays at/under the prior total so authoritative usage only corrects
+      // upward for heavier turns; lighter turns settle when the real value lands.
+      if (priorTurnPromptTokens > visibleEstimate) {
+        const cycleProgress = Math.min(1, toolCycleCount / PROMPT_CLIMB_EXPECTED_CYCLES);
+        const climbed = visibleEstimate + Math.round((priorTurnPromptTokens - visibleEstimate) * cycleProgress);
+        return Math.max(0, climbed);
+      }
+      return Math.max(0, visibleEstimate);
     };
 
     const withEstimatedTokenFallback = (usage: HermesTokenUsage | undefined) => {
@@ -369,93 +384,14 @@ export function ChatView({
       });
     };
 
-    const flushReasoningSegment = (status: "running" | "completed", completedAt?: string) => {
-      if (!reasoningSegmentEvent) {
-        return;
-      }
-      // A "running" flush is only worth a store write when the text actually
-      // grew; a "completed" flush always records so the final text is persisted.
-      if (status === "running" && reasoningSegmentText === reasoningSegmentRecordedText) {
-        return;
-      }
-      const flushed: AgentActivityEvent = {
-        ...reasoningSegmentEvent,
-        status,
-        summary: reasoningSegmentText || reasoningSegmentEvent.summary,
-        completedAt: status === "completed" ? completedAt ?? new Date().toISOString() : undefined
-      };
-      reasoningSegmentEvent = flushed;
-      reasoningSegmentRecordedText = reasoningSegmentText;
-      lastReasoningFlushMs = performance.now();
-      recordRunActivity(session.id, flushed);
-      workspaceActions.appendToolEvent(session.id, toToolEvent(flushed));
-    };
-
-    const closeReasoningSegment = () => {
-      if (reasoningSegmentEvent && reasoningSegmentEvent.status === "running") {
-        flushReasoningSegment("completed");
-      }
-      reasoningSegmentId = null;
-      reasoningSegmentText = "";
-      reasoningSegmentRecordedText = "";
-      reasoningSegmentStartedAt = null;
-      reasoningSegmentEvent = null;
-      reasoningSegmentSeq += 1;
-    };
-
-    const handleReasoningStreamEvent = (eventName: string, base: AgentActivityEvent) => {
-      const isDone = eventName === "reasoning.done" || eventName === "reasoning.summary.done";
-      const hasText = base.metadata?.rawReasoningTextRendered === true;
-      const deltaText = hasText ? (base.summary ?? "") : "";
-      const now = new Date().toISOString();
-
-      // A bare progress signal (no text) only matters when no segment is open:
-      // record it so the live status can show "Thinking" without forcing a block.
-      if (!deltaText && !reasoningSegmentId) {
-        addActivityTokenEstimate(base);
-        recordRunActivity(session.id, base);
-        workspaceActions.appendToolEvent(session.id, toToolEvent(base));
-        return;
-      }
-
-      if (!reasoningSegmentId) {
-        reasoningSegmentId = `reasoning-${runRecordId}-${reasoningSegmentSeq}`;
-        reasoningSegmentText = "";
-        reasoningSegmentRecordedText = "";
-        reasoningSegmentStartedAt = now;
-        lastReasoningFlushMs = 0;
-      }
-      if (isDone) {
-        // Some providers send the full text in the *.done frame; keep the longer.
-        if (deltaText.length > reasoningSegmentText.length) {
-          reasoningSegmentText = deltaText;
-        }
-      } else if (deltaText) {
-        reasoningSegmentText += deltaText;
-      }
-
-      // Keep the in-memory segment current every delta; the live token estimate
-      // tracks the growing text, but persist to the store on a throttle (and
-      // always on the closing frame) to avoid a store write per reasoning token.
-      reasoningSegmentEvent = {
-        ...base,
-        id: reasoningSegmentId,
-        type: "reasoning",
-        title: "Thinking",
-        status: "running",
-        summary: reasoningSegmentText || base.summary,
-        startedAt: reasoningSegmentStartedAt ?? base.startedAt,
-        completedAt: undefined
-      };
-      estimatedActivityChars += Math.min(deltaText.length, 900);
-
-      if (isDone) {
-        flushReasoningSegment("completed", now);
-        closeReasoningSegment();
-        return;
-      }
-      if (performance.now() - lastReasoningFlushMs >= REASONING_FLUSH_INTERVAL_MS) {
-        flushReasoningSegment("running");
+    // Reasoning text is internal intermediate output and is never surfaced in
+    // the activity flow. We only keep its size feeding the live token estimate
+    // so usage still advances while the model is thinking.
+    const handleReasoningStreamEvent = (_eventName: string, base: AgentActivityEvent) => {
+      const reasoningText = base.metadata?.rawReasoningTextRendered === true ? (base.summary ?? "") : "";
+      if (reasoningText) {
+        estimatedActivityChars += Math.min(reasoningText.length, 900);
+        syncEstimatedLiveTokenUsage();
       }
     };
 
@@ -596,6 +532,44 @@ export function ChatView({
       }
     };
 
+    const streamCurrentTurnAsAnswer = (force = false) => {
+      if (!currentTurnText.trim()) {
+        return;
+      }
+      accumulated = currentTurnText;
+      lastAnswerCandidateText = currentTurnText;
+      markAssistantHasContent();
+      if (force) {
+        flushNow("streaming");
+        return;
+      }
+      flush();
+    };
+
+    // An intermediate assistant turn (more activity follows it) carries working
+    // text we never surface. Drop it so only the final turn reaches the body.
+    const discardIntermediateTurn = () => {
+      currentTurnText = "";
+    };
+
+    const finalizeCurrentTurnAsAnswer = () => {
+      if (!currentTurnText.trim()) {
+        return;
+      }
+      streamCurrentTurnAsAnswer(true);
+    };
+
+    // Commands, tools, memory, files, and approvals mean the preceding assistant
+    // text was intermediate — discard it before recording the activity row.
+    const activityEndsIntermediateTurn = (activityEvent: AgentActivityEvent) =>
+      activityEvent.type === "command" ||
+      Boolean(activityEvent.command) ||
+      activityEvent.type === "tool" ||
+      activityEvent.type === "memory" ||
+      activityEvent.type === "file" ||
+      activityEvent.type === "approval" ||
+      activityEvent.status === "waiting_for_approval";
+
     const completeAssistantMessage = (references?: string[], usage?: HermesTokenUsage) => {
       cancelPendingFlush();
       // Commit the final text immediately. The assistant body keeps its reveal
@@ -681,21 +655,22 @@ export function ChatView({
       {
         onEvent: (event) => {
           if (event.type === "message_delta") {
-            accumulated += event.delta;
-            if (event.delta.trim()) {
-              // Real answer text ends the current reasoning segment.
-              closeReasoningSegment();
-              markAssistantHasContent();
-            }
-            flush("streaming");
+            // Accumulate the in-progress turn but render NOTHING yet. A turn's
+            // role (intermediate working text vs final answer) is only known
+            // from what follows it, so streaming partial text now is exactly
+            // what caused the "…Sta" leak/flash. We defer: commit at boundaries.
+            currentTurnText += event.delta;
           } else if (event.type === "message_done") {
-            closeReasoningSegment();
             completedAssistant = true;
-            accumulated = event.message.content || accumulated;
+            // Hold the completed turn. If activity follows it was intermediate
+            // working text (discarded then); if the stream ends it is the final
+            // answer (handed to the body at completion). Render nothing here so
+            // a completed intermediate turn never flashes in the answer.
+            currentTurnText = event.message.content || currentTurnText;
             hermesRunId = event.runId || hermesRunId;
             updateResponseTokenUsage(event.usage);
             updateRunRecord({ hermesRunId });
-            if (accumulated.trim()) {
+            if (currentTurnText.trim()) {
               markAssistantHasContent();
             }
             pendingCompletion = {
@@ -719,16 +694,24 @@ export function ChatView({
               if (event.type === "run_event" && isReasoningRunEventName(event.name)) {
                 handleReasoningStreamEvent(event.name, activityEvent);
               } else {
-                // Any other activity ends the current reasoning segment, giving
-                // the command -> reasoning -> command ordering of the timeline.
-                closeReasoningSegment();
+                if (activityEndsIntermediateTurn(activityEvent)) {
+                  discardIntermediateTurn();
+                }
+                if (
+                  activityEvent.status === "completed" &&
+                  (activityEvent.type === "command" || activityEvent.command || activityEvent.type === "tool")
+                ) {
+                  // Each finished command/tool roughly corresponds to one more
+                  // upstream request that re-sends the full context.
+                  toolCycleCount += 1;
+                }
                 addActivityTokenEstimate(activityEvent);
                 recordRunActivity(session.id, activityEvent);
                 workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
               }
             }
           } else if (event.type === "error") {
-            closeReasoningSegment();
+            discardIntermediateTurn();
             hadStreamError = true;
             cancelPendingFlush();
             accumulated = event.error.message;
@@ -764,6 +747,7 @@ export function ChatView({
     const completedAt = new Date().toISOString();
     if (streamResult === "aborted" || stopRequestedRef.current) {
       cancelPendingFlush();
+      finalizeCurrentTurnAsAnswer();
       finalizeStoppedStream(
         session.id,
         assistantId,
@@ -786,6 +770,13 @@ export function ChatView({
       return;
     }
 
+    // The last turn had no activity after it, so it is the final answer: commit
+    // it to the answer body.
+    finalizeCurrentTurnAsAnswer();
+    if (!accumulated.trim() && lastAnswerCandidateText.trim()) {
+      currentTurnText = lastAnswerCandidateText;
+      streamCurrentTurnAsAnswer(true);
+    }
     const emptyAssistantText = !hadStreamError && !accumulated.trim();
 
     await completePendingAssistantMessage(completedAt);
@@ -1273,6 +1264,24 @@ function estimatePromptTokensForRequest({
     .filter(Boolean)
     .join("\n");
   return estimateTokenCount(promptText);
+}
+
+function recentAuthoritativePromptTokens(messages: ChatMessage[]): number {
+  // The most recent assistant turn's reported prompt size is the best proxy for
+  // the next turn's prompt: conversation + injected context carry forward and
+  // generally only grow. Estimated usage is skipped so we calibrate off real
+  // provider-reported totals only.
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "assistant") {
+      continue;
+    }
+    const usage = message.usage;
+    if (usage && usage.source !== "estimated" && typeof usage.promptTokens === "number" && usage.promptTokens > 0) {
+      return usage.promptTokens;
+    }
+  }
+  return 0;
 }
 
 function estimateTokenCount(value: string) {

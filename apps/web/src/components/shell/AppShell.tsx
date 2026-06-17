@@ -312,7 +312,9 @@ export function AppShell() {
         isHermesStatusLoading={hermesStatus.isLoading}
         isHydrated={isHydrated}
         projects={state.projects}
-        refreshHermesStatus={hermesStatus.refresh}
+        refreshHermesStatus={() => {
+          void hermesStatus.refresh({ refreshModels: true });
+        }}
       />
       <button
         aria-label="Resize left sidebar"
@@ -367,7 +369,9 @@ export function AppShell() {
           mode={rightPaneMode}
           onActivityEvent={appendActivityEvent}
           refreshBrainMemoryStatus={brainMemoryStatus.refresh}
-          refreshHermesStatus={hermesStatus.refresh}
+          refreshHermesStatus={() => {
+            void hermesStatus.refresh({ refreshModels: true });
+          }}
           refreshHermesSessions={hermesSessions.refresh}
           selectSideSession={selectSideSession}
           setMode={setRightPaneMode}

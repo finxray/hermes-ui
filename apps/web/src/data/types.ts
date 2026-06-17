@@ -106,6 +106,7 @@ export type PersistedActivityEvent = {
   id: string;
   runId: string;
   type:
+    | "narration"
     | "reasoning"
     | "command"
     | "tool"

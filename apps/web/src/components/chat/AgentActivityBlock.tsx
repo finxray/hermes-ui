@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { LiveTokenUsageTicker, type LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
@@ -29,7 +29,7 @@ type AgentActivityBlockProps = {
 // the whole activity block — and any thinking/command rows under it — vanish the
 // moment a short run completed.
 const WORKED_LABEL_MIN_DURATION_MS = 0;
-const COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 1000;
+const COMPLETED_WORK_AUTO_COLLAPSE_DELAY_MS = 2000;
 const EMPTY_ACTIVITY_ID_SET: ReadonlySet<string> = new Set();
 
 type CommandGroup = {
@@ -45,14 +45,15 @@ type CommandItem = {
 
 type ActivityTimelineItem =
   | {
-      event: AgentActivityEvent;
+      events: AgentActivityEvent[];
       id: string;
-      kind: "note";
+      kind: "commands";
     }
   | {
       events: AgentActivityEvent[];
       id: string;
-      kind: "commands";
+      kind: "notes";
+      title: string;
     };
 
 export const AgentActivityBlock = memo(function AgentActivityBlock({
@@ -232,14 +233,16 @@ function ActivityTimeline({
         item.kind === "commands" ? (
           <CommandGroupRow allowActiveState={allowActiveState} events={item.events} key={item.id} />
         ) : (
-          <ReasoningChunk allowActiveState={allowActiveState} event={item.event} key={item.id} />
+          <NoteGroupRow allowActiveState={allowActiveState} events={item.events} key={item.id} title={item.title} />
         )
       )}
     </div>
   );
 }
 
-function ReasoningChunk({
+// A single tool/memory/approval note: one status-like line ("Used Read File
+// /tmp/...") with the action and its target.
+function ToolNoteLine({
   allowActiveState = false,
   event
 }: {
@@ -247,46 +250,73 @@ function ReasoningChunk({
   event: AgentActivityEvent;
 }) {
   const title = titleForReasoningChunk(event);
-  const detail = summarizeWorkedDetail(event);
-  const showDetail = detail ? !isSameActivityLabel(title, detail) : false;
-
-  if (event.type === "tool") {
-    // Render a tool note as a single status-like line ("Used Write File
-    // /tmp/...") instead of a title stacked over its target, matching the
-    // inline Thinking/Running/Reading status rows.
-    const active = allowActiveState && isActiveActivityStatus(event.status);
-    return (
-      <div className={styles.toolNote}>
-        <span className={styles.toolIcon} aria-hidden="true" />
-        <p className={styles.toolNoteLine} data-active={active ? "true" : "false"}>
-          <span className={styles.toolNoteTitle}>{title}</span>
-          {showDetail ? <span className={styles.toolNoteTarget}>{detail}</span> : null}
-        </p>
-      </div>
-    );
-  }
-
-  // Once reasoning text is being surfaced, the text itself communicates the
-  // activity — drop the "Thinking" header and render only the reasoning prose.
-  // "Thinking" is reserved for the bare signal (model is thinking, no text yet).
-  if (event.type === "reasoning" && hasRenderedReasoningText(event) && showDetail) {
-    return (
-      <div className={styles.reasoningChunk}>
-        <p className={styles.reasoningLine}>{detail}</p>
-      </div>
-    );
-  }
-
+  const detail = noteRowDetail(event);
+  const active = allowActiveState && isActiveActivityStatus(event.status);
   return (
-    <div className={styles.reasoningChunk}>
-      <p className={styles.reasoningTitle}>{title}</p>
-      {showDetail ? <p className={styles.reasoningLine}>{detail}</p> : null}
+    <div className={styles.toolNote}>
+      <span className={styles.toolIcon} aria-hidden="true" />
+      <p className={styles.toolNoteLine} data-active={active ? "true" : "false"}>
+        <span className={styles.toolNoteTitle}>{title}</span>
+        {detail ? <span className={styles.toolNoteTarget}>{detail}</span> : null}
+      </p>
     </div>
   );
 }
 
-function hasRenderedReasoningText(event: AgentActivityEvent) {
-  return event.metadata?.rawReasoningTextRendered === true && Boolean(pickMeaningfulActivityText(event.summary));
+// Consecutive notes of the same kind ("Used Read File" x3) collapse into one
+// row. While only one has arrived it is a plain line; once it repeats, the row
+// shows the latest target and a chevron to expand every task of that kind.
+function NoteGroupRow({
+  allowActiveState = false,
+  events,
+  title
+}: {
+  allowActiveState?: boolean;
+  events: AgentActivityEvent[];
+  title: string;
+}) {
+  if (events.length === 0) {
+    return null;
+  }
+  if (events.length === 1) {
+    return <ToolNoteLine allowActiveState={allowActiveState} event={events[0]} />;
+  }
+
+  const latest = events[events.length - 1];
+  const latestDetail = noteRowDetail(latest);
+  const active = allowActiveState && events.some((event) => isActiveActivityStatus(event.status));
+
+  return (
+    <AnimatedDisclosure
+      className={styles.commandBlock}
+      summaryClassName={styles.commandSummary}
+      type="command"
+      summary={
+        <>
+          <span className={styles.toolIcon} aria-hidden="true" />
+          <span className={styles.commandLabel} data-active={active ? "true" : "false"}>{title}</span>
+          {latestDetail ? <span className={styles.toolNoteTarget}>{latestDetail}</span> : null}
+          <ChevronRight className={styles.commandChevron} size={14} aria-hidden="true" />
+        </>
+      }
+    >
+      <div className={styles.expandedBody}>
+        <div className={styles.commandItems}>
+          {events.map((event, index) => (
+            <ToolNoteLine allowActiveState={allowActiveState} event={event} key={`${event.id}-${index}`} />
+          ))}
+        </div>
+      </div>
+    </AnimatedDisclosure>
+  );
+}
+
+function noteRowDetail(event: AgentActivityEvent) {
+  const detail = summarizeWorkedDetail(event);
+  if (!detail) {
+    return "";
+  }
+  return isSameActivityLabel(titleForReasoningChunk(event), detail) ? "" : detail;
 }
 
 function CommandGroupRow({
@@ -444,7 +474,12 @@ function CommandDetail({ allowActiveState = false, item }: { allowActiveState?: 
           {preview}
         </pre>
       ) : null}
-      {status ? <p className={styles.commandResult} data-status={status.kind}>{status.label}</p> : null}
+      {status ? (
+        <p className={styles.commandResult} data-status={status.kind}>
+          {status.kind === "completed" ? <Check className={styles.commandResultIcon} size={14} aria-hidden="true" /> : null}
+          <span>{status.label}</span>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -472,7 +507,7 @@ function buildLiveTimelineItems(
   const currentRunEvents =
     liveBaselineIds.size > 0 ? events.filter((event) => !liveBaselineIds.has(event.id)) : events;
   const meaningfulEvents = currentRunEvents.filter(isMeaningfulTimelineEvent);
-  return buildTimelineItems(meaningfulEvents, meaningfulEvents).slice(-8);
+  return buildTimelineItems(meaningfulEvents, meaningfulEvents);
 }
 
 // A single source of truth for which activity events deserve their own row.
@@ -480,8 +515,8 @@ function buildLiveTimelineItems(
 // completed"), stream/elapsed bookkeeping, and the internal "thinking" signal
 // are intentionally dropped: the live status line already says Thinking/Running,
 // so they would only add a noisy list of repeated rows. Real commands, tool
-// uses, memory operations, approvals, errors, and reasoning that carries an
-// actual public summary are kept.
+// uses, memory operations, approvals, errors, public narration, and reasoning
+// that carries an actual public summary are kept.
 function isMeaningfulTimelineEvent(event: AgentActivityEvent): boolean {
   if (event.type === "elapsed" || event.type === "stream" || event.type === "status") {
     return false;
@@ -492,11 +527,12 @@ function isMeaningfulTimelineEvent(event: AgentActivityEvent): boolean {
   if (isInternalThinkingSignal(event)) {
     return false;
   }
+  // Reasoning and narration are intermediate text and are never surfaced.
+  if (event.type === "reasoning" || event.type === "narration") {
+    return false;
+  }
   if (isCommandLikeEvent(event) || event.type === "memory" || event.type === "approval" || event.type === "error") {
     return true;
-  }
-  if (event.type === "reasoning") {
-    return Boolean(pickMeaningfulActivityText(event.summary));
   }
   if (event.type === "tool") {
     return Boolean(event.summary) || Boolean(pickMeaningfulActivityText(event.title));
@@ -516,6 +552,9 @@ function summarizeWorkedDetail(event: AgentActivityEvent) {
   if (event.command?.outputPreview) {
     return event.command.outputPreview;
   }
+  // Narration summaries are already compacted once when the event is created
+  // (in ChatView). Re-running the compactor on every render was the main source
+  // of the streaming slowdown, so render the stored text as-is here.
   return pickMeaningfulActivityText(event.summary);
 }
 
@@ -528,6 +567,9 @@ function normalizeActivityLabel(value: string) {
 }
 
 function titleForReasoningChunk(event: AgentActivityEvent) {
+  if (event.type === "narration") {
+    return "Progress";
+  }
   if (event.type === "reasoning") {
     return "Thinking";
   }
@@ -566,7 +608,15 @@ function commandItemRowLabel(item?: CommandItem, allowActiveState = false) {
 }
 
 function commandItemIsActive(item: CommandItem) {
-  return [item.event, ...item.relatedEvents].some(
+  const events = [item.event, ...item.relatedEvents];
+  // A command groups its started (running) and completed events. Once any
+  // terminal event has arrived it is done — stop shimmering even though the
+  // earlier running event is still in the group. Only commands still awaiting a
+  // result shimmer, so a finished command settles while the next one animates.
+  if (events.some((event) => event.status === "completed" || event.status === "failed" || event.status === "cancelled")) {
+    return false;
+  }
+  return events.some(
     (event) => event.status === "running" || event.status === "queued" || event.status === "waiting_for_approval"
   );
 }
@@ -865,70 +915,71 @@ function groupCommandEvents(events: AgentActivityEvent[]): CommandGroup[] {
 }
 
 function buildTimelineItems(events: AgentActivityEvent[], fallbackDetails: AgentActivityEvent[]): ActivityTimelineItem[] {
-  const items: ActivityTimelineItem[] = [];
-  let currentCommands: AgentActivityEvent[] = [];
   const fallbackIds = new Set(fallbackDetails.map((event) => event.id));
 
-  const flushCommands = () => {
-    if (currentCommands.length === 0) {
-      return;
+  const build = (source: AgentActivityEvent[], honorFallbackFilter: boolean) => {
+    const items: ActivityTimelineItem[] = [];
+    let currentCommands: AgentActivityEvent[] = [];
+
+    const flushCommands = () => {
+      if (currentCommands.length === 0) {
+        return;
+      }
+      items.push({
+        events: currentCommands,
+        id: `timeline-commands-${items.length}-${currentCommands[0]?.id ?? "batch"}`,
+        kind: "commands"
+      });
+      currentCommands = [];
+    };
+
+    for (const event of source) {
+      if (event.type === "elapsed" || event.type === "stream") {
+        continue;
+      }
+      if (isCommandLikeEvent(event)) {
+        currentCommands.push(event);
+        continue;
+      }
+      if (honorFallbackFilter && fallbackIds.size > 0 && !fallbackIds.has(event.id)) {
+        continue;
+      }
+      if (!event.summary && !event.title) {
+        continue;
+      }
+      flushCommands();
+
+      // Group a note with the run of same-kind notes immediately before it
+      // (e.g. several "Used Read File" in a row), so one expandable row stands
+      // in for the group. A note of a different kind starts a new row.
+      const title = titleForReasoningChunk(event);
+      const previous = items[items.length - 1];
+      if (previous && previous.kind === "notes" && isSameActivityLabel(previous.title, title)) {
+        const last = previous.events[previous.events.length - 1];
+        // Drop a true duplicate (same kind AND same target) of the last member.
+        if (last && isDuplicateNoteEvent(last, event)) {
+          continue;
+        }
+        previous.events.push(event);
+        continue;
+      }
+      items.push({
+        events: [event],
+        id: `timeline-notes-${event.id}`,
+        kind: "notes",
+        title
+      });
     }
-    items.push({
-      events: currentCommands,
-      id: `timeline-commands-${items.length}-${currentCommands[0]?.id ?? "batch"}`,
-      kind: "commands"
-    });
-    currentCommands = [];
+
+    flushCommands();
+    return items;
   };
 
-  for (const event of events) {
-    if (event.type === "elapsed" || event.type === "stream") {
-      continue;
-    }
-    if (isCommandLikeEvent(event)) {
-      currentCommands.push(event);
-      continue;
-    }
-    if (fallbackIds.size > 0 && !fallbackIds.has(event.id)) {
-      continue;
-    }
-    if (!event.summary && !event.title) {
-      continue;
-    }
-    flushCommands();
-    // Only collapse a note when it duplicates the note immediately before it
-    // (same title AND body). A reasoning note must not be dropped just because
-    // an earlier "Thinking" block — possibly separated by a command — shared the
-    // same title; distinct reasoning segments carry distinct text.
-    const previous = items[items.length - 1];
-    if (previous && previous.kind === "note" && isDuplicateNoteEvent(previous.event, event)) {
-      continue;
-    }
-    items.push({
-      event,
-      id: `timeline-note-${event.id}`,
-      kind: "note"
-    });
-  }
-
-  flushCommands();
+  const items = build(events, true);
   if (items.length > 0) {
     return items;
   }
-
-  const fallbackItems: ActivityTimelineItem[] = [];
-  for (const event of fallbackDetails) {
-    const previous = fallbackItems[fallbackItems.length - 1];
-    if (previous && previous.kind === "note" && isDuplicateNoteEvent(previous.event, event)) {
-      continue;
-    }
-    fallbackItems.push({
-      event,
-      id: `timeline-note-${event.id}`,
-      kind: "note"
-    });
-  }
-  return fallbackItems;
+  return build(fallbackDetails, false);
 }
 
 function isDuplicateNoteEvent(left: AgentActivityEvent, right: AgentActivityEvent) {
@@ -948,8 +999,8 @@ function isRunLifecycleNoiseEvent(event: AgentActivityEvent) {
   if (event.type !== "status") {
     return false;
   }
-  const label = `${event.title} ${event.summary ?? ""}`.trim();
-  return /\brun\s+(started|completed)\b/i.test(label);
+  const label = `${event.title} ${event.summary ?? ""} ${event.hermes?.eventType ?? ""}`.trim();
+  return /\b(?:run|message|response|stream)[\s._-]*(?:start|started|created|complete|completed|done|finished)\b/i.test(label);
 }
 
 function toActivityEventFromToolEvent(event: ToolEvent): AgentActivityEvent {

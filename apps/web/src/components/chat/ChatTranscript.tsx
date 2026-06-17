@@ -10,7 +10,6 @@ import type { ChatMessage, Project, RunRecord, Session } from "@/data/types";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./ChatView.module.css";
 
-const ACTIVITY_REVEAL_DELAY_MS = 5_000;
 const COMPLETED_WORK_ANCHOR_LOCK_MS = 900;
 
 type ChatTranscriptProps = {
@@ -52,7 +51,6 @@ export function ChatTranscript({
   const collapseAnchorObserverRef = useRef<ResizeObserver | null>(null);
   const collapseAnchorTimerRef = useRef<number | null>(null);
   const collapseAnchorLastHeightRef = useRef(0);
-  const [activityDelayElapsed, setActivityDelayElapsed] = useState(false);
   const [revealedAssistantMessageId, setRevealedAssistantMessageId] = useState<string | null>(null);
   const lastMessage = activeSession?.messages.at(-1);
   const messageCount = activeSession?.messages.length ?? 0;
@@ -90,12 +88,9 @@ export function ChatTranscript({
     isStreamingAssistant && activityIsWorking ? resolveStreamStatusLabel(activityEvents) : null;
   const shouldShowActivityBlock = activeSession
     ? shouldShowAgentActivityBlock({
-        activityDelayElapsed,
-        assistantContent: activityAnchorMessage?.content ?? "",
         events: activityBlockEvents,
         isGenerating: activityIsWorking,
-        legacyEventCount: activityBlockLegacyEvents.length,
-        liveTokenUsage
+        legacyEventCount: activityBlockLegacyEvents.length
       })
     : false;
   const activitySignal = `${activityAnchorRun?.id ?? "legacy"}:${shouldShowActivityBlock ? "visible" : "hidden"}:${activityBlockEvents.length}:${activityBlockLegacyEvents.length}`;
@@ -120,12 +115,9 @@ export function ChatTranscript({
     const legacyEvents = !run && isCurrentAnchor ? activityBlockLegacyEvents : [];
     const isWorking = isCurrentRun && activityIsWorking;
     const showBlock = shouldShowAgentActivityBlock({
-      activityDelayElapsed: isCurrentAnchor ? activityDelayElapsed : true,
-      assistantContent: message.content,
       events,
       isGenerating: isWorking,
-      legacyEventCount: legacyEvents.length,
-      liveTokenUsage: isCurrentAnchor ? liveTokenUsage : null
+      legacyEventCount: legacyEvents.length
     });
 
     if (!showBlock) {
@@ -282,29 +274,6 @@ export function ChatTranscript({
       setRevealedAssistantMessageId(null);
     }
   }, [activityIsWorking, lastMessage?.id]);
-
-  useEffect(() => {
-    if (!activityIsWorking || !generationStartedAt) {
-      setActivityDelayElapsed(false);
-      return;
-    }
-
-    const startedAtMs = Date.parse(generationStartedAt);
-    if (!Number.isFinite(startedAtMs)) {
-      const timer = window.setTimeout(() => setActivityDelayElapsed(true), ACTIVITY_REVEAL_DELAY_MS);
-      return () => window.clearTimeout(timer);
-    }
-
-    const remainingMs = Math.max(0, ACTIVITY_REVEAL_DELAY_MS - (Date.now() - startedAtMs));
-    if (remainingMs === 0) {
-      setActivityDelayElapsed(true);
-      return;
-    }
-
-    setActivityDelayElapsed(false);
-    const timer = window.setTimeout(() => setActivityDelayElapsed(true), remainingMs);
-    return () => window.clearTimeout(timer);
-  }, [activityIsWorking, generationStartedAt]);
 
   useLayoutEffect(() => {
     if (isStartState || !activeSession) {
@@ -739,29 +708,21 @@ function finitePositiveNumber(value: unknown) {
 }
 
 function shouldShowAgentActivityBlock({
-  activityDelayElapsed,
-  assistantContent,
   events,
   isGenerating,
-  legacyEventCount,
-  liveTokenUsage
+  legacyEventCount
 }: {
-  activityDelayElapsed: boolean;
-  assistantContent: string;
   events: AgentActivityEvent[];
   isGenerating: boolean;
   legacyEventCount: number;
-  liveTokenUsage: LiveTokenUsageSnapshot | null;
 }) {
-  const hasSubstantialContent = hasSubstantialAssistantContent(assistantContent);
   const commandStartCount = events.filter(isCommandStartActivityEvent).length;
-  const hasLiveActivity = commandStartCount >= 2 || events.some(isMeaningfulNonCommandActivityEvent);
-  const hasLiveTokenUsage =
-    typeof liveTokenUsage?.promptTokens === "number" ||
-    typeof liveTokenUsage?.completionTokens === "number";
-
+  const hasLiveActivity = commandStartCount >= 1 || events.some(isMeaningfulNonCommandActivityEvent);
   if (isGenerating) {
-    return hasLiveTokenUsage || (activityDelayElapsed && (legacyEventCount > 1 || hasLiveActivity || hasSubstantialContent));
+    // Token usage alone should not steal the first visible state from the
+    // streaming assistant message. The user should see "Thinking" first; the
+    // timed work log appears only when there is actual progress/tool content.
+    return legacyEventCount > 0 || hasLiveActivity;
   }
 
   // Completed runs only keep a "Worked for…" summary when the turn actually did
@@ -775,23 +736,18 @@ function shouldShowAgentActivityBlock({
   return events.some(isWorthwhileActivityEvent);
 }
 
-const SIGNIFICANT_REASONING_MIN_CHARS = 80;
-
 function isWorthwhileActivityEvent(event: AgentActivityEvent) {
-  if (
+  // Only real work earns a "Worked for…" block: commands, tools, memory,
+  // approvals, errors. Reasoning and narration are intermediate text and are
+  // never surfaced.
+  return (
     event.type === "command" ||
-    event.command ||
+    Boolean(event.command) ||
     event.type === "tool" ||
     event.type === "memory" ||
     event.type === "approval" ||
     event.type === "error"
-  ) {
-    return true;
-  }
-  if (event.type === "reasoning") {
-    return (event.summary?.trim().length ?? 0) >= SIGNIFICANT_REASONING_MIN_CHARS;
-  }
-  return false;
+  );
 }
 
 function findMessageElementById(root: HTMLElement, messageId: string) {
@@ -837,19 +793,7 @@ function isRunLifecycleNoiseEvent(event: AgentActivityEvent) {
   if (event.type !== "status") {
     return false;
   }
-  const label = `${event.title} ${event.summary ?? ""}`.trim();
-  return /\brun\s+(started|completed)\b/i.test(label);
+  const label = `${event.title} ${event.summary ?? ""} ${event.hermes?.eventType ?? ""}`.trim();
+  return /\b(?:run|message|response|stream)[\s._-]*(?:start|started|created|complete|completed|done|finished)\b/i.test(label);
 }
 
-function hasSubstantialAssistantContent(content: string) {
-  const trimmed = content.trim();
-  if (!trimmed) {
-    return false;
-  }
-  const visibleLines = trimmed.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  if (visibleLines.length > 5) {
-    return true;
-  }
-  const sentenceCount = trimmed.split(/[.!?](?:\s|$)/).filter((part) => part.trim().length > 0).length;
-  return sentenceCount > 5 || trimmed.length > 420;
-}

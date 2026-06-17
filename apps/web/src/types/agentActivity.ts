@@ -1,4 +1,5 @@
 export type AgentActivityType =
+  | "narration"
   | "reasoning"
   | "command"
   | "tool"

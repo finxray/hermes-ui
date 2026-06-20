@@ -240,10 +240,19 @@
   padding: 8px;
   border-radius: 10px;
   color: var(--text-primary);
+  transform: translateZ(0);
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
-.skillCard:hover {
+.skillCard:hover,
+.skillCard:focus-within {
   background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  transform: scale(1.018);
+  z-index: 1;
 }
 
 .skillIcon {
@@ -423,12 +432,12 @@
 }
 
 .skillToggleInput:checked + .skillToggleTrack {
-  border-color: rgba(142, 230, 198, 0.32);
-  background: rgba(142, 230, 198, 0.22);
+  border-color: rgba(255, 155, 82, 0.4);
+  background: rgba(255, 155, 82, 0.24);
 }
 
 .skillToggleInput:checked + .skillToggleTrack .skillToggleThumb {
-  background: #9eeed3;
+  background: #ffb06a;
   transform: translateX(16px);
 }
 
@@ -444,8 +453,8 @@
 
 .skillsStack {
   display: grid;
-  gap: 46px;
-  width: min(620px, 100%);
+  gap: 28px;
+  width: 100%;
   margin: 34px 0 0;
   padding-bottom: 48px;
 }
@@ -552,6 +561,15 @@
   margin: 3px 0 0;
 }
 
+.skillCard:hover .skillBody p,
+.skillCard:focus-within .skillBody p {
+  display: -webkit-box;
+  overflow: visible;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .metaLine {
   display: flex;
   gap: 8px;
@@ -610,6 +628,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .skillCard {
+    transition: none;
+  }
+
+  .skillCard:hover,
+  .skillCard:focus-within {
+    transform: none;
+  }
+
   .loadingCard {
     animation: none;
   }

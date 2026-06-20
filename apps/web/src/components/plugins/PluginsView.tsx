@@ -1,6 +1,6 @@
 "use client";
 
-import type { HermesSkillDescriptor, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { HermesPluginDescriptor, HermesSkillDescriptor, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import {
   Activity,
   BarChart3,
@@ -54,6 +54,7 @@ import {
 } from "./skillGlyphs";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { useHermesPlugins } from "@/hooks/useHermesPlugins";
 import { useHermesSkills } from "@/hooks/useHermesSkills";
 import styles from "./PluginsView.module.css";
 
@@ -62,6 +63,7 @@ type PluginsViewProps = {
 };
 
 type PluginsTab = "plugins" | "skills";
+type CatalogItem = HermesPluginDescriptor | HermesSkillDescriptor;
 
 export function PluginsView({ hermesStatus }: PluginsViewProps) {
   const [activeTab, setActiveTab] = useState<PluginsTab>("plugins");
@@ -69,8 +71,19 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
   const [toggleError, setToggleError] = useState<string | null>(null);
   const canLoadSkills = hermesStatus?.uiCapabilities.tools.skills === true;
   const { isLoading, refresh, result, setSkillEnabled, skills, updatingSkillIds } = useHermesSkills(canLoadSkills);
+  const {
+    isLoading: isLoadingPlugins,
+    plugins,
+    refresh: refreshPlugins,
+    result: pluginsResult,
+    setPluginEnabled,
+    updatingPluginIds
+  } = useHermesPlugins(canLoadSkills);
   const filteredSkills = useMemo(() => filterSkills(skills, query), [query, skills]);
-  const pluginGroups = useMemo(() => groupSkillsBySource(filteredSkills), [filteredSkills]);
+  const filteredPlugins = useMemo(() => filterCatalogItems(plugins, query), [plugins, query]);
+  const pluginGroups = useMemo(() => groupCatalogItemsBySource(filteredPlugins), [filteredPlugins]);
+  const activeRefresh = activeTab === "plugins" ? refreshPlugins : refresh;
+  const activeLoading = activeTab === "plugins" ? isLoadingPlugins : isLoading;
   const title = activeTab === "skills" ? "Skills" : "Plugins";
   const subtitle =
     activeTab === "skills"
@@ -108,10 +121,10 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
         <button
           className={styles.iconButton}
           type="button"
-          onClick={() => void refresh()}
-          title="Refresh Hermes skills"
-          aria-label="Refresh Hermes skills"
-          disabled={!canLoadSkills || isLoading}
+          onClick={() => void activeRefresh()}
+          title="Refresh Hermes metadata"
+          aria-label="Refresh Hermes metadata"
+          disabled={!canLoadSkills || activeLoading}
         >
           <RefreshCw size={15} />
         </button>
@@ -135,8 +148,9 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
       {activeTab === "plugins" ? (
         <div className={styles.summaryRow} aria-label="Hermes skills summary">
           <SummaryPill label="Hermes" value={hermesStatusLabel(hermesStatus)} />
-          <SummaryPill label="Skills" value={isLoading ? "Loading" : String(skills.length)} />
-          <SummaryPill label="Source" value={canLoadSkills ? "Hermes skills" : "Unavailable"} />
+          <SummaryPill label="Plugins" value={isLoadingPlugins ? "Loading" : String(plugins.length)} />
+          <SummaryPill label="Enabled" value={String(plugins.filter((plugin) => plugin.enabled === true).length)} />
+          <SummaryPill label="Source" value={canLoadSkills ? "Hermes plugins" : "Unavailable"} />
         </div>
       ) : null}
 
@@ -148,21 +162,23 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
           title="Hermes skills are unavailable"
           body="Hermes did not advertise the skills endpoint. Connect a Hermes runtime with /v1/skills enabled to populate this view."
         />
-      ) : result?.ok === false ? (
+      ) : activeTab === "plugins" && pluginsResult?.ok === false ? (
+        <EmptyState compact title="Could not load Hermes plugins" body={pluginsResult.error.message} />
+      ) : activeTab === "skills" && result?.ok === false ? (
         <EmptyState compact title="Could not load Hermes skills" body={result.error.message} />
       ) : activeTab === "plugins" ? (
         <PluginsPanel
           groups={pluginGroups}
-          isLoading={isLoading}
-          onToggle={async (skill, nextEnabled) => {
+          isLoading={isLoadingPlugins}
+          onToggle={async (plugin, nextEnabled) => {
             setToggleError(null);
-            const response = await setSkillEnabled(skill.id, nextEnabled);
+            const response = await setPluginEnabled(plugin.id, nextEnabled);
             if (!response.ok) {
               setToggleError(response.error.message);
             }
           }}
           query={query}
-          updatingSkillIds={updatingSkillIds}
+          updatingIds={updatingPluginIds}
         />
       ) : (
         <SkillsPanel
@@ -188,13 +204,13 @@ function PluginsPanel({
   isLoading,
   onToggle,
   query,
-  updatingSkillIds
+  updatingIds
 }: {
-  groups: Array<{ source: string; skills: HermesSkillDescriptor[] }>;
+  groups: Array<{ source: string; items: HermesPluginDescriptor[] }>;
   isLoading: boolean;
-  onToggle: (skill: HermesSkillDescriptor, enabled: boolean) => Promise<void>;
+  onToggle: (plugin: HermesPluginDescriptor, enabled: boolean) => Promise<void>;
   query: string;
-  updatingSkillIds: Set<string>;
+  updatingIds: Set<string>;
 }) {
   if (isLoading) {
     return <LoadingGrid />;
@@ -228,15 +244,15 @@ function PluginsPanel({
         <section className={styles.group} key={group.source} aria-labelledby={`plugin-${slug(group.source)}`}>
           <div className={styles.sectionHeader}>
             <h2 id={`plugin-${slug(group.source)}`}>{group.source}</h2>
-            <span>{group.skills.length} skills</span>
+            <span>{group.items.length} plugins</span>
           </div>
           <div className={styles.grid}>
-            {group.skills.map((skill) => (
-              <SkillCard
-                isUpdating={updatingSkillIds.has(skill.id)}
-                key={skill.id}
+            {group.items.map((plugin) => (
+              <PluginCard
+                isUpdating={updatingIds.has(plugin.id)}
+                key={plugin.id}
                 onToggle={onToggle}
-                skill={skill}
+                plugin={plugin}
               />
             ))}
           </div>
@@ -273,20 +289,20 @@ function SkillsPanel({
     );
   }
 
-  const groups = groupSkillsForSkillsTab(skills);
+  const groups = groupCatalogItemsBySource(skills);
 
   return (
     <div className={styles.skillsStack}>
       {groups.map((group) => (
-        <section className={styles.skillsSection} key={group.label} aria-labelledby={`skills-${slug(group.label)}`}>
-          <h2 id={`skills-${slug(group.label)}`}>{group.label}</h2>
-          <div className={styles.skillsList}>
-            {group.skills.map((skill) => (
-              <SkillListRow
+        <section className={styles.skillsSection} key={group.source} aria-labelledby={`skills-${slug(group.source)}`}>
+          <h2 id={`skills-${slug(group.source)}`}>{group.source}</h2>
+          <div className={styles.grid}>
+            {group.items.map((skill) => (
+              <SkillCard
                 isUpdating={updatingSkillIds.has(skill.id)}
                 key={skill.id}
                 onToggle={onToggle}
-                skill={skill}
+                skill={skill as HermesSkillDescriptor}
               />
             ))}
           </div>
@@ -298,6 +314,32 @@ function SkillsPanel({
         </button>
       </div>
     </div>
+  );
+}
+
+function PluginCard({
+  isUpdating,
+  onToggle,
+  plugin
+}: {
+  isUpdating: boolean;
+  onToggle: (plugin: HermesPluginDescriptor, enabled: boolean) => Promise<void>;
+  plugin: HermesPluginDescriptor;
+}) {
+  return (
+    <article className={styles.skillCard}>
+      <SkillIcon className={styles.skillIcon} skill={plugin} />
+      <div className={styles.skillBody}>
+        <h3>{plugin.title}</h3>
+        <p>{plugin.description ?? plugin.name}</p>
+        <div className={styles.metaLine}>
+          <span>{plugin.source ?? "Hermes"}</span>
+          {plugin.version ? <span>v{plugin.version}</span> : null}
+          {plugin.status ? <span>{plugin.status}</span> : null}
+        </div>
+      </div>
+      <PluginActionButton isUpdating={isUpdating} onToggle={(enabled) => onToggle(plugin, enabled)} item={plugin} />
+    </article>
   );
 }
 
@@ -322,7 +364,7 @@ function SkillCard({
           {skill.enabled === null ? <span>Unknown</span> : null}
         </div>
       </div>
-      <PluginActionButton isUpdating={isUpdating} onToggle={(enabled) => onToggle(skill, enabled)} skill={skill} />
+      <SkillToggle isUpdating={isUpdating} onToggle={(enabled) => onToggle(skill, enabled)} skill={skill} />
     </article>
   );
 }
@@ -350,15 +392,15 @@ function SkillListRow({
 
 function PluginActionButton({
   isUpdating,
+  item,
   onToggle,
-  skill
 }: {
   isUpdating: boolean;
+  item: CatalogItem;
   onToggle: (enabled: boolean) => Promise<void>;
-  skill: HermesSkillDescriptor;
 }) {
-  const hasKnownState = skill.enabled !== null;
-  const isEnabled = skill.enabled === true;
+  const hasKnownState = item.enabled !== null;
+  const isEnabled = item.enabled === true;
   const actionLabel = isEnabled ? "Disable" : "Enable";
   const nextEnabled = !isEnabled;
 
@@ -367,9 +409,9 @@ function PluginActionButton({
       className={`${styles.pluginActionButton} ${isEnabled ? styles.removeActionButton : ""}`}
       disabled={!hasKnownState || isUpdating}
       onClick={() => void onToggle(nextEnabled)}
-      title={hasKnownState ? `${actionLabel} ${skill.title}` : "Hermes did not report this plugin state"}
+      title={hasKnownState ? `${actionLabel} ${item.title}` : "Hermes did not report this plugin state"}
       type="button"
-      aria-label={hasKnownState ? `${actionLabel} ${skill.title}` : `${skill.title} state unavailable`}
+      aria-label={hasKnownState ? `${actionLabel} ${item.title}` : `${item.title} state unavailable`}
     >
       {isUpdating ? "..." : hasKnownState ? actionLabel : "Unavailable"}
     </button>
@@ -415,7 +457,7 @@ function SkillIcon({
 }: {
   className: string;
   label?: string;
-  skill?: HermesSkillDescriptor;
+  skill?: CatalogItem;
   source?: string;
 }) {
   const visual = resolveSkillVisual(skill, source ?? skill?.source ?? label);
@@ -632,7 +674,7 @@ function matchRule(rules: IconRule[], text: string): IconRule | undefined {
   return rules.find((rule) => rule.match.some((keyword) => text.includes(keyword)));
 }
 
-function resolveSkillVisual(skill?: HermesSkillDescriptor, source?: string | null): SkillVisual {
+function resolveSkillVisual(skill?: CatalogItem, source?: string | null): SkillVisual {
   // Brand matching uses only the identifying fields — a description that merely
   // mentions "Claude" or "GitHub" should not hijack a skill's logo.
   const brandText = normalizeIconText([
@@ -691,15 +733,34 @@ function LoadingGrid() {
 }
 
 function filterSkills(skills: HermesSkillDescriptor[], query: string) {
+  return filterCatalogItems(skills, query) as HermesSkillDescriptor[];
+}
+
+function filterCatalogItems<T extends CatalogItem>(items: T[], query: string) {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
-    return skills;
+    return items;
   }
-  return skills.filter((skill) =>
-    [skill.title, skill.name, skill.description, skill.source, skill.category, ...skill.tags]
+  return items.filter((item) =>
+    [item.title, item.name, item.description, item.source, item.category, ...item.tags]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(normalizedQuery))
   );
+}
+
+function groupCatalogItemsBySource<T extends CatalogItem>(items: T[]) {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const source = item.category ?? item.source ?? "Hermes";
+    groups.set(source, [...(groups.get(source) ?? []), item]);
+  }
+  return Array.from(groups.entries())
+    .map(([source, groupItems]) => ({
+      label: source,
+      source,
+      items: sortCatalogItemsByState(groupItems)
+    }))
+    .sort((a, b) => a.source.localeCompare(b.source));
 }
 
 function groupSkillsBySource(skills: HermesSkillDescriptor[]) {
@@ -735,8 +796,8 @@ function groupSkillsForSkillsTab(skills: HermesSkillDescriptor[]) {
   ].filter((group) => group.skills.length > 0);
 }
 
-function sortSkillsByState(skills: HermesSkillDescriptor[]) {
-  return [...skills].sort((a, b) => {
+function sortCatalogItemsByState<T extends CatalogItem>(items: T[]) {
+  return [...items].sort((a, b) => {
     const stateDelta = skillStateRank(a) - skillStateRank(b);
     if (stateDelta !== 0) {
       return stateDelta;
@@ -745,7 +806,11 @@ function sortSkillsByState(skills: HermesSkillDescriptor[]) {
   });
 }
 
-function skillStateRank(skill: HermesSkillDescriptor) {
+function sortSkillsByState(skills: HermesSkillDescriptor[]) {
+  return sortCatalogItemsByState(skills) as HermesSkillDescriptor[];
+}
+
+function skillStateRank(skill: CatalogItem) {
   if (skill.enabled === true) {
     return 0;
   }

@@ -8,6 +8,9 @@ import type {
   HermesClientConfig,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesPluginDescriptor,
+  HermesPluginToggleResult,
+  HermesPluginsListResult,
   HermesModelRuntimeMetadata,
   HermesModelDescriptor,
   LmStudioModelCatalogResult,
@@ -62,6 +65,9 @@ export type {
   HermesClientConfig,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesPluginDescriptor,
+  HermesPluginToggleResult,
+  HermesPluginsListResult,
   HermesFastStreamProfile,
   HermesModelCatalogSource,
   HermesModelDescriptor,
@@ -2139,6 +2145,72 @@ export async function setHermesSkillEnabled(
   };
 }
 
+export async function listHermesPlugins(config: HermesClientConfig): Promise<HermesPluginsListResult> {
+  const checkedAt = new Date().toISOString();
+  const baseResult = validateHermesDashboardConfig(config, "plugins");
+  if (!baseResult.ok) {
+    return { ok: false, plugins: [], checkedAt, raw: null, error: baseResult.error };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const result = await fetchHermesDashboardJson({
+    config,
+    fetchImpl,
+    path: "/api/dashboard/plugins/hub",
+    timeoutMs,
+    apiBase: baseResult.base
+  });
+  if (!result.ok) {
+    return { ok: false, plugins: [], checkedAt, raw: null, error: result.error };
+  }
+
+  return {
+    ok: true,
+    plugins: normalizeHermesPluginsPayload(result.data),
+    checkedAt,
+    raw: result.data,
+    error: null
+  };
+}
+
+export async function setHermesPluginEnabled(
+  config: HermesClientConfig,
+  pluginId: string,
+  enabled: boolean
+): Promise<HermesPluginToggleResult> {
+  const checkedAt = new Date().toISOString();
+  const safeId = sanitizeHermesId(pluginId);
+  const baseResult = validateHermesDashboardConfig(config, "plugin controls");
+  if (!baseResult.ok) {
+    return { ok: false, pluginId: safeId, enabled, plugin: null, checkedAt, raw: null, error: baseResult.error };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const result = await fetchHermesDashboardJson({
+    config,
+    fetchImpl,
+    method: "POST",
+    path: `/api/dashboard/agent-plugins/${encodeURIComponent(safeId)}/${enabled ? "enable" : "disable"}`,
+    timeoutMs,
+    apiBase: baseResult.base
+  });
+  if (!result.ok) {
+    return { ok: false, pluginId: safeId, enabled, plugin: null, checkedAt, raw: null, error: result.error };
+  }
+
+  return {
+    ok: true,
+    pluginId: safeId,
+    enabled,
+    plugin: normalizeHermesPluginRecord({ ...result.data, name: safeId, runtime_status: enabled ? "active" : "disabled" }, safeId),
+    checkedAt,
+    raw: result.data,
+    error: null
+  };
+}
+
 export async function getHermesSession(
   config: HermesClientConfig,
   sessionId: string
@@ -2434,6 +2506,55 @@ function normalizeHermesSkillRecord(
     enabled,
     tags: stringArray(record.tags)
   };
+}
+
+function normalizeHermesPluginsPayload(data: Record<string, unknown>): HermesPluginDescriptor[] {
+  const rawPlugins = Array.isArray(data.plugins)
+    ? data.plugins
+    : Array.isArray(data.data)
+      ? data.data
+      : [];
+  return rawPlugins
+    .map((item) => objectRecord(item))
+    .filter((record): record is Record<string, unknown> => Boolean(record))
+    .map((record) => normalizeHermesPluginRecord(record))
+    .filter((plugin): plugin is HermesPluginDescriptor => Boolean(plugin));
+}
+
+function normalizeHermesPluginRecord(
+  record: Record<string, unknown>,
+  fallbackId?: string
+): HermesPluginDescriptor | null {
+  const manifest = objectRecord(record.dashboard_manifest);
+  const id = firstString(record.name, record.id, record.slug, fallbackId);
+  const title = firstString(record.label, record.title, manifest?.label) || humanizeSkillTitle(id);
+  if (!id && !title) {
+    return null;
+  }
+  const status = firstString(record.runtime_status, record.status, record.state) || null;
+  const normalizedStatus = normalizeName(status ?? "");
+  const enabled =
+    optionalBoolean(record.enabled, record.active) ??
+    (normalizedStatus
+      ? normalizedStatus === "active" || normalizedStatus === "enabled" || normalizedStatus === "ready"
+      : null);
+
+  return {
+    id: id || title,
+    name: id || title,
+    title: title || id,
+    description: firstString(record.description, record.summary, manifest?.description) || null,
+    source: firstString(record.source, record.provider, record.origin) || null,
+    category: firstString(record.category, record.group, record.kind, record.type) || pluginCategoryFromName(id),
+    enabled,
+    status,
+    version: firstString(record.version, manifest?.version) || null,
+    tags: stringArray(record.tags)
+  };
+}
+
+function pluginCategoryFromName(name: string) {
+  return firstString(name).split("/")[0]?.replace(/[_-]+/g, " ") || null;
 }
 
 function humanizeSkillTitle(value: string) {
@@ -4045,6 +4166,81 @@ async function fetchJsonEndpoint(args: {
       ok: false,
       error: normalizeChatFetchError(error)
     };
+  } finally {
+    abort.cleanup();
+  }
+}
+
+function validateHermesDashboardConfig(
+  config: HermesClientConfig,
+  label: string
+): { ok: true; base: URL } | { ok: false; error: HermesStatusError } {
+  if (config.enabled === false) {
+    return { ok: false, error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." } };
+  }
+  if (!config.baseUrl?.trim()) {
+    return { ok: false, error: { kind: "unconfigured", message: `Set HERMES_API_BASE_URL to enable Hermes ${label}.` } };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return { ok: false, error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." } };
+  }
+  return { ok: true, base };
+}
+
+async function fetchHermesDashboardJson(args: {
+  apiBase: URL;
+  body?: Record<string, unknown>;
+  config: HermesClientConfig;
+  fetchImpl: typeof fetch;
+  method?: "GET" | "POST";
+  path: string;
+  timeoutMs: number;
+}): Promise<
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: HermesChatError }
+> {
+  const dashboardBase = resolveHermesDashboardBase(args.config, args.apiBase);
+  if (!dashboardBase) {
+    return {
+      ok: false,
+      error: { kind: "unconfigured", message: "Set HERMES_DASHBOARD_BASE_URL to enable Hermes dashboard metadata." }
+    };
+  }
+
+  const token =
+    args.config.dashboardSessionToken ??
+    await fetchHermesDashboardSessionToken(args.fetchImpl, dashboardBase, args.timeoutMs, args.config.signal);
+  const abort = createLinkedAbortController(args.config.signal, args.timeoutMs);
+  const headers = new Headers({ Accept: "application/json" });
+  if (args.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) {
+    headers.set("X-Hermes-Session-Token", token);
+  }
+
+  try {
+    const response = await args.fetchImpl(buildEndpointUrl(dashboardBase, args.path), {
+      body: args.body ? JSON.stringify(args.body) : undefined,
+      cache: "no-store",
+      headers,
+      method: args.method ?? "GET",
+      signal: abort.signal
+    });
+    const data = await readJsonObject(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, args.path)
+        }
+      };
+    }
+    return { ok: true, data: data ?? {} };
+  } catch (error) {
+    return { ok: false, error: normalizeChatFetchError(error) };
   } finally {
     abort.cleanup();
   }

@@ -226,10 +226,14 @@ export function Sidebar({
                   collapsed={isCollapsed}
                   label={project.name}
                   onCreateChat={() => {
+                    onSectionChange("workspace");
                     actions.switchProject(project.id);
                     actions.createSessionForProject(project.id);
                   }}
-                  onOpenProject={() => actions.switchProject(project.id)}
+                  onOpenProject={() => {
+                    onSectionChange("workspace");
+                    actions.switchProject(project.id);
+                  }}
                   onToggle={() => toggleFolder(folderId)}
                 />
                 <div className={styles.folderBody} data-expanded={isCollapsed ? "false" : "true"}>
@@ -243,7 +247,10 @@ export function Sidebar({
                         isPinned={(sessionId) => pinnedSessionIdSet.has(sessionId)}
                         isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
                         onArchive={(sessionId) => actions.archiveSession(sessionId)}
-                        onSelect={(sessionId) => actions.switchSession(sessionId)}
+                        onSelect={(sessionId) => {
+                          onSectionChange("workspace");
+                          actions.switchSession(sessionId);
+                        }}
                         onTogglePin={togglePinnedSession}
                         sessions={projectSessions}
                       />
@@ -268,7 +275,10 @@ export function Sidebar({
           isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
           listClassName={styles.list}
           onArchive={(sessionId) => actions.archiveSession(sessionId)}
-          onSelect={(sessionId) => actions.switchSession(sessionId)}
+          onSelect={(sessionId) => {
+            onSectionChange("workspace");
+            actions.switchSession(sessionId);
+          }}
           onTogglePin={togglePinnedSession}
           previewCount={3}
           sessions={getRecentChats(allSessions)}

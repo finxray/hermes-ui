@@ -595,6 +595,55 @@ export type HermesSkillToggleResult =
       error: HermesStatusError;
     };
 
+export type HermesPluginDescriptor = {
+  id: string;
+  name: string;
+  title: string;
+  description: string | null;
+  source: string | null;
+  category: string | null;
+  enabled: boolean | null;
+  status: string | null;
+  version: string | null;
+  tags: string[];
+};
+
+export type HermesPluginsListResult =
+  | {
+      ok: true;
+      plugins: HermesPluginDescriptor[];
+      checkedAt: string;
+      raw: Record<string, unknown> | null;
+      error: null;
+    }
+  | {
+      ok: false;
+      plugins: [];
+      checkedAt: string;
+      raw: null;
+      error: HermesStatusError;
+    };
+
+export type HermesPluginToggleResult =
+  | {
+      ok: true;
+      pluginId: string;
+      enabled: boolean;
+      plugin: HermesPluginDescriptor | null;
+      checkedAt: string;
+      raw: Record<string, unknown> | null;
+      error: null;
+    }
+  | {
+      ok: false;
+      pluginId: string;
+      enabled: boolean;
+      plugin: null;
+      checkedAt: string;
+      raw: null;
+      error: HermesStatusError;
+    };
+
 export type HermesRunApprovalChoice = "once" | "session" | "always" | "deny";
 
 export type HermesRunApprovalResult = {

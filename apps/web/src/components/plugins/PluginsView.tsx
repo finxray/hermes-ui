@@ -322,7 +322,7 @@ function SkillCard({
           {skill.enabled === null ? <span>Unknown</span> : null}
         </div>
       </div>
-      <SkillToggle isUpdating={isUpdating} onToggle={(enabled) => onToggle(skill, enabled)} skill={skill} />
+      <PluginActionButton isUpdating={isUpdating} onToggle={(enabled) => onToggle(skill, enabled)} skill={skill} />
     </article>
   );
 }
@@ -345,6 +345,34 @@ function SkillListRow({
       </div>
       <SkillToggle isUpdating={isUpdating} onToggle={(enabled) => onToggle(skill, enabled)} skill={skill} />
     </article>
+  );
+}
+
+function PluginActionButton({
+  isUpdating,
+  onToggle,
+  skill
+}: {
+  isUpdating: boolean;
+  onToggle: (enabled: boolean) => Promise<void>;
+  skill: HermesSkillDescriptor;
+}) {
+  const hasKnownState = skill.enabled !== null;
+  const isEnabled = skill.enabled === true;
+  const actionLabel = isEnabled ? "Remove" : "Add";
+  const nextEnabled = !isEnabled;
+
+  return (
+    <button
+      className={`${styles.pluginActionButton} ${isEnabled ? styles.removeActionButton : ""}`}
+      disabled={!hasKnownState || isUpdating}
+      onClick={() => void onToggle(nextEnabled)}
+      title={hasKnownState ? `${actionLabel} ${skill.title}` : "Hermes did not report this plugin state"}
+      type="button"
+      aria-label={hasKnownState ? `${actionLabel} ${skill.title}` : `${skill.title} state unavailable`}
+    >
+      {isUpdating ? "..." : hasKnownState ? actionLabel : "Unavailable"}
+    </button>
   );
 }
 
@@ -681,7 +709,7 @@ function groupSkillsBySource(skills: HermesSkillDescriptor[]) {
     groups.set(source, [...(groups.get(source) ?? []), skill]);
   }
   return Array.from(groups.entries())
-    .map(([source, groupSkills]) => ({ source, skills: groupSkills }))
+    .map(([source, groupSkills]) => ({ source, skills: sortSkillsByState(groupSkills) }))
     .sort((a, b) => a.source.localeCompare(b.source));
 }
 
@@ -701,10 +729,30 @@ function groupSkillsForSkillsTab(skills: HermesSkillDescriptor[]) {
   }
 
   return [
-    { label: "Personal", skills: personal },
-    { label: "System", skills: system },
-    { label: "Recommended", skills: recommended }
+    { label: "Personal", skills: sortSkillsByState(personal) },
+    { label: "System", skills: sortSkillsByState(system) },
+    { label: "Recommended", skills: sortSkillsByState(recommended) }
   ].filter((group) => group.skills.length > 0);
+}
+
+function sortSkillsByState(skills: HermesSkillDescriptor[]) {
+  return [...skills].sort((a, b) => {
+    const stateDelta = skillStateRank(a) - skillStateRank(b);
+    if (stateDelta !== 0) {
+      return stateDelta;
+    }
+    return a.title.localeCompare(b.title);
+  });
+}
+
+function skillStateRank(skill: HermesSkillDescriptor) {
+  if (skill.enabled === true) {
+    return 0;
+  }
+  if (skill.enabled === null) {
+    return 1;
+  }
+  return 2;
 }
 
 function isSystemSkill(skill: HermesSkillDescriptor) {

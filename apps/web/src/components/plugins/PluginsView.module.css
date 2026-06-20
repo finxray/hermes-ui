@@ -348,6 +348,37 @@
   min-width: 0;
 }
 
+.pluginActionButton {
+  justify-self: end;
+  min-width: 58px;
+  min-height: 30px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.115);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  font-weight: 560;
+}
+
+.pluginActionButton:hover:not(:disabled),
+.pluginActionButton:focus-visible:not(:disabled) {
+  outline: 0;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.095);
+}
+
+.removeActionButton {
+  color: var(--text-secondary);
+}
+
+.pluginActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .skillToggle {
   display: inline-grid;
   justify-self: end;
@@ -415,7 +446,7 @@
   display: grid;
   gap: 46px;
   width: min(620px, 100%);
-  margin: 34px auto 0;
+  margin: 34px 0 0;
   padding-bottom: 48px;
 }
 

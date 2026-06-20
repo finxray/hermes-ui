@@ -33,10 +33,24 @@ export function SidebarRow({
     active ? styles.active : "",
     muted ? styles.muted : "",
     disabled ? styles.disabled : "",
-    actions ? styles.hasActions : ""
+    actions ? styles.hasActions : "",
+    icon ? "" : styles.noIcon
   ]
     .filter(Boolean)
     .join(" ");
+
+  const metaSlot = (
+    <span className={styles.metaSlot}>
+      {meta ? <span className={styles.meta}>{meta}</span> : null}
+    </span>
+  );
+  const actionMetaSlot = actions ? (
+    <span className={`${styles.metaSlot} ${styles.actionMetaSlot}`}>
+      {meta ? <span className={styles.meta}>{meta}</span> : null}
+      <span className={styles.actions}>{actions}</span>
+    </span>
+  ) : null;
+
   const content = (
     <>
       <span className={styles.icon} aria-hidden={icon ? undefined : "true"}>
@@ -46,10 +60,26 @@ export function SidebarRow({
         <span className={styles.label}>{label}</span>
         {secondary ? <span className={styles.secondary}>{secondary}</span> : null}
       </span>
-      <span className={styles.meta}>{meta}</span>
-      {actions ? <span className={styles.actions}>{actions}</span> : null}
+      {meta ? metaSlot : null}
     </>
   );
+
+  if (onClick && actions) {
+    return (
+      <div className={className} data-depth={depth} title={title}>
+        <button
+          aria-current={active ? "page" : undefined}
+          className={styles.contentButton}
+          disabled={disabled}
+          onClick={onClick}
+          type="button"
+        >
+          {content}
+        </button>
+        {actionMetaSlot}
+      </div>
+    );
+  }
 
   if (onClick) {
     return (
@@ -84,7 +114,16 @@ export function SidebarIconButton({
   onClick: () => void;
 }) {
   return (
-    <button className={styles.actionButton} type="button" aria-label={label} onClick={onClick}>
+    <button
+      className={styles.actionButton}
+      type="button"
+      aria-label={label}
+      data-sidebar-row-action="true"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
       {children}
     </button>
   );

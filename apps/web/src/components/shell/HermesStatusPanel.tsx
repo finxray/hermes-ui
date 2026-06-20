@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "@/components/ui/AppIcons";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import type { HermesModelRuntimeMetadata, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import styles from "./StatusPanel.module.css";

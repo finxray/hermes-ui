@@ -1,4 +1,4 @@
-import { ArrowUp, Check, ChevronDown, LoaderCircle, Plus, Search, Square } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, LoaderCircle, Plus, Search, Square } from "@/components/ui/AppIcons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { CSSProperties } from "react";
@@ -29,6 +29,7 @@ type ComposerProps = {
   modelState?: HermesUiCapabilities["models"];
   modelSelectInProgress?: boolean;
   onModelSelect?: (modelId: string) => void;
+  queuedMessage?: string | null;
   onSend: (message: string) => void;
   onStop?: () => void;
   showContextPanel?: boolean;
@@ -48,6 +49,7 @@ export function Composer({
   modelState,
   modelSelectInProgress = false,
   onModelSelect,
+  queuedMessage = null,
   onSend,
   onStop,
   showContextPanel = false,
@@ -64,7 +66,8 @@ export function Composer({
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasDraft = getTrimmedDraft(textareaRef.current, draft).length > 0;
-  const canSend = hasDraft && !disabled && !isGenerating && !modelSelectInProgress;
+  const canSend = hasDraft && !disabled && !modelSelectInProgress;
+  const willQueue = canSend && isGenerating;
   const modelOptions = modelState?.availableModels ?? [];
   const canSelectModel =
     Boolean(modelState?.clientSelectable) &&
@@ -217,7 +220,7 @@ export function Composer({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = getTrimmedDraft(textareaRef.current, draft);
-    const canSubmit = message.length > 0 && !disabled && !isGenerating;
+    const canSubmit = message.length > 0 && !disabled && !modelSelectInProgress;
     if (!message || !canSubmit) {
       return;
     }
@@ -393,18 +396,25 @@ export function Composer({
                   className={[
                     styles.sendButton,
                     canSend ? styles.ready : "",
+                    willQueue ? styles.queueButton : "",
                     isGenerating ? styles.stopButton : ""
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   data-ready={canSend ? "true" : "false"}
-                  type={isGenerating ? "button" : "submit"}
-                  disabled={isGenerating ? disabled || isStopRequested : !canSend}
-                  aria-label={isGenerating ? "Stop generation" : "Send message"}
-                  onClick={isGenerating ? stopGeneration : undefined}
-                  title={isGenerating ? stopControlTitle(stopControlState) : undefined}
+                  type={willQueue ? "submit" : isGenerating ? "button" : "submit"}
+                  disabled={willQueue ? false : isGenerating ? disabled || isStopRequested : !canSend}
+                  aria-label={willQueue ? "Queue next message" : isGenerating ? "Stop generation" : "Send message"}
+                  onClick={willQueue ? undefined : isGenerating ? stopGeneration : undefined}
+                  title={
+                    willQueue
+                      ? "Queue this message to send after the current response."
+                      : isGenerating
+                        ? stopControlTitle(stopControlState)
+                        : undefined
+                  }
                 >
-                  {isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
+                  {willQueue ? <ArrowUp size={17} /> : isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
                 </button>
               </div>
             </div>
@@ -435,7 +445,12 @@ export function Composer({
             </span>
           </div>
         </div>
-        {isGenerating ? (
+        {queuedMessage ? (
+          <div className={styles.statusLine} title="This message will send when the current response finishes.">
+            Next message queued
+          </div>
+        ) : null}
+        {isGenerating && !queuedMessage ? (
           <div className={styles.statusLine} title={streamBatchingDetail}>
             Generating response…
           </div>

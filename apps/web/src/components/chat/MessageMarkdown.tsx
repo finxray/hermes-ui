@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, Copy, ExternalLink, type LucideIcon } from "lucide-react";
+import { Check, Copy, ExternalLink, type LucideIcon } from "@/components/ui/AppIcons";
 import { memo, useMemo, useState } from "react";
+import type { SVGProps } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism-plus";
@@ -138,7 +139,7 @@ export function CopyTextButton({
   variant = "icon"
 }: {
   className?: string;
-  icon?: LucideIcon;
+  icon?: LucideIcon | ((props: SVGProps<SVGSVGElement>) => React.ReactElement);
   label?: string;
   text: string;
   variant?: "icon" | "pill";

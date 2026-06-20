@@ -1,13 +1,13 @@
 .shell {
   --density-scale: 1;
   --content-width: 972px;
-  --composer-width: 781px;
-  --font-xs: 11.5px;
-  --font-small: 13px;
-  --font-body: 15px;
-  --font-ui: 15px;
-  --font-title: 19px;
-  --font-section-title: 13px;
+  --composer-width: 713px;
+  --font-xs: 12.305px;
+  --font-small: 13.91px;
+  --font-body: 16.05px;
+  --font-ui: 16.05px;
+  --font-title: 20.33px;
+  --font-section-title: 13.91px;
   --icon-sm: 14px;
   --icon-md: 16px;
   --icon-lg: 20px;
@@ -38,18 +38,14 @@
   min-height: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 0% 0%, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.12) 17%, transparent 36%),
-    radial-gradient(circle at 100% 0%, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.12) 17%, transparent 36%),
-    radial-gradient(circle at 0% 100%, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.12) 17%, transparent 36%),
-    radial-gradient(circle at 100% 100%, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.12) 17%, transparent 36%),
-    radial-gradient(
-      ellipse 460px 880px at var(--rail-width-left) 54%,
-      rgba(69, 21, 32, 0.36) 0%,
-      rgba(48, 15, 23, 0.25) 40%,
-      rgba(21, 12, 16, 0.13) 64%,
-      transparent 82%
-    ),
-    linear-gradient(90deg, #1f1f20 0%, #1a1618 47%, #22141b 88%, #161618 100%);
+    radial-gradient(circle at 0% 0%, rgba(0, 0, 0, 0.24) 0%, rgba(0, 0, 0, 0.12) 18%, transparent 38%),
+    radial-gradient(circle at 100% 0%, rgba(0, 0, 0, 0.24) 0%, rgba(0, 0, 0, 0.12) 18%, transparent 38%),
+    radial-gradient(circle at 0% 100%, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.16) 22%, transparent 42%),
+    radial-gradient(circle at 100% 100%, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0.14) 20%, transparent 42%),
+    radial-gradient(circle at 20% 18%, rgba(47, 48, 51, 0.26) 0%, rgba(36, 37, 40, 0.18) 28%, transparent 58%),
+    radial-gradient(ellipse 620px 1180px at calc(var(--rail-width-left) + 80px) 62%, rgba(74, 31, 45, 0.34) 0%, rgba(52, 24, 34, 0.25) 34%, rgba(32, 24, 29, 0.16) 58%, transparent 78%),
+    radial-gradient(circle at 10% 74%, rgba(42, 43, 46, 0.18) 0%, rgba(31, 32, 35, 0.12) 34%, transparent 70%),
+    linear-gradient(90deg, #202123 0%, #201f21 36%, #241a21 74%, #1b1c1e 100%);
   color: var(--text-primary);
   font-size: var(--font-body);
   transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1);

@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw } from "@/components/ui/AppIcons";
 import { useLifecycleMetrics } from "@/hooks/useLifecycleMetrics";
 import type { LifecycleMetrics } from "@hermes-ui/brain-memory-client";
 import styles from "./LifecycleDashboard.module.css";

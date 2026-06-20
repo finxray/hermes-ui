@@ -24,31 +24,9 @@ export function resolveStreamStatusLabel(events: AgentActivityEvent[]): StreamSt
   if (activeEvent) {
     return labelForActiveEvent(activeEvent);
   }
-  // "Thinking" is only for the silent phase — model is reasoning but has emitted
-  // no text yet. Once reasoning text is being surfaced, the reasoning block
-  // itself communicates the activity, so the inline indicator hides (returns "")
-  // and reappears if the model goes quiet again before any output.
-  if (latestReasoningHasText(events)) {
-    return "";
-  }
+  // Intermediate narration/reasoning lives in the activity timeline, while
+  // final-answer deltas stream into the message body once classified.
   return "Thinking";
-}
-
-function latestReasoningHasText(events: AgentActivityEvent[]) {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (event.type === "reasoning") {
-      return event.metadata?.rawReasoningTextRendered === true && Boolean(event.summary?.trim());
-    }
-    if (event.type === "elapsed" || event.type === "stream") {
-      continue;
-    }
-    if (isTemporaryActiveEvent(event)) {
-      // A live command/tool/approval is the current activity, not reasoning.
-      return false;
-    }
-  }
-  return false;
 }
 
 function latestCurrentActiveEvent(events: AgentActivityEvent[]) {

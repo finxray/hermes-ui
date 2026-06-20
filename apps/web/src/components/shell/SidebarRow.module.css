@@ -1,7 +1,10 @@
 .row {
   position: relative;
   display: grid;
-  grid-template-columns: var(--sidebar-icon-column, var(--icon-sm)) minmax(0, 1fr) var(--sidebar-meta-column, minmax(28px, auto));
+  grid-template-columns:
+    var(--sidebar-icon-column, var(--icon-sm))
+    minmax(0, 1fr)
+    var(--sidebar-meta-column, 44px);
   gap: var(--sidebar-column-gap, 9px);
   align-items: center;
   width: 100%;
@@ -10,28 +13,61 @@
   border: 0;
   border-radius: 11px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   text-align: left;
   transition:
     background 140ms ease,
     color 140ms ease;
 }
 
-.row[data-depth="1"] {
-  grid-template-columns: var(--sidebar-icon-column, var(--icon-sm)) minmax(0, 1fr) var(--sidebar-child-meta-column, minmax(20px, auto));
+.contentButton {
+  display: grid;
+  grid-template-columns:
+    var(--sidebar-icon-column, var(--icon-sm))
+    minmax(0, 1fr)
+    var(--sidebar-meta-column, 44px);
   gap: var(--sidebar-column-gap, 9px);
+  align-items: center;
+  width: 100%;
+  min-height: var(--row-height);
+  padding: 0 var(--sidebar-row-padding-x, clamp(12px, calc(8px + 0.25vw), 18px));
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.row.hasActions {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+.row.hasActions .contentButton {
+  padding-right: var(--sidebar-row-padding-x, clamp(12px, calc(8px + 0.25vw), 18px));
+}
+
+.row[data-depth="1"] {
   min-height: var(--row-height);
 }
 
+.row.noIcon .icon {
+  opacity: 0;
+}
+
 .row:hover,
-.row:focus-visible {
+.row:focus-visible,
+.contentButton:hover,
+.contentButton:focus-visible {
   outline: 0;
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.042);
   color: var(--text-primary);
 }
 
-.row.active {
-  background: rgba(255, 255, 255, 0.075);
+.row.active,
+.contentButton[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.058);
   color: var(--text-primary);
   font-weight: 560;
 }
@@ -40,7 +76,12 @@
   color: var(--text-muted);
 }
 
-.row.disabled {
+.row.muted .icon {
+  color: var(--text-muted);
+}
+
+.row.disabled,
+.contentButton:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
@@ -49,7 +90,7 @@
   display: grid;
   min-width: 0;
   place-items: center;
-  color: var(--text-muted);
+  color: currentColor;
 }
 
 .row[data-depth="1"] .icon {
@@ -83,19 +124,45 @@
   line-height: 1.25;
 }
 
-.meta {
+.metaSlot {
+  position: relative;
   justify-self: end;
+  align-self: center;
+  flex: none;
+  width: var(--sidebar-meta-column, 44px);
+  min-width: var(--sidebar-meta-column, 44px);
+  max-width: var(--sidebar-meta-column, 44px);
+  height: var(--row-height);
+}
+
+.actionMetaSlot {
+  position: absolute;
+  top: 0;
+  right: var(--sidebar-row-padding-x, clamp(12px, calc(8px + 0.25vw), 18px));
+}
+
+.meta {
+  display: block;
+  width: 100%;
   text-align: right;
+  font-variant-numeric: tabular-nums;
+  line-height: var(--row-height);
+}
+
+.meta:has([role="status"]) {
+  display: grid;
+  width: 100%;
+  place-items: center;
 }
 
 .actions {
   position: absolute;
-  right: 8px;
+  inset: 0;
   display: flex;
-  gap: 2px;
   align-items: center;
   justify-content: flex-end;
-  padding-left: 12px;
+  gap: 2px;
+  padding: 0;
   background: transparent;
   opacity: 0;
   pointer-events: none;
@@ -104,26 +171,51 @@
 }
 
 .row:hover .actions,
-.row:focus-within .actions {
+.row:focus-within .actions,
+.contentButton:hover + .actionMetaSlot .actions,
+.contentButton:focus-visible + .actionMetaSlot .actions,
+.actionMetaSlot:focus-within .actions {
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
 }
 
-.row:hover .meta:has(+ .actions),
-.row:focus-within .meta:has(+ .actions) {
+.row.active:hover .actions,
+.row.active:focus-within .actions,
+.contentButton[aria-current="page"]:hover + .actionMetaSlot .actions,
+.contentButton[aria-current="page"]:focus-visible + .actionMetaSlot .actions,
+.contentButton[aria-current="page"] + .actionMetaSlot:focus-within .actions {
   opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.row:hover .metaSlot .meta,
+.row:focus-within .metaSlot .meta,
+.contentButton:hover + .actionMetaSlot .meta,
+.contentButton:focus-visible + .actionMetaSlot .meta,
+.actionMetaSlot:focus-within .meta {
+  opacity: 0;
+}
+
+.row.active:hover .metaSlot .meta,
+.row.active:focus-within .metaSlot .meta,
+.contentButton[aria-current="page"]:hover + .actionMetaSlot .meta,
+.contentButton[aria-current="page"]:focus-visible + .actionMetaSlot .meta,
+.contentButton[aria-current="page"] + .actionMetaSlot:focus-within .meta {
+  opacity: 1;
 }
 
 .actionButton {
   display: grid;
-  width: calc(var(--control-height) * 0.68);
-  height: calc(var(--control-height) * 0.68);
+  width: 18px;
+  height: 18px;
+  flex: none;
   place-items: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .actionButton:hover,

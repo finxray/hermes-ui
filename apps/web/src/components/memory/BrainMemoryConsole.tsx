@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Database, Search } from "lucide-react";
+import { Activity, Database, Search } from "@/components/ui/AppIcons";
 import { useEffect, useMemo, useState } from "react";
 import { BrainMemoryStatusPanel } from "@/components/memory/BrainMemoryStatusPanel";
 import { LifecycleDashboard } from "@/components/memory/LifecycleDashboard";

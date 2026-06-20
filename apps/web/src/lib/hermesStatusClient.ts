@@ -1,9 +1,14 @@
 import { normalizeHermesUiCapabilities } from "@hermes-ui/hermes-client";
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 
-export async function fetchHermesStatus(): Promise<NormalizedHermesStatus> {
+export async function fetchHermesStatus(
+  options: { refreshModels?: boolean } = {}
+): Promise<NormalizedHermesStatus> {
   try {
-    const response = await fetch("/api/hermes/status", {
+    const path = options.refreshModels
+      ? "/api/hermes/status?refreshModels=true"
+      : "/api/hermes/status";
+    const response = await fetch(path, {
       cache: "no-store"
     });
 

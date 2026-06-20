@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Clock, Cpu, Database, FileText, FolderGit2, KeyRound, RefreshCw, Server, ShieldCheck, Terminal, Trash2 } from "lucide-react";
+import { Activity, Clock, Cpu, Database, FileText, FolderGit2, KeyRound, RefreshCw, Server, ShieldCheck, Terminal, Trash2 } from "@/components/ui/AppIcons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { BrainMemoryConsole } from "@/components/memory/BrainMemoryConsole";

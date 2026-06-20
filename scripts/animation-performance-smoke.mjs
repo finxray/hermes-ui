@@ -85,7 +85,10 @@ async function checkPlainShellCanvas() {
     }
     const shellStyle = window.getComputedStyle(shell);
     const beforeStyle = window.getComputedStyle(shell, "::before");
+    const afterStyle = window.getComputedStyle(shell, "::after");
     return {
+      afterAnimationName: afterStyle.animationName,
+      afterContent: afterStyle.content,
       beforeAnimationName: beforeStyle.animationName,
       beforeContent: beforeStyle.content,
       shellAnimationName: shellStyle.animationName,
@@ -95,26 +98,27 @@ async function checkPlainShellCanvas() {
   report.metrics.shellCanvas = layer;
 
   check(
-    "shell-no-ambient-layer",
-    Boolean(layer) && (layer.beforeContent === "none" || layer.beforeContent === ""),
-    `Shell must not mount an ambient pseudo-layer (::before content is ${layer?.beforeContent || "missing"}).`
+    "shell-oil-slick-ambient-layer",
+    Boolean(layer) && layer.beforeContent === "\"\"" && layer.afterContent === "\"\"",
+    `Shell must mount the approved CSS-only oil slick pseudo-layers (::before=${layer?.beforeContent || "missing"}, ::after=${layer?.afterContent || "missing"}).`
   );
   check(
-    "shell-static-historical-gradient",
+    "shell-historical-gradient-foundation",
     Boolean(layer?.shellBackgroundImage) &&
       layer.shellBackgroundImage.includes("radial-gradient") &&
       layer.shellBackgroundImage.includes("linear-gradient") &&
-      layer.shellBackgroundImage.includes("rgba(69, 21, 32, 0.36)") &&
-      layer.shellBackgroundImage.includes("rgb(31, 31, 32)") &&
-      layer.shellBackgroundImage.includes("rgb(34, 20, 27)") &&
-      layer.shellBackgroundImage.includes("rgb(22, 22, 24)"),
-    `Shell background must use the approved static Studio gradient, found ${layer?.shellBackgroundImage || "missing"}.`
+      layer.shellBackgroundImage.includes("rgba(69, 21, 32, 0.28)") &&
+      layer.shellBackgroundImage.includes("rgb(36, 36, 38)") &&
+      layer.shellBackgroundImage.includes("rgb(37, 23, 32)") &&
+      layer.shellBackgroundImage.includes("rgb(28, 28, 30)"),
+    `Shell background must retain the approved dark Studio gradient foundation, found ${layer?.shellBackgroundImage || "missing"}.`
   );
   check(
-    "shell-not-animated",
+    "shell-ambient-css-only-animation",
     layer?.shellAnimationName === "none" &&
-      (layer?.beforeAnimationName === "none" || layer?.beforeAnimationName === undefined),
-    `Shell canvas must not animate (shell=${layer?.shellAnimationName || "missing"}, ::before=${layer?.beforeAnimationName || "missing"}).`
+      layer?.beforeAnimationName?.includes("shellOilSlickDrift") &&
+      layer?.afterAnimationName?.includes("shellOilSlickCounterDrift"),
+    `Shell canvas must keep animation on subtle CSS pseudo-layers only (shell=${layer?.shellAnimationName || "missing"}, ::before=${layer?.beforeAnimationName || "missing"}, ::after=${layer?.afterAnimationName || "missing"}).`
   );
 }
 

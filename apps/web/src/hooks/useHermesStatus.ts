@@ -13,6 +13,10 @@ type HermesStatusState = {
   isRefreshing: boolean;
 };
 
+type HermesStatusRefreshOptions = {
+  refreshModels?: boolean;
+};
+
 export function useHermesStatus() {
   const [state, setState] = useState<HermesStatusState>({
     status: null,
@@ -23,7 +27,7 @@ export function useHermesStatus() {
   const inFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options: HermesStatusRefreshOptions = {}) => {
     if (inFlightRef.current) {
       return;
     }
@@ -33,7 +37,7 @@ export function useHermesStatus() {
       isRefreshing: current.isInitialLoading ? current.isRefreshing : true
     }));
     try {
-      const newStatus = await fetchHermesStatus();
+      const newStatus = await fetchHermesStatus(options);
       if (mountedRef.current) {
         setState((current) => {
           const resolvedStatus = preserveKnownModelOnTransientFailure(current.status, newStatus);
@@ -147,7 +151,22 @@ function isMeaningfullyChanged(
     prev.configured !== next.configured ||
     prev.baseUrl !== next.baseUrl ||
     prev.uiCapabilities.models.currentModelLabel !== next.uiCapabilities.models.currentModelLabel ||
+    modelListSignature(prev) !== modelListSignature(next) ||
     prev.uiCapabilities.models.selectionStatus !== next.uiCapabilities.models.selectionStatus ||
     (prev.error?.message ?? null) !== (next.error?.message ?? null)
   );
+}
+
+function modelListSignature(status: NormalizedHermesStatus): string {
+  return status.uiCapabilities.models.availableModels
+    .map((model) =>
+      [
+        model.id,
+        model.selectModelId ?? "",
+        model.providerKey ?? model.provider ?? "",
+        model.catalogSource ?? "",
+        model.availability ?? ""
+      ].join(":")
+    )
+    .join("|");
 }

@@ -1,7 +1,7 @@
 .markdown {
   --markdown-text: #d7dbe2;
-  --markdown-heading: #f2f3f5;
-  --markdown-strong: #e3e6ec;
+  --markdown-heading: var(--markdown-title);
+  --markdown-strong: var(--markdown-title);
 
   min-width: 0;
   color: var(--markdown-text);
@@ -372,7 +372,7 @@
 
 :global(.token.function),
 :global(.token.class-name) {
-  color: #ffb86c;
+  color: var(--orange);
 }
 
 :global(.token.regex),

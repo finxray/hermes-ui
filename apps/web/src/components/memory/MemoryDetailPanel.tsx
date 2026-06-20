@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "@/components/ui/AppIcons";
 import { MessageMarkdown } from "@/components/chat/MessageMarkdown";
 import type {
   NormalizedBrainMemoryInspectResponse,

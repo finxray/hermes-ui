@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, CircleDashed, Terminal, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, CircleDashed, Terminal, XCircle } from "@/components/ui/AppIcons";
 import type { ToolEvent } from "@/data/types";
 import styles from "./ChatActivityBlock.module.css";
 

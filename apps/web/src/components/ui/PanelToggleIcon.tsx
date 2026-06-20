@@ -1,57 +1,20 @@
+import { PanelLeftClose, PanelRightClose, PanelSplit } from "@/components/ui/AppIcons";
+
 type PanelToggleIconProps = {
   side: "left" | "right" | "split";
 };
 
+const PANEL_TOGGLE_GLYPH_STYLE = {
+  height: "calc(var(--icon-md) * 1.3)",
+  width: "calc(var(--icon-md) * 1.3)"
+};
+
 export function PanelToggleIcon({ side }: PanelToggleIconProps) {
-  if (side === "split") {
-    return (
-      <svg
-        aria-hidden="true"
-        fill="none"
-        focusable="false"
-        viewBox="0 0 20 20"
-      >
-        <rect x="3.5" y="3.5" width="13" height="13" rx="3" stroke="currentColor" strokeWidth="1.5" />
-        <path
-          d="M10 4.25V15.75"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M6.75 7.5V12.5M13.25 7.5V12.5"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeWidth="1.5"
-          opacity="0.55"
-        />
-      </svg>
-    );
+  if (side === "left") {
+    return <PanelLeftClose focusable="false" style={PANEL_TOGGLE_GLYPH_STYLE} />;
   }
-
-  const isLeft = side === "left";
-
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      focusable="false"
-      viewBox="0 0 20 20"
-    >
-      <rect x="3.5" y="3.5" width="13" height="13" rx="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d={isLeft ? "M8 4.25V15.75" : "M12 4.25V15.75"}
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.5"
-      />
-      <path
-        d={isLeft ? "M6.25 7.5V12.5" : "M13.75 7.5V12.5"}
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.5"
-        opacity="0.55"
-      />
-    </svg>
-  );
+  if (side === "right") {
+    return <PanelRightClose focusable="false" style={PANEL_TOGGLE_GLYPH_STYLE} />;
+  }
+  return <PanelSplit focusable="false" style={PANEL_TOGGLE_GLYPH_STYLE} />;
 }

@@ -121,6 +121,7 @@ export function redactPersistedActivityEvent(
 // with many command/progress frames never evicts its early reasoning or
 // commands — which previously made reasoning vanish or reorder after a reload.
 const HIGH_VALUE_PERSISTED_TYPES: ReadonlySet<PersistedActivityEvent["type"]> = new Set([
+  "narration",
   "reasoning",
   "command",
   "tool",

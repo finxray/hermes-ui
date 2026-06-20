@@ -253,6 +253,13 @@ Current source inspection confirms model names are advertised via `/v1/models` a
 - Hermes journal verification showed selecting `moonshotai/kimi-k2.6` from the Web UI's OpenRouter catalog resolved to `provider=nvidia base_url=https://integrate.api.nvidia.com/v1 model=moonshotai/kimi-k2.6` and failed with a NVIDIA 401. The Web UI must therefore hide Kimi from HTTP-session selection and fail loudly if a direct BFF call detects this mismatch.
 - User OpenRouter logs confirmed `qwen/qwen3.7-max` requests were actually billed by OpenRouter, even when the assistant self-reported a fallback/default identity. The UI must treat assistant self-identification as untrusted and display only requested route plus provider-log/route-metadata evidence.
 
+2026-06-15 Kimi K2.7 Code addition:
+
+- OpenRouter currently lists `MoonshotAI: Kimi K2.7 Code` at model id `moonshotai/kimi-k2.7-code`.
+- The Web UI may show and order this model when Hermes advertises `moonshotai/kimi-k2.7-code` through `/v1/models` with `owned_by: openrouter`.
+- The Web UI must not synthesize `moonshotai/kimi-k2.7-code` from the public OpenRouter catalog alone. Selection still has to flow through `POST /api/hermes/model/select`, then Hermes session readback must verify the effective provider as OpenRouter.
+- If Hermes resolves this model through NVIDIA, Nous, or another provider family, the BFF must reject it with the existing provider-verification error. Configure Hermes with the OpenRouter provider route, for example via Hermes' provider-aware model command/config, rather than exposing `OPENROUTER_API_KEY` to browser JavaScript.
+
 ## Stable Enough To Build Against
 
 Stable enough for first integration:

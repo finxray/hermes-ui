@@ -225,7 +225,9 @@ async function checkSidebarScrollResponsiveness() {
 }
 
 async function checkActiveRowSelection() {
-  const sessionRows = page.locator('section[aria-labelledby="projects-heading"] ul ul li button');
+  const sessionRows = page.locator(
+    'section[aria-labelledby="projects-heading"] ul ul li button:not([data-sidebar-row-action="true"])'
+  );
   const count = await sessionRows.count();
   if (count !== expected.sessions) {
     addResult("fixture-active-row-selection", "fail", `Expected ${expected.sessions} selectable session rows, found ${count}.`);

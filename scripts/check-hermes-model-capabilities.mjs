@@ -236,10 +236,11 @@ check(
   Boolean(
     indexFile?.includes("STABLE_HERMES_MODEL_ORDER") &&
       indexFile?.includes("orderModelsWithDefaultFirst") &&
+      indexFile?.includes('"moonshotai/kimi-k2.7-code"') &&
       indexFile?.includes('"gpt-oss-120b"') &&
       indexFile?.includes('"zai-glm-4.7"')
   ),
-  "Hermes Configured order should not flap between GPT OSS 120B and Zai GLM 4.7."
+  "Hermes Configured order should keep DeepSeek and Kimi K2.7 Code ahead of GPT OSS 120B and Zai GLM 4.7 when Hermes advertises them."
 );
 check(
   "Hermes model labels preserve market acronyms",
@@ -648,7 +649,7 @@ check(
   Boolean(
     chatViewFile?.includes("if (streamCompletedSuccessfully)") &&
       chatViewFile?.includes("sessionModel.markStreamSucceeded();") &&
-      chatViewFile?.includes("} else {\n          void sessionModel.refresh();")
+      /}\s*else\s*{\s*void sessionModel\.refresh\(\);/.test(chatViewFile)
   ),
   "A flaky post-run session readback must not overwrite a successful chat stream with false unavailable/attention UI."
 );
@@ -825,6 +826,21 @@ check(
   "useHermesStatus has meaningful equality gate to skip redundant setState",
   Boolean(hookFile?.includes("isMeaningfullyChanged")),
   "Equality check prevents unnecessary re-renders when Hermes state hasn't changed"
+);
+check(
+  "useHermesStatus repaints when Hermes model catalog changes",
+  Boolean(hookFile?.includes("modelListSignature") && hookFile?.includes("availableModels")),
+  "Newly configured Hermes models must update the Composer even when the current model label stays unchanged."
+);
+check(
+  "Manual Hermes refresh can force a model catalog refresh",
+  Boolean(
+    readFile("apps/web/src/lib/server/hermesStatusProbe.ts")?.includes("forceModels") &&
+      readFile("apps/web/src/app/api/hermes/status/route.ts")?.includes("refreshModels") &&
+      readFile("apps/web/src/lib/hermesStatusClient.ts")?.includes("refreshModels=true") &&
+      readFile("apps/web/src/components/shell/AppShell.tsx")?.includes("refreshModels: true")
+  ),
+  "The refresh button should pull newly configured Hermes models instead of waiting for the background model-cache TTL."
 );
 check(
   "useHermesStatus returns isRefreshing for subtle indicator",

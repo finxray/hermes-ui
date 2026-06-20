@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { Pencil } from "@/components/ui/AppIcons";
 import { memo, useMemo } from "react";
 import type { ChatMessage } from "@/data/types";
 import { CollapsibleUserMessage } from "@/components/chat/CollapsibleUserMessage";
@@ -52,6 +52,7 @@ export const MessageBubble = memo(function MessageBubble({
               <div className={styles.messageActions}>
                 <CopyTextButton
                   className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
+                  icon={ChatCopyIcon}
                   label="Copy message"
                   text={message.content}
                   variant="icon"
@@ -102,6 +103,7 @@ export const MessageBubble = memo(function MessageBubble({
             <div className={styles.messageActions}>
               <CopyTextButton
                 className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
+                icon={ChatCopyIcon}
                 label="Copy message"
                 text={message.content}
                 variant="icon"
@@ -123,6 +125,16 @@ export const MessageBubble = memo(function MessageBubble({
     </article>
   );
 });
+
+function ChatCopyIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" {...props}>
+      <rect x="6.2" y="2.7" width="10.6" height="10.6" rx="2.6" stroke="currentColor" strokeWidth="1.65" />
+      <rect x="2.7" y="6.2" width="10.6" height="10.6" rx="2.6" fill="var(--bg-workspace-solid)" />
+      <rect x="2.7" y="6.2" width="10.6" height="10.6" rx="2.6" stroke="currentColor" strokeWidth="1.65" />
+    </svg>
+  );
+}
 
 type UsagePart = {
   key: string;

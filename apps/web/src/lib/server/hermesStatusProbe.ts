@@ -47,13 +47,21 @@ const lastReachable: { status: NormalizedHermesStatus | null; at: number } = {
   at: 0
 };
 
-export function getCoalescedHermesStatus(config: HermesClientConfig): Promise<NormalizedHermesStatus> {
+export async function getCoalescedHermesStatus(
+  config: HermesClientConfig,
+  options: { forceModels?: boolean } = {}
+): Promise<NormalizedHermesStatus> {
   const now = Date.now();
+  if (options.forceModels) {
+    await refreshModelsIfStale(config, true);
+    statusCache.expiresAt = 0;
+  }
+
   // Keep the model catalog warm without ever blocking the reachability path.
   triggerModelsRefreshIfStale(config);
 
   if (statusCache.value && statusCache.expiresAt > now) {
-    return Promise.resolve(statusCache.value);
+    return statusCache.value;
   }
 
   if (statusCache.inFlight) {
@@ -125,15 +133,22 @@ function refreshedReachableStatus(): NormalizedHermesStatus {
 }
 
 function triggerModelsRefreshIfStale(config: HermesClientConfig): void {
+  void refreshModelsIfStale(config, false);
+}
+
+function refreshModelsIfStale(config: HermesClientConfig, force: boolean): Promise<void> | null {
   if (config.enabled === false || !config.baseUrl?.trim()) {
-    return;
+    return null;
   }
 
   const now = Date.now();
   const stale = !modelsCache.value || now - modelsCache.fetchedAt >= MODELS_TTL_MS;
-  const recentlyAttempted = now - modelsCache.lastAttemptAt < MODELS_RETRY_MS;
-  if (modelsCache.inFlight || !stale || recentlyAttempted) {
-    return;
+  const recentlyAttempted = !force && now - modelsCache.lastAttemptAt < MODELS_RETRY_MS;
+  if (modelsCache.inFlight) {
+    return modelsCache.inFlight;
+  }
+  if (!force && (!stale || recentlyAttempted)) {
+    return null;
   }
 
   modelsCache.lastAttemptAt = now;
@@ -156,4 +171,5 @@ function triggerModelsRefreshIfStale(config: HermesClientConfig): void {
     .finally(() => {
       modelsCache.inFlight = null;
     });
+  return modelsCache.inFlight;
 }

@@ -158,7 +158,7 @@
 }
 
 .tokenPart[data-kind="in"] {
-  color: var(--markdown-inline-code);
+  color: var(--text-primary);
 }
 
 .tokenPart[data-kind="out"] {
@@ -398,6 +398,12 @@
 
 .reasoningLine {
   color: var(--text-muted);
+  white-space: pre-line;
+}
+
+.reasoningChunk[data-kind="narration"] .reasoningLine,
+.reasoningChunk[data-kind="reasoning"] .reasoningLine {
+  color: var(--text-primary);
 }
 
 .thinkingLine {
@@ -517,15 +523,20 @@
 }
 
 .commandResult {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 8px 0 auto;
   color: var(--text-muted);
   font-size: var(--font-small);
   line-height: 1.35;
 }
 
-.commandResult[data-status="completed"]::before {
-  content: "\2713";
-  padding-right: 6px;
+.commandResultIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  stroke-width: 2;
 }
 
 .commandResult[data-status="failed"] {

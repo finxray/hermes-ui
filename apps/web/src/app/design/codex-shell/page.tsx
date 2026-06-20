@@ -15,7 +15,7 @@ import {
   SendHorizontal,
   SlidersHorizontal,
   TerminalSquare
-} from "lucide-react";
+} from "@/components/ui/AppIcons";
 import type { ReactNode } from "react";
 import styles from "./page.module.css";
 

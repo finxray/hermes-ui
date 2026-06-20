@@ -10,7 +10,6 @@
   "dependencies": {
     "@hermes-ui/brain-memory-client": "file:../../packages/brain-memory-client",
     "@hermes-ui/hermes-client": "file:../../packages/hermes-client",
-    "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",

@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquare, MessageSquarePlus, Plus } from "lucide-react";
+import { MessageSquare, MessageSquarePlus, Plus } from "@/components/ui/AppIcons";
 import { useEffect, useRef, useState } from "react";
 import { ChatView } from "@/components/chat/ChatView";
 import { ContextRail } from "@/components/shell/ContextRail";
@@ -36,6 +36,7 @@ type SplitPaneProps = {
   isHermesStatusRefreshing?: boolean;
   mode: RightPaneMode;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
+  onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
   refreshBrainMemoryStatus: () => void;
   refreshHermesStatus: () => void;
   refreshHermesSessions: () => void;
@@ -66,6 +67,7 @@ export function SplitPane({
   isHermesStatusRefreshing = false,
   mode,
   onActivityEvent,
+  onGeneratingChange,
   refreshBrainMemoryStatus,
   refreshHermesStatus,
   refreshHermesSessions,
@@ -238,6 +240,7 @@ export function SplitPane({
               hermesStatus={hermesStatus}
               isHermesStatusLoading={isHermesStatusLoading}
               onActivityEvent={onActivityEvent}
+              onGeneratingChange={onGeneratingChange}
               sessionModel={sideSessionModel}
               showHeader={false}
               variant="side"

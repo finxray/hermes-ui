@@ -56,6 +56,7 @@ export default function SidebarLargeFixturePage() {
       <section className={styles.shell} aria-label="Large sidebar Studio shell fixture">
         <Sidebar
           actions={fixtureActions as never}
+          activeSection="workspace"
           activeProject={activeProject}
           activeSession={activeSession}
           allSessions={largeSidebarSessions}
@@ -63,6 +64,7 @@ export default function SidebarLargeFixturePage() {
           hermesStatus={null}
           isHermesStatusLoading={false}
           isHydrated
+          onSectionChange={noop}
           projects={largeSidebarProjects}
           refreshHermesStatus={noop}
         />

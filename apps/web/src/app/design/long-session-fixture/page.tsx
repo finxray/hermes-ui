@@ -86,6 +86,7 @@ export default function LongSessionFixturePage() {
       <section className={styles.shell} aria-label="Long-session Studio shell fixture">
         <Sidebar
           actions={fixtureActions as never}
+          activeSection="workspace"
           activeProject={longSessionActiveProject}
           activeSession={longSessionActiveSession}
           allSessions={longSessionSessions}
@@ -93,6 +94,7 @@ export default function LongSessionFixturePage() {
           hermesStatus={null}
           isHermesStatusLoading={false}
           isHydrated
+          onSectionChange={noop}
           projects={longSessionProjects}
           refreshHermesStatus={noop}
         />

@@ -97,21 +97,21 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   color: var(--text-muted);
 }
 
 .messageActions .messageActionButton {
-  --icon-action-size: 32px;
-  --icon-action-pad: 6px;
-  --icon-action-glyph: 18px;
+  --icon-action-size: 30px;
+  --icon-action-pad: 5px;
+  --icon-action-glyph: 23px;
 
-  border-radius: 13px;
+  border-radius: 12px;
   color: var(--text-muted);
 }
 
 .messageActions .messageActionButton[data-copy-action="true"] {
-  --icon-action-glyph: 18px;
+  --icon-action-glyph: 28px;
 }
 
 .messageActions .messageActionButton svg {
@@ -158,41 +158,51 @@
   min-width: 0;
 }
 
-.userContent {
-  position: relative;
-  overflow: hidden;
+.userContentShell {
   min-width: 0;
+  overflow: hidden;
+  transition:
+    max-height 700ms cubic-bezier(0.42, 0, 0.2, 1),
+    opacity 560ms ease-in-out,
+    clip-path 700ms cubic-bezier(0.42, 0, 0.2, 1);
 }
 
-.userContentWrap[data-overflowing="true"][data-expanded="false"] .userContent {
+.userContentShell[data-overflowing="true"][data-expanded="false"] {
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 42%,
-    rgba(0, 0, 0, 0.92) 56%,
-    rgba(0, 0, 0, 0.72) 68%,
-    rgba(0, 0, 0, 0.48) 78%,
-    rgba(0, 0, 0, 0.24) 88%,
-    rgba(0, 0, 0, 0.08) 95%,
-    transparent 100%
+    #000 58%,
+    rgba(0, 0, 0, 0.88) 68%,
+    rgba(0, 0, 0, 0.52) 76%,
+    rgba(0, 0, 0, 0.18) 84%,
+    transparent 92%
   );
   mask-image: linear-gradient(
     to bottom,
     #000 0%,
-    #000 42%,
-    rgba(0, 0, 0, 0.92) 56%,
-    rgba(0, 0, 0, 0.72) 68%,
-    rgba(0, 0, 0, 0.48) 78%,
-    rgba(0, 0, 0, 0.24) 88%,
-    rgba(0, 0, 0, 0.08) 95%,
-    transparent 100%
+    #000 58%,
+    rgba(0, 0, 0, 0.88) 68%,
+    rgba(0, 0, 0, 0.52) 76%,
+    rgba(0, 0, 0, 0.18) 84%,
+    transparent 92%
   );
+}
+
+.userContent {
+  position: relative;
+  min-width: 0;
+}
+
+.userContentWrap[data-overflowing="true"][data-expanded="false"] .userContent {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .userExpandButton {
   justify-self: start;
   min-height: auto;
-  padding: 2px 0 0;
+  margin-top: 2px;
+  padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -202,6 +212,7 @@
   font-weight: 500;
   line-height: 1.4;
   text-align: left;
+  transition: color 120ms ease, opacity 360ms ease;
 }
 
 .userExpandButton:hover,
@@ -317,5 +328,13 @@
 
   .streamTrailingStatus {
     animation: none;
+  }
+
+  .userContentShell {
+    transition: none;
+  }
+
+  .userExpandButton {
+    transition: none;
   }
 }

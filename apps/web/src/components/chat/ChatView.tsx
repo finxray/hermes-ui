@@ -57,6 +57,7 @@ type ChatViewProps = {
   isHermesStatusLoading: boolean;
   isSplitViewOpen?: boolean;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
+  onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
   onSplitView?: () => void;
   sessionModel: HermesSessionModelSync;
   showHeader?: boolean;
@@ -73,6 +74,7 @@ export function ChatView({
   isHermesStatusLoading,
   isSplitViewOpen = false,
   onActivityEvent,
+  onGeneratingChange,
   onSplitView,
   sessionModel,
   showHeader = true,
@@ -86,6 +88,7 @@ export function ChatView({
   const [liveTokenUsage, setLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [visibleLiveTokenUsage, setVisibleLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
+  const [queuedTurn, setQueuedTurn] = useState<{ content: string; sessionId: string } | null>(null);
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const flushTimeoutRef = useRef<number | null>(null);
@@ -101,6 +104,24 @@ export function ChatView({
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
   const composerClearancePx = useComposerInset(scrollViewportRef, composerWrapRef, !isStartState);
+  const providerModelState = sessionModel.modelState;
+  const modelLabel = sessionModel.modelLabel;
+  const modelSelectError = sessionModel.error;
+  const modelSelectInProgress = sessionModel.modelSelectInProgress;
+  const visibleQueuedMessage =
+    queuedTurn && queuedTurn.sessionId === activeSession?.id ? queuedTurn.content : null;
+
+  useEffect(() => {
+    if (!activeSession) {
+      return;
+    }
+
+    onGeneratingChange?.(activeSession.id, isGenerating);
+
+    return () => {
+      onGeneratingChange?.(activeSession.id, false);
+    };
+  }, [activeSession?.id, isGenerating, onGeneratingChange]);
 
   useEffect(() => {
     setIsGenerating(false);
@@ -109,6 +130,7 @@ export function ChatView({
     setVisibleLiveTokenUsage(null);
     setIsFinalizingResponse(false);
     setGenerationStartedAt(null);
+    setQueuedTurn(null);
     stopRequestedRef.current = false;
     activeStreamControllerRef.current?.abort();
     activeStreamControllerRef.current = null;
@@ -133,6 +155,21 @@ export function ChatView({
       liveTokenClearTimerRef.current = null;
     }
   }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (isGenerating || modelSelectInProgress || !activeSession || !queuedTurn) {
+      return;
+    }
+    if (queuedTurn.sessionId !== activeSession.id) {
+      return;
+    }
+
+    const nextContent = queuedTurn.content;
+    setQueuedTurn(null);
+    window.setTimeout(() => {
+      void handleSend(nextContent);
+    }, 0);
+  }, [activeSession?.id, isGenerating, modelSelectInProgress, queuedTurn]);
 
   useEffect(() => {
     if (liveTokenClearTimerRef.current !== null) {
@@ -161,10 +198,6 @@ export function ChatView({
       }
     };
   }, [liveTokenUsage, visibleLiveTokenUsage]);
-  const providerModelState = sessionModel.modelState;
-  const modelLabel = sessionModel.modelLabel;
-  const modelSelectError = sessionModel.error;
-  const modelSelectInProgress = sessionModel.modelSelectInProgress;
   const composerContextItems = activeSession
     ? [
         { label: "Workspace", value: "hermes-ui" },
@@ -180,7 +213,11 @@ export function ChatView({
       ];
 
   async function handleSend(content: string) {
-    if (!activeSession || isGenerating || modelSelectInProgress) {
+    if (!activeSession || modelSelectInProgress) {
+      return;
+    }
+    if (isGenerating) {
+      setQueuedTurn({ content, sessionId: activeSession.id });
       return;
     }
 
@@ -979,6 +1016,7 @@ export function ChatView({
             onModelSelect={sessionModel.selectModel}
             onSend={handleSend}
             onStop={handleStop}
+            queuedMessage={visibleQueuedMessage}
             showContextPanel={false}
             stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
           />
@@ -1035,6 +1073,7 @@ export function ChatView({
               onModelSelect={sessionModel.selectModel}
               onSend={handleSend}
               onStop={handleStop}
+              queuedMessage={visibleQueuedMessage}
               showContextPanel={false}
               stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
             />

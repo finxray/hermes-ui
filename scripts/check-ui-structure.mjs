@@ -377,27 +377,36 @@ if (!tokensCss.includes("--border-window-outline: rgba(255, 255, 255, 0.2)")) {
 if (!tokensCss.includes("--border-window-separator: rgba(255, 255, 255, 0.16)")) {
   failures.push("Window separator border must use the same color at 0.8 opacity.");
 }
-if (
-  appShellCss.includes("@keyframes") ||
-  appShellCss.includes("ambientCanvasShift") ||
-  appShellCss.includes("shellAmbient")
-) {
-  failures.push("Shell canvas must not use ambient animation keyframes or animated background layers.");
+for (const token of [
+  ".shell::before",
+  ".shell::after",
+  "mix-blend-mode: soft-light",
+  "pointer-events: none",
+  "animation: shellOilSlickDrift 92s ease-in-out infinite alternate",
+  "animation: shellOilSlickCounterDrift 128s ease-in-out infinite alternate",
+  "@keyframes shellOilSlickDrift",
+  "@keyframes shellOilSlickCounterDrift",
+  "@media (prefers-reduced-motion: reduce)",
+  "animation: none"
+]) {
+  if (!appShellCss.includes(token)) {
+    failures.push(`Shell canvas must use the approved subtle CSS oil slick layer: missing ${token}.`);
+  }
 }
 for (const token of [
   "radial-gradient(",
-  "circle at 0% 0%, rgba(0, 0, 0, 0.2) 0%",
-  "circle at 100% 0%, rgba(0, 0, 0, 0.2) 0%",
-  "circle at 0% 100%, rgba(0, 0, 0, 0.2) 0%",
-  "circle at 100% 100%, rgba(0, 0, 0, 0.2) 0%",
-  "ellipse 460px 880px at var(--rail-width-left) 54%",
-  "rgba(69, 21, 32, 0.36) 0%",
-  "rgba(48, 15, 23, 0.25) 40%",
+  "circle at 0% 0%, rgba(0, 0, 0, 0.26) 0%",
+  "circle at 100% 0%, rgba(0, 0, 0, 0.26) 0%",
+  "circle at 0% 100%, rgba(0, 0, 0, 0.26) 0%",
+  "circle at 100% 100%, rgba(0, 0, 0, 0.26) 0%",
+  "ellipse 460px 880px at calc(var(--rail-width-left) + 116px) 54%",
+  "rgba(69, 21, 32, 0.28) 0%",
+  "rgba(48, 15, 23, 0.2) 40%",
   "rgba(21, 12, 16, 0.13) 64%",
-  "linear-gradient(90deg, #1f1f20 0%, #1a1618 47%, #22141b 88%, #161618 100%)"
+  "linear-gradient(90deg, #242426 0%, #201c1f 47%, #251720 88%, #1c1c1e 100%)"
 ]) {
   if (!appShellCss.includes(token)) {
-    failures.push(`Shell canvas must use the approved static Studio gradient: missing ${token}.`);
+    failures.push(`Shell canvas must retain the approved dark Studio gradient foundation: missing ${token}.`);
   }
 }
 if (!messageBubbleCss.includes(".userExpandButton") || messageBubbleCss.includes("border: 1px solid")) {

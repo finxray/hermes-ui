@@ -46,7 +46,7 @@
 }
 
 .metric[data-kind="in"] {
-  --token-metric-fg: var(--markdown-inline-code);
+  --token-metric-fg: var(--text-primary);
 }
 
 .metric[data-kind="out"] {

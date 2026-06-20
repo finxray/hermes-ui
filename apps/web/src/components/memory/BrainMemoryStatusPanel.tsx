@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "@/components/ui/AppIcons";
 import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import styles from "@/components/shell/StatusPanel.module.css";
 

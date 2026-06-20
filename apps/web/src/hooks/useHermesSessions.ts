@@ -37,7 +37,9 @@ export function useHermesSessions(enabled = true) {
       }
       if (result.ok) {
         setState({
-          sessions: result.sessions,
+          // Hide hidden utility sessions (created for secondary-model
+          // summarization) from the user-facing Hermes session list.
+          sessions: result.sessions.filter((session) => !session.id.endsWith("::utility")),
           isLoading: false,
           error: null,
           lastFetchedAt: new Date().toISOString()

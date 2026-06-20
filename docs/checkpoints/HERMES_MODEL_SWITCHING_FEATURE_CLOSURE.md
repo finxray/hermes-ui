@@ -96,7 +96,7 @@ The Composer model control opens a large tinted glass model browser instead of a
 - `Hermes config`: models returned by Hermes `/v1/models`.
 - `UI OpenRouter catalog`: models returned by the Web UI BFF route `/api/model-catalog/openrouter`, backed by OpenRouter `/api/v1/models`.
 
-`Hermes config` order is stable for models Hermes actually advertises: `DeepSeek V4 Flash`, `GPT OSS 120B`, then `Zai GLM 4.7`, followed by the remaining configured models by label/id. The UI must not synthesize DeepSeek into the live server-configured state when Hermes does not advertise that id.
+`Hermes config` order is stable for models Hermes actually advertises: `DeepSeek V4 Flash`, `Kimi K2.7 Code` (`moonshotai/kimi-k2.7-code` via OpenRouter), `GPT OSS 120B`, then `Zai GLM 4.7`, followed by the remaining configured models by label/id. The UI must not synthesize DeepSeek or Kimi into the live server-configured state when Hermes does not advertise that id.
 
 Selecting a Hermes-configured model uses the full session path: Composer -> Web UI BFF -> Hermes session model select -> Hermes session readback.
 
@@ -104,7 +104,7 @@ The `UI OpenRouter catalog` group must not add standalone runtime choices. It ma
 
 DeepSeek V4 Flash is a concrete guard case: `deepseek/deepseek-v4-flash` is not advertised by the current local Hermes `/v1/models`, and mapping it to bare `deepseek-v4-flash` routes to the direct DeepSeek provider, which fails with the configured direct-provider key. The Web UI must fail honestly instead of aliasing that OpenRouter id to a different provider route.
 
-Kimi K2.6 is a second guard case: Hermes logs on 2026-06-15 showed `moonshotai/kimi-k2.6` resolving to NVIDIA despite the UI-requested OpenRouter route. The HTTP selector must hide Kimi/NVIDIA/Nous routes until Hermes exposes provider-aware HTTP model switching equivalent to Telegram `/model --provider ...`.
+Kimi K2.6 is a second guard case: Hermes logs on 2026-06-15 showed `moonshotai/kimi-k2.6` resolving to NVIDIA despite the UI-requested OpenRouter route. Kimi K2.7 Code should use OpenRouter model id `moonshotai/kimi-k2.7-code`, but it remains subject to the same provider readback guard: if Hermes resolves it through NVIDIA/Nous instead of OpenRouter, the BFF rejects the selection. The HTTP selector must hide or fail unsafe Kimi/NVIDIA/Nous routes until Hermes exposes provider-aware HTTP model switching equivalent to Telegram `/model --provider ...`.
 
 ---
 

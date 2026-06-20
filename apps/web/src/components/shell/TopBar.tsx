@@ -4,15 +4,19 @@ import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
 import styles from "./TopBar.module.css";
 
 type TopBarProps = {
+  activeSection: "workspace" | "plugins";
   leftToggleId: string;
   leftCollapsed: boolean;
+  onSectionChange: (section: "workspace" | "plugins") => void;
   rightToggleId: string;
   rightCollapsed: boolean;
 };
 
 export function TopBar({
+  activeSection,
   leftToggleId,
   leftCollapsed,
+  onSectionChange,
   rightToggleId,
   rightCollapsed
 }: TopBarProps) {
@@ -35,13 +39,22 @@ export function TopBar({
         </button>
         <nav className={styles.menu} aria-label="Workspace sections">
           <button
-            aria-current="page"
-            aria-label="Workspace section current"
-            className={`${styles.menuItem} ${styles.active}`}
-            title="Current workspace section"
+            aria-current={activeSection === "workspace" ? "page" : undefined}
+            className={`${styles.menuItem} ${activeSection === "workspace" ? styles.active : ""}`}
+            onClick={() => onSectionChange("workspace")}
+            title="Workspace"
             type="button"
           >
             Workspace
+          </button>
+          <button
+            aria-current={activeSection === "plugins" ? "page" : undefined}
+            className={`${styles.menuItem} ${activeSection === "plugins" ? styles.active : ""}`}
+            onClick={() => onSectionChange("plugins")}
+            title="Plugins"
+            type="button"
+          >
+            Plugins
           </button>
           {["Memory", "Projects", "Tools", "Help"].map((item) => (
             <button

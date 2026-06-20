@@ -546,6 +546,33 @@ export type HermesSessionDeleteResult =
   | { ok: true; error: null }
   | { ok: false; error: HermesStatusError };
 
+export type HermesSkillDescriptor = {
+  id: string;
+  name: string;
+  title: string;
+  description: string | null;
+  source: string | null;
+  category: string | null;
+  enabled: boolean | null;
+  tags: string[];
+};
+
+export type HermesSkillsListResult =
+  | {
+      ok: true;
+      skills: HermesSkillDescriptor[];
+      checkedAt: string;
+      raw: Record<string, unknown> | null;
+      error: null;
+    }
+  | {
+      ok: false;
+      skills: [];
+      checkedAt: string;
+      raw: null;
+      error: HermesStatusError;
+    };
+
 export type HermesRunApprovalChoice = "once" | "session" | "always" | "deny";
 
 export type HermesRunApprovalResult = {

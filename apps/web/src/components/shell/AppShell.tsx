@@ -1,6 +1,7 @@
 "use client";
 
 import { ChatView } from "@/components/chat/ChatView";
+import { PluginsView } from "@/components/plugins/PluginsView";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { SplitPane, type RightPaneMode } from "@/components/shell/SplitPane";
 import { TopBar } from "@/components/shell/TopBar";
@@ -12,7 +13,7 @@ import { useLmStudioModels } from "@/hooks/useLmStudioModels";
 import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnosticsPosture";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
-import { type CSSProperties, type PointerEvent as ReactPointerEvent, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from "react";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import mainWindowStyles from "./MainWindow.module.css";
 import styles from "./AppShell.module.css";
@@ -22,6 +23,8 @@ type ShellStyle = CSSProperties & {
   "--rail-width-right"?: string;
   "--rail-right-transition-duration"?: string;
 };
+
+type ShellSection = "workspace" | "plugins";
 
 function clampPanelWidth(width: number, min: number, max: number) {
   return Math.min(Math.max(width, min), max);
@@ -61,7 +64,9 @@ export function AppShell() {
   });
   const brainMemoryStatus = useBrainMemoryStatus();
   const tenantScopePosture = useTenantScopeDiagnosticsPosture();
+  const [activeSection, setActiveSection] = useState<ShellSection>("workspace");
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
+  const [generatingSessionIds, setGeneratingSessionIds] = useState<string[]>([]);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(true);
   const [leftRailWidth, setLeftRailWidth] = useState<number | null>(null);
@@ -100,6 +105,16 @@ export function AppShell() {
     });
   }
 
+  const markSessionGenerating = useCallback((sessionId: string, isGenerating: boolean) => {
+    setGeneratingSessionIds((current) => {
+      const hasSession = current.includes(sessionId);
+      if (isGenerating) {
+        return hasSession ? current : [...current, sessionId];
+      }
+      return hasSession ? current.filter((id) => id !== sessionId) : current;
+    });
+  }, []);
+
   function startLeftResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (leftCollapsed) {
       return;
@@ -114,13 +129,32 @@ export function AppShell() {
     const startX = event.clientX;
     let nextWidth = startWidth;
     let animationFrame: number | null = null;
+    let foldedDuringDrag = false;
 
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     document.body.dataset.shellResizing = "true";
 
     const handleMove = (moveEvent: PointerEvent) => {
-      nextWidth = clampPanelWidth(startWidth + moveEvent.clientX - startX, minWidth, maxWidth);
+      const rawNextWidth = startWidth + moveEvent.clientX - startX;
+
+      if (rawNextWidth <= minWidth + 1) {
+        foldedDuringDrag = true;
+        if (animationFrame !== null) {
+          window.cancelAnimationFrame(animationFrame);
+          animationFrame = null;
+        }
+        shellRef.current?.style.removeProperty("--rail-width-left");
+        setLeftRailWidth(null);
+        setLeftCollapsed(true);
+        delete document.body.dataset.shellResizing;
+        document.removeEventListener("pointermove", handleMove);
+        document.removeEventListener("pointerup", stopResize);
+        document.removeEventListener("pointercancel", stopResize);
+        return;
+      }
+
+      nextWidth = clampPanelWidth(rawNextWidth, minWidth, maxWidth);
 
       if (animationFrame !== null) {
         return;
@@ -133,13 +167,23 @@ export function AppShell() {
     };
 
     const stopResize = () => {
+      if (foldedDuringDrag) {
+        return;
+      }
+
       if (animationFrame !== null) {
         window.cancelAnimationFrame(animationFrame);
         animationFrame = null;
       }
 
-      shellRef.current?.style.setProperty("--rail-width-left", `${Math.round(nextWidth)}px`);
-      setLeftRailWidth(nextWidth);
+      if (nextWidth <= minWidth + 1) {
+        shellRef.current?.style.removeProperty("--rail-width-left");
+        setLeftRailWidth(null);
+        setLeftCollapsed(true);
+      } else {
+        shellRef.current?.style.setProperty("--rail-width-left", `${Math.round(nextWidth)}px`);
+        setLeftRailWidth(nextWidth);
+      }
       delete document.body.dataset.shellResizing;
       document.removeEventListener("pointermove", handleMove);
       document.removeEventListener("pointerup", stopResize);
@@ -264,6 +308,13 @@ export function AppShell() {
     setRightPaneMode("console");
   }
 
+  function activateSection(section: ShellSection) {
+    setActiveSection(section);
+    if (section === "plugins") {
+      setRightCollapsed(true);
+    }
+  }
+
   return (
     <main
       className={styles.shell}
@@ -297,13 +348,16 @@ export function AppShell() {
         type="checkbox"
       />
       <TopBar
+        activeSection={activeSection}
         leftToggleId="studio-left-rail-toggle"
         leftCollapsed={leftCollapsed}
+        onSectionChange={activateSection}
         rightToggleId="studio-right-rail-toggle"
         rightCollapsed={rightCollapsed}
       />
       <Sidebar
         actions={actions}
+        activeSection={activeSection}
         activeProject={activeProject}
         activeSession={activeSession}
         allSessions={state.sessions}
@@ -311,7 +365,9 @@ export function AppShell() {
         hermesStatus={hermesStatus.status}
         isHermesStatusLoading={hermesStatus.isLoading}
         isHydrated={isHydrated}
+        onSectionChange={activateSection}
         projects={state.projects}
+        runningSessionIds={generatingSessionIds}
         refreshHermesStatus={() => {
           void hermesStatus.refresh({ refreshModels: true });
         }}
@@ -329,19 +385,24 @@ export function AppShell() {
         data-right-collapsed={rightCollapsed ? "true" : "false"}
       >
         <div className={mainWindowStyles.chatPane} data-shell-chat-pane="true">
-          <ChatView
-            activeProject={activeProject}
-            activeSession={activeSession}
-            activityEvents={activeActivityEvents}
-            createSession={actions.createSession}
-            hermesStatus={hermesStatus.status}
-            isHermesStatusLoading={hermesStatus.isLoading}
-            isSplitViewOpen={!rightCollapsed && rightPaneMode === "chat"}
-            onActivityEvent={appendActivityEvent}
-            onSplitView={toggleMainWindowSplit}
-            sessionModel={hermesSessionModel}
-            workspaceActions={actions}
-          />
+          {activeSection === "plugins" ? (
+            <PluginsView hermesStatus={hermesStatus.status} />
+          ) : (
+            <ChatView
+              activeProject={activeProject}
+              activeSession={activeSession}
+              activityEvents={activeActivityEvents}
+              createSession={actions.createSession}
+              hermesStatus={hermesStatus.status}
+              isHermesStatusLoading={hermesStatus.isLoading}
+              isSplitViewOpen={!rightCollapsed && rightPaneMode === "chat"}
+              onActivityEvent={appendActivityEvent}
+              onGeneratingChange={markSessionGenerating}
+              onSplitView={toggleMainWindowSplit}
+              sessionModel={hermesSessionModel}
+              workspaceActions={actions}
+            />
+          )}
         </div>
         <button
           aria-label="Resize right context panel"
@@ -368,6 +429,7 @@ export function AppShell() {
           isHermesStatusRefreshing={hermesStatus.isRefreshing}
           mode={rightPaneMode}
           onActivityEvent={appendActivityEvent}
+          onGeneratingChange={markSessionGenerating}
           refreshBrainMemoryStatus={brainMemoryStatus.refresh}
           refreshHermesStatus={() => {
             void hermesStatus.refresh({ refreshModels: true });

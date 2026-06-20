@@ -2,6 +2,7 @@
   color-scheme: dark;
 
   --bg-canvas: #07080a;
+  --bg-shell: #202123;
   --bg-app: #0c0d0f;
   --bg-rail: #101114;
   --bg-rail-warm: #1d1719;
@@ -34,13 +35,17 @@
 
   --accent: #8ee6c6;
   --accent-2: #91b8ff;
+  --orange: #ff7a33;
+  --orange-rgb: 255, 122, 51;
+  --accent-orange: var(--orange);
   --markdown-inline-code: #79b8ff;
+  --markdown-title: var(--accent-orange);
   --markdown-status-check: #4caf50;
   --accent-dim: rgba(142, 230, 198, 0.12);
   --danger: #ff6b6b;
-  --warning: #ffb86b;
-  --warning-dim: rgba(255, 184, 107, 0.12);
-  --notice: #f08c4a;
+  --warning: var(--orange);
+  --warning-dim: rgba(var(--orange-rgb), 0.12);
+  --notice: var(--orange);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -55,13 +60,17 @@
   /* Z-index scale: keep transient overlays above clipped app panels. */
   --z-floating: 1000;
   --scrollbar-size: 17.28px;
+  --scrollbar-size-active: 21.6px;
   --scrollbar-thumb-border: 3.6px;
+  --scrollbar-thumb-border-active: 2px;
+  --scrollbar-thumb-border-hover-active: 1px;
   --scrollbar-thumb-min-height: 43.2px;
   --scrollbar-thumb: rgba(180, 176, 183, 0.32);
   --scrollbar-thumb-hover: rgba(207, 204, 210, 0.46);
   --scrollbar-track: transparent;
   --scrollbar-track-hover: transparent;
   --scrollbar-fade-duration: 1600ms;
+  --scrollbar-scale-duration: 200ms;
 
   /* Activity shimmer keyframes are defined per-component */
 }

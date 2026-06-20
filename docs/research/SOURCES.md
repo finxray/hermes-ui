@@ -42,6 +42,8 @@ Verified by ChatGPT on 2026-05-29. Codex must re-check these during Slice 0 beca
 
 - Cerebras Kimi K2.6 announcement: https://www.cerebras.ai/blog/cerebras-kimi-k2-Enterprise
   - Notes: Cerebras says Kimi K2.6 approaches ~1,000 output tokens/sec and cites 981 output tokens/sec measured by Artificial Analysis.
+- OpenRouter Kimi K2.7 Code model page: https://openrouter.ai/moonshotai/kimi-k2.7-code
+  - Notes: verified on 2026-06-15 that the OpenRouter model id is `moonshotai/kimi-k2.7-code`.
 
 - Cerebras inference page: https://www.cerebras.ai/inference
   - Notes: Cerebras positions fast inference as enabling more interactive products and more reasoning within a latency budget.

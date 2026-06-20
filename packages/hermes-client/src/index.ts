@@ -28,6 +28,8 @@ import type {
   HermesSessionMessage,
   HermesSessionMessagesResult,
   HermesSessionSummary,
+  HermesSkillDescriptor,
+  HermesSkillsListResult,
   HermesStatusError,
   HermesTokenUsage,
   HermesUiCapabilities,
@@ -39,9 +41,11 @@ const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/api/v1/models";
 const LOCAL_LMSTUDIO_PROVIDER_KEY = "local-lmstudio";
 const PROJECT_DEFAULT_MODEL_ID = "deepseek/deepseek-v4-flash";
+const KIMI_K27_CODE_OPENROUTER_MODEL_ID = "moonshotai/kimi-k2.7-code";
 const UNSAFE_HTTP_SESSION_PROVIDER_KEYS = new Set(["nvidia", "nous", "ollama", "ollama-local"]);
 const STABLE_HERMES_MODEL_ORDER = [
   PROJECT_DEFAULT_MODEL_ID,
+  KIMI_K27_CODE_OPENROUTER_MODEL_ID,
   "gpt-oss-120b",
   "zai-glm-4.7"
 ];
@@ -81,6 +85,8 @@ export type {
   HermesSessionMessage,
   HermesSessionMessagesResult,
   HermesSessionSummary,
+  HermesSkillDescriptor,
+  HermesSkillsListResult,
   HermesStatusError,
   HermesTokenUsage,
   HermesUiCapabilities,
@@ -1948,6 +1954,61 @@ export async function listHermesSessions(
   return { ok: true, sessions, error: null };
 }
 
+export async function listHermesSkills(
+  config: HermesClientConfig
+): Promise<HermesSkillsListResult> {
+  const checkedAt = new Date().toISOString();
+  if (config.enabled === false) {
+    return {
+      ok: false,
+      skills: [],
+      checkedAt,
+      raw: null,
+      error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." }
+    };
+  }
+  if (!config.baseUrl?.trim()) {
+    return {
+      ok: false,
+      skills: [],
+      checkedAt,
+      raw: null,
+      error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes skills." }
+    };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return {
+      ok: false,
+      skills: [],
+      checkedAt,
+      raw: null,
+      error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." }
+    };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const result = await fetchJsonEndpoint({
+    apiKey: config.apiKey,
+    base,
+    fetchImpl,
+    path: "/v1/skills",
+    signal: config.signal,
+    timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  });
+  if (!result.ok) {
+    return { ok: false, skills: [], checkedAt, raw: null, error: result.error };
+  }
+
+  return {
+    ok: true,
+    skills: normalizeHermesSkillsPayload(result.data),
+    checkedAt,
+    raw: result.data,
+    error: null
+  };
+}
+
 export async function getHermesSession(
   config: HermesClientConfig,
   sessionId: string
@@ -2160,6 +2221,97 @@ function normalizeMessageRole(value: unknown): HermesSessionMessage["role"] {
     return s;
   }
   return "assistant";
+}
+
+function normalizeHermesSkillsPayload(data: Record<string, unknown>): HermesSkillDescriptor[] {
+  const candidates = [
+    ...skillRecordsFromValue(data.skills),
+    ...skillRecordsFromValue(data.data),
+    ...skillRecordsFromValue(data.items),
+    ...skillRecordsFromValue(data.registry),
+    ...skillRecordsFromValue(data.available_skills),
+    ...skillRecordsFromValue(data.availableSkills)
+  ];
+  const seen = new Set<string>();
+
+  return candidates
+    .map(({ key, record }) => normalizeHermesSkillRecord(record, key))
+    .filter((skill): skill is HermesSkillDescriptor => Boolean(skill))
+    .filter((skill) => {
+      const fingerprint = normalizeName(skill.id || skill.name || skill.title);
+      if (!fingerprint || seen.has(fingerprint)) {
+        return false;
+      }
+      seen.add(fingerprint);
+      return true;
+    })
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function skillRecordsFromValue(value: unknown): Array<{ key?: string; record: Record<string, unknown> }> {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => objectRecord(item))
+      .filter((item): item is Record<string, unknown> => Boolean(item))
+      .map((record) => ({ record }));
+  }
+
+  const record = objectRecord(value);
+  if (!record) {
+    return [];
+  }
+
+  return Object.entries(record)
+    .map(([key, item]) => {
+      const child = objectRecord(item);
+      return child ? { key, record: child } : null;
+    })
+    .filter((item): item is { key: string; record: Record<string, unknown> } => Boolean(item));
+}
+
+function normalizeHermesSkillRecord(
+  record: Record<string, unknown>,
+  fallbackId?: string
+): HermesSkillDescriptor | null {
+  const id = firstString(
+    record.id,
+    record.name,
+    record.slug,
+    record.skill_id,
+    record.skillId,
+    fallbackId
+  );
+  const name = firstString(record.name, record.slug, record.id, fallbackId);
+  const rawTitle = firstString(record.title, record.display_name, record.displayName);
+  const title = rawTitle || humanizeSkillTitle(name || id);
+  if (!id && !name && !title) {
+    return null;
+  }
+
+  const enabled =
+    optionalBoolean(record.enabled) ??
+    optionalBoolean(record.available) ??
+    optionalBoolean(record.active) ??
+    null;
+
+  return {
+    id: id || name || title,
+    name: name || id || title,
+    title: title || name || id,
+    description: firstString(record.description, record.summary, record.detail) || null,
+    source: firstString(record.source, record.plugin, record.provider, record.package, record.origin) || null,
+    category: firstString(record.category, record.group, record.kind, record.type) || null,
+    enabled,
+    tags: stringArray(record.tags)
+  };
+}
+
+function humanizeSkillTitle(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function normalizeHermesSseEvent(

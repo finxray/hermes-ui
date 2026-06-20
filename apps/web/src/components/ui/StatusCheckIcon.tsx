@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check } from "@/components/ui/AppIcons";
 import styles from "./StatusCheckIcon.module.css";
 
 type StatusCheckIconProps = {

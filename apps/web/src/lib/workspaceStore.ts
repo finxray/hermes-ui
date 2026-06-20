@@ -1254,17 +1254,60 @@ function normalizeTitleSource(session: Session): NonNullable<Session["titleSourc
 }
 
 function summarizeTitle(content: string): string {
-  const clean = summarizeMessage(content)
+  const clean = content
     .replace(/^(please\s+)?(can|could|would)\s+you\s+/i, "")
     .replace(/^(please\s+)/i, "")
+    .replace(/\b(in|under)\s+\d+\s+(words?|sentences?|chars?|characters?)\b/gi, "")
+    .replace(/\b(done|thanks|thank you)\b[.!?:;,\s]*/gi, " ")
     .replace(/[`"'()[\]{}<>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const commandTitle = summarizeCommandTitle(clean);
+  if (commandTitle) {
+    return commandTitle;
+  }
+
+  const firstSentence = clean
+    .split(/[.!?\n]/)
+    .map((part) => part.trim())
+    .find(Boolean) ?? clean;
+  const compact = firstSentence
+    .replace(/^(i\s+need\s+to|i\s+need|we\s+need\s+to|we\s+need|let'?s|please)\s+/i, "")
+    .replace(/\b(the|this|that|below|following)\b\s*$/i, "")
     .replace(/[?!.,:;]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  if (!clean) {
+
+  if (!compact) {
     return "New chat";
   }
-  return `${clean[0].toUpperCase()}${clean.slice(1)}`.slice(0, 44);
+
+  const title = `${compact[0].toUpperCase()}${compact.slice(1)}`;
+  return title.length > 34 ? `${title.slice(0, 31).trimEnd()}...` : title;
+}
+
+function summarizeCommandTitle(content: string): string | null {
+  const lower = content.toLowerCase();
+  if (/\b(summarise|summarize|summary)\b/.test(lower)) {
+    return "Summarize text";
+  }
+  if (/\b(audit|review|inspect)\b/.test(lower)) {
+    return "Audit request";
+  }
+  if (/\b(fix|repair|resolve)\b/.test(lower)) {
+    return "Fix issue";
+  }
+  if (/\b(add|create|build|implement)\b/.test(lower)) {
+    return "Add feature";
+  }
+  if (/\b(remove|delete)\b/.test(lower)) {
+    return "Remove item";
+  }
+  if (/\b(explain|describe)\b/.test(lower)) {
+    return "Explain topic";
+  }
+  return null;
 }
 
 function summarizeMessage(content: string): string {

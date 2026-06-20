@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3 } from "lucide-react";
+import { Clock3 } from "@/components/ui/AppIcons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useLifecycleTimeline } from "@/hooks/useLifecycleTimeline";
 import type { TimelineEvent } from "@hermes-ui/brain-memory-client";

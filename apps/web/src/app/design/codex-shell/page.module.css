@@ -1,8 +1,8 @@
 .shell {
   --content-width: 973px;
-  --font-body: 16.1px;
-  --font-ui: 17.25px;
-  --font-title: 19.55px;
+  --font-body: 17.227px;
+  --font-ui: 18.4575px;
+  --font-title: 20.9185px;
   --icon-scale: 1.15;
   --canvas: #07080a;
   --window: #101114;
@@ -17,7 +17,6 @@
   --hover: rgba(255, 255, 255, 0.072);
   --active: rgba(255, 255, 255, 0.105);
   --accent: #8ee6c6;
-  --orange: #ff9b52;
   display: grid;
   grid-template-areas:
     "top top top"

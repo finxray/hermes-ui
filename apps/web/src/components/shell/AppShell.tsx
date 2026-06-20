@@ -384,7 +384,13 @@ export function AppShell() {
         data-shell-main-window="true"
         data-right-collapsed={rightCollapsed ? "true" : "false"}
       >
-        <div className={mainWindowStyles.chatPane} data-shell-chat-pane="true">
+        <div
+          className={`${mainWindowStyles.chatPane}${
+            activeSection === "plugins" ? ` ${mainWindowStyles.chatPaneScrollable}` : ""
+          }`}
+          data-scrollable={activeSection === "plugins" ? "true" : "false"}
+          data-shell-chat-pane="true"
+        >
           {activeSection === "plugins" ? (
             <PluginsView hermesStatus={hermesStatus.status} />
           ) : (

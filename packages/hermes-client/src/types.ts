@@ -573,6 +573,26 @@ export type HermesSkillsListResult =
       error: HermesStatusError;
     };
 
+export type HermesSkillToggleResult =
+  | {
+      ok: true;
+      skillId: string;
+      enabled: boolean;
+      skill: HermesSkillDescriptor | null;
+      checkedAt: string;
+      raw: Record<string, unknown> | null;
+      error: null;
+    }
+  | {
+      ok: false;
+      skillId: string;
+      enabled: boolean;
+      skill: null;
+      checkedAt: string;
+      raw: null;
+      error: HermesStatusError;
+    };
+
 export type HermesRunApprovalChoice = "once" | "session" | "always" | "deny";
 
 export type HermesRunApprovalResult = {

@@ -64,7 +64,8 @@ Current Hermes `gateway/platforms/api_server.py` registers:
 | `GET` | `/health/detailed` | Rich status for dashboards. |
 | `GET` | `/v1/models` | Advertised model/profile id. |
 | `GET` | `/v1/capabilities` | Machine-readable feature flags and endpoints. |
-| `GET` | `/v1/skills` | Read-only installed skill metadata. |
+| `GET` | `/v1/skills` | Installed skill metadata, including enabled state when Hermes reports it. |
+| `PATCH/POST/PUT` | `/v1/skills/{skill_id}` or capability-advertised skill mutation path | Enable/disable a skill when Hermes exposes a writable skills control endpoint. |
 | `GET` | `/v1/toolsets` | Read-only toolset metadata for `api_server`. |
 | `POST` | `/v1/chat/completions` | OpenAI-compatible chat fallback. |
 | `POST` | `/v1/responses` | OpenAI Responses-style endpoint. |
@@ -186,6 +187,11 @@ UI contract:
   not direct UI writes.
 - Use `skills` and `toolsets` later to render deterministic tool registry
   surfaces without asking the model.
+- Skill enable/disable controls must remain capability/runtime driven. The
+  browser calls the Studio BFF, and the BFF calls a Hermes-advertised skill
+  mutation endpoint or the standard `/v1/skills/{skill_id}` style endpoint.
+  If Hermes does not expose a writable route, the UI must revert and show the
+  Hermes error rather than storing a fake local enabled state.
 
 ## 3. Sessions
 

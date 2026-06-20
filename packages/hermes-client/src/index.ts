@@ -29,6 +29,7 @@ import type {
   HermesSessionMessagesResult,
   HermesSessionSummary,
   HermesSkillDescriptor,
+  HermesSkillToggleResult,
   HermesSkillsListResult,
   HermesStatusError,
   HermesTokenUsage,
@@ -86,6 +87,7 @@ export type {
   HermesSessionMessagesResult,
   HermesSessionSummary,
   HermesSkillDescriptor,
+  HermesSkillToggleResult,
   HermesSkillsListResult,
   HermesStatusError,
   HermesTokenUsage,
@@ -2009,6 +2011,119 @@ export async function listHermesSkills(
   };
 }
 
+export async function setHermesSkillEnabled(
+  config: HermesClientConfig,
+  skillId: string,
+  enabled: boolean
+): Promise<HermesSkillToggleResult> {
+  const checkedAt = new Date().toISOString();
+  const safeId = sanitizeHermesId(skillId);
+  if (config.enabled === false) {
+    return {
+      ok: false,
+      skillId: safeId,
+      enabled,
+      skill: null,
+      checkedAt,
+      raw: null,
+      error: { kind: "disabled", message: "Real Hermes is disabled for this UI process." }
+    };
+  }
+  if (!config.baseUrl?.trim()) {
+    return {
+      ok: false,
+      skillId: safeId,
+      enabled,
+      skill: null,
+      checkedAt,
+      raw: null,
+      error: { kind: "unconfigured", message: "Set HERMES_API_BASE_URL to enable Hermes skill controls." }
+    };
+  }
+  const base = parseBaseUrl(config.baseUrl);
+  if (!base) {
+    return {
+      ok: false,
+      skillId: safeId,
+      enabled,
+      skill: null,
+      checkedAt,
+      raw: null,
+      error: { kind: "invalid_config", message: "HERMES_API_BASE_URL must be a valid http:// or https:// URL." }
+    };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const targets = await discoverHermesSkillToggleTargets({
+    apiKey: config.apiKey,
+    base,
+    enabled,
+    fetchImpl,
+    signal: config.signal,
+    skillId: safeId,
+    timeoutMs
+  });
+  let lastError: HermesChatError | null = null;
+
+  for (const target of targets) {
+    const result = await fetchJsonMutationEndpoint({
+      apiKey: config.apiKey,
+      base,
+      body: target.body,
+      fetchImpl,
+      method: target.method,
+      path: target.path,
+      signal: config.signal,
+      timeoutMs
+    });
+    if (!result.ok) {
+      lastError = result.error;
+      if (!isEndpointMismatchError(result.error)) {
+        return {
+          ok: false,
+          skillId: safeId,
+          enabled,
+          skill: null,
+          checkedAt,
+          raw: null,
+          error: result.error
+        };
+      }
+      continue;
+    }
+
+    const returnedSkill =
+      normalizeHermesSkillRecord(objectRecord(result.data.skill) ?? objectRecord(result.data.data) ?? {}, safeId) ??
+      normalizeHermesSkillRecord(result.data, safeId);
+
+    return {
+      ok: true,
+      skillId: safeId,
+      enabled: returnedSkill?.enabled ?? enabled,
+      skill: returnedSkill,
+      checkedAt,
+      raw: result.data,
+      error: null
+    };
+  }
+
+  return {
+    ok: false,
+    skillId: safeId,
+    enabled,
+    skill: null,
+    checkedAt,
+    raw: null,
+    error: {
+      kind: "bad_response",
+      message:
+        lastError?.message ??
+        "Hermes did not expose a writable skill toggle endpoint. Update Hermes or advertise one in /v1/capabilities."
+    }
+  };
+}
+
 export async function getHermesSession(
   config: HermesClientConfig,
   sessionId: string
@@ -3918,6 +4033,163 @@ async function fetchJsonEndpoint(args: {
   } finally {
     abort.cleanup();
   }
+}
+
+type HermesSkillToggleTarget = {
+  body: Record<string, unknown>;
+  method: "PATCH" | "POST" | "PUT";
+  path: string;
+};
+
+async function discoverHermesSkillToggleTargets(args: {
+  apiKey?: string | null;
+  base: URL;
+  enabled: boolean;
+  fetchImpl: typeof fetch;
+  signal?: AbortSignal;
+  skillId: string;
+  timeoutMs: number;
+}): Promise<HermesSkillToggleTarget[]> {
+  const fromCapabilities: HermesSkillToggleTarget[] = [];
+  const capabilities = await fetchJsonEndpoint({
+    apiKey: args.apiKey,
+    base: args.base,
+    fetchImpl: args.fetchImpl,
+    path: "/v1/capabilities",
+    signal: args.signal,
+    timeoutMs: args.timeoutMs
+  });
+
+  if (capabilities.ok) {
+    for (const endpoint of extractSkillMutationEndpoints(capabilities.data)) {
+      fromCapabilities.push({
+        body: { enabled: args.enabled },
+        method: endpoint.method,
+        path: fillSkillEndpointPath(endpoint.path, args.skillId)
+      });
+    }
+  }
+
+  const encodedId = encodeURIComponent(args.skillId);
+  const fallbackTargets: HermesSkillToggleTarget[] = [
+    { method: "PATCH", path: `/v1/skills/${encodedId}`, body: { enabled: args.enabled } },
+    { method: "PATCH", path: `/v1/skills/${encodedId}/enabled`, body: { enabled: args.enabled } },
+    { method: "POST", path: `/v1/skills/${encodedId}/${args.enabled ? "enable" : "disable"}`, body: {} },
+    { method: "POST", path: `/v1/skills/${encodedId}/toggle`, body: { enabled: args.enabled } },
+    { method: "PUT", path: `/v1/skills/${encodedId}`, body: { enabled: args.enabled } },
+    { method: "POST", path: `/v1/skills/${encodedId}`, body: { enabled: args.enabled } }
+  ];
+  const seen = new Set<string>();
+
+  return [...fromCapabilities, ...fallbackTargets].filter((target) => {
+    const key = `${target.method} ${target.path}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function extractSkillMutationEndpoints(data: Record<string, unknown>) {
+  const endpoints = objectRecord(data.endpoints);
+  if (!endpoints) {
+    return [];
+  }
+
+  return Object.entries(endpoints)
+    .flatMap(([key, value]) => endpointEntriesFromCapability(key, value))
+    .filter((endpoint) => {
+      const text = `${endpoint.key} ${endpoint.path}`.toLowerCase();
+      return text.includes("skill") && /enable|disable|toggle|update|patch|write|set/.test(text);
+    });
+}
+
+function endpointEntriesFromCapability(key: string, value: unknown): Array<{ key: string; method: "PATCH" | "POST" | "PUT"; path: string }> {
+  const record = objectRecord(value);
+  if (!record) {
+    return [];
+  }
+
+  const path = firstString(record.path, record.url, record.href, record.endpoint);
+  if (!path) {
+    return [];
+  }
+
+  const rawMethods = Array.isArray(record.methods)
+    ? record.methods
+    : Array.isArray(record.method)
+      ? record.method
+      : [record.method];
+
+  return rawMethods
+    .map((method) => asString(method).toUpperCase())
+    .filter((method): method is "PATCH" | "POST" | "PUT" => method === "PATCH" || method === "POST" || method === "PUT")
+    .map((method) => ({ key, method, path }));
+}
+
+function fillSkillEndpointPath(path: string, skillId: string) {
+  const encodedId = encodeURIComponent(skillId);
+  return path
+    .replace("{skill_id}", encodedId)
+    .replace("{skillId}", encodedId)
+    .replace(":skill_id", encodedId)
+    .replace(":skillId", encodedId);
+}
+
+async function fetchJsonMutationEndpoint(args: {
+  apiKey?: string | null;
+  base: URL;
+  body: Record<string, unknown>;
+  fetchImpl: typeof fetch;
+  method: "PATCH" | "POST" | "PUT";
+  path: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: HermesChatError }
+> {
+  const abort = createLinkedAbortController(args.signal, args.timeoutMs);
+  const headers = new Headers({ Accept: "application/json", "Content-Type": "application/json" });
+  applyHermesAuth(headers, args.apiKey);
+
+  try {
+    const response = await args.fetchImpl(buildEndpointUrl(args.base, args.path), {
+      body: JSON.stringify(args.body),
+      cache: "no-store",
+      headers,
+      method: args.method,
+      signal: abort.signal
+    });
+    const data = await readJsonObject(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, args.path)
+        }
+      };
+    }
+    return { ok: true, data: data ?? {} };
+  } catch (error) {
+    return {
+      ok: false,
+      error: normalizeChatFetchError(error)
+    };
+  } finally {
+    abort.cleanup();
+  }
+}
+
+function isEndpointMismatchError(error: HermesChatError) {
+  return (
+    error.kind === "http_error" &&
+    (error.message.includes("HTTP 404") ||
+      error.message.includes("HTTP 405") ||
+      error.message.includes("HTTP 501"))
+  );
 }
 
 function withUiCapabilities(

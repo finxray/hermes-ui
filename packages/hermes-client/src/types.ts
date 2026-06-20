@@ -216,6 +216,8 @@ export type NormalizedHermesStatus = {
 export type HermesClientConfig = {
   baseUrl?: string | null;
   apiKey?: string | null;
+  dashboardBaseUrl?: string | null;
+  dashboardSessionToken?: string | null;
   configuredDefaultModelId?: string | null;
   enabled?: boolean;
   memoryScopeBridgeEnabled?: boolean;

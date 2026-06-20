@@ -7,6 +7,8 @@ export async function GET() {
   const result = await listHermesSkills({
     apiKey: process.env.HERMES_API_KEY,
     baseUrl: process.env.HERMES_API_BASE_URL,
+    dashboardBaseUrl: process.env.HERMES_DASHBOARD_BASE_URL,
+    dashboardSessionToken: process.env.HERMES_DASHBOARD_SESSION_TOKEN,
     enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
     timeoutMs: 8000
   });

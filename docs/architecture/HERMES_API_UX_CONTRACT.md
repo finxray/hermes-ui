@@ -192,6 +192,12 @@ UI contract:
   mutation endpoint or the standard `/v1/skills/{skill_id}` style endpoint.
   If Hermes does not expose a writable route, the UI must revert and show the
   Hermes error rather than storing a fake local enabled state.
+- Current local Hermes exposes richer enabled-state metadata and the working
+  toggle action through the dashboard API (`GET /api/skills` and
+  `PUT /api/skills/toggle`). The Studio BFF may merge this dashboard metadata
+  server-side when `/v1/skills` omits enabled state, using
+  `HERMES_DASHBOARD_BASE_URL`/`HERMES_DASHBOARD_SESSION_TOKEN` when provided
+  or the local `8642 -> 9119` development mapping.
 
 ## 3. Sessions
 

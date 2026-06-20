@@ -2002,9 +2002,11 @@ export async function listHermesSkills(
     return { ok: false, skills: [], checkedAt, raw: null, error: result.error };
   }
 
+  const skills = normalizeHermesSkillsPayload(result.data);
+
   return {
     ok: true,
-    skills: normalizeHermesSkillsPayload(result.data),
+    skills: await mergeHermesDashboardSkillState(config, base, fetchImpl, skills),
     checkedAt,
     raw: result.data,
     error: null
@@ -2055,6 +2057,19 @@ export async function setHermesSkillEnabled(
 
   const fetchImpl = config.fetchImpl ?? fetch;
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const dashboardResult = await setHermesDashboardSkillEnabled(config, base, fetchImpl, safeId, enabled, timeoutMs);
+  if (dashboardResult?.ok) {
+    return {
+      ok: true,
+      skillId: safeId,
+      enabled: dashboardResult.enabled,
+      skill: dashboardResult.skill,
+      checkedAt,
+      raw: dashboardResult.raw,
+      error: null
+    };
+  }
+
   const targets = await discoverHermesSkillToggleTargets({
     apiKey: config.apiKey,
     base,
@@ -2064,7 +2079,7 @@ export async function setHermesSkillEnabled(
     skillId: safeId,
     timeoutMs
   });
-  let lastError: HermesChatError | null = null;
+  let lastError: HermesChatError | null = dashboardResult?.error ?? null;
 
   for (const target of targets) {
     const result = await fetchJsonMutationEndpoint({
@@ -4033,6 +4048,160 @@ async function fetchJsonEndpoint(args: {
   } finally {
     abort.cleanup();
   }
+}
+
+async function mergeHermesDashboardSkillState(
+  config: HermesClientConfig,
+  apiBase: URL,
+  fetchImpl: typeof fetch,
+  skills: HermesSkillDescriptor[]
+): Promise<HermesSkillDescriptor[]> {
+  const dashboardSkills = await listHermesDashboardSkills(config, apiBase, fetchImpl, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  if (!dashboardSkills.length) {
+    return skills;
+  }
+
+  const stateByName = new Map(dashboardSkills.map((skill) => [normalizeName(skill.name || skill.id), skill.enabled]));
+  return skills.map((skill) => {
+    const enabled = stateByName.get(normalizeName(skill.name || skill.id));
+    return typeof enabled === "boolean" ? { ...skill, enabled } : skill;
+  });
+}
+
+async function listHermesDashboardSkills(
+  config: HermesClientConfig,
+  apiBase: URL,
+  fetchImpl: typeof fetch,
+  timeoutMs: number
+): Promise<HermesSkillDescriptor[]> {
+  const dashboardBase = resolveHermesDashboardBase(config, apiBase);
+  if (!dashboardBase) {
+    return [];
+  }
+
+  const token = config.dashboardSessionToken ?? await fetchHermesDashboardSessionToken(fetchImpl, dashboardBase, timeoutMs, config.signal);
+  const abort = createLinkedAbortController(config.signal, timeoutMs);
+  const headers = new Headers({ Accept: "application/json" });
+  if (token) {
+    headers.set("X-Hermes-Session-Token", token);
+  }
+
+  try {
+    const response = await fetchImpl(buildEndpointUrl(dashboardBase, "/api/skills"), {
+      cache: "no-store",
+      headers,
+      signal: abort.signal
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const data = (await response.json()) as unknown;
+    const payload = Array.isArray(data)
+      ? { data }
+      : data && typeof data === "object" && !Array.isArray(data)
+        ? (data as Record<string, unknown>)
+        : null;
+    return payload ? normalizeHermesSkillsPayload(payload) : [];
+  } catch {
+    return [];
+  } finally {
+    abort.cleanup();
+  }
+}
+
+async function setHermesDashboardSkillEnabled(
+  config: HermesClientConfig,
+  apiBase: URL,
+  fetchImpl: typeof fetch,
+  skillId: string,
+  enabled: boolean,
+  timeoutMs: number
+): Promise<({ ok: true; enabled: boolean; skill: HermesSkillDescriptor | null; raw: Record<string, unknown> | null } | { ok: false; error: HermesChatError }) | null> {
+  const dashboardBase = resolveHermesDashboardBase(config, apiBase);
+  if (!dashboardBase) {
+    return null;
+  }
+
+  const token = config.dashboardSessionToken ?? await fetchHermesDashboardSessionToken(fetchImpl, dashboardBase, timeoutMs, config.signal);
+  const abort = createLinkedAbortController(config.signal, timeoutMs);
+  const headers = new Headers({ Accept: "application/json", "Content-Type": "application/json" });
+  if (token) {
+    headers.set("X-Hermes-Session-Token", token);
+  }
+
+  try {
+    const response = await fetchImpl(buildEndpointUrl(dashboardBase, "/api/skills/toggle"), {
+      body: JSON.stringify({ name: skillId, enabled }),
+      cache: "no-store",
+      headers,
+      method: "PUT",
+      signal: abort.signal
+    });
+    const data = await readJsonObject(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: "http_error",
+          message: await safeHermesErrorMessageFromData(response.status, data, "/api/skills/toggle")
+        }
+      };
+    }
+
+    const skill = normalizeHermesSkillRecord(data ?? {}, skillId);
+    return {
+      ok: true,
+      enabled: optionalBoolean(data?.enabled) ?? enabled,
+      skill,
+      raw: data
+    };
+  } catch (error) {
+    return { ok: false, error: normalizeChatFetchError(error) };
+  } finally {
+    abort.cleanup();
+  }
+}
+
+async function fetchHermesDashboardSessionToken(
+  fetchImpl: typeof fetch,
+  dashboardBase: URL,
+  timeoutMs: number,
+  signal?: AbortSignal
+) {
+  const abort = createLinkedAbortController(signal, timeoutMs);
+  try {
+    const response = await fetchImpl(buildEndpointUrl(dashboardBase, "/skills"), {
+      cache: "no-store",
+      headers: new Headers({ Accept: "text/html" }),
+      signal: abort.signal
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const html = await response.text();
+    return /__HERMES_SESSION_TOKEN__="([^"]+)"/.exec(html)?.[1] ?? null;
+  } catch {
+    return null;
+  } finally {
+    abort.cleanup();
+  }
+}
+
+function resolveHermesDashboardBase(config: HermesClientConfig, apiBase: URL) {
+  if (config.dashboardBaseUrl?.trim()) {
+    return parseBaseUrl(config.dashboardBaseUrl);
+  }
+
+  if (
+    apiBase.port === "8642" &&
+    (apiBase.hostname === "127.0.0.1" || apiBase.hostname === "localhost" || apiBase.hostname === "::1")
+  ) {
+    const inferred = new URL(apiBase.href);
+    inferred.port = "9119";
+    return inferred;
+  }
+
+  return null;
 }
 
 type HermesSkillToggleTarget = {

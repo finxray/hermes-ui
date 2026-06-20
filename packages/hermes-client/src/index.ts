@@ -4062,10 +4062,19 @@ async function mergeHermesDashboardSkillState(
   }
 
   const stateByName = new Map(dashboardSkills.map((skill) => [normalizeName(skill.name || skill.id), skill.enabled]));
-  return skills.map((skill) => {
+  const merged = skills.map((skill) => {
     const enabled = stateByName.get(normalizeName(skill.name || skill.id));
     return typeof enabled === "boolean" ? { ...skill, enabled } : skill;
   });
+  const seen = new Set(merged.map((skill) => normalizeName(skill.name || skill.id)));
+  for (const dashboardSkill of dashboardSkills) {
+    const key = normalizeName(dashboardSkill.name || dashboardSkill.id);
+    if (!seen.has(key)) {
+      merged.push(dashboardSkill);
+      seen.add(key);
+    }
+  }
+  return merged;
 }
 
 async function listHermesDashboardSkills(

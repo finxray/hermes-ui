@@ -74,8 +74,8 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
   const title = activeTab === "skills" ? "Skills" : "Plugins";
   const subtitle =
     activeTab === "skills"
-      ? "Extend Codex's capabilities with task-specific skills"
-      : "Work with Codex across your favorite tools";
+      ? "Extend Hermes' capabilities with task-specific skills"
+      : "Work with Hermes across your favorite tools";
 
   return (
     <section className={styles.view} aria-labelledby="plugins-heading">
@@ -136,7 +136,7 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
         <div className={styles.summaryRow} aria-label="Hermes skills summary">
           <SummaryPill label="Hermes" value={hermesStatusLabel(hermesStatus)} />
           <SummaryPill label="Skills" value={isLoading ? "Loading" : String(skills.length)} />
-          <SummaryPill label="Source" value={canLoadSkills ? "Hermes /v1/skills" : "Unavailable"} />
+          <SummaryPill label="Source" value={canLoadSkills ? "Hermes skills" : "Unavailable"} />
         </div>
       ) : null}
 
@@ -214,7 +214,7 @@ function PluginsPanel({
     <div className={styles.groupStack}>
       <section className={styles.addedSection} aria-labelledby="plugins-added-heading">
         <div className={styles.sectionHeader}>
-          <h2 id="plugins-added-heading">Added</h2>
+          <h2 id="plugins-added-heading">Enabled</h2>
           <span>{groups.length}</span>
         </div>
         <div className={styles.addedIcons} aria-label="Added Hermes skill sources">
@@ -359,7 +359,7 @@ function PluginActionButton({
 }) {
   const hasKnownState = skill.enabled !== null;
   const isEnabled = skill.enabled === true;
-  const actionLabel = isEnabled ? "Remove" : "Add";
+  const actionLabel = isEnabled ? "Disable" : "Enable";
   const nextEnabled = !isEnabled;
 
   return (

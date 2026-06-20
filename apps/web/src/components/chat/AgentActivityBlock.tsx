@@ -191,30 +191,41 @@ function WorkedRow({
 }) {
   const hasDetails = items.length > 0;
   const openInitially = hasDetails && initiallyOpen;
+  const summaryContent = (
+    <>
+      <span className={styles.workedLabel}>{label}</span>
+      {tokenParts.map((part) => (
+        <span className={styles.tokenPart} data-kind={part.kind} key={part.key}>
+          {part.label}
+        </span>
+      ))}
+      {hasDetails ? <ChevronRight className={styles.workedChevron} size={14} aria-hidden="true" /> : null}
+    </>
+  );
+
+  if (!hasDetails) {
+    return (
+      <div className={styles.workedBlock} data-has-details="false">
+        <div className={`${styles.workedSummary} ${styles.workedSummaryStatic}`}>
+          {summaryContent}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AnimatedDisclosure
-      autoCollapseDelayMs={hasDetails ? autoCollapseDelayMs : null}
-      autoCollapseKey={hasDetails ? autoCollapseKey : null}
+      autoCollapseDelayMs={autoCollapseDelayMs}
+      autoCollapseKey={autoCollapseKey}
       className={styles.workedBlock}
       initiallyOpen={openInitially}
       onAutoCollapseStart={onAutoCollapseStart}
       summaryClassName={styles.workedSummary}
       type={openInitially ? "completed-work" : undefined}
-      summary={
-        <>
-          <span className={styles.workedLabel}>{label}</span>
-          {tokenParts.map((part) => (
-            <span className={styles.tokenPart} data-kind={part.kind} key={part.key}>
-              {part.label}
-            </span>
-          ))}
-          <ChevronRight className={styles.workedChevron} size={14} aria-hidden="true" />
-        </>
-      }
+      summary={summaryContent}
     >
       <div className={styles.expandedBody}>
-        {hasDetails ? <ActivityTimeline items={items} /> : null}
+        <ActivityTimeline items={items} />
       </div>
     </AnimatedDisclosure>
   );

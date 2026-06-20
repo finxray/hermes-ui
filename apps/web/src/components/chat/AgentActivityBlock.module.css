@@ -81,6 +81,11 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.workedSummaryStatic {
+  cursor: default;
+  user-select: text;
+}
+
 .commandSummary {
   width: fit-content;
   max-width: 100%;

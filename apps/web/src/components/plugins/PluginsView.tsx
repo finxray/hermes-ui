@@ -70,6 +70,11 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
   const { isLoading, refresh, result, skills } = useHermesSkills(canLoadSkills);
   const filteredSkills = useMemo(() => filterSkills(skills, query), [query, skills]);
   const pluginGroups = useMemo(() => groupSkillsBySource(filteredSkills), [filteredSkills]);
+  const title = activeTab === "skills" ? "Skills" : "Plugins";
+  const subtitle =
+    activeTab === "skills"
+      ? "Extend Codex's capabilities with task-specific skills"
+      : "Work with Codex across your favorite tools";
 
   return (
     <section className={styles.view} aria-labelledby="plugins-heading">
@@ -96,8 +101,8 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
 
       <div className={styles.header}>
         <div>
-          <h1 id="plugins-heading">Plugins</h1>
-          <p>Work with Hermes skills across local tools and memory-aware workflows</p>
+          <h1 id="plugins-heading">{title}</h1>
+          <p>{subtitle}</p>
         </div>
         <button
           className={styles.iconButton}
@@ -126,11 +131,13 @@ export function PluginsView({ hermesStatus }: PluginsViewProps) {
         </button>
       </div>
 
-      <div className={styles.summaryRow} aria-label="Hermes skills summary">
-        <SummaryPill label="Hermes" value={hermesStatusLabel(hermesStatus)} />
-        <SummaryPill label="Skills" value={isLoading ? "Loading" : String(skills.length)} />
-        <SummaryPill label="Source" value={canLoadSkills ? "Hermes /v1/skills" : "Unavailable"} />
-      </div>
+      {activeTab === "plugins" ? (
+        <div className={styles.summaryRow} aria-label="Hermes skills summary">
+          <SummaryPill label="Hermes" value={hermesStatusLabel(hermesStatus)} />
+          <SummaryPill label="Skills" value={isLoading ? "Loading" : String(skills.length)} />
+          <SummaryPill label="Source" value={canLoadSkills ? "Hermes /v1/skills" : "Unavailable"} />
+        </div>
+      ) : null}
 
       {!canLoadSkills ? (
         <EmptyState
@@ -226,18 +233,26 @@ function SkillsPanel({
     );
   }
 
+  const groups = groupSkillsForSkillsTab(skills);
+
   return (
-    <section className={styles.group} aria-labelledby="skills-heading">
-      <div className={styles.sectionHeader}>
-        <h2 id="skills-heading">Hermes Configured</h2>
-        <span>{skills.length}</span>
+    <div className={styles.skillsStack}>
+      {groups.map((group) => (
+        <section className={styles.skillsSection} key={group.label} aria-labelledby={`skills-${slug(group.label)}`}>
+          <h2 id={`skills-${slug(group.label)}`}>{group.label}</h2>
+          <div className={styles.skillsList}>
+            {group.skills.map((skill) => (
+              <SkillListRow key={skill.id} skill={skill} />
+            ))}
+          </div>
+        </section>
+      ))}
+      <div className={styles.skillsBottomAction}>
+        <button className={styles.addSkillButton} type="button" title="Skill install is not connected yet">
+          Add skill
+        </button>
       </div>
-      <div className={styles.grid}>
-        {skills.map((skill) => (
-          <SkillCard key={skill.id} skill={skill} />
-        ))}
-      </div>
-    </section>
+    </div>
   );
 }
 
@@ -262,6 +277,29 @@ function SkillCard({ skill }: { skill: HermesSkillDescriptor }) {
       >
         Add
       </button>
+    </article>
+  );
+}
+
+function SkillListRow({ skill }: { skill: HermesSkillDescriptor }) {
+  const isEnabled = skill.enabled !== false;
+
+  return (
+    <article className={styles.skillListRow}>
+      <SkillIcon className={styles.skillListIcon} skill={skill} />
+      <div className={styles.skillListBody}>
+        <h3>{skill.title}</h3>
+        <p>{skill.description ?? skill.name}</p>
+      </div>
+      {isEnabled ? (
+        <span className={styles.skillCheck} aria-label={`${skill.title} installed`} title="Installed">
+          <Check size={15} />
+        </span>
+      ) : (
+        <button className={styles.addSkillButton} type="button" aria-label={`Add ${skill.title}`}>
+          Add skill
+        </button>
+      )}
     </article>
   );
 }
@@ -570,6 +608,42 @@ function groupSkillsBySource(skills: HermesSkillDescriptor[]) {
   return Array.from(groups.entries())
     .map(([source, groupSkills]) => ({ source, skills: groupSkills }))
     .sort((a, b) => a.source.localeCompare(b.source));
+}
+
+function groupSkillsForSkillsTab(skills: HermesSkillDescriptor[]) {
+  const personal: HermesSkillDescriptor[] = [];
+  const system: HermesSkillDescriptor[] = [];
+  const recommended: HermesSkillDescriptor[] = [];
+
+  for (const skill of skills) {
+    if (skill.enabled === false) {
+      recommended.push(skill);
+    } else if (isSystemSkill(skill)) {
+      system.push(skill);
+    } else {
+      personal.push(skill);
+    }
+  }
+
+  return [
+    { label: "Personal", skills: personal },
+    { label: "System", skills: system },
+    { label: "Recommended", skills: recommended }
+  ].filter((group) => group.skills.length > 0);
+}
+
+function isSystemSkill(skill: HermesSkillDescriptor) {
+  const text = normalizeIconText([skill.title, skill.name, skill.source, skill.category, ...(skill.tags ?? [])]);
+  return [
+    "browser",
+    "image gen",
+    "imagegen",
+    "openai docs",
+    "plugin creator",
+    "skill creator",
+    "skill installer",
+    "system"
+  ].some((keyword) => text.includes(keyword));
 }
 
 function hermesStatusLabel(status: NormalizedHermesStatus | null) {

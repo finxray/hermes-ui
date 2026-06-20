@@ -196,7 +196,8 @@
 }
 
 .pluginIcon,
-.skillIcon {
+.skillIcon,
+.skillListIcon {
   display: grid;
   flex: none;
   place-items: center;
@@ -239,6 +240,18 @@
   height: 34px;
   border-radius: 9px;
   color: var(--text-secondary);
+}
+
+.skillListIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+}
+
+.skillListIcon svg {
+  width: 25px;
+  height: 25px;
 }
 
 .resolvedIcon {
@@ -345,6 +358,100 @@
   background: rgba(255, 255, 255, 0.095);
 }
 
+.skillsStack {
+  display: grid;
+  gap: 46px;
+  width: min(620px, 100%);
+  margin: 34px auto 0;
+  padding-bottom: 48px;
+}
+
+.skillsSection {
+  display: grid;
+  gap: 18px;
+}
+
+.skillsSection h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-weight: 620;
+  letter-spacing: 0;
+}
+
+.skillsList {
+  display: grid;
+  gap: 20px;
+}
+
+.skillListRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 36px;
+  gap: 14px;
+  align-items: center;
+  min-height: 52px;
+  color: var(--text-primary);
+}
+
+.skillListBody {
+  min-width: 0;
+}
+
+.skillListBody h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  font-weight: 650;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skillListBody p {
+  overflow: hidden;
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skillCheck {
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  width: 28px;
+  height: 28px;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.skillsBottomAction {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -12px;
+}
+
+.addSkillButton {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.085);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  font-weight: 560;
+}
+
+.addSkillButton:hover,
+.addSkillButton:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.13);
+}
+
 .skillBody h3 {
   overflow: hidden;
   margin: 0;
@@ -420,6 +527,10 @@
   .grid,
   .loadingGrid {
     grid-template-columns: 1fr;
+  }
+
+  .skillsStack {
+    width: 100%;
   }
 }
 

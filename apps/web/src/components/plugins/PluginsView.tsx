@@ -1,7 +1,23 @@
 "use client";
 
 import type { HermesSkillDescriptor, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import { Plug, RefreshCw, Search, SlidersHorizontal, Sparkles } from "@/components/ui/AppIcons";
+import {
+  Activity,
+  Brain,
+  Cpu,
+  Database,
+  FileText,
+  MessageSquare,
+  Plug,
+  RefreshCw,
+  Search,
+  Server,
+  SlidersHorizontal,
+  Sparkles,
+  Terminal,
+  TerminalSquare
+} from "@/components/ui/AppIcons";
+import type { AppIcon } from "@/components/ui/AppIcons";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useHermesSkills } from "@/hooks/useHermesSkills";
@@ -131,9 +147,7 @@ function PluginsPanel({
         </div>
         <div className={styles.addedIcons} aria-label="Added Hermes skill sources">
           {groups.slice(0, 8).map((group) => (
-            <span className={styles.pluginIcon} key={group.source} title={group.source}>
-              {group.source.slice(0, 1).toUpperCase()}
-            </span>
+            <SkillIcon className={styles.pluginIcon} key={group.source} label={group.source} source={group.source} />
           ))}
         </div>
       </section>
@@ -196,9 +210,7 @@ function SkillsPanel({
 function SkillCard({ skill }: { skill: HermesSkillDescriptor }) {
   return (
     <article className={styles.skillCard}>
-      <span className={styles.skillIcon} aria-hidden="true">
-        {skill.category === "memory" ? <Sparkles size={16} /> : <Plug size={16} />}
-      </span>
+      <SkillIcon className={styles.skillIcon} skill={skill} />
       <div className={styles.skillBody}>
         <h3>{skill.title}</h3>
         <p>{skill.description ?? skill.name}</p>
@@ -210,6 +222,132 @@ function SkillCard({ skill }: { skill: HermesSkillDescriptor }) {
       </div>
     </article>
   );
+}
+
+function SkillIcon({
+  className,
+  label,
+  skill,
+  source
+}: {
+  className: string;
+  label?: string;
+  skill?: HermesSkillDescriptor;
+  source?: string;
+}) {
+  const visual = resolveSkillVisual(skill, source ?? skill?.source ?? label);
+  const Icon = visual.icon;
+
+  return (
+    <span
+      className={[className, styles.resolvedIcon, styles[visual.tone]].join(" ")}
+      aria-hidden="true"
+      title={label ?? skill?.title ?? source}
+    >
+      {visual.mark ? <span className={styles.iconMark}>{visual.mark}</span> : <Icon size={17} />}
+    </span>
+  );
+}
+
+type SkillVisual = {
+  icon: AppIcon;
+  mark?: string;
+  tone:
+    | "toneAgent"
+    | "toneArticle"
+    | "toneCode"
+    | "toneCreative"
+    | "toneData"
+    | "toneDiagram"
+    | "toneHermes"
+    | "toneMemory"
+    | "toneVideo";
+};
+
+function resolveSkillVisual(skill?: HermesSkillDescriptor, source?: string | null): SkillVisual {
+  const text = normalizeIconText([
+    skill?.title,
+    skill?.name,
+    skill?.description,
+    skill?.source,
+    skill?.category,
+    source,
+    ...(skill?.tags ?? [])
+  ]);
+
+  if (text.includes("codex")) {
+    return { icon: TerminalSquare, mark: "Cx", tone: "toneCode" };
+  }
+  if (text.includes("claude")) {
+    return { icon: Brain, mark: "Cl", tone: "toneAgent" };
+  }
+  if (text.includes("opencode") || text.includes("open code")) {
+    return { icon: TerminalSquare, mark: "OC", tone: "toneCode" };
+  }
+  if (text.includes("hermes")) {
+    return { icon: Sparkles, mark: "H", tone: "toneHermes" };
+  }
+  if (text.includes("memory") || text.includes("brain")) {
+    return { icon: Database, tone: "toneMemory" };
+  }
+  if (text.includes("agent") || text.includes("autonomous")) {
+    return { icon: Brain, tone: "toneAgent" };
+  }
+  if (text.includes("creative")) {
+    return { icon: Sparkles, tone: "toneCreative" };
+  }
+  if (text.includes("diagram") || text.includes("architecture") || text.includes("infographic")) {
+    return { icon: Activity, tone: "toneDiagram" };
+  }
+  if (text.includes("ascii")) {
+    return { icon: Terminal, mark: "Aa", tone: "toneCode" };
+  }
+  if (text.includes("video")) {
+    return { icon: VideoGlyph, tone: "toneVideo" };
+  }
+  if (text.includes("comic") || text.includes("illustrator") || text.includes("illustration")) {
+    return { icon: MessageSquare, tone: "toneCreative" };
+  }
+  if (text.includes("article") || text.includes("writer") || text.includes("docs")) {
+    return { icon: FileText, tone: "toneArticle" };
+  }
+  if (text.includes("comfy") || text.includes("image") || text.includes("workflow")) {
+    return { icon: Cpu, tone: "toneCreative" };
+  }
+  if (text.includes("server") || text.includes("mcp") || text.includes("gateway")) {
+    return { icon: Server, tone: "toneData" };
+  }
+
+  return skill?.category === "memory"
+    ? { icon: Sparkles, tone: "toneMemory" }
+    : { icon: Plug, tone: "toneHermes" };
+}
+
+const VideoGlyph: AppIcon = ({ size = 17, ...props }) => (
+  <svg
+    aria-hidden="true"
+    fill="none"
+    height={size}
+    stroke="currentColor"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth="1.75"
+    viewBox="0 0 24 24"
+    width={size}
+    {...props}
+  >
+    <rect x="4" y="6" width="12" height="12" rx="2.4" />
+    <path d="m16 10 4-2.2v8.4L16 14" />
+    <path d="M8.2 9.2v5.6" />
+  </svg>
+);
+
+function normalizeIconText(values: Array<string | null | undefined>) {
+  return values
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
 }
 
 function SummaryPill({ label, value }: { label: string; value: string }) {

@@ -3,7 +3,9 @@
 import type { HermesSkillDescriptor, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import {
   Activity,
+  BarChart3,
   Brain,
+  Check,
   Cpu,
   Database,
   FileText,
@@ -12,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Server,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Terminal
@@ -24,6 +27,31 @@ import {
   ComfyUiBrandIcon,
   OpenCodeBrandIcon
 } from "./BrandSkillIcons";
+import {
+  BRAND_ICONS,
+  BookGlyph,
+  BugGlyph,
+  BulbGlyph,
+  ChromeColorIcon,
+  ComputerUseColorIcon,
+  GamepadGlyph,
+  GlobeGlyph,
+  GoogleDocsColorIcon,
+  GoogleSheetsColorIcon,
+  GoogleSlidesColorIcon,
+  ImageGlyph,
+  KanbanGlyph,
+  MailGlyph,
+  MusicGlyph,
+  PaletteGlyph,
+  PdfColorIcon,
+  PixelGlyph,
+  PresentationGlyph,
+  TerminalMark,
+  UsersGlyph,
+  VideoGlyph,
+  WrenchGlyph
+} from "./skillGlyphs";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useHermesSkills } from "@/hooks/useHermesSkills";
@@ -226,6 +254,14 @@ function SkillCard({ skill }: { skill: HermesSkillDescriptor }) {
           {skill.enabled === false ? <span>Disabled</span> : null}
         </div>
       </div>
+      <button
+        className={styles.skillActionButton}
+        type="button"
+        aria-label={`Add ${skill.title}`}
+        title="Plugin install is not connected yet"
+      >
+        Add
+      </button>
     </article>
   );
 }
@@ -243,11 +279,19 @@ function SkillIcon({
 }) {
   const visual = resolveSkillVisual(skill, source ?? skill?.source ?? label);
   const Icon = visual.icon;
+  const style =
+    visual.color || visual.background
+      ? {
+          background: visual.background,
+          color: visual.color
+        }
+      : undefined;
 
   return (
     <span
       className={[className, styles.resolvedIcon, styles[visual.tone]].join(" ")}
       aria-hidden="true"
+      style={style}
       title={label ?? skill?.title ?? source}
     >
       {visual.mark ? <span className={styles.iconMark}>{visual.mark}</span> : <Icon size={17} />}
@@ -256,6 +300,8 @@ function SkillIcon({
 }
 
 type SkillVisual = {
+  background?: string;
+  color?: string;
   icon: AppIcon;
   mark?: string;
   tone:
@@ -271,89 +317,210 @@ type SkillVisual = {
     | "toneVideo";
 };
 
+type IconRule = { match: string[]; icon: AppIcon; tone?: SkillVisual["tone"]; mark?: string };
+
+const BRAND_COLORS = {
+  airtable: "#18bfff",
+  anthropic: "#d97757",
+  arxiv: "#b31b1b",
+  claude: "#d97757",
+  codex: "#f4f4f5",
+  comfyui: "#f0ff41",
+  excalidraw: "#6965db",
+  giphy: "#ff6666",
+  github: "#f5f5f5",
+  google: "#4285f4",
+  googledocs: "#4285f4",
+  googlemaps: "#4285f4",
+  huggingface: "#ffd21e",
+  jupyter: "#f37626",
+  linear: "#5e6ad2",
+  linux: "#fcc624",
+  notion: "#f5f5f5",
+  obsidian: "#7c3aed",
+  ollama: "#f5f5f5",
+  opencode: "#f5f5f5",
+  p5dotjs: "#ed225d",
+  philipshue: "#0065d3",
+  spotify: "#1ed760",
+  weightsandbiases: "#ffbe00",
+  x: "#f5f5f5",
+  youtube: "#ff0000"
+} as const;
+
+const DARK_BRAND_BACKGROUND = "rgba(255, 255, 255, 0.075)";
+const LIGHT_BRAND_BACKGROUND = "#f4f4f5";
+
+function brandVisual(icon: AppIcon, color: string, background = DARK_BRAND_BACKGROUND): SkillVisual {
+  return { background, color, icon, tone: "toneBrand" };
+}
+
+function colorTile(icon: AppIcon): SkillVisual {
+  return { background: "rgba(255, 255, 255, 0.08)", icon, tone: "toneBrand" };
+}
+
+// Brand logos (Simple Icons paths + a few hand-tuned marks). Checked first so a
+// skill that maps to a real product shows its real glyph, like Codex's app list.
+// Order matters: more specific keys precede generic ones.
+const BRAND_RULES: IconRule[] = [
+  { match: ["computer use"], icon: ComputerUseColorIcon },
+  { match: ["chrome"], icon: ChromeColorIcon },
+  { match: ["spreadsheets", "spreadsheet", "sheets"], icon: GoogleSheetsColorIcon },
+  { match: ["presentations", "presentation", "slides"], icon: GoogleSlidesColorIcon },
+  { match: ["pdf"], icon: PdfColorIcon },
+  { match: ["documents", "document", "google docs", "docs"], icon: GoogleDocsColorIcon },
+  { match: ["claude code"], icon: ClaudeCodeBrandIcon },
+  { match: ["codex"], icon: CodexBrandIcon },
+  { match: ["opencode", "open code"], icon: OpenCodeBrandIcon },
+  { match: ["comfy"], icon: ComfyUiBrandIcon },
+  { match: ["claude"], icon: ClaudeBrandIcon },
+  { match: ["airtable"], icon: BRAND_ICONS.airtable },
+  { match: ["linear"], icon: BRAND_ICONS.linear },
+  { match: ["notion"], icon: BRAND_ICONS.notion },
+  { match: ["obsidian"], icon: BRAND_ICONS.obsidian },
+  { match: ["jupyter"], icon: BRAND_ICONS.jupyter },
+  { match: ["hugging"], icon: BRAND_ICONS.huggingface },
+  { match: ["excalidraw"], icon: BRAND_ICONS.excalidraw },
+  { match: ["p5js", "p5.js"], icon: BRAND_ICONS.p5dotjs },
+  { match: ["arxiv"], icon: BRAND_ICONS.arxiv },
+  { match: ["ollama"], icon: BRAND_ICONS.ollama },
+  { match: ["spotify"], icon: BRAND_ICONS.spotify },
+  { match: ["youtube"], icon: BRAND_ICONS.youtube },
+  { match: ["github"], icon: BRAND_ICONS.github },
+  { match: ["xurl"], icon: BRAND_ICONS.x },
+  { match: ["gif "], icon: BRAND_ICONS.giphy },
+  { match: ["weights and biases", "wandb"], icon: BRAND_ICONS.weightsandbiases },
+  { match: ["google maps", "maps"], icon: BRAND_ICONS.googlemaps },
+  { match: ["openhue", "philips hue"], icon: BRAND_ICONS.philipshue },
+  { match: ["google workspace", "google docs", "gmail"], icon: BRAND_ICONS.googledocs },
+  { match: ["wsl", "ubuntu", "linux"], icon: BRAND_ICONS.linux }
+];
+
+const BRAND_VISUALS = new Map<AppIcon, SkillVisual>([
+  [ComputerUseColorIcon, colorTile(ComputerUseColorIcon)],
+  [ChromeColorIcon, colorTile(ChromeColorIcon)],
+  [GoogleSheetsColorIcon, colorTile(GoogleSheetsColorIcon)],
+  [GoogleSlidesColorIcon, colorTile(GoogleSlidesColorIcon)],
+  [PdfColorIcon, colorTile(PdfColorIcon)],
+  [GoogleDocsColorIcon, colorTile(GoogleDocsColorIcon)],
+  [ClaudeCodeBrandIcon, brandVisual(ClaudeCodeBrandIcon, BRAND_COLORS.claude)],
+  [CodexBrandIcon, brandVisual(CodexBrandIcon, BRAND_COLORS.codex)],
+  [OpenCodeBrandIcon, brandVisual(OpenCodeBrandIcon, BRAND_COLORS.opencode)],
+  [ComfyUiBrandIcon, brandVisual(ComfyUiBrandIcon, BRAND_COLORS.comfyui, "#162dd4")],
+  [ClaudeBrandIcon, brandVisual(ClaudeBrandIcon, BRAND_COLORS.claude)],
+  [BRAND_ICONS.airtable, brandVisual(BRAND_ICONS.airtable, BRAND_COLORS.airtable)],
+  [BRAND_ICONS.linear, brandVisual(BRAND_ICONS.linear, BRAND_COLORS.linear)],
+  [BRAND_ICONS.notion, brandVisual(BRAND_ICONS.notion, "#111111", LIGHT_BRAND_BACKGROUND)],
+  [BRAND_ICONS.obsidian, brandVisual(BRAND_ICONS.obsidian, BRAND_COLORS.obsidian)],
+  [BRAND_ICONS.jupyter, brandVisual(BRAND_ICONS.jupyter, BRAND_COLORS.jupyter)],
+  [BRAND_ICONS.huggingface, brandVisual(BRAND_ICONS.huggingface, "#111111", BRAND_COLORS.huggingface)],
+  [BRAND_ICONS.excalidraw, brandVisual(BRAND_ICONS.excalidraw, BRAND_COLORS.excalidraw)],
+  [BRAND_ICONS.p5dotjs, brandVisual(BRAND_ICONS.p5dotjs, BRAND_COLORS.p5dotjs)],
+  [BRAND_ICONS.arxiv, brandVisual(BRAND_ICONS.arxiv, BRAND_COLORS.arxiv)],
+  [BRAND_ICONS.ollama, brandVisual(BRAND_ICONS.ollama, "#111111", LIGHT_BRAND_BACKGROUND)],
+  [BRAND_ICONS.spotify, brandVisual(BRAND_ICONS.spotify, BRAND_COLORS.spotify)],
+  [BRAND_ICONS.youtube, brandVisual(BRAND_ICONS.youtube, BRAND_COLORS.youtube)],
+  [BRAND_ICONS.github, brandVisual(BRAND_ICONS.github, BRAND_COLORS.github)],
+  [BRAND_ICONS.x, brandVisual(BRAND_ICONS.x, BRAND_COLORS.x)],
+  [BRAND_ICONS.giphy, brandVisual(BRAND_ICONS.giphy, BRAND_COLORS.giphy)],
+  [BRAND_ICONS.weightsandbiases, brandVisual(BRAND_ICONS.weightsandbiases, "#111111", BRAND_COLORS.weightsandbiases)],
+  [BRAND_ICONS.googlemaps, brandVisual(BRAND_ICONS.googlemaps, BRAND_COLORS.googlemaps)],
+  [BRAND_ICONS.philipshue, brandVisual(BRAND_ICONS.philipshue, BRAND_COLORS.philipshue)],
+  [BRAND_ICONS.googledocs, brandVisual(BRAND_ICONS.googledocs, BRAND_COLORS.googledocs)],
+  [BRAND_ICONS.linux, brandVisual(BRAND_ICONS.linux, "#111111", BRAND_COLORS.linux)]
+]);
+
+// Semantic glyphs for skills with no brand. Ordered most-specific first.
+const SEMANTIC_RULES: IconRule[] = [
+  { match: ["hermes"], icon: Sparkles, mark: "H", tone: "toneHermes" },
+  { match: ["ascii"], icon: TerminalMark, mark: "Aa", tone: "toneCode" },
+  { match: ["pixel"], icon: PixelGlyph, tone: "toneCreative" },
+  { match: ["godmode", "red team", "jailbreak", "exploit", "security"], icon: ShieldCheck, tone: "toneVideo" },
+  { match: ["kanban", "lane", "board", "worker", "orchestrator"], icon: KanbanGlyph, tone: "toneAgent" },
+  { match: ["minecraft", "pokemon", "modpack", "gaming", "game"], icon: GamepadGlyph, tone: "toneCreative" },
+  { match: ["openhue", "smart home", "philips hue"], icon: BulbGlyph, tone: "toneCreative" },
+  { match: ["infographic", "bloomberg", "polymarket", "ib connect", "chart", "dashboard", "analytics", "market", "trading"], icon: BarChart3, tone: "toneData" },
+  { match: ["comic", "illustrat", "manga"], icon: MessageSquare, tone: "toneCreative" },
+  { match: ["palette", "web design", "popular web", "design", "sketch", "humanizer"], icon: PaletteGlyph, tone: "toneCreative" },
+  { match: ["architecture", "diagram", "flowchart"], icon: Activity, tone: "toneDiagram" },
+  { match: ["segment anything", "stable diffusion", "nano banana", "image", "photo", "inpaint"], icon: ImageGlyph, tone: "toneCreative" },
+  { match: ["video", "film", "animation", "touchdesigner"], icon: VideoGlyph, tone: "toneVideo" },
+  { match: ["music", "song", "audio", "audiocraft", "melody", "heartmula", "songsee"], icon: MusicGlyph, tone: "toneCreative" },
+  { match: ["powerpoint", "presentation", "slides", "deck"], icon: PresentationGlyph, tone: "toneArticle" },
+  { match: ["meeting", "teams", "standup", "call"], icon: UsersGlyph, tone: "toneArticle" },
+  { match: ["ocr", "pdf", "document"], icon: FileText, tone: "toneArticle" },
+  { match: ["debug", "debugger", "debugpy", "node inspect", "troubleshoot"], icon: BugGlyph, tone: "toneCode" },
+  { match: ["audit", "code review", "review", "policy", "verification", "inspection"], icon: ShieldCheck, tone: "toneCode" },
+  { match: ["test driven", "tdd"], icon: Check, tone: "toneCode" },
+  { match: ["arxiv", "research", "paper", "wiki", "blog", "blogwatcher"], icon: BookGlyph, tone: "toneArticle" },
+  { match: ["memory", "brain memory", "obliteratus"], icon: Database, tone: "toneMemory" },
+  { match: ["llm", "vllm", "llama", "dspy", "eval", "harness", "serving", "model", "inference", "mlops"], icon: Cpu, tone: "toneData" },
+  { match: ["agent", "autonomous", "supervis", "dogfood", "subagent", "yuanbao"], icon: Brain, tone: "toneAgent" },
+  { match: ["email", "himalaya", "imap", "mail"], icon: MailGlyph, tone: "toneArticle" },
+  { match: ["server", "mcp", "gateway", "webhook", "container", "supervision", "integration", "bridge", "connect", "provider"], icon: Server, tone: "toneData" },
+  { match: ["environment", "awareness", "windows", "map"], icon: GlobeGlyph, tone: "toneData" },
+  { match: ["plan", "spike", "ideation"], icon: FileText, tone: "toneCode" },
+  { match: ["code", "coding", "debugging", "python", "node", "tui"], icon: Terminal, tone: "toneCode" },
+  { match: ["tool", "wrench", "status"], icon: WrenchGlyph, tone: "toneData" }
+];
+
+// Per-category default when no keyword rule matches.
+const CATEGORY_DEFAULTS: Record<string, SkillVisual> = {
+  productivity: { icon: FileText, tone: "toneArticle" },
+  creative: { icon: Sparkles, tone: "toneCreative" },
+  research: { icon: BookGlyph, tone: "toneArticle" },
+  mlops: { icon: Cpu, tone: "toneData" },
+  tools: { icon: WrenchGlyph, tone: "toneData" },
+  "autonomous-ai-agents": { icon: Brain, tone: "toneAgent" },
+  "software-development": { icon: Terminal, tone: "toneCode" },
+  github: { icon: BRAND_ICONS.github, tone: "toneBrand" },
+  media: { icon: MusicGlyph, tone: "toneCreative" },
+  devops: { icon: Server, tone: "toneData" },
+  gaming: { icon: GamepadGlyph, tone: "toneCreative" },
+  email: { icon: MailGlyph, tone: "toneArticle" },
+  "data-science": { icon: Cpu, tone: "toneData" },
+  "smart-home": { icon: BulbGlyph, tone: "toneCreative" },
+  "social-media": { icon: BRAND_ICONS.x, tone: "toneBrand" },
+  "note-taking": { icon: FileText, tone: "toneArticle" },
+  mcp: { icon: Plug, tone: "toneData" },
+  domain: { icon: GlobeGlyph, tone: "toneData" },
+  "red-teaming": { icon: ShieldCheck, tone: "toneVideo" }
+};
+
+function matchRule(rules: IconRule[], text: string): IconRule | undefined {
+  return rules.find((rule) => rule.match.some((keyword) => text.includes(keyword)));
+}
+
 function resolveSkillVisual(skill?: HermesSkillDescriptor, source?: string | null): SkillVisual {
-  const text = normalizeIconText([
+  // Brand matching uses only the identifying fields — a description that merely
+  // mentions "Claude" or "GitHub" should not hijack a skill's logo.
+  const brandText = normalizeIconText([
     skill?.title,
     skill?.name,
-    skill?.description,
     skill?.source,
     skill?.category,
     source,
     ...(skill?.tags ?? [])
   ]);
-
-  if (text.includes("codex")) {
-    return { icon: CodexBrandIcon, tone: "toneBrand" };
-  }
-  if (text.includes("claude code")) {
-    return { icon: ClaudeCodeBrandIcon, tone: "toneBrand" };
-  }
-  if (text.includes("claude")) {
-    return { icon: ClaudeBrandIcon, tone: "toneBrand" };
-  }
-  if (text.includes("opencode") || text.includes("open code")) {
-    return { icon: OpenCodeBrandIcon, tone: "toneBrand" };
-  }
-  if (text.includes("hermes")) {
-    return { icon: Sparkles, mark: "H", tone: "toneHermes" };
-  }
-  if (text.includes("memory") || text.includes("brain")) {
-    return { icon: Database, tone: "toneMemory" };
-  }
-  if (text.includes("agent") || text.includes("autonomous")) {
-    return { icon: Brain, tone: "toneAgent" };
-  }
-  if (text.includes("creative")) {
-    return { icon: Sparkles, tone: "toneCreative" };
-  }
-  if (text.includes("diagram") || text.includes("architecture") || text.includes("infographic")) {
-    return { icon: Activity, tone: "toneDiagram" };
-  }
-  if (text.includes("ascii")) {
-    return { icon: Terminal, mark: "Aa", tone: "toneCode" };
-  }
-  if (text.includes("video")) {
-    return { icon: VideoGlyph, tone: "toneVideo" };
-  }
-  if (text.includes("comic") || text.includes("illustrator") || text.includes("illustration")) {
-    return { icon: MessageSquare, tone: "toneCreative" };
-  }
-  if (text.includes("article") || text.includes("writer") || text.includes("docs")) {
-    return { icon: FileText, tone: "toneArticle" };
-  }
-  if (text.includes("comfy")) {
-    return { icon: ComfyUiBrandIcon, tone: "toneBrand" };
-  }
-  if (text.includes("image") || text.includes("workflow")) {
-    return { icon: Cpu, tone: "toneCreative" };
-  }
-  if (text.includes("server") || text.includes("mcp") || text.includes("gateway")) {
-    return { icon: Server, tone: "toneData" };
+  const brand = matchRule(BRAND_RULES, brandText);
+  if (brand) {
+    return BRAND_VISUALS.get(brand.icon) ?? { icon: brand.icon, tone: "toneBrand" };
   }
 
-  return skill?.category === "memory"
-    ? { icon: Sparkles, tone: "toneMemory" }
-    : { icon: Plug, tone: "toneHermes" };
+  // Semantic matching also ignores the description: every Hermes skill's blurb
+  // mentions "Hermes"/"Codex"/etc., which would otherwise mislabel skills.
+  const semantic = matchRule(SEMANTIC_RULES, brandText);
+  if (semantic) {
+    return { icon: semantic.icon, mark: semantic.mark, tone: semantic.tone ?? "toneHermes" };
+  }
+
+  const category = (skill?.category ?? source ?? "").toLowerCase().replace(/\s+/g, "-");
+  if (CATEGORY_DEFAULTS[category]) {
+    return CATEGORY_DEFAULTS[category];
+  }
+
+  return { icon: Plug, tone: "toneHermes" };
 }
-
-const VideoGlyph: AppIcon = ({ size = 17, ...props }) => (
-  <svg
-    aria-hidden="true"
-    fill="none"
-    height={size}
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth="1.75"
-    viewBox="0 0 24 24"
-    width={size}
-    {...props}
-  >
-    <rect x="4" y="6" width="12" height="12" rx="2.4" />
-    <path d="m16 10 4-2.2v8.4L16 14" />
-    <path d="M8.2 9.2v5.6" />
-  </svg>
-);
 
 function normalizeIconText(values: Array<string | null | undefined>) {
   return values

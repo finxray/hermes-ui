@@ -28,3 +28,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Simple Icons
+
+Some plugin and skill SVG icon paths and official brand colors are adapted from
+Simple Icons.
+
+Repository: https://github.com/simple-icons/simple-icons
+Website: https://simpleicons.org/
+Package: https://www.npmjs.com/package/simple-icons
+
+License: CC0-1.0

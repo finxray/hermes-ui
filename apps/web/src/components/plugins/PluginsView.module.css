@@ -221,7 +221,7 @@
 
 .skillCard {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   min-height: 58px;
@@ -322,6 +322,27 @@
 
 .skillBody {
   min-width: 0;
+}
+
+.skillActionButton {
+  min-width: 48px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.115);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  font-weight: 520;
+}
+
+.skillActionButton:hover,
+.skillActionButton:focus-visible {
+  outline: 0;
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.095);
 }
 
 .skillBody h3 {

@@ -14,10 +14,16 @@ import {
   Server,
   SlidersHorizontal,
   Sparkles,
-  Terminal,
-  TerminalSquare
+  Terminal
 } from "@/components/ui/AppIcons";
 import type { AppIcon } from "@/components/ui/AppIcons";
+import {
+  ClaudeBrandIcon,
+  ClaudeCodeBrandIcon,
+  CodexBrandIcon,
+  ComfyUiBrandIcon,
+  OpenCodeBrandIcon
+} from "./BrandSkillIcons";
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useHermesSkills } from "@/hooks/useHermesSkills";
@@ -255,6 +261,7 @@ type SkillVisual = {
   tone:
     | "toneAgent"
     | "toneArticle"
+    | "toneBrand"
     | "toneCode"
     | "toneCreative"
     | "toneData"
@@ -276,13 +283,16 @@ function resolveSkillVisual(skill?: HermesSkillDescriptor, source?: string | nul
   ]);
 
   if (text.includes("codex")) {
-    return { icon: TerminalSquare, mark: "Cx", tone: "toneCode" };
+    return { icon: CodexBrandIcon, tone: "toneBrand" };
+  }
+  if (text.includes("claude code")) {
+    return { icon: ClaudeCodeBrandIcon, tone: "toneBrand" };
   }
   if (text.includes("claude")) {
-    return { icon: Brain, mark: "Cl", tone: "toneAgent" };
+    return { icon: ClaudeBrandIcon, tone: "toneBrand" };
   }
   if (text.includes("opencode") || text.includes("open code")) {
-    return { icon: TerminalSquare, mark: "OC", tone: "toneCode" };
+    return { icon: OpenCodeBrandIcon, tone: "toneBrand" };
   }
   if (text.includes("hermes")) {
     return { icon: Sparkles, mark: "H", tone: "toneHermes" };
@@ -311,7 +321,10 @@ function resolveSkillVisual(skill?: HermesSkillDescriptor, source?: string | nul
   if (text.includes("article") || text.includes("writer") || text.includes("docs")) {
     return { icon: FileText, tone: "toneArticle" };
   }
-  if (text.includes("comfy") || text.includes("image") || text.includes("workflow")) {
+  if (text.includes("comfy")) {
+    return { icon: ComfyUiBrandIcon, tone: "toneBrand" };
+  }
+  if (text.includes("image") || text.includes("workflow")) {
     return { icon: Cpu, tone: "toneCreative" };
   }
   if (text.includes("server") || text.includes("mcp") || text.includes("gateway")) {

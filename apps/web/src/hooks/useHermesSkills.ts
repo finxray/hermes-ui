@@ -22,7 +22,7 @@ export function useHermesSkills(enabled: boolean) {
       return;
     }
 
-    setState((current) => ({ ...current, isLoading: true }));
+    setState((current) => ({ ...current, isLoading: current.result === null }));
     const result = await fetchHermesSkills();
     setState({ isLoading: false, result });
   }, [enabled]);

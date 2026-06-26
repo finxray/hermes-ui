@@ -129,7 +129,17 @@ export function useHermesSessionModel({
         hermesStatus.configured;
 
       if (!session || !canReadHermesSession) {
-        setSnapshot(emptySnapshot(session?.id ?? null, session ? resolveHermesSessionId(session) : null, "unavailable"));
+        const nextLocalSessionId = session?.id ?? null;
+        const nextHermesSessionId = session ? resolveHermesSessionId(session) : null;
+        setSnapshot((current) => {
+          const sameSession =
+            current.localSessionId === nextLocalSessionId &&
+            current.hermesSessionId === nextHermesSessionId;
+          if (sameSession && hasStableModelSnapshot(current)) {
+            return current;
+          }
+          return emptySnapshot(nextLocalSessionId, nextHermesSessionId, "unavailable");
+        });
         return null;
       }
 
@@ -170,19 +180,32 @@ export function useHermesSessionModel({
         return null;
       }
 
-      setSnapshot((current) => {
-        const sameSession =
-          current.localSessionId === session.id &&
-          current.hermesSessionId === hermesSessionId;
-        return {
-          ...(sameSession ? current : emptySnapshot(session.id, hermesSessionId, phase)),
-          error: null,
-          errorModelId: null,
-          hermesSessionId,
-          localSessionId: session.id,
-          syncStatus: phase
-        };
-      });
+      const currentBeforeLoad = snapshotRef.current;
+      const sameSessionBeforeLoad =
+        currentBeforeLoad.localSessionId === session.id &&
+        currentBeforeLoad.hermesSessionId === hermesSessionId;
+      const canRefreshSilently =
+        phase === "loading" &&
+        !expected &&
+        !options.force &&
+        sameSessionBeforeLoad &&
+        hasStableModelSnapshot(currentBeforeLoad);
+
+      if (!canRefreshSilently) {
+        setSnapshot((current) => {
+          const sameSession =
+            current.localSessionId === session.id &&
+            current.hermesSessionId === hermesSessionId;
+          return {
+            ...(sameSession ? current : emptySnapshot(session.id, hermesSessionId, phase)),
+            error: null,
+            errorModelId: null,
+            hermesSessionId,
+            localSessionId: session.id,
+            syncStatus: phase
+          };
+        });
+      }
 
       const result = await fetchHermesSession(hermesSessionId);
       if (requestSeqRef.current !== requestId) {
@@ -201,17 +224,21 @@ export function useHermesSessionModel({
           : expected
           ? `Hermes accepted the selection request, but the UI could not verify the session model: ${message}`
           : message;
-        setSnapshot((current) => ({
-          ...(current.localSessionId === session.id && current.hermesSessionId === hermesSessionId
-            ? current
-            : emptySnapshot(session.id, hermesSessionId, fallbackOnly ? "fallback" : "error")),
-          checkedAt: new Date().toISOString(),
-          error,
-          errorModelId: expected?.catalogModelId ?? null,
-          hermesSessionId,
-          localSessionId: session.id,
-          syncStatus: fallbackOnly ? "fallback" : "error"
-        }));
+        setSnapshot((current) => {
+          const sameSession =
+            current.localSessionId === session.id &&
+            current.hermesSessionId === hermesSessionId;
+          const keepStableSnapshot = fallbackOnly && sameSession && hasStableModelSnapshot(current);
+          return {
+            ...(sameSession ? current : emptySnapshot(session.id, hermesSessionId, fallbackOnly ? "fallback" : "error")),
+            checkedAt: new Date().toISOString(),
+            error,
+            errorModelId: expected?.catalogModelId ?? null,
+            hermesSessionId,
+            localSessionId: session.id,
+            syncStatus: keepStableSnapshot ? current.syncStatus : fallbackOnly ? "fallback" : "error"
+          };
+        });
         return null;
       }
 
@@ -232,7 +259,7 @@ export function useHermesSessionModel({
         errorModelId: mismatch ? next.catalogModelId ?? expected?.catalogModelId ?? null : null,
         syncStatus: mismatch ? "error" as const : "synced" as const
       };
-      setSnapshot(verified);
+      setSnapshot((current) => (sameModelSnapshot(current, verified) ? current : verified));
       return verified;
     },
     [activeSession, baseModelState.availableModels, hermesStatus]
@@ -256,12 +283,22 @@ export function useHermesSessionModel({
         appliedPreferenceKeyRef.current = preferenceKey;
       }
 
-      setSnapshot((current) => ({
-        ...current,
-        error: null,
-        errorModelId: null,
-        syncStatus: "verifying"
-      }));
+      setSnapshot((current) => {
+        if (
+          !persistPreference &&
+          current.localSessionId === activeSession.id &&
+          current.catalogModelId === selectRequest.catalogModelId &&
+          current.syncStatus !== "error"
+        ) {
+          return current;
+        }
+        return {
+          ...current,
+          error: null,
+          errorModelId: null,
+          syncStatus: "verifying"
+        };
+      });
 
       if (selectRequest.selectionScope === "turn") {
         appliedPreferenceKeyRef.current = preferenceKey;
@@ -471,6 +508,23 @@ export function useHermesSessionModel({
 
 function isHermesSessionNotFound(result: Awaited<ReturnType<typeof fetchHermesSession>>) {
   return !result.ok && result.error.kind === "http_error" && result.error.message.includes("HTTP 404");
+}
+
+function hasStableModelSnapshot(snapshot: SessionModelSnapshot): boolean {
+  return Boolean(snapshot.catalogModelId || snapshot.effectiveModel);
+}
+
+function sameModelSnapshot(left: SessionModelSnapshot, right: SessionModelSnapshot): boolean {
+  return (
+    left.catalogModelId === right.catalogModelId &&
+    left.effectiveModel === right.effectiveModel &&
+    left.effectiveProvider === right.effectiveProvider &&
+    left.error === right.error &&
+    left.errorModelId === right.errorModelId &&
+    left.hermesSessionId === right.hermesSessionId &&
+    left.localSessionId === right.localSessionId &&
+    left.syncStatus === right.syncStatus
+  );
 }
 
 function resolveHermesSessionId(session: Session): string {
@@ -754,7 +808,9 @@ function canApplySessionSelectedModel(state: HermesUiCapabilities["models"]): bo
 
 function modelLabelForState(state: HermesUiCapabilities["models"]) {
   if (state.selectionStatus === "unavailable") {
-    return "Hermes unavailable";
+    return state.currentModelLabel && state.currentModelLabel !== "Hermes server model"
+      ? state.currentModelLabel
+      : "Hermes default";
   }
   if (state.currentModelLabel && state.currentModelLabel !== "Hermes server model") {
     return state.currentModelLabel;

@@ -1,6 +1,9 @@
 .workspace {
   --chat-fade-bg: var(--bg-workspace-solid);
-  --chat-top-overlay-height: 95px;
+  --font-body: 14.3px;
+  --font-small: 12.65px;
+  --font-xs: 11px;
+  --chat-top-overlay-height: 67px;
   --chat-transcript-top-margin: 50px;
   position: relative;
   min-width: 0;
@@ -139,18 +142,11 @@
   width: auto;
   z-index: 5;
   align-items: center;
+  padding-bottom: 16px;
 }
 
 .workspace[data-variant="side"] .composerDock {
   right: 0;
-}
-
-.workspace[data-variant="side"] .startStage {
-  padding-top: 0;
-}
-
-.workspace[data-variant="side"][data-show-header="false"] .startStage {
-  padding-top: 0;
 }
 
 .header {
@@ -185,7 +181,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--text-primary);
-  font-size: var(--font-small);
+  font-size: var(--font-body);
   font-weight: 450;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -268,12 +264,31 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-content: stretch;
-  gap: 12px;
+  place-items: center;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: clamp(20px, 6vh, 56px) clamp(20px, 2vw, 36px) 0;
+  padding: clamp(20px, 6vh, 56px) clamp(20px, 2vw, 36px);
+}
+
+.startStack {
+  display: grid;
+  width: 100%;
+  max-width: calc(var(--composer-width) + 20px);
+  gap: 30px;
+  transform: translateY(-6vh);
+}
+
+.startPrompt {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(24px, 2.1vw, 34px);
+  font-weight: 440;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.startStack .composerAnchor {
+  padding: 0;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -316,7 +331,16 @@
   }
 
   .startStage {
-    align-content: start;
+    place-items: start center;
     padding-top: 52px;
+  }
+
+  .startStack {
+    gap: 22px;
+    transform: none;
+  }
+
+  .startPrompt {
+    font-size: 25px;
   }
 }

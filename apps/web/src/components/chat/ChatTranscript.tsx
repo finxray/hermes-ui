@@ -137,6 +137,7 @@ export function ChatTranscript({
         legacyEvents={legacyEvents}
         liveTokenUsage={isCurrentAnchor ? liveTokenUsage : null}
         onCompletedWorkAutoCollapse={isCurrentAnchor ? handleCompletedWorkAutoCollapse : undefined}
+        showSummaryTokenUsage={isCurrentAnchor}
         startedAt={isCurrentAnchor ? generationStartedAt : null}
       />
     );
@@ -425,23 +426,27 @@ export function ChatTranscript({
       <div className={styles.transcriptInner}>
         {!isStartState && activeSession ? (
           activeSession.messages.length > 0 ? (
-            activeSession.messages.map((message) => (
-              <Fragment key={message.id}>
-                {activityBlockForMessage(message)}
-                <MessageBubble
-                  message={message}
-                  onRevealComplete={
-                    message.id === activityAnchorMessageId
-                      ? () => setRevealedAssistantMessageId(message.id)
-                      : undefined
-                  }
-                  showFooterAlways={
-                    message.role === "assistant" && message.id === activityAnchorMessageId
-                  }
-                  streamStatusLabel={message.id === lastMessage?.id ? streamStatusLabel : null}
-                />
-              </Fragment>
-            ))
+            activeSession.messages.map((message) => {
+              const activityBlock = activityBlockForMessage(message);
+              const isActivityAnchorAssistant =
+                message.role === "assistant" && message.id === activityAnchorMessageId;
+              return (
+                <Fragment key={message.id}>
+                  {activityBlock}
+                  <MessageBubble
+                    message={message}
+                    onRevealComplete={
+                      message.id === activityAnchorMessageId
+                        ? () => setRevealedAssistantMessageId(message.id)
+                        : undefined
+                    }
+                    showFooterAlways={isActivityAnchorAssistant}
+                    showUsageInFooter={!(isActivityAnchorAssistant && activityBlock)}
+                    streamStatusLabel={message.id === lastMessage?.id ? streamStatusLabel : null}
+                  />
+                </Fragment>
+              );
+            })
           ) : (
             <EmptyState
               title="New chat is empty"

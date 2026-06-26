@@ -14,6 +14,11 @@
   isolation: isolate;
 }
 
+.wrap[data-project-menu-open="true"] {
+  z-index: 7;
+  isolation: isolate;
+}
+
 .wrap[data-start-state="true"] {
   padding: 0;
 }
@@ -33,6 +38,108 @@
   gap: 0;
 }
 
+.followUpQueue {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-width: 0;
+  max-height: 92px;
+  gap: 1px;
+  margin: 0 10px -1px;
+  overflow: auto;
+  padding: 7px 11px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+  border-radius: 19px 19px 6px 6px;
+  background: rgba(36, 36, 38, 0.96);
+  box-shadow: none;
+  list-style: none;
+}
+
+.followUpRow {
+  display: grid;
+  min-width: 0;
+  min-height: 31px;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.followUpLead {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.followUpText {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: var(--font-body);
+  line-height: 1.58;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.followUpActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.followUpAction,
+.followUpIconAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.followUpAction {
+  min-height: 28px;
+  gap: 5px;
+  padding: 0 7px;
+  font-size: var(--font-small);
+  line-height: 1;
+}
+
+.followUpIconAction {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.followUpAction svg,
+.followUpIconAction svg {
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.followUpAction:hover,
+.followUpAction:focus-visible,
+.followUpIconAction:hover,
+.followUpIconAction:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.steerAction:hover,
+.steerAction:focus-visible {
+  color: var(--orange);
+}
+
 .box {
   position: relative;
   z-index: 3;
@@ -43,6 +150,12 @@
   border-radius: var(--composer-radius, 30px);
   background: rgba(38, 38, 40, 1);
   box-shadow: none;
+}
+
+.box[data-drag-over="true"] {
+  outline: 1px solid rgba(255, 255, 255, 0.24);
+  outline-offset: 3px;
+  background: rgba(46, 46, 49, 1);
 }
 
 .boxContent {
@@ -59,17 +172,173 @@
   padding: 9px var(--composer-content-inset-right) 10px var(--composer-content-inset-x);
 }
 
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.attachmentTray {
+  composes: scrollbar-hover-reveal from global;
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 2px 4px 1px 0;
+}
+
+.attachmentTile {
+  position: relative;
+  display: grid;
+  width: 124px;
+  height: 124px;
+  flex: 0 0 124px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+    rgba(18, 18, 19, 0.82);
+  color: var(--text-primary);
+}
+
+.attachmentTile[data-status="too-large"] {
+  border-color: rgba(255, 111, 92, 0.5);
+}
+
+.attachmentPreview {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.055), transparent 44%),
+    rgba(0, 0, 0, 0.2);
+}
+
+.attachmentPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachmentGlyph {
+  display: inline-grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.attachmentTile[data-kind="pdf"] .attachmentGlyph {
+  color: rgba(255, 126, 109, 0.95);
+}
+
+.attachmentTile[data-kind="code"] .attachmentGlyph,
+.attachmentTile[data-kind="text"] .attachmentGlyph {
+  color: rgba(139, 201, 255, 0.95);
+}
+
+.attachmentTile[data-kind="spreadsheet"] .attachmentGlyph {
+  color: rgba(88, 214, 141, 0.95);
+}
+
+.attachmentMeta {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 8px 10px 9px;
+  background: rgba(10, 10, 11, 0.62);
+}
+
+.attachmentName,
+.attachmentDetail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentName {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.attachmentDetail {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.attachmentTile[data-status="too-large"] .attachmentDetail {
+  color: rgba(255, 132, 115, 0.95);
+}
+
+.attachmentRemove {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: inline-flex;
+  width: 25px;
+  height: 25px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.92);
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.attachmentTile:hover .attachmentRemove,
+.attachmentTile:focus-within .attachmentRemove {
+  opacity: 1;
+}
+
+.attachmentRemove:hover,
+.attachmentRemove:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.followUpAttachmentCount {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
 .box textarea {
   width: 100%;
   min-width: 0;
   min-height: 38px;
-  max-height: clamp(140px, 13vh, 240px);
+  max-height: clamp(220px, 26vh, 360px);
+  overflow-y: hidden;
   resize: none;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--text-primary);
-  line-height: 1.45;
+  font: inherit;
+  font-size: var(--font-body);
+  line-height: 1.58;
 }
 
 .box textarea::placeholder {
@@ -147,7 +416,8 @@
 }
 
 .toolButton {
-  width: calc(var(--control-height) * 0.86);
+  width: calc(var(--control-height) * 0.92);
+  height: calc(var(--control-height) * 0.92);
   flex: 0 0 auto;
 }
 
@@ -155,9 +425,9 @@
   color: var(--composer-plus-idle);
 }
 
-.plusButton svg {
-  width: 26.4px;
-  height: 26.4px;
+.toolButton.plusButton svg {
+  width: 21px;
+  height: 21px;
   stroke-width: 2px;
 }
 
@@ -212,9 +482,10 @@
 .modelButton {
   max-width: min(36vw, 220px);
   min-width: 90px;
-  padding: 0 10px;
+  padding: 0 2px;
   overflow: hidden;
   gap: 5px;
+  background: transparent;
 }
 
 .modelButtonText {
@@ -240,7 +511,7 @@
 .modelButton:hover,
 .modelButton:focus-visible {
   outline: 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
   color: var(--orange);
 }
 
@@ -256,6 +527,9 @@
 
 .modelMenu {
   --model-menu-item-radius: 8px;
+  --model-menu-font-body: 13.91px;
+  --model-menu-font-small: 12.305px;
+  --model-menu-font-xs: 11px;
 
   position: fixed;
   z-index: 40;
@@ -266,10 +540,12 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
-  background: rgba(48, 48, 50, 0.98);
+  background: rgba(28, 28, 30, 1);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.35),
     0 12px 32px rgba(0, 0, 0, 0.42);
+  font-size: var(--model-menu-font-body);
+  transform-origin: left bottom;
 }
 
 .modelSearchWrap {
@@ -293,7 +569,7 @@
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: var(--font-small);
+  font-size: var(--model-menu-font-body);
 }
 
 .modelSearchWrap input::placeholder {
@@ -323,7 +599,7 @@
   justify-content: space-between;
   gap: 12px;
   color: var(--text-muted);
-  font-size: var(--font-xs);
+  font-size: var(--model-menu-font-small);
   font-weight: 600;
   line-height: 1.2;
   padding: 2px 8px 4px;
@@ -400,7 +676,7 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: var(--font-body);
+  font-size: var(--model-menu-font-body);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -411,7 +687,7 @@
   max-width: 42%;
   overflow: hidden;
   color: var(--text-muted);
-  font-size: var(--font-xs);
+  font-size: var(--model-menu-font-small);
   line-height: 1.2;
   text-align: right;
   text-overflow: ellipsis;
@@ -426,7 +702,7 @@
   border: 1px dashed rgba(255, 255, 255, 0.14);
   border-radius: 14px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--model-menu-font-small);
   line-height: 1.35;
   padding: 14px 12px;
 }
@@ -470,8 +746,133 @@
 }
 
 .stopButton svg {
-  transform: scale(0.7);
+  transform: scale(1.4);
   transform-origin: center;
+}
+
+.projectCard {
+  position: relative;
+  display: flex;
+  width: 98%;
+  min-width: 0;
+  justify-content: flex-start;
+  margin: -24px auto 0;
+  padding: 32px 12px 9px 24px;
+  border-radius: 0 0 var(--composer-radius, 30px) var(--composer-radius, 30px);
+  background: rgba(24, 24, 25, 1);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);
+}
+
+.wrap[data-start-state="true"] .projectCard {
+  box-shadow: none;
+}
+
+.wrap[data-project-menu-open="true"] .projectCard {
+  z-index: auto;
+}
+
+.projectButton {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-body);
+  line-height: 1.25;
+  text-align: left;
+  transition: color 140ms ease;
+}
+
+.projectButton:hover,
+.projectButton:focus-visible,
+.projectButton[aria-expanded="true"] {
+  outline: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.projectButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectButton svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.projectMenu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 14px;
+  z-index: 60;
+  display: grid;
+  width: min(300px, calc(100vw - 36px));
+  max-height: min(320px, 52vh);
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(28, 28, 30, 1);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 12px 32px rgba(0, 0, 0, 0.42);
+}
+
+.projectMenuItem {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  line-height: 1.25;
+  text-align: left;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.projectMenuItem:hover,
+.projectMenuItem:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.projectMenuItem[data-active="true"] {
+  color: var(--orange);
+}
+
+.projectMenuItem span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectMenuDivider {
+  height: 1px;
+  margin: 6px 4px;
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .contextPanel {
@@ -553,17 +954,6 @@
   white-space: nowrap;
 }
 
-.statusLine {
-  min-width: 0;
-  margin-top: 8px;
-  padding-top: 2px;
-  color: var(--text-muted);
-  font-size: var(--font-xs);
-  line-height: 1.35;
-  text-align: center;
-  opacity: 0.75;
-}
-
 @keyframes contextItemReveal {
   from {
     opacity: 0.62;
@@ -617,7 +1007,8 @@
     background: rgba(38, 38, 40, 1);
   }
 
-  .modelMenu {
+  .modelMenu,
+  .projectMenu {
     background: #303032;
   }
 }

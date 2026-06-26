@@ -6,8 +6,15 @@ import type {
   HermesChatStreamEvent,
   HermesChatStreamResult,
   HermesClientConfig,
+  HermesConfigField,
+  HermesConfigResult,
+  HermesConfigSection,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesEnvCategory,
+  HermesEnvKey,
+  HermesEnvResult,
+  HermesLogsResult,
   HermesPluginDescriptor,
   HermesPluginToggleResult,
   HermesPluginsListResult,
@@ -63,8 +70,16 @@ export type {
   HermesChatStreamEvent,
   HermesChatStreamResult,
   HermesClientConfig,
+  HermesConfigField,
+  HermesConfigResult,
+  HermesConfigSection,
+  HermesConfigFieldType,
   HermesEndpointName,
   HermesEndpointResult,
+  HermesEnvCategory,
+  HermesEnvKey,
+  HermesEnvResult,
+  HermesLogsResult,
   HermesPluginDescriptor,
   HermesPluginToggleResult,
   HermesPluginsListResult,
@@ -679,6 +694,7 @@ export async function streamHermesSessionChat(
         provider: request.provider || undefined,
         metadata: {
           context: request.context,
+          attachments: request.attachments ?? [],
           memory_scope_bridge_enabled: Boolean(request.instructions),
           model_runtime: request.modelRuntime ?? null,
           model_selection_scope: request.modelSelectionScope ?? null,
@@ -2211,6 +2227,284 @@ export async function setHermesPluginEnabled(
   };
 }
 
+const CONFIG_SECTION_ORDER = [
+  "general",
+  "agent",
+  "terminal",
+  "web",
+  "browser",
+  "memory",
+  "delegation",
+  "display",
+  "security",
+  "compression",
+  "tool_output",
+  "tool_loop_guardrails",
+  "auxiliary",
+  "curator",
+  "sessions",
+  "logging",
+  "gateway",
+  "updates",
+  "lsp",
+  "model_catalog",
+  "openrouter",
+  "bedrock",
+  "tts",
+  "stt",
+  "voice",
+  "slack",
+  "discord",
+  "mattermost",
+  "matrix",
+  "kanban",
+  "x_search",
+  "secrets"
+];
+
+export async function getHermesConfig(config: HermesClientConfig): Promise<HermesConfigResult> {
+  const checkedAt = new Date().toISOString();
+  const baseResult = validateHermesDashboardConfig(config, "config");
+  if (!baseResult.ok) {
+    return { ok: false, model: null, sections: [], checkedAt, raw: null, error: baseResult.error };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const [valuesResult, schemaResult] = await Promise.all([
+    fetchHermesDashboardJson({ config, fetchImpl, path: "/api/config", timeoutMs, apiBase: baseResult.base }),
+    fetchHermesDashboardJson({ config, fetchImpl, path: "/api/config/schema", timeoutMs, apiBase: baseResult.base })
+  ]);
+
+  if (!valuesResult.ok) {
+    return { ok: false, model: null, sections: [], checkedAt, raw: null, error: valuesResult.error };
+  }
+  if (!schemaResult.ok) {
+    return { ok: false, model: null, sections: [], checkedAt, raw: null, error: schemaResult.error };
+  }
+
+  const values = valuesResult.data;
+  const schemaFields = objectRecord(schemaResult.data.fields) ?? schemaResult.data;
+  const sections = buildHermesConfigSections(schemaFields, values);
+
+  return {
+    ok: true,
+    model: asString(values.model) || null,
+    sections,
+    checkedAt,
+    raw: values,
+    error: null
+  };
+}
+
+function buildHermesConfigSections(
+  schemaFields: Record<string, unknown>,
+  values: Record<string, unknown>
+): HermesConfigSection[] {
+  const grouped = new Map<string, HermesConfigField[]>();
+
+  for (const [key, rawField] of Object.entries(schemaFields)) {
+    const field = objectRecord(rawField);
+    if (!field) {
+      continue;
+    }
+    const category = asString(field.category) || "general";
+    const type = normalizeConfigFieldType(asString(field.type));
+    const value = resolveConfigValue(values, key);
+    const options = stringArray(field.options);
+    const descriptionRaw = asString(field.description) || null;
+    const list = grouped.get(category) ?? [];
+    list.push({
+      key,
+      label: configFieldLabel(key, descriptionRaw),
+      description: descriptionRaw,
+      type,
+      value,
+      options,
+      isSet: value !== null && value !== "" && !(Array.isArray(value) && value.length === 0)
+    });
+    grouped.set(category, list);
+  }
+
+  const orderedCategories = [
+    ...CONFIG_SECTION_ORDER.filter((category) => grouped.has(category)),
+    ...Array.from(grouped.keys()).filter((category) => !CONFIG_SECTION_ORDER.includes(category)).sort()
+  ];
+
+  return orderedCategories.map((category) => ({
+    id: category,
+    label: humanizeSkillTitle(category),
+    fields: grouped.get(category) ?? []
+  }));
+}
+
+function normalizeConfigFieldType(type: string): HermesConfigField["type"] {
+  switch (type) {
+    case "number":
+    case "boolean":
+    case "list":
+    case "select":
+      return type;
+    default:
+      return "string";
+  }
+}
+
+function resolveConfigValue(
+  values: Record<string, unknown>,
+  key: string
+): HermesConfigField["value"] {
+  const segments = key.split(".");
+  let current: unknown = values;
+  for (const segment of segments) {
+    const record = objectRecord(current);
+    if (!record || !(segment in record)) {
+      return null;
+    }
+    current = record[segment];
+  }
+
+  if (current === null || current === undefined) {
+    return null;
+  }
+  if (typeof current === "string" || typeof current === "number" || typeof current === "boolean") {
+    return current;
+  }
+  if (Array.isArray(current)) {
+    return current.map((item) => (typeof item === "string" ? item : JSON.stringify(item)));
+  }
+  return JSON.stringify(current);
+}
+
+function configFieldLabel(key: string, description: string | null): string {
+  // Schema descriptions like "Agent → Max Turns" carry a clean label after the
+  // arrow; prefer that, otherwise humanize the dotted key's leaf segment.
+  if (description) {
+    const arrowParts = description.split(/→|->/).map((part) => part.trim()).filter(Boolean);
+    if (arrowParts.length > 1) {
+      return arrowParts[arrowParts.length - 1];
+    }
+  }
+  const leaf = key.split(".").pop() ?? key;
+  return humanizeSkillTitle(leaf);
+}
+
+const ENV_CATEGORY_ORDER = ["provider", "tool", "skill", "messaging", "setting"];
+const ENV_CATEGORY_LABELS: Record<string, string> = {
+  provider: "Model Providers",
+  tool: "Tools",
+  skill: "Skills",
+  messaging: "Messaging",
+  setting: "Settings"
+};
+
+export async function getHermesEnvKeys(config: HermesClientConfig): Promise<HermesEnvResult> {
+  const checkedAt = new Date().toISOString();
+  const baseResult = validateHermesDashboardConfig(config, "keys");
+  if (!baseResult.ok) {
+    return { ok: false, categories: [], checkedAt, raw: null, error: baseResult.error };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const result = await fetchHermesDashboardJson({
+    config,
+    fetchImpl,
+    path: "/api/env",
+    timeoutMs,
+    apiBase: baseResult.base
+  });
+  if (!result.ok) {
+    return { ok: false, categories: [], checkedAt, raw: null, error: result.error };
+  }
+
+  return {
+    ok: true,
+    categories: buildHermesEnvCategories(result.data),
+    checkedAt,
+    raw: result.data,
+    error: null
+  };
+}
+
+function buildHermesEnvCategories(data: Record<string, unknown>): HermesEnvCategory[] {
+  const grouped = new Map<string, HermesEnvKey[]>();
+
+  for (const [name, rawEntry] of Object.entries(data)) {
+    const entry = objectRecord(rawEntry);
+    if (!entry) {
+      continue;
+    }
+    const category = asString(entry.category) || "setting";
+    const key: HermesEnvKey = {
+      name,
+      isSet: optionalBoolean(entry.is_set) ?? false,
+      redactedValue: asString(entry.redacted_value) || null,
+      description: asString(entry.description) || null,
+      url: asString(entry.url) || null,
+      category,
+      isPassword: optionalBoolean(entry.is_password) ?? false,
+      advanced: optionalBoolean(entry.advanced) ?? false
+    };
+    const list = grouped.get(category) ?? [];
+    list.push(key);
+    grouped.set(category, list);
+  }
+
+  const orderedCategories = [
+    ...ENV_CATEGORY_ORDER.filter((category) => grouped.has(category)),
+    ...Array.from(grouped.keys()).filter((category) => !ENV_CATEGORY_ORDER.includes(category)).sort()
+  ];
+
+  return orderedCategories.map((category) => ({
+    id: category,
+    label: ENV_CATEGORY_LABELS[category] ?? humanizeSkillTitle(category),
+    keys: (grouped.get(category) ?? []).sort((a, b) => {
+      if (a.isSet !== b.isSet) {
+        return a.isSet ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    })
+  }));
+}
+
+export async function getHermesLogs(
+  config: HermesClientConfig,
+  options: { file?: string; lines?: number } = {}
+): Promise<HermesLogsResult> {
+  const checkedAt = new Date().toISOString();
+  const file = options.file?.trim() || "agent";
+  const baseResult = validateHermesDashboardConfig(config, "logs");
+  if (!baseResult.ok) {
+    return { ok: false, file, lines: [], checkedAt, error: baseResult.error };
+  }
+
+  const fetchImpl = config.fetchImpl ?? fetch;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const query = new URLSearchParams({ file });
+  if (options.lines) {
+    query.set("lines", String(options.lines));
+  }
+  const result = await fetchHermesDashboardJson({
+    config,
+    fetchImpl,
+    path: `/api/logs?${query.toString()}`,
+    timeoutMs,
+    apiBase: baseResult.base
+  });
+  if (!result.ok) {
+    return { ok: false, file, lines: [], checkedAt, error: result.error };
+  }
+
+  return {
+    ok: true,
+    file: asString(result.data.file) || file,
+    lines: stringArray(result.data.lines),
+    checkedAt,
+    error: null
+  };
+}
+
 export async function getHermesSession(
   config: HermesClientConfig,
   sessionId: string
@@ -2527,7 +2821,12 @@ function normalizeHermesPluginRecord(
 ): HermesPluginDescriptor | null {
   const manifest = objectRecord(record.dashboard_manifest);
   const id = firstString(record.name, record.id, record.slug, fallbackId);
-  const title = firstString(record.label, record.title, manifest?.label) || humanizeSkillTitle(id);
+  // Plugin ids are path-style ("image_gen/fal", "model-providers/nvidia").
+  // The leading segment is the category (rendered in the left rail), so the
+  // card title shows only the leaf ("Fal", "Nvidia") unless Hermes provides a
+  // human label of its own.
+  const leaf = id.includes("/") ? id.slice(id.lastIndexOf("/") + 1) : id;
+  const title = firstString(record.label, record.title, manifest?.label) || humanizeSkillTitle(leaf);
   if (!id && !title) {
     return null;
   }

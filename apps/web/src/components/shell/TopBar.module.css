@@ -1,9 +1,10 @@
 .topbar {
-  --topbar-menu-padding: clamp(8px, calc(6px + 0.16vw), 12px);
+  --topbar-menu-padding-y: clamp(4px, calc(3px + 0.09vw), 6px);
+  --topbar-menu-padding-x: clamp(8px, calc(6px + 0.16vw), 12px);
   grid-area: top;
   grid-column: 1 / -1;
   display: flex;
-  min-height: var(--topbar-height);
+  min-height: 0;
   align-items: center;
   gap: 14px;
   padding: 0 var(--shell-rail-padding-x, 8px);
@@ -43,6 +44,7 @@
 
 .right {
   margin-left: auto;
+  margin-right: 6px;
   justify-content: flex-end;
 }
 
@@ -52,7 +54,8 @@
 }
 
 .menuItem,
-.iconButton {
+.iconButton,
+.backButton {
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -64,7 +67,7 @@
 
 .menuItem {
   min-height: calc(var(--control-height) * 0.72);
-  padding: var(--topbar-menu-padding);
+  padding: var(--topbar-menu-padding-y) var(--topbar-menu-padding-x);
   border-radius: 8px;
   font-size: var(--font-small);
   font-weight: 400;
@@ -81,6 +84,25 @@
   user-select: none;
 }
 
+.backButton {
+  position: relative;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.backButton span {
+  width: 9px;
+  height: 9px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: translateX(2px) rotate(45deg);
+}
+
 .iconButton svg {
   pointer-events: none;
 }
@@ -93,7 +115,9 @@
 }
 
 .iconButton:hover,
-.iconButton:focus-visible {
+.iconButton:focus-visible,
+.backButton:hover,
+.backButton:focus-visible {
   outline: 0;
   background: var(--bg-control-hover);
   color: var(--text-primary);
@@ -106,7 +130,8 @@
   font-weight: 500;
 }
 
-.iconButton:active {
+.iconButton:active,
+.backButton:active {
   transform: scale(0.98);
 }
 

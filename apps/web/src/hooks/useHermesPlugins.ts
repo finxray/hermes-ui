@@ -22,7 +22,7 @@ export function useHermesPlugins(enabled: boolean) {
       return;
     }
 
-    setState((current) => ({ ...current, isLoading: true }));
+    setState((current) => ({ ...current, isLoading: current.result === null }));
     const result = await fetchHermesPlugins();
     setState({ isLoading: false, result });
   }, [enabled]);

@@ -14,8 +14,8 @@
   display: grid;
   gap: 12px;
   width: 100%;
-  max-width: 483px;
-  padding: 20px 20px 0;
+  max-width: none;
+  padding: 18px 14px 0;
   justify-self: center;
   box-sizing: border-box;
   background-color: var(--bg-workspace-solid);
@@ -23,7 +23,7 @@
 
 .head h2 {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--context-orange);
   font-size: var(--font-body);
   font-weight: 620;
   line-height: 1.2;
@@ -71,12 +71,12 @@
   composes: scrollbar-hover-reveal from global;
   min-height: 0;
   width: 100%;
-  max-width: 483px;
+  max-width: none;
   overflow-x: hidden;
   overflow-y: auto;
   justify-self: center;
   box-sizing: border-box;
-  padding: 20px;
+  padding: 16px 14px;
   background-color: var(--bg-workspace-solid);
 }
 
@@ -90,7 +90,7 @@
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 14px;
-  color: var(--text-muted);
+  color: var(--context-orange);
   font-size: var(--font-small);
   font-weight: 650;
 }
@@ -140,7 +140,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 7px;
-  color: var(--text-primary);
+  color: var(--context-orange);
   font-size: var(--font-xs);
   font-weight: 650;
 }
@@ -317,6 +317,7 @@
 .hermesHistoryTitle {
   min-width: 0;
   overflow: hidden;
+  color: var(--context-orange);
   font-size: var(--font-small);
   line-height: 1.28;
   text-overflow: ellipsis;
@@ -613,7 +614,12 @@
 }
 
 .artifactIcon {
-  color: var(--text-secondary);
+  color: var(--context-orange);
+}
+
+.artifactTitle,
+.artifactFileName {
+  color: var(--context-orange);
 }
 
 .ghostAction {

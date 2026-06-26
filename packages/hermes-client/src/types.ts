@@ -251,6 +251,15 @@ export type HermesChatHistoryMessage = {
   content: string;
 };
 
+export type HermesChatAttachment = {
+  id: string;
+  fileName: string;
+  kind: string;
+  mimeType: string;
+  sizeBytes: number;
+  status: string;
+};
+
 export type HermesChatContext = {
   project: {
     id: string;
@@ -282,6 +291,7 @@ export type HermesChatRequest = {
   context: HermesChatContext;
   instructions?: string | null;
   message: string;
+  attachments?: HermesChatAttachment[];
   recentMessages?: HermesChatHistoryMessage[];
   model?: string | null;
   modelRuntime?: HermesModelRuntimeMetadata | null;
@@ -641,6 +651,91 @@ export type HermesPluginToggleResult =
       plugin: null;
       checkedAt: string;
       raw: null;
+      error: HermesStatusError;
+    };
+
+export type HermesConfigFieldType = "string" | "number" | "boolean" | "list" | "select";
+
+export type HermesConfigField = {
+  key: string;
+  label: string;
+  description: string | null;
+  type: HermesConfigFieldType;
+  value: string | number | boolean | string[] | null;
+  options: string[];
+  isSet: boolean;
+};
+
+export type HermesConfigSection = {
+  id: string;
+  label: string;
+  fields: HermesConfigField[];
+};
+
+export type HermesConfigResult =
+  | {
+      ok: true;
+      model: string | null;
+      sections: HermesConfigSection[];
+      checkedAt: string;
+      raw: Record<string, unknown> | null;
+      error: null;
+    }
+  | {
+      ok: false;
+      model: null;
+      sections: [];
+      checkedAt: string;
+      raw: null;
+      error: HermesStatusError;
+    };
+
+export type HermesEnvKey = {
+  name: string;
+  isSet: boolean;
+  redactedValue: string | null;
+  description: string | null;
+  url: string | null;
+  category: string;
+  isPassword: boolean;
+  advanced: boolean;
+};
+
+export type HermesEnvCategory = {
+  id: string;
+  label: string;
+  keys: HermesEnvKey[];
+};
+
+export type HermesEnvResult =
+  | {
+      ok: true;
+      categories: HermesEnvCategory[];
+      checkedAt: string;
+      raw: Record<string, unknown> | null;
+      error: null;
+    }
+  | {
+      ok: false;
+      categories: [];
+      checkedAt: string;
+      raw: null;
+      error: HermesStatusError;
+    };
+
+export type HermesLogsResult =
+  | {
+      ok: true;
+      file: string;
+      lines: string[];
+      checkedAt: string;
+      error: null;
+    }
+  | {
+      ok: false;
+      file: string;
+      lines: [];
+      checkedAt: string;
       error: HermesStatusError;
     };
 

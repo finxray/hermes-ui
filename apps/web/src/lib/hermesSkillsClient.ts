@@ -1,9 +1,64 @@
 import type {
+  HermesConfigResult,
+  HermesEnvResult,
+  HermesLogsResult,
   HermesPluginToggleResult,
   HermesPluginsListResult,
   HermesSkillToggleResult,
   HermesSkillsListResult
 } from "@hermes-ui/hermes-client";
+
+export async function fetchHermesEnvKeys(): Promise<HermesEnvResult> {
+  try {
+    const response = await fetch("/api/hermes/env", { cache: "no-store" });
+    return (await response.json()) as HermesEnvResult;
+  } catch {
+    return {
+      ok: false,
+      categories: [],
+      checkedAt: new Date().toISOString(),
+      raw: null,
+      error: { kind: "network", message: "Could not reach the local Hermes keys route." }
+    };
+  }
+}
+
+export async function fetchHermesLogs(file: string): Promise<HermesLogsResult> {
+  try {
+    const response = await fetch(`/api/hermes/logs?file=${encodeURIComponent(file)}`, { cache: "no-store" });
+    return (await response.json()) as HermesLogsResult;
+  } catch {
+    return {
+      ok: false,
+      file,
+      lines: [],
+      checkedAt: new Date().toISOString(),
+      error: { kind: "network", message: "Could not reach the local Hermes logs route." }
+    };
+  }
+}
+
+export async function fetchHermesConfig(): Promise<HermesConfigResult> {
+  try {
+    const response = await fetch("/api/hermes/config", {
+      cache: "no-store"
+    });
+    const data = (await response.json()) as HermesConfigResult;
+    return data;
+  } catch {
+    return {
+      ok: false,
+      model: null,
+      sections: [],
+      checkedAt: new Date().toISOString(),
+      raw: null,
+      error: {
+        kind: "network",
+        message: "Could not reach the local Hermes config route."
+      }
+    };
+  }
+}
 
 export async function fetchHermesSkills(): Promise<HermesSkillsListResult> {
   try {

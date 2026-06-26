@@ -1,12 +1,23 @@
 .splitPane {
+  --split-pane-toolbar-height: 60px;
   display: grid;
   min-width: 0;
   min-height: 0;
   height: 100%;
+  contain: layout paint;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   background-color: var(--bg-workspace-solid);
   border-left: var(--border-window-outline-width) solid var(--border-window-separator);
+}
+
+.splitPane[data-active-pane="console"] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.splitPane[data-layout="combined"] {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.6fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .toolbar {
@@ -17,18 +28,59 @@
   min-height: 44px;
   align-items: center;
   gap: 8px;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 8px 16px;
   border-bottom: 0;
   background-color: var(--bg-workspace-solid);
 }
 
+.splitPane[data-active-pane="console"] .toolbar {
+  display: none;
+}
+
+.splitPane[data-layout="combined"] .toolbar {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
 .tabGroup {
   display: flex;
+  width: 100%;
   min-width: 0;
   align-items: center;
   gap: 7px;
   transform: translateY(4px);
+}
+
+.tabGroup > .tabButton:last-child {
+  margin-left: auto;
+}
+
+.returnButton {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+
+.returnButton:hover,
+.returnButton:focus-visible {
+  background: transparent;
+}
+
+.splitPane[data-layout="combined"] .tabGroup {
+  display: flex;
+}
+
+.splitPane[data-layout="combined"] .menuHost {
+  grid-column: 1;
+}
+
+.splitPane[data-layout="combined"] .returnButton {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
 }
 
 .menuHost {
@@ -248,10 +300,19 @@
 
 .body {
   position: relative;
+  display: block;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background-color: var(--bg-workspace-solid);
+}
+
+.splitPane[data-layout="combined"] .body {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.6fr);
+  transition: grid-template-columns 700ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .pane {
@@ -259,19 +320,56 @@
   inset: 0;
   min-width: 0;
   min-height: 0;
+  contain: layout paint;
   overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity 120ms ease,
+    visibility 0s linear 120ms;
 }
 
-.pane[hidden] {
-  display: none;
+.splitPane[data-layout="combined"] .pane {
+  position: relative;
+  inset: auto;
+}
+
+.pane[data-active="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .chatPane {
+  box-sizing: border-box;
   background-color: var(--bg-workspace-solid);
+}
+
+.splitPane[data-layout="combined"] .chatPane {
+  padding-top: var(--split-pane-toolbar-height);
 }
 
 .consolePane {
   background-color: var(--bg-workspace-solid);
+}
+
+.splitPane[data-layout="combined"] .consolePane {
+  border-left: var(--border-window-outline-width) solid var(--border-window-separator);
+  opacity: 0;
+  transform: translate3d(32px, 0, 0);
+  transition:
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 700ms;
+  will-change: opacity, transform;
+}
+
+.splitPane[data-layout="combined"] .consolePane[data-active="true"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition-delay: 0s;
 }
 
 @media (max-width: 1180px) {

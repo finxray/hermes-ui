@@ -15,6 +15,7 @@ export const runtime = "nodejs";
 const MAX_BODY_BYTES = 64_000;
 const MAX_MESSAGE_CHARS = 8_000;
 const MAX_HISTORY_ITEMS = 12;
+const MAX_ATTACHMENT_ITEMS = 20;
 
 export async function POST(request: Request) {
   const parsed = await readChatRequest(request);
@@ -75,6 +76,7 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
   const modelRuntime = readModelRuntime(input.modelRuntime);
   const modelSelectionScope = readModelSelectionScope(input.modelSelectionScope);
   const provider = cleanOptionalString(input.provider, 128);
+  const attachments = readAttachments(input.attachments);
 
   if (!message) {
     return badRequest("bad_response", "Message is required.");
@@ -89,8 +91,10 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
       context,
       instructions: joinInstructions(
         buildHermesRuntimeIdentityInstruction({ model, modelRuntime, provider }),
+        buildAttachmentInstruction(attachments),
         isMemoryScopeBridgeEnabled() ? buildMemoryScopeBridgeInstruction(context) : null
       ),
+      attachments,
       message,
       provider,
       modelRuntime,
@@ -99,6 +103,24 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
       recentMessages: readRecentMessages(input.recentMessages)
     }
   };
+}
+
+function buildAttachmentInstruction(attachments: HermesChatRequest["attachments"]): string | null {
+  if (!attachments || attachments.length === 0) {
+    return null;
+  }
+  const summary = attachments
+    .map((attachment) => {
+      const size = typeof attachment.sizeBytes === "number" ? `${attachment.sizeBytes} bytes` : "unknown size";
+      return `- ${attachment.fileName} (${attachment.kind}, ${attachment.mimeType || "unknown MIME"}, ${size})`;
+    })
+    .join("\n");
+  return [
+    "The Hermes UI attached local file metadata for this turn.",
+    "The browser UI has not uploaded raw file bytes through a verified Hermes file endpoint yet; do not claim to have read file contents unless Hermes tools or future upload events provide them.",
+    "Attached file metadata:",
+    summary
+  ].join("\n");
 }
 
 function isMemoryScopeBridgeEnabled(): boolean {
@@ -259,6 +281,39 @@ function readStringArray(value: unknown, maxItems: number, maxLength: number): s
     .map((item) => cleanString(item, maxLength))
     .filter(Boolean)
     .slice(0, maxItems);
+}
+
+function readAttachments(value: unknown): HermesChatRequest["attachments"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .slice(0, MAX_ATTACHMENT_ITEMS)
+    .map((item) => {
+      const attachment = readObject(item);
+      if (!attachment) {
+        return null;
+      }
+      const id = cleanString(attachment.id, 128);
+      const fileName = cleanString(attachment.fileName, 240);
+      const kind = cleanString(attachment.kind, 40) || "unknown";
+      const mimeType = cleanString(attachment.mimeType, 120) || "application/octet-stream";
+      const status = cleanString(attachment.status, 40) || "needs-upload";
+      const sizeBytes = cleanOptionalNumber(attachment.sizeBytes) ?? 0;
+      if (!id || !fileName) {
+        return null;
+      }
+      return {
+        id,
+        fileName,
+        kind,
+        mimeType,
+        sizeBytes,
+        status
+      };
+    })
+    .filter((item): item is NonNullable<HermesChatRequest["attachments"]>[number] => Boolean(item));
 }
 
 function readRecentMessages(value: unknown): HermesChatRequest["recentMessages"] {

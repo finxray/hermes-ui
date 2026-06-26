@@ -1,27 +1,29 @@
 .mainWindow {
   grid-area: main-window;
   position: relative;
-  display: grid;
+  display: block;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  grid-template-columns: minmax(0, 1fr) minmax(0, var(--rail-width-right));
   background-color: var(--bg-workspace-solid);
   background-image: none;
   border: var(--border-window-outline-width) solid var(--border-window-outline);
   border-right: 0;
   border-radius: 20px 0 0 20px;
   box-shadow: none;
-  transition: grid-template-columns var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chatPane {
-  position: relative;
+  position: absolute;
+  inset: 0 var(--rail-width-right) 0 0;
   min-width: 0;
   min-height: 0;
   height: 100%;
+  contain: layout paint;
   overflow: hidden;
   background-color: var(--bg-workspace-solid);
+  transition:
+    right var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chatPaneScrollable {
@@ -50,6 +52,9 @@
   background: transparent;
   cursor: col-resize;
   transform: translateX(6px);
+  transition:
+    right var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 160ms ease;
 }
 
 .rightResizeHandle::after {
@@ -73,14 +78,67 @@
   transition: none;
 }
 
+:global(body[data-shell-resizing="true"]) .chatPane,
+:global(body[data-shell-resizing="true"]) .rightResizeHandle,
+:global(body[data-shell-resizing="true"]) .mainWindow > :global([data-shell-rail="right"]) {
+  transition: none;
+}
+
+.mainWindow > :global([data-shell-rail="right"]) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 7;
+  width: var(--rail-width-right);
+  min-width: 0;
+  contain: layout paint;
+  transform: translateX(0);
+  opacity: 1;
+  transition:
+    width var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1),
+    transform var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease;
+  will-change: transform;
+}
+
 :global([data-right-collapsed="true"]) .mainWindow,
 .mainWindow[data-right-collapsed="true"] {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0px);
+  grid-template-columns: none;
+}
+
+:global([data-right-collapsed="true"]) .chatPane,
+.mainWindow[data-right-collapsed="true"] .chatPane {
+  right: 0;
+}
+
+:global([data-right-collapsed="true"]) .mainWindow > :global([data-shell-rail="right"]),
+.mainWindow[data-right-collapsed="true"] > :global([data-shell-rail="right"]) {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+:global([data-right-collapsed="true"]) .rightResizeHandle,
+.mainWindow[data-right-collapsed="true"] .rightResizeHandle {
+  right: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (max-width: 1280px) {
   .mainWindow {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0px);
+    grid-template-columns: none;
+  }
+
+  .chatPane {
+    right: 0;
+  }
+
+  .mainWindow > :global([data-shell-rail="right"]) {
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
   }
 
   .rightResizeHandle {
@@ -95,7 +153,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mainWindow {
+  .chatPane,
+  .rightResizeHandle,
+  .mainWindow > :global([data-shell-rail="right"]) {
     transition-duration: 1ms;
   }
 }

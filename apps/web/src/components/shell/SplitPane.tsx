@@ -17,7 +17,7 @@ import styles from "./SplitPane.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 
-export type RightPaneMode = "chat" | "console";
+export type RightPaneMode = "chat" | "console" | "chat-console";
 
 type SplitPaneProps = {
   activeProject: Project;
@@ -35,11 +35,14 @@ type SplitPaneProps = {
   isHermesStatusLoading: boolean;
   isHermesStatusRefreshing?: boolean;
   mode: RightPaneMode;
+  onActivateSideChat?: () => void;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
   onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
+  projects: Project[];
   refreshBrainMemoryStatus: () => void;
   refreshHermesStatus: () => void;
   refreshHermesSessions: () => void;
+  returnToSingleChat: () => void;
   closeSideSession: () => void;
   selectSideSession: (sessionId: string) => void;
   setMode: (mode: RightPaneMode) => void;
@@ -66,11 +69,14 @@ export function SplitPane({
   isHermesStatusLoading,
   isHermesStatusRefreshing = false,
   mode,
+  onActivateSideChat,
   onActivityEvent,
   onGeneratingChange,
+  projects,
   refreshBrainMemoryStatus,
   refreshHermesStatus,
   refreshHermesSessions,
+  returnToSingleChat,
   closeSideSession,
   selectSideSession,
   setMode,
@@ -83,7 +89,9 @@ export function SplitPane({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const sideTitle = sideSession?.title ?? "Side chat";
-  const canCloseSideTab = mode === "chat" && Boolean(sideSession);
+  const isChatVisible = mode === "chat" || mode === "chat-console";
+  const isConsoleVisible = mode === "console" || mode === "chat-console";
+  const canCloseSideTab = isChatVisible && Boolean(sideSession);
 
   useEffect(() => {
     if (!menuOpen) {
@@ -123,17 +131,9 @@ export function SplitPane({
   };
 
   const handleSideTabClick = () => {
-    if (canCloseSideTab) {
-      closeSideSession();
-      setMenuOpen(false);
-      return;
-    }
-
     if (sideSession) {
       setMode("chat");
-      return;
     }
-
     setMenuOpen((current) => !current);
   };
 
@@ -142,6 +142,7 @@ export function SplitPane({
       aria-label="Split chat and context console"
       className={styles.splitPane}
       data-active-pane={mode}
+      data-layout={mode === "chat-console" ? "combined" : "single"}
       data-shell-rail="right"
     >
       <header className={styles.toolbar}>
@@ -151,8 +152,8 @@ export function SplitPane({
               aria-controls="studio-side-chat-menu"
               aria-expanded={menuOpen}
               aria-haspopup="menu"
-              aria-selected={mode === "chat"}
-              className={`${styles.tabButton} ${styles.sideTab} ${mode === "chat" ? styles.activeTab : ""}`}
+              aria-selected={isChatVisible}
+              className={`${styles.tabButton} ${styles.sideTab} ${isChatVisible ? styles.activeTab : ""}`}
               data-side-chat-tab="true"
               onClick={handleSideTabClick}
               role="tab"
@@ -173,7 +174,10 @@ export function SplitPane({
               aria-haspopup="menu"
               className={styles.addButton}
               data-side-chat-add="true"
-              onClick={() => setMenuOpen((current) => !current)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((current) => !current);
+              }}
               title="Open side chat menu"
               type="button"
             >
@@ -211,27 +215,25 @@ export function SplitPane({
             ) : null}
           </div>
           <button
-            aria-selected={mode === "console"}
-            className={`${styles.tabButton} ${mode === "console" ? styles.activeTab : ""}`}
-            onClick={() => setMode("console")}
-            role="tab"
+            aria-label={isChatVisible ? "Return to single chat view" : "Context console is open"}
+            className={`${styles.tabButton} ${styles.returnButton}`}
+            onClick={isChatVisible ? returnToSingleChat : undefined}
+            title={isChatVisible ? "Return to single chat view" : "Context console is open"}
             type="button"
           >
-            <PanelToggleIcon side="split" />
-            <span>Console</span>
+            <PanelToggleIcon side="single" />
           </button>
         </div>
       </header>
 
       <div className={styles.body}>
         <div
-          aria-hidden={mode !== "chat"}
+          aria-hidden={!isChatVisible}
           className={`${styles.pane} ${styles.chatPane}`}
-          data-active={mode === "chat" ? "true" : "false"}
-          hidden={mode !== "chat"}
+          data-active={isChatVisible ? "true" : "false"}
           role="tabpanel"
         >
-          {mode === "chat" ? (
+          {isChatVisible && sideSession ? (
             <ChatView
               activeProject={activeProject}
               activeSession={sideSession}
@@ -239,8 +241,11 @@ export function SplitPane({
               createSession={createSideSession}
               hermesStatus={hermesStatus}
               isHermesStatusLoading={isHermesStatusLoading}
+              isSplitViewOpen={isChatVisible}
+              onActivate={onActivateSideChat}
               onActivityEvent={onActivityEvent}
               onGeneratingChange={onGeneratingChange}
+              projects={projects}
               sessionModel={sideSessionModel}
               showHeader={false}
               variant="side"
@@ -249,13 +254,12 @@ export function SplitPane({
           ) : null}
         </div>
         <div
-          aria-hidden={mode !== "console"}
+          aria-hidden={!isConsoleVisible}
           className={`${styles.pane} ${styles.consolePane}`}
-          data-active={mode === "console" ? "true" : "false"}
-          hidden={mode !== "console"}
+          data-active={isConsoleVisible ? "true" : "false"}
           role="tabpanel"
         >
-          {mode === "console" ? (
+          {isConsoleVisible ? (
             <ContextRail
               activeProject={activeProject}
               activeSession={activeSession}

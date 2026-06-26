@@ -13,7 +13,7 @@ export function ChatHeader({ isSplitViewOpen = false, onSplitView, title }: Chat
     : "Split chat and context panels evenly";
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-split-view={isSplitViewOpen ? "true" : "false"}>
       <div className={styles.headerTitle}>
         <h1>{title}</h1>
         {onSplitView ? (
@@ -26,7 +26,7 @@ export function ChatHeader({ isSplitViewOpen = false, onSplitView, title }: Chat
             title={splitButtonLabel}
             type="button"
           >
-            <PanelToggleIcon side="split" />
+            <PanelToggleIcon side={isSplitViewOpen ? "single" : "split"} />
           </button>
         ) : null}
       </div>

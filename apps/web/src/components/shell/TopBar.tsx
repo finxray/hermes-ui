@@ -3,22 +3,40 @@
 import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
 import styles from "./TopBar.module.css";
 
+export type ShellSection = "workspace" | "plugins" | "config" | "keys" | "logs";
+
+const SECTION_ITEMS: { id: ShellSection; label: string }[] = [
+  { id: "workspace", label: "Workspace" },
+  { id: "plugins", label: "Plugins" },
+  { id: "config", label: "Config" },
+  { id: "keys", label: "Keys" },
+  { id: "logs", label: "Logs" }
+];
+
 type TopBarProps = {
-  activeSection: "workspace" | "plugins";
+  activeSection: ShellSection;
+  canGoBack?: boolean;
   leftToggleId: string;
   leftCollapsed: boolean;
-  onSectionChange: (section: "workspace" | "plugins") => void;
+  onBack?: () => void;
+  onSectionChange: (section: ShellSection) => void;
+  onRightToggle?: () => void;
   rightToggleId: string;
   rightCollapsed: boolean;
+  rightToggleLabel?: string;
 };
 
 export function TopBar({
   activeSection,
+  canGoBack = false,
   leftToggleId,
   leftCollapsed,
+  onBack,
+  onRightToggle,
   onSectionChange,
   rightToggleId,
-  rightCollapsed
+  rightCollapsed,
+  rightToggleLabel
 }: TopBarProps) {
   const activateToggle = (toggleId: string) => {
     document.getElementById(toggleId)?.click();
@@ -37,35 +55,28 @@ export function TopBar({
         >
           <PanelToggleIcon side="left" />
         </button>
+        {canGoBack ? (
+          <button
+            className={styles.backButton}
+            aria-label="Go back"
+            onClick={onBack}
+            title="Go back"
+            type="button"
+          >
+            <span aria-hidden="true" />
+          </button>
+        ) : null}
         <nav className={styles.menu} aria-label="Workspace sections">
-          <button
-            aria-current={activeSection === "workspace" ? "page" : undefined}
-            className={`${styles.menuItem} ${activeSection === "workspace" ? styles.active : ""}`}
-            onClick={() => onSectionChange("workspace")}
-            title="Workspace"
-            type="button"
-          >
-            Workspace
-          </button>
-          <button
-            aria-current={activeSection === "plugins" ? "page" : undefined}
-            className={`${styles.menuItem} ${activeSection === "plugins" ? styles.active : ""}`}
-            onClick={() => onSectionChange("plugins")}
-            title="Plugins"
-            type="button"
-          >
-            Plugins
-          </button>
-          {["Memory", "Projects", "Tools", "Help"].map((item) => (
+          {SECTION_ITEMS.map((item) => (
             <button
-              aria-label={`${item} section coming soon`}
-              className={styles.menuItem}
-              disabled
-              key={item}
-              title={`${item} section navigation is coming soon.`}
+              aria-current={activeSection === item.id ? "page" : undefined}
+              className={`${styles.menuItem} ${activeSection === item.id ? styles.active : ""}`}
+              key={item.id}
+              onClick={() => onSectionChange(item.id)}
+              title={item.label}
               type="button"
             >
-              {item}
+              {item.label}
             </button>
           ))}
         </nav>
@@ -73,10 +84,10 @@ export function TopBar({
       <div className={styles.right}>
         <button
           className={styles.iconButton}
-          aria-label={rightCollapsed ? "Open right context panel" : "Collapse right context panel"}
+          aria-label={rightToggleLabel ?? (rightCollapsed ? "Open right context panel" : "Collapse right context panel")}
           aria-pressed={!rightCollapsed}
-          onClick={() => activateToggle(rightToggleId)}
-          title={rightCollapsed ? "Open right context panel" : "Collapse right context panel"}
+          onClick={onRightToggle ?? (() => activateToggle(rightToggleId))}
+          title={rightToggleLabel ?? (rightCollapsed ? "Open right context panel" : "Collapse right context panel")}
           type="button"
         >
           <PanelToggleIcon side="right" />

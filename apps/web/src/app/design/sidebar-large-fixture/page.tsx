@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Sidebar } from "@/components/shell/Sidebar";
+import { SectionNavProvider } from "@/components/shell/SectionNavContext";
 import {
   LARGE_SIDEBAR_PROJECT_COUNT,
   LARGE_SIDEBAR_SESSION_COUNT,
@@ -30,6 +31,7 @@ export default function SidebarLargeFixturePage() {
       archiveSession: noop,
       createProject: noop,
       createSession: noop,
+      createSessionForProject: noop,
       renameProject: noop,
       renameSession: noop,
       reset: noop,
@@ -54,20 +56,22 @@ export default function SidebarLargeFixturePage() {
       </section>
 
       <section className={styles.shell} aria-label="Large sidebar Studio shell fixture">
-        <Sidebar
-          actions={fixtureActions as never}
-          activeSection="workspace"
-          activeProject={activeProject}
-          activeSession={activeSession}
-          allSessions={largeSidebarSessions}
-          connectionStatus={largeSidebarWorkspaceState.connectionStatus}
-          hermesStatus={null}
-          isHermesStatusLoading={false}
-          isHydrated
-          onSectionChange={noop}
-          projects={largeSidebarProjects}
-          refreshHermesStatus={noop}
-        />
+        <SectionNavProvider>
+          <Sidebar
+            actions={fixtureActions as never}
+            activeSection="workspace"
+            activeProject={activeProject}
+            activeSession={activeSession}
+            allSessions={largeSidebarSessions}
+            connectionStatus={largeSidebarWorkspaceState.connectionStatus}
+            hermesStatus={null}
+            isHermesStatusLoading={false}
+            isHydrated
+            onSectionChange={noop}
+            projects={largeSidebarProjects}
+            refreshHermesStatus={noop}
+          />
+        </SectionNavProvider>
         <section className={styles.panel} aria-label="Large sidebar measurement panel">
           <div className={styles.panelBody}>
             <p>Static local fixture</p>

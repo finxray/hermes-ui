@@ -19,9 +19,11 @@ import {
 } from "@/lib/persistedActivityReplay";
 import { DEFAULT_USER_DISPLAY_NAME, WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
-import type { HermesTokenUsage, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
+import type { QueuedComposerMessage } from "@/components/chat/Composer";
+import type { HermesChatRequest, HermesTokenUsage, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type {
   ChatMessage,
+  ChatAttachment,
   PersistedActivityEvent,
   Project,
   RunActivitySummary,
@@ -36,6 +38,7 @@ import styles from "./ChatView.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ActivityRecorder = (sessionId: string, event: AgentActivityEvent) => void;
+type QueuedTurn = QueuedComposerMessage & { attachments?: ChatAttachment[]; sessionId: string };
 const STREAM_FLUSH_INTERVAL_MS = 32;
 const ESTIMATED_CHARS_PER_TOKEN = 4;
 const ESTIMATED_ACTIVITY_CHARS_PER_TOKEN = 6;
@@ -43,6 +46,7 @@ const ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND = 2.5;
 const LIVE_TOKEN_ESTIMATE_INTERVAL_MS = 650;
 const LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS = 512;
 const LIVE_TOKEN_AFTERGLOW_MS = 15_000;
+const CHATS_PROJECT_NAME = "Chats";
 // How many completed tool cycles it takes for the live "in" estimate to climb
 // all the way to the prior turn's prompt total (a tool loop re-sends the full
 // context each request, so prompt grows roughly per cycle).
@@ -56,9 +60,11 @@ type ChatViewProps = {
   hermesStatus: NormalizedHermesStatus | null;
   isHermesStatusLoading: boolean;
   isSplitViewOpen?: boolean;
+  onActivate?: () => void;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
   onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
   onSplitView?: () => void;
+  projects: Project[];
   sessionModel: HermesSessionModelSync;
   showHeader?: boolean;
   variant?: "main" | "side";
@@ -73,9 +79,11 @@ export function ChatView({
   hermesStatus,
   isHermesStatusLoading,
   isSplitViewOpen = false,
+  onActivate,
   onActivityEvent,
   onGeneratingChange,
   onSplitView,
+  projects,
   sessionModel,
   showHeader = true,
   variant = "main",
@@ -88,7 +96,11 @@ export function ChatView({
   const [liveTokenUsage, setLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [visibleLiveTokenUsage, setVisibleLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
-  const [queuedTurn, setQueuedTurn] = useState<{ content: string; sessionId: string } | null>(null);
+  const [frozenComposerModel, setFrozenComposerModel] = useState<{
+    label: string;
+    modelState: HermesSessionModelSync["modelState"];
+  } | null>(null);
+  const [queuedTurns, setQueuedTurns] = useState<QueuedTurn[]>([]);
   const activeStreamControllerRef = useRef<AbortController | null>(null);
   const flushFrameRef = useRef<number | null>(null);
   const flushTimeoutRef = useRef<number | null>(null);
@@ -103,13 +115,22 @@ export function ChatView({
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
+  const isProjectScopedStart = activeProject.name.trim().toLowerCase() !== CHATS_PROJECT_NAME.toLowerCase();
+  const startPrompt = isProjectScopedStart
+    ? `What should we build in ${activeProject.name}?`
+    : "What should we work on?";
   const composerClearancePx = useComposerInset(scrollViewportRef, composerWrapRef, !isStartState);
   const providerModelState = sessionModel.modelState;
   const modelLabel = sessionModel.modelLabel;
+  const displayedProviderModelState = frozenComposerModel?.modelState ?? providerModelState;
+  const displayedModelLabel = frozenComposerModel?.label ?? modelLabel;
   const modelSelectError = sessionModel.error;
   const modelSelectInProgress = sessionModel.modelSelectInProgress;
-  const visibleQueuedMessage =
-    queuedTurn && queuedTurn.sessionId === activeSession?.id ? queuedTurn.content : null;
+  const visibleQueuedMessages = activeSession
+    ? queuedTurns
+        .filter((turn) => turn.sessionId === activeSession.id)
+        .map(({ attachments, id, content }) => ({ attachments, id, content }))
+    : [];
 
   useEffect(() => {
     if (!activeSession) {
@@ -130,7 +151,8 @@ export function ChatView({
     setVisibleLiveTokenUsage(null);
     setIsFinalizingResponse(false);
     setGenerationStartedAt(null);
-    setQueuedTurn(null);
+    setFrozenComposerModel(null);
+    setQueuedTurns([]);
     stopRequestedRef.current = false;
     activeStreamControllerRef.current?.abort();
     activeStreamControllerRef.current = null;
@@ -157,19 +179,19 @@ export function ChatView({
   }, [activeSession?.id]);
 
   useEffect(() => {
-    if (isGenerating || modelSelectInProgress || !activeSession || !queuedTurn) {
+    if (isGenerating || modelSelectInProgress || !activeSession) {
       return;
     }
-    if (queuedTurn.sessionId !== activeSession.id) {
+    const nextQueuedTurn = queuedTurns.find((turn) => turn.sessionId === activeSession.id);
+    if (!nextQueuedTurn) {
       return;
     }
 
-    const nextContent = queuedTurn.content;
-    setQueuedTurn(null);
+    setQueuedTurns((current) => current.filter((turn) => turn.id !== nextQueuedTurn.id));
     window.setTimeout(() => {
-      void handleSend(nextContent);
+      void handleSend(nextQueuedTurn.content, nextQueuedTurn.attachments ?? []);
     }, 0);
-  }, [activeSession?.id, isGenerating, modelSelectInProgress, queuedTurn]);
+  }, [activeSession?.id, isGenerating, modelSelectInProgress, queuedTurns]);
 
   useEffect(() => {
     if (liveTokenClearTimerRef.current !== null) {
@@ -212,20 +234,27 @@ export function ChatView({
         { label: "Route", value: "Select or create a chat" }
       ];
 
-  async function handleSend(content: string) {
+  async function handleSend(content: string, attachments: ChatAttachment[] = []) {
     if (!activeSession || modelSelectInProgress) {
       return;
     }
     if (isGenerating) {
-      setQueuedTurn({ content, sessionId: activeSession.id });
+      setQueuedTurns((current) => [
+        ...current,
+        { attachments, content, id: `queued-${crypto.randomUUID()}`, sessionId: activeSession.id }
+      ]);
       return;
     }
 
     const session = activeSession;
     const sendModelState = sessionModel.modelState;
+    setFrozenComposerModel({
+      label: modelLabel,
+      modelState: sendModelState
+    });
     const modelRequest = sessionModel.modelRequest;
     let generationStarted = false;
-    const userMessage = createMessage("user", DEFAULT_USER_DISPLAY_NAME, content, "complete");
+    const userMessage = createMessage("user", DEFAULT_USER_DISPLAY_NAME, content, "complete", attachments);
     const assistantId = `msg-${crypto.randomUUID()}`;
     const assistantMessage: ChatMessage = {
       id: assistantId,
@@ -484,6 +513,7 @@ export function ChatView({
 
     estimatedPromptTokens = estimatePromptTokensForRequest({
       message: content,
+      attachments,
       project: activeProject,
       recentMessages: session.messages.slice(-12),
       session
@@ -680,6 +710,7 @@ export function ChatView({
           }
         },
         message: content,
+        attachments: toHermesChatAttachments(attachments),
         model: modelRequest?.selectModelId ?? null,
         modelRuntime: modelRequest?.modelRuntime ?? null,
         modelSelectionScope: modelRequest?.selectionScope ?? null,
@@ -862,6 +893,7 @@ export function ChatView({
         } else {
           void sessionModel.refresh();
         }
+        setFrozenComposerModel(null);
         setIsGenerating(false);
         setIsStopRequested(false);
         // Commit the final authoritative totals to the visible ticker before
@@ -904,6 +936,64 @@ export function ChatView({
     stopRequestedRef.current = true;
     setIsStopRequested(true);
     activeStreamControllerRef.current?.abort();
+  }
+
+  function openProjectFromComposer(projectId: string) {
+    if (activeSession?.projectId === projectId && activeSession.messages.length === 0) {
+      return;
+    }
+    workspaceActions.switchProject(projectId);
+    workspaceActions.createSessionForProject(projectId);
+  }
+
+  function createProjectFromComposer() {
+    const projectId = workspaceActions.createProject();
+    workspaceActions.createSessionForProject(projectId);
+  }
+
+  function continueInChatsFolder() {
+    const chatsProject =
+      projects.find((project) => project.name.trim().toLowerCase() === CHATS_PROJECT_NAME.toLowerCase()) ?? null;
+    const projectId =
+      chatsProject?.id ??
+      workspaceActions.createProject({
+        activate: false,
+        name: CHATS_PROJECT_NAME
+      });
+    workspaceActions.createSessionForProject(projectId);
+  }
+
+  const projectControls = {
+    activeProjectId: activeProject.id,
+    activeProjectName: activeProject.name,
+    onCreateProject: createProjectFromComposer,
+    onSelectProject: openProjectFromComposer,
+    onUseChats: continueInChatsFolder,
+    projects: projects.map((project) => ({ id: project.id, name: project.name }))
+  };
+
+  function removeQueuedTurn(id: string) {
+    setQueuedTurns((current) => current.filter((turn) => turn.id !== id));
+  }
+
+  function prioritizeQueuedTurn(id: string) {
+    setQueuedTurns((current) => {
+      const target = current.find((turn) => turn.id === id);
+      if (!target) {
+        return current;
+      }
+      return [target, ...current.filter((turn) => turn.id !== id)];
+    });
+  }
+
+  function deferQueuedTurn(id: string) {
+    setQueuedTurns((current) => {
+      const target = current.find((turn) => turn.id === id);
+      if (!target) {
+        return current;
+      }
+      return [...current.filter((turn) => turn.id !== id), target];
+    });
   }
 
   function appendActivityEvent(sessionId: string, event: AgentActivityEvent) {
@@ -968,8 +1058,13 @@ export function ChatView({
 
   const activeActivityEvents = activeSession ? activityEvents : [];
   const bottomFadeStyle = {
-    "--chat-bottom-fade-height": `${Math.max(136, composerClearancePx + 30)}px`
+    "--chat-bottom-fade-height": `${Math.max(95, composerClearancePx + 21)}px`
   } as CSSProperties;
+  const headerFadeStyle = {
+    "--chat-top-overlay-height": isSplitViewOpen ? "67px" : "34px"
+  } as CSSProperties;
+  const showHeaderFade = showHeader || isSplitViewOpen;
+  const showTopChrome = showHeader || showHeaderFade;
 
   return (
     <section
@@ -977,10 +1072,13 @@ export function ChatView({
       data-start-state={isStartState ? "true" : "false"}
       data-show-header={showHeader ? "true" : "false"}
       data-variant={variant}
+      onFocusCapture={onActivate}
+      onPointerDown={onActivate}
       aria-label="Chat workspace"
     >
       {isStartState ? (
         <>
+          {showHeaderFade ? <div className={styles.contentFadeLayer} style={headerFadeStyle} aria-hidden="true" /> : null}
           {showHeader ? (
             <ChatHeader
               isSplitViewOpen={isSplitViewOpen}
@@ -989,39 +1087,35 @@ export function ChatView({
             />
           ) : null}
           <div className={styles.startStage}>
-          <ChatTranscript
-            activeProject={activeProject}
-            activeSession={activeSession}
-            activityEvents={activeActivityEvents}
-            createSession={createSession}
-            generationStartedAt={generationStartedAt}
-            isFinalizingResponse={isFinalizingResponse}
-            isGenerating={isGenerating}
-            isStartState
-            liveTokenUsage={liveTokenUsage}
-          />
-          <div ref={composerWrapRef} className={styles.composerAnchor}>
-          <Composer
-            contextItems={composerContextItems}
-            draftStorageKey={activeSession ? composerDraftStorageKey(variant, activeSession.id) : undefined}
-            disabled={!activeSession}
-            isGenerating={isGenerating}
-            isStopRequested={isStopRequested}
-            isStartState
-            liveTokenUsage={visibleLiveTokenUsage}
-            modelLabel={modelLabel}
-            modelSelectError={modelSelectError}
-            modelSelectInProgress={modelSelectInProgress}
-            modelState={providerModelState}
-            onModelSelect={sessionModel.selectModel}
-            onSend={handleSend}
-            onStop={handleStop}
-            queuedMessage={visibleQueuedMessage}
-            showContextPanel={false}
-            stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
-          />
+            <div className={styles.startStack}>
+              <h2 className={styles.startPrompt}>{startPrompt}</h2>
+              <div ref={composerWrapRef} className={styles.composerAnchor}>
+                <Composer
+                  contextItems={composerContextItems}
+                  draftStorageKey={activeSession ? composerDraftStorageKey(variant, activeSession.id) : undefined}
+                  disabled={!activeSession}
+                  isGenerating={isGenerating}
+                  isStopRequested={isStopRequested}
+                  isStartState
+                  liveTokenUsage={visibleLiveTokenUsage}
+                  modelLabel={displayedModelLabel}
+                  modelSelectError={modelSelectError}
+                  modelSelectInProgress={modelSelectInProgress}
+                  modelState={displayedProviderModelState}
+                  onModelSelect={sessionModel.selectModel}
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  onDeferQueuedMessage={deferQueuedTurn}
+                  onPrioritizeQueuedMessage={prioritizeQueuedTurn}
+                  onRemoveQueuedMessage={removeQueuedTurn}
+                  projectControls={projectControls}
+                  queuedMessages={visibleQueuedMessages}
+                  showContextPanel={false}
+                  stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
+                />
+              </div>
+            </div>
           </div>
-        </div>
         </>
       ) : (
         <>
@@ -1031,16 +1125,18 @@ export function ChatView({
             data-chat-scroll-viewport="true"
             aria-label="Chat transcript"
           >
-            {showHeader ? (
+            {showTopChrome ? (
               <div className={styles.topChrome}>
-                <div className={styles.contentFadeLayer} aria-hidden="true" />
-                <div className={styles.headerLayer}>
-                  <ChatHeader
-                    isSplitViewOpen={isSplitViewOpen}
-                    onSplitView={onSplitView}
-                    title={activeSession?.title ?? "No chat selected"}
-                  />
-                </div>
+                {showHeaderFade ? <div className={styles.contentFadeLayer} style={headerFadeStyle} aria-hidden="true" /> : null}
+                {showHeader ? (
+                  <div className={styles.headerLayer}>
+                    <ChatHeader
+                      isSplitViewOpen={isSplitViewOpen}
+                      onSplitView={onSplitView}
+                      title={activeSession?.title ?? "No chat selected"}
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
             <ChatTranscript
@@ -1066,14 +1162,17 @@ export function ChatView({
               isGenerating={isGenerating}
               isStopRequested={isStopRequested}
               liveTokenUsage={visibleLiveTokenUsage}
-              modelLabel={modelLabel}
+              modelLabel={displayedModelLabel}
               modelSelectError={modelSelectError}
               modelSelectInProgress={modelSelectInProgress}
-              modelState={providerModelState}
+              modelState={displayedProviderModelState}
               onModelSelect={sessionModel.selectModel}
               onSend={handleSend}
               onStop={handleStop}
-              queuedMessage={visibleQueuedMessage}
+              onDeferQueuedMessage={deferQueuedTurn}
+              onPrioritizeQueuedMessage={prioritizeQueuedTurn}
+              onRemoveQueuedMessage={removeQueuedTurn}
+              queuedMessages={visibleQueuedMessages}
               showContextPanel={false}
               stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
             />
@@ -1204,13 +1303,26 @@ function cleanRouteValue(value?: string | null) {
   return typeof value === "string" ? value.trim() || undefined : undefined;
 }
 
+function toHermesChatAttachments(attachments: ChatAttachment[]): NonNullable<HermesChatRequest["attachments"]> {
+  return attachments.map(({ fileName, id, kind, mimeType, sizeBytes, status }) => ({
+    fileName,
+    id,
+    kind,
+    mimeType,
+    sizeBytes,
+    status
+  }));
+}
+
 function createMessage(
   role: ChatMessage["role"],
   author: string,
   content: string,
-  status: ChatMessage["status"]
+  status: ChatMessage["status"],
+  attachments?: ChatAttachment[]
 ): ChatMessage {
   return {
+    attachments: attachments && attachments.length > 0 ? attachments : undefined,
     id: `msg-${crypto.randomUUID()}`,
     role,
     author,
@@ -1280,11 +1392,13 @@ function emptyHermesResponseMessage(modelLabel: string): string {
 }
 
 function estimatePromptTokensForRequest({
+  attachments = [],
   message,
   project,
   recentMessages,
   session
 }: {
+  attachments?: ChatAttachment[];
   message: string;
   project: Project;
   recentMessages: ChatMessage[];
@@ -1298,6 +1412,9 @@ function estimatePromptTokensForRequest({
     session.title,
     session.memoryScope.stableSessionKey,
     session.memoryScope.userVisibleSummary,
+    ...attachments.map((attachment) =>
+      `${attachment.fileName} ${attachment.kind} ${attachment.mimeType} ${attachment.sizeBytes}`
+    ),
     ...recentMessages.map((item) => item.content)
   ]
     .filter(Boolean)

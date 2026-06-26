@@ -21,6 +21,7 @@ type AgentActivityBlockProps = {
   legacyEvents?: ToolEvent[];
   liveTokenUsage?: LiveTokenUsageSnapshot | null;
   onCompletedWorkAutoCollapse?: () => void;
+  showSummaryTokenUsage?: boolean;
   startedAt?: string | null;
 };
 
@@ -64,6 +65,7 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
   legacyEvents = [],
   liveTokenUsage = null,
   onCompletedWorkAutoCollapse,
+  showSummaryTokenUsage = true,
   startedAt = null
 }: AgentActivityBlockProps) {
   const displayEvents = useMemo(
@@ -125,7 +127,7 @@ export const AgentActivityBlock = memo(function AgentActivityBlock({
           items={sections.timelineItems}
           label={completedSummaryLabel!}
           onAutoCollapseStart={onCompletedWorkAutoCollapse}
-          tokenParts={sections.tokenParts}
+          tokenParts={showSummaryTokenUsage ? sections.tokenParts : []}
         />
       ) : (
         <>
@@ -501,12 +503,15 @@ function buildActivitySections(
   isWorking = false
 ) {
   const elapsed = [...events].reverse().find((event) => event.type === "elapsed");
-  const workedLabel = resolveWorkedLabel(events, elapsed) ?? (!isWorking ? resolveFallbackWorkedLabel(events) : null);
   const commandGroups = groupCommandEvents(events);
   const tokenParts = formatTokenUsageParts(extractTokenUsage(elapsed) ?? extractTokenUsage([...events].reverse().find((event) => Boolean(extractTokenUsage(event)))));
   const meaningfulEvents = events.filter(isMeaningfulTimelineEvent);
   const timelineItems = buildTimelineItems(meaningfulEvents, meaningfulEvents);
   const liveTimelineItems = buildLiveTimelineItems(events, liveBaselineIds);
+  const hasDisplayableWork = commandGroups.length > 0 || timelineItems.length > 0;
+  const workedLabel = hasDisplayableWork
+    ? resolveWorkedLabel(events, elapsed) ?? (!isWorking ? resolveFallbackWorkedLabel(events) : null)
+    : null;
 
   return { commandGroups, liveTimelineItems, timelineItems, tokenParts, workedLabel };
 }

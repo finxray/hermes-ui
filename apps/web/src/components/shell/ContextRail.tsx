@@ -800,7 +800,7 @@ function FilesSection({
               <FileText className={styles.artifactIcon} size={18} aria-hidden="true" />
               <span className={styles.artifactContent}>
                 <span className={styles.cardTitle}>
-                  <span>{artifact.title}</span>
+                  <span className={styles.artifactTitle}>{artifact.title}</span>
                   <span className={styles.pill}>{artifact.status}</span>
                 </span>
                 <span className={styles.cardBody}>
@@ -811,7 +811,11 @@ function FilesSection({
                   {artifact.updatedAt ? ` - ${formatArtifactDate(artifact.updatedAt)}` : ""}
                   {artifact.sizeBytes ? ` - ${formatArtifactSize(artifact.sizeBytes)}` : ""}
                 </span>
-                {artifact.path ? <span className={styles.meta}>{artifact.path}</span> : null}
+                {artifact.path ? (
+                  <span className={`${styles.meta} ${styles.artifactFileName}`}>
+                    {artifact.path}
+                  </span>
+                ) : null}
                 <button
                   className={styles.ghostAction}
                   type="button"

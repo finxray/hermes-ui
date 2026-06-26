@@ -126,6 +126,7 @@
 
 .metaSlot {
   position: relative;
+  display: grid;
   justify-self: end;
   align-self: center;
   flex: none;
@@ -133,6 +134,7 @@
   min-width: var(--sidebar-meta-column, 44px);
   max-width: var(--sidebar-meta-column, 44px);
   height: var(--row-height);
+  place-items: center end;
 }
 
 .actionMetaSlot {
@@ -142,17 +144,12 @@
 }
 
 .meta {
-  display: block;
+  display: grid;
   width: 100%;
+  place-items: center end;
   text-align: right;
   font-variant-numeric: tabular-nums;
   line-height: var(--row-height);
-}
-
-.meta:has([role="status"]) {
-  display: grid;
-  width: 100%;
-  place-items: center;
 }
 
 .actions {
@@ -161,7 +158,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: 4px;
   padding: 0;
   background: transparent;
   opacity: 0;
@@ -208,14 +205,19 @@
 
 .actionButton {
   display: grid;
-  width: 18px;
-  height: 18px;
+  width: 14.4px;
+  height: 14.4px;
   flex: none;
   place-items: center;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--text-secondary);
+}
+
+.actionButton svg {
+  width: 80%;
+  height: 80%;
 }
 
 .actionButton:hover,

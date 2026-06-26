@@ -38,8 +38,10 @@
   --orange: #ff7a33;
   --orange-rgb: 255, 122, 51;
   --accent-orange: var(--orange);
+  --orange-soft: #eb7847;
+  --context-orange: var(--orange-soft);
   --markdown-inline-code: #79b8ff;
-  --markdown-title: var(--accent-orange);
+  --markdown-title: var(--text-primary);
   --markdown-status-check: #4caf50;
   --accent-dim: rgba(142, 230, 198, 0.12);
   --danger: #ff6b6b;

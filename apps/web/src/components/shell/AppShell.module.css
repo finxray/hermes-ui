@@ -13,7 +13,7 @@
   --icon-lg: 20px;
   --control-height: 34px;
   --row-height: 36px;
-  --topbar-height: 54px;
+  --topbar-height: auto;
   --shell-rail-padding-x: 8px;
   --shell-row-padding-x: clamp(12px, calc(8px + 0.25vw), 18px);
   --shell-column-gap: 9px;
@@ -21,8 +21,8 @@
   --shell-left-text-inset: calc(
     var(--shell-left-icon-inset) + var(--icon-sm) + var(--shell-column-gap)
   );
-  --rail-width-left: clamp(196px, 12.25vw, 252px);
-  --rail-width-right: clamp(345px, 23vw, 483px);
+  --rail-width-left: clamp(235px, 14.7vw, 302px);
+  --rail-width-right: clamp(304px, 20vw, 384px);
   --rail-right-transition-duration: 280ms;
   position: relative;
   isolation: isolate;
@@ -33,7 +33,7 @@
   grid-template-columns:
     minmax(0, var(--rail-width-left))
     minmax(0, 1fr);
-  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
@@ -77,14 +77,6 @@
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
-}
-
-.shell:has(.leftToggle:checked) :global([data-shell-rail="left"]) {
-  padding-right: 0;
-  padding-left: 0;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-100%);
 }
 
 .shell :global(svg) {
@@ -134,9 +126,9 @@
 
 @media (max-width: 1280px) {
   .shell {
-    --rail-width-left: 196px;
+    --rail-width-left: 235px;
     --rail-width-right: 0px;
-    grid-template-columns: minmax(0, 196px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 235px) minmax(0, 1fr);
   }
 
   .shell[data-left-collapsed="true"],
@@ -153,7 +145,6 @@
 
 @media (max-width: 760px) {
   .shell {
-    --topbar-height: 58px;
     grid-template-areas:
       "top"
       "main-window";

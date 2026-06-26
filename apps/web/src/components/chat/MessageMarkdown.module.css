@@ -372,7 +372,7 @@
 
 :global(.token.function),
 :global(.token.class-name) {
-  color: var(--orange);
+  color: var(--accent-2);
 }
 
 :global(.token.regex),

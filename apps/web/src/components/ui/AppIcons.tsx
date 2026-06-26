@@ -104,6 +104,11 @@ export const ChevronRight = makeIcon([
   { d: "m9 6.5 5.5 5.5L9 17.5" }
 ]);
 
+export const CornerDownRight = makeIcon([
+  { d: "M15 10.5 19.5 15 15 19.5" },
+  { d: "M4.5 4.5v5.2c0 3.4 1.9 5.3 5.3 5.3h9.2" }
+]);
+
 export const Circle = makeIcon([
   { element: "circle", props: { cx: 12, cy: 12, r: 8 } }
 ]);
@@ -166,6 +171,15 @@ export const FolderPlus = makeIcon([
   { d: "M12 11.4v4.4M9.8 13.6h4.4" }
 ]);
 
+export const GripVertical = makeIcon([
+  { element: "circle", props: { cx: 9, cy: 7, r: 1 } },
+  { element: "circle", props: { cx: 15, cy: 7, r: 1 } },
+  { element: "circle", props: { cx: 9, cy: 12, r: 1 } },
+  { element: "circle", props: { cx: 15, cy: 12, r: 1 } },
+  { element: "circle", props: { cx: 9, cy: 17, r: 1 } },
+  { element: "circle", props: { cx: 15, cy: 17, r: 1 } }
+]);
+
 export const KeyRound = makeIcon([
   { element: "circle", props: { cx: 8, cy: 14, r: 3.5 } },
   { d: "M11 11 20 2" },
@@ -188,6 +202,12 @@ export const MessageSquarePlus = makeIcon([
   { d: "M12 8.6v5.2M9.4 11.2h5.2" }
 ]);
 
+export const MoreHorizontal = makeIcon([
+  { element: "circle", props: { cx: 6.6, cy: 12, r: 1 } },
+  { element: "circle", props: { cx: 12, cy: 12, r: 1 } },
+  { element: "circle", props: { cx: 17.4, cy: 12, r: 1 } }
+]);
+
 export const Mic = makeIcon([
   { d: "M12 14c1.8 0 3-1.2 3-3V6.5c0-1.8-1.2-3-3-3s-3 1.2-3 3V11c0 1.8 1.2 3 3 3Z" },
   { d: "M6 10.5c0 3.4 2.4 5.7 6 5.7s6-2.3 6-5.7" },
@@ -196,17 +216,17 @@ export const Mic = makeIcon([
 ]);
 
 export const PanelLeftClose = makeIcon([
-  { element: "rect", props: { x: 4, y: 6, width: 16, height: 12, rx: 3.6 } },
-  { d: "M8.6 9.15v5.7" }
+  { element: "rect", props: { x: 4.8, y: 6, width: 14.4, height: 12, rx: 3.6 } },
+  { d: "M8.94 9.15v5.7" }
 ]);
 
 export const PanelRightClose = makeIcon([
-  { element: "rect", props: { x: 4, y: 6, width: 16, height: 12, rx: 3.6 } },
-  { d: "M15.4 9.15v5.7" }
+  { element: "rect", props: { x: 4.8, y: 6, width: 14.4, height: 12, rx: 3.6 } },
+  { d: "M15.06 9.15v5.7" }
 ]);
 
 export const PanelSplit = makeIcon([
-  { element: "rect", props: { x: 4, y: 6, width: 16, height: 12, rx: 3.6 } },
+  { element: "rect", props: { x: 4.8, y: 6, width: 14.4, height: 12, rx: 3.6 } },
   { d: "M12 6.95v10.1" }
 ]);
 
@@ -249,12 +269,19 @@ export const Plus = makeIcon([
   { d: "M12 5v14M5 12h14" }
 ]);
 
-export const RefreshCw = makeIcon([
-  { d: "M20 6.8v5h-5" },
-  { d: "M4 17.2v-5h5" },
-  { d: "M18.2 11.8A6.2 6.2 0 0 0 7.4 7.4L4 10.8" },
-  { d: "M5.8 12.2a6.2 6.2 0 0 0 10.8 4.4L20 13.2" }
-]);
+// Source: https://pngtree.com/freepng/refresh-icon-3d-render-symbol_6068296.html
+export const RefreshCw: AppIcon = ({ "aria-hidden": ariaHidden, className, height, size = 16, style, width }) => (
+  <img
+    aria-hidden={ariaHidden ?? true}
+    alt=""
+    className={className}
+    draggable={false}
+    height={height ?? size}
+    src="/assets/icons/pngtree-refresh-icon-3d-render-symbol-6068296.png"
+    style={{ display: "block", objectFit: "contain", ...style }}
+    width={width ?? size}
+  />
+);
 
 export const RotateCcw = makeIcon([
   { d: "M4.5 5v5h5" },

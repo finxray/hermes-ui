@@ -29,7 +29,7 @@ type WorkspaceAction =
   | { type: "hydrate"; state: WorkspaceState }
   | { type: "switchProject"; projectId: string }
   | { type: "switchSession"; sessionId: string }
-  | { type: "createProject" }
+  | { type: "createProject"; activate?: boolean; name?: string; projectId?: string }
   | { type: "createSession"; activate?: boolean; projectId?: string; sessionId?: string }
   | { type: "renameProject"; projectId: string; name: string }
   | { type: "renameSession"; sessionId: string; title: string }
@@ -69,7 +69,7 @@ export function workspaceReducer(
     case "switchSession":
       return switchSession(state, action.sessionId);
     case "createProject":
-      return createProject(state);
+      return createProject(state, action);
     case "createSession":
       return createSession(state, action);
     case "renameProject":
@@ -154,10 +154,12 @@ function switchProject(state: WorkspaceState, projectId: string): WorkspaceState
     return state;
   }
   const activeSession = selectSessionForProject(state.sessions, projectId, null);
+  const now = new Date().toISOString();
   return {
     ...state,
     activeProjectId: projectId,
-    activeSessionId: activeSession?.id ?? null
+    activeSessionId: activeSession?.id ?? null,
+    sessions: activeSession ? markSessionViewed(state.sessions, activeSession.id, now) : state.sessions
   };
 }
 
@@ -166,20 +168,25 @@ function switchSession(state: WorkspaceState, sessionId: string): WorkspaceState
   if (!session) {
     return state;
   }
+  const now = new Date().toISOString();
   return {
     ...state,
     activeProjectId: session.projectId,
-    activeSessionId: session.id
+    activeSessionId: session.id,
+    sessions: markSessionViewed(state.sessions, session.id, now)
   };
 }
 
-function createProject(state: WorkspaceState): WorkspaceState {
+function createProject(
+  state: WorkspaceState,
+  options: Extract<WorkspaceAction, { type: "createProject" }>
+): WorkspaceState {
   const now = new Date().toISOString();
   const name = makeUniqueTitle(
-    "Untitled project",
+    options.name?.trim() || "Untitled project",
     state.projects.map((project) => project.name)
   );
-  const id = `project-${crypto.randomUUID()}`;
+  const id = options.projectId ?? `project-${crypto.randomUUID()}`;
   const memoryScopeKey = makeProjectStableKey(DEFAULT_TENANT_ID, id);
   const project: Project = {
     id,
@@ -198,8 +205,8 @@ function createProject(state: WorkspaceState): WorkspaceState {
 
   return {
     ...state,
-    activeProjectId: id,
-    activeSessionId: null,
+    activeProjectId: options.activate === false ? state.activeProjectId : id,
+    activeSessionId: options.activate === false ? state.activeSessionId : null,
     projects: [project, ...state.projects]
   };
 }
@@ -237,6 +244,7 @@ function createSession(
     }),
     createdAt: now,
     updatedAt: now,
+    lastViewedAt: now,
     messages: [],
     memoryEvidence: [],
     toolEvents: [],
@@ -339,7 +347,9 @@ function appendMessage(
   const next = {
     ...state,
     sessions: state.sessions.map((item) =>
-      item.id === sessionId ? appendMessageToSession(item, message, now) : item
+      item.id === sessionId
+        ? appendMessageToSession(item, message, now, state.activeSessionId === sessionId)
+        : item
     )
   };
   return touchProject(next, session.projectId, now);
@@ -368,7 +378,8 @@ function appendRunRecord(
               normalizedRun,
               ...(item.runRecords ?? []).filter((record) => record.id !== normalizedRun.id)
             ].slice(0, 24),
-            updatedAt: now
+            updatedAt: now,
+            lastViewedAt: state.activeSessionId === sessionId ? now : item.lastViewedAt
           }
         : item
     )
@@ -409,7 +420,8 @@ function updateRunRecord(
             runRecords: (item.runRecords ?? []).map((record) =>
               record.id === runId ? mergedRun : record
             ),
-            updatedAt: now
+            updatedAt: now,
+            lastViewedAt: state.activeSessionId === sessionId ? now : item.lastViewedAt
           }
         : item
     )
@@ -444,7 +456,8 @@ function updateMessage(
                   }
                 : message
             ),
-            updatedAt: now
+            updatedAt: now,
+            lastViewedAt: state.activeSessionId === action.sessionId ? now : item.lastViewedAt
           }
         : item
     )
@@ -470,7 +483,8 @@ function appendToolEvent(
         ? {
             ...item,
             toolEvents: [event, ...item.toolEvents].slice(0, 24),
-            updatedAt: now
+            updatedAt: now,
+            lastViewedAt: state.activeSessionId === sessionId ? now : item.lastViewedAt
           }
         : item
     )
@@ -495,7 +509,8 @@ function loadHermesMessages(
         ? {
             ...item,
             messages,
-            updatedAt: now
+            updatedAt: now,
+            lastViewedAt: state.activeSessionId === sessionId ? now : item.lastViewedAt
           }
         : item
     )
@@ -590,6 +605,7 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     ...session,
     hermesSessionId: session.hermesSessionId || `hermes-${session.id}`,
     titleSource: normalizeTitleSource(session),
+    lastViewedAt: normalizeTimestamp(session.lastViewedAt) ?? normalizeTimestamp(session.updatedAt),
     memoryScope: {
       ...memoryScope,
       tenantId,
@@ -1214,7 +1230,12 @@ function isDefaultSessionTitle(title: string): boolean {
   return /^New chat(?: \d+)?$/i.test(title.trim());
 }
 
-function appendMessageToSession(session: Session, message: ChatMessage, now: string): Session {
+function appendMessageToSession(
+  session: Session,
+  message: ChatMessage,
+  now: string,
+  viewed: boolean
+): Session {
   const titleSource = session.titleSource ?? normalizeTitleSource(session);
   const shouldAutoTitle =
     message.role === "user" &&
@@ -1233,8 +1254,15 @@ function appendMessageToSession(session: Session, message: ChatMessage, now: str
     titleSource: shouldAutoTitle ? "first-message" : titleSource,
     firstUserMessageAt:
       shouldAutoTitle && !session.firstUserMessageAt ? now : session.firstUserMessageAt,
-    updatedAt: now
+    updatedAt: now,
+    lastViewedAt: viewed ? now : session.lastViewedAt
   };
+}
+
+function markSessionViewed(sessions: Session[], sessionId: string, viewedAt: string): Session[] {
+  return sessions.map((session) =>
+    session.id === sessionId ? { ...session, lastViewedAt: viewedAt } : session
+  );
 }
 
 function normalizeTitleSource(session: Session): NonNullable<Session["titleSource"]> {

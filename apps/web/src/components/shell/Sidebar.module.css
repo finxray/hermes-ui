@@ -1,4 +1,7 @@
 .sidebar {
+  --font-body: 16.05px;
+  --font-small: 13.91px;
+  --font-xs: 12.305px;
   --sidebar-rail-padding-x: var(--shell-rail-padding-x, 8px);
   --sidebar-row-padding-x: var(--shell-row-padding-x, clamp(12px, calc(8px + 0.25vw), 18px));
   --sidebar-icon-column: var(--icon-sm);
@@ -18,10 +21,11 @@
   padding: 8px var(--sidebar-rail-padding-x) 0;
   background: transparent;
   border: 0;
+  contain: layout paint;
   transition:
     opacity 180ms ease,
-    transform 180ms ease,
-    padding 180ms ease;
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
 }
 
 .sidebarHeader {
@@ -80,9 +84,6 @@
 }
 
 :global([data-left-collapsed="true"]) .sidebar {
-  width: 0;
-  padding-right: 0;
-  padding-left: 0;
   opacity: 0;
   pointer-events: none;
   transform: translateX(-100%);
@@ -95,7 +96,7 @@
 }
 
 .quickActions {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section {
@@ -111,9 +112,18 @@
   gap: 10px;
   padding: 0 var(--sidebar-row-padding-x) 0
     calc(var(--sidebar-row-padding-x) + var(--sidebar-icon-column) + var(--sidebar-column-gap));
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
   font-size: var(--font-small);
-  font-weight: 650;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.workspaceSectionLabel,
+.folderHeaderNoIcon .folderTitle {
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  font-size: var(--font-small);
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .list {
@@ -172,6 +182,11 @@
 .folderHeader:focus-within {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
+}
+
+.folderHeaderNoIcon:hover,
+.folderHeaderNoIcon:focus-within {
+  background: transparent;
 }
 
 .folderHeaderActive {
@@ -342,6 +357,150 @@
   color: var(--text-secondary);
 }
 
+.chatsFolderRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: var(--row-height);
+  padding: 0 var(--sidebar-row-padding-x);
+  border-radius: 11px;
+  color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.chatsFolderRow:hover,
+.chatsFolderRow:focus-within {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.chatsFolderMain {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.chatsFolderMain:focus-visible {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.chatsFolderMain svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.chatsFolderTitle {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-small);
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatsFolderActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 120ms ease;
+}
+
+.chatsFolderRow:hover .chatsFolderActions,
+.chatsFolderRow:focus-within .chatsFolderActions,
+.chatsFolderRow[data-menu-open="true"] .chatsFolderActions {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.chatsMenu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  width: min(206px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(42, 42, 43, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.chatsMenuItem {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
+  gap: 9px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  line-height: 1.25;
+  text-align: left;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.chatsMenuItem:hover:not(:disabled),
+.chatsMenuItem:focus-visible:not(:disabled) {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chatsMenuItem:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.chatsMenuItem span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatsMenuItem svg:first-child {
+  justify-self: center;
+}
+
+.chatsMenuItem svg:last-child {
+  justify-self: end;
+  color: var(--text-muted);
+}
+
+.chatsMenuDivider {
+  height: 1px;
+  margin: 7px 10px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
 .runningSpinner {
   display: block;
   width: 13px;
@@ -350,6 +509,16 @@
   border-top-color: rgba(244, 244, 245, 0.86);
   border-radius: 999px;
   animation: sidebarRunningSpinner 820ms linear infinite;
+}
+
+.unseenResultDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #7abfff;
+  box-shadow: 0 0 0 1px rgba(122, 191, 255, 0.18);
+  vertical-align: middle;
 }
 
 .footerDock {

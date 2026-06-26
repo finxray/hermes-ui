@@ -1,10 +1,14 @@
 "use client";
 
 import { ChatView } from "@/components/chat/ChatView";
+import { ConfigView } from "@/components/config/ConfigView";
+import { KeysView } from "@/components/keys/KeysView";
+import { LogsView } from "@/components/logs/LogsView";
 import { PluginsView } from "@/components/plugins/PluginsView";
+import { SectionNavProvider } from "@/components/shell/SectionNavContext";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { SplitPane, type RightPaneMode } from "@/components/shell/SplitPane";
-import { TopBar } from "@/components/shell/TopBar";
+import { TopBar, type ShellSection } from "@/components/shell/TopBar";
 import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
 import { useHermesSessionModel } from "@/hooks/useHermesSessionModel";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
@@ -13,7 +17,7 @@ import { useLmStudioModels } from "@/hooks/useLmStudioModels";
 import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnosticsPosture";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
-import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import mainWindowStyles from "./MainWindow.module.css";
 import styles from "./AppShell.module.css";
@@ -24,17 +28,23 @@ type ShellStyle = CSSProperties & {
   "--rail-right-transition-duration"?: string;
 };
 
-type ShellSection = "workspace" | "plugins";
-
 function clampPanelWidth(width: number, min: number, max: number) {
   return Math.min(Math.max(width, min), max);
 }
 
 function computeRightPanelTransition(width: number) {
-  return clampPanelWidth(Math.round(180 + width * 0.2), 240, 420);
+  return 700;
 }
 
 export function AppShell() {
+  return (
+    <SectionNavProvider>
+      <AppShellInner />
+    </SectionNavProvider>
+  );
+}
+
+function AppShellInner() {
   const { actions, activeProject, activeProjectSessions, activeSession, isHydrated, state } = useWorkspaceState();
   const hermesStatus = useHermesStatus();
   const lmStudioModels = useLmStudioModels();
@@ -50,6 +60,7 @@ export function AppShell() {
     refreshHermesStatus: hermesStatus.refresh
   });
   const [sideSessionId, setSideSessionId] = useState<string | null>(null);
+  const [focusedChatPane, setFocusedChatPane] = useState<"main" | "side">("main");
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>("console");
   const sideSession =
     activeProjectSessions.find((session) => session.id === sideSessionId && !session.archivedAt) ?? null;
@@ -65,6 +76,7 @@ export function AppShell() {
   const brainMemoryStatus = useBrainMemoryStatus();
   const tenantScopePosture = useTenantScopeDiagnosticsPosture();
   const [activeSection, setActiveSection] = useState<ShellSection>("workspace");
+  const [sectionHistory, setSectionHistory] = useState<ShellSection[]>([]);
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
   const [generatingSessionIds, setGeneratingSessionIds] = useState<string[]>([]);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -74,8 +86,13 @@ export function AppShell() {
   const shellRef = useRef<HTMLElement | null>(null);
   const leftRailDefaultWidthRef = useRef<number | null>(null);
   const rightRailDefaultWidthRef = useRef<number | null>(null);
+  const rightRevealFrameRef = useRef<number | null>(null);
   const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
   const sideActivityEvents = sideSession ? (activityEventsBySession[sideSession.id] ?? []) : [];
+  const sidebarActiveSession =
+    focusedChatPane === "side" && !rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console") && sideSession
+      ? sideSession
+      : activeSession;
   const shellStyle: ShellStyle = {};
 
   if (leftRailWidth !== null) {
@@ -114,6 +131,42 @@ export function AppShell() {
       return hasSession ? current.filter((id) => id !== sessionId) : current;
     });
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rightRevealFrameRef.current !== null) {
+        window.cancelAnimationFrame(rightRevealFrameRef.current);
+        rightRevealFrameRef.current = null;
+      }
+    };
+  }, []);
+
+  function revealRightRailAfterRender() {
+    if (!rightCollapsed) {
+      setRightCollapsed(false);
+      return;
+    }
+
+    if (rightRevealFrameRef.current !== null) {
+      window.cancelAnimationFrame(rightRevealFrameRef.current);
+    }
+
+    rightRevealFrameRef.current = window.requestAnimationFrame(() => {
+      rightRevealFrameRef.current = window.requestAnimationFrame(() => {
+        rightRevealFrameRef.current = null;
+        setRightCollapsed(false);
+      });
+    });
+  }
+
+  function hideRightRail() {
+    if (rightRevealFrameRef.current !== null) {
+      window.cancelAnimationFrame(rightRevealFrameRef.current);
+      rightRevealFrameRef.current = null;
+    }
+    setRightCollapsed(true);
+    setFocusedChatPane("main");
+  }
 
   function startLeftResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (leftCollapsed) {
@@ -207,7 +260,10 @@ export function AppShell() {
     rightRailDefaultWidthRef.current = defaultWidth;
     const mainWidth = mainWindow?.getBoundingClientRect().width ?? defaultWidth * 2;
     const minWidth = Math.round(defaultWidth * 0.5);
-    const maxWidth = Math.max(minWidth, Math.round(mainWidth * 0.5));
+    // Allow the right panel to grow past half so the chat-and-console split
+    // (opened at 0.62 of the main window) can be dragged further left without
+    // snapping back, while still keeping a usable minimum width for the main chat.
+    const maxWidth = Math.max(minWidth, Math.round(mainWidth * 0.72));
     const startX = event.clientX;
     let nextWidth = startWidth;
     let animationFrame: number | null = null;
@@ -254,6 +310,7 @@ export function AppShell() {
 
   function splitMainWindowEvenly() {
     setRightPaneMode("chat");
+    setFocusedChatPane("side");
     if (!sideSession) {
       const sessionId = actions.createSessionForProject(activeProject.id, { activate: false });
       if (activeSession?.modelPreference) {
@@ -264,7 +321,7 @@ export function AppShell() {
 
     const mainWindow = shellRef.current?.querySelector<HTMLElement>("[data-shell-main-window='true']");
     if (!mainWindow) {
-      setRightCollapsed(false);
+      revealRightRailAfterRender();
       return;
     }
 
@@ -275,16 +332,63 @@ export function AppShell() {
       `${computeRightPanelTransition(nextWidth)}ms`
     );
     setRightRailWidth(nextWidth);
-    setRightCollapsed(false);
+    revealRightRailAfterRender();
+  }
+
+  function setRightRailToMainWindowFraction(fraction: number) {
+    const mainWindow = shellRef.current?.querySelector<HTMLElement>("[data-shell-main-window='true']");
+    if (!mainWindow) {
+      return;
+    }
+
+    const nextWidth = Math.round(mainWindow.getBoundingClientRect().width * fraction);
+    shellRef.current?.style.setProperty("--rail-width-right", `${nextWidth}px`);
+    shellRef.current?.style.setProperty(
+      "--rail-right-transition-duration",
+      `${computeRightPanelTransition(nextWidth)}ms`
+    );
+    setRightRailWidth(nextWidth);
+  }
+
+  function resetRightRailWidth() {
+    shellRef.current?.style.removeProperty("--rail-width-right");
+    shellRef.current?.style.removeProperty("--rail-right-transition-duration");
+    setRightRailWidth(null);
   }
 
   function toggleMainWindowSplit() {
-    if (!rightCollapsed && rightPaneMode === "chat") {
-      setRightCollapsed(true);
+    if (!rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console")) {
+      hideRightRail();
       return;
     }
 
     splitMainWindowEvenly();
+  }
+
+  function toggleConsolePanel() {
+    if (!rightCollapsed && rightPaneMode === "chat-console") {
+      setRightPaneMode("chat");
+      setFocusedChatPane("side");
+      setRightRailToMainWindowFraction(0.5);
+      return;
+    }
+
+    if (!rightCollapsed && rightPaneMode === "console") {
+      hideRightRail();
+      return;
+    }
+
+    if (!rightCollapsed && rightPaneMode === "chat" && sideSession) {
+      setRightPaneMode("chat-console");
+      setFocusedChatPane("main");
+      setRightRailToMainWindowFraction(0.62);
+      return;
+    }
+
+    resetRightRailWidth();
+    setRightPaneMode("console");
+    setFocusedChatPane("main");
+    revealRightRailAfterRender();
   }
 
   function createSideSession() {
@@ -294,24 +398,40 @@ export function AppShell() {
     }
     setSideSessionId(sessionId);
     setRightPaneMode("chat");
-    setRightCollapsed(false);
+    setFocusedChatPane("side");
+    revealRightRailAfterRender();
   }
 
   function selectSideSession(sessionId: string) {
     setSideSessionId(sessionId);
     setRightPaneMode("chat");
-    setRightCollapsed(false);
+    setFocusedChatPane("side");
+    revealRightRailAfterRender();
   }
 
   function closeSideSession() {
     setSideSessionId(null);
     setRightPaneMode("console");
+    setFocusedChatPane("main");
   }
 
   function activateSection(section: ShellSection) {
+    if (section === activeSection) {
+      return;
+    }
+    setSectionHistory((current) => [...current, activeSection]);
     setActiveSection(section);
-    if (section === "plugins") {
-      setRightCollapsed(true);
+    if (section !== "workspace") {
+      hideRightRail();
+    }
+  }
+
+  function navigateBack() {
+    const previous = sectionHistory[sectionHistory.length - 1] ?? "workspace";
+    setSectionHistory((current) => current.slice(0, -1));
+    setActiveSection(previous);
+    if (previous !== "workspace") {
+      hideRightRail();
     }
   }
 
@@ -349,23 +469,32 @@ export function AppShell() {
       />
       <TopBar
         activeSection={activeSection}
+        canGoBack={sectionHistory.length > 0}
         leftToggleId="studio-left-rail-toggle"
         leftCollapsed={leftCollapsed}
+        onBack={navigateBack}
         onSectionChange={activateSection}
+        onRightToggle={toggleConsolePanel}
         rightToggleId="studio-right-rail-toggle"
         rightCollapsed={rightCollapsed}
+        rightToggleLabel={
+          !rightCollapsed && (rightPaneMode === "console" || rightPaneMode === "chat-console")
+            ? "Close context console"
+            : "Open context console"
+        }
       />
       <Sidebar
         actions={actions}
         activeSection={activeSection}
         activeProject={activeProject}
-        activeSession={activeSession}
+        activeSession={sidebarActiveSession}
         allSessions={state.sessions}
         connectionStatus={state.connectionStatus}
         hermesStatus={hermesStatus.status}
         isHermesStatusLoading={hermesStatus.isLoading}
         isHydrated={isHydrated}
         onSectionChange={activateSection}
+        onWorkspaceSessionSelect={() => setFocusedChatPane("main")}
         projects={state.projects}
         runningSessionIds={generatingSessionIds}
         refreshHermesStatus={() => {
@@ -386,13 +515,35 @@ export function AppShell() {
       >
         <div
           className={`${mainWindowStyles.chatPane}${
-            activeSection === "plugins" ? ` ${mainWindowStyles.chatPaneScrollable}` : ""
+            activeSection !== "workspace" ? ` ${mainWindowStyles.chatPaneScrollable}` : ""
           }`}
-          data-scrollable={activeSection === "plugins" ? "true" : "false"}
+          data-scrollable={activeSection !== "workspace" ? "true" : "false"}
           data-shell-chat-pane="true"
         >
           {activeSection === "plugins" ? (
-            <PluginsView hermesStatus={hermesStatus.status} />
+            <PluginsView
+              availableModels={hermesSessionModel.modelState.availableModels}
+              hermesStatus={hermesStatus.status}
+            />
+          ) : activeSection === "keys" ? (
+            <KeysView hermesStatus={hermesStatus.status} />
+          ) : activeSection === "logs" ? (
+            <LogsView hermesStatus={hermesStatus.status} />
+          ) : activeSection === "config" ? (
+            <ConfigView
+              activeProject={activeProject}
+              activeSession={activeSession}
+              brainMemoryStatus={brainMemoryStatus.status}
+              hermesStatus={hermesStatus.status}
+              isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
+              isHermesStatusLoading={hermesStatus.isLoading}
+              onRefreshBrainMemory={() => {
+                void brainMemoryStatus.refresh();
+              }}
+              onRefreshHermes={() => {
+                void hermesStatus.refresh({ refreshModels: true });
+              }}
+            />
           ) : (
             <ChatView
               activeProject={activeProject}
@@ -401,10 +552,12 @@ export function AppShell() {
               createSession={actions.createSession}
               hermesStatus={hermesStatus.status}
               isHermesStatusLoading={hermesStatus.isLoading}
-              isSplitViewOpen={!rightCollapsed && rightPaneMode === "chat"}
+              isSplitViewOpen={!rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console")}
+              onActivate={() => setFocusedChatPane("main")}
               onActivityEvent={appendActivityEvent}
               onGeneratingChange={markSessionGenerating}
               onSplitView={toggleMainWindowSplit}
+              projects={state.projects}
               sessionModel={hermesSessionModel}
               workspaceActions={actions}
             />
@@ -422,6 +575,7 @@ export function AppShell() {
           activeSession={activeSession}
           activityEvents={activeActivityEvents}
           availableSessions={activeProjectSessions}
+          projects={state.projects}
           allSessions={state.sessions}
           brainMemoryStatus={brainMemoryStatus.status}
           closeSideSession={closeSideSession}
@@ -434,6 +588,7 @@ export function AppShell() {
           isHermesStatusLoading={hermesStatus.isLoading}
           isHermesStatusRefreshing={hermesStatus.isRefreshing}
           mode={rightPaneMode}
+          onActivateSideChat={() => setFocusedChatPane("side")}
           onActivityEvent={appendActivityEvent}
           onGeneratingChange={markSessionGenerating}
           refreshBrainMemoryStatus={brainMemoryStatus.refresh}
@@ -441,6 +596,7 @@ export function AppShell() {
             void hermesStatus.refresh({ refreshModels: true });
           }}
           refreshHermesSessions={hermesSessions.refresh}
+          returnToSingleChat={hideRightRail}
           selectSideSession={selectSideSession}
           setMode={setRightPaneMode}
           sideActivityEvents={sideActivityEvents}

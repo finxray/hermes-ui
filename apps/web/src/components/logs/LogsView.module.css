@@ -1,0 +1,122 @@
+.view {
+  display: grid;
+  align-content: start;
+  width: min(calc(var(--content-width) * 0.9), calc(100% - 48px));
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 16px 0 72px;
+  color: var(--text-primary);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 34px;
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 25px;
+  font-weight: 540;
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  line-height: 1.35;
+}
+
+.iconButton {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(38, 38, 40, 1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.iconButton:hover:not(:disabled),
+.iconButton:focus-visible:not(:disabled) {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.console {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 17px;
+  background: rgba(38, 38, 40, 0.72);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.18);
+  overflow-x: auto;
+}
+
+.line {
+  display: block;
+  min-width: max-content;
+  padding: 2px 8px 3px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre;
+  word-break: break-word;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.line:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.info {
+  color: var(--text-muted);
+}
+
+.warn {
+  color: var(--orange);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.loading {
+  min-height: 64px;
+  padding: 20px 8px;
+  border-radius: 17px;
+  background: rgba(38, 38, 40, 0.72);
+  color: var(--text-muted);
+  font-size: var(--font-small);
+}
+
+@media (max-width: 920px) {
+  .view {
+    width: min(680px, calc(100% - 28px));
+  }
+}

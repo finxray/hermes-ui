@@ -10,6 +10,7 @@ export type LiveTokenUsageSnapshot = {
 type LiveTokenUsageTickerProps = LiveTokenUsageSnapshot;
 
 const TOKEN_DIGITS = Array.from({ length: 10 }, (_, index) => index);
+const TOKEN_TICKER_MIN_FRAME_MS = 84;
 
 export const LiveTokenUsageTicker = memo(function LiveTokenUsageTicker({
   promptTokens,
@@ -130,6 +131,7 @@ function useAnimatedNumber(target: number) {
   const [displayValue, setDisplayValue] = useState(initialValue);
   const displayValueRef = useRef(initialValue);
   const frameRef = useRef<number | null>(null);
+  const lastPaintAtRef = useRef(0);
 
   useEffect(() => {
     if (frameRef.current !== null) {
@@ -146,15 +148,28 @@ function useAnimatedNumber(target: number) {
     }
 
     const startedAt = performance.now();
-    const durationMs = Math.min(2200, Math.max(900, Math.sqrt(Math.abs(to - from)) * 95));
+    const delta = Math.abs(to - from);
+    const durationMs = Math.min(2600, Math.max(1000, Math.sqrt(delta) * 110));
+    const displayStep = tokenDisplayStep(delta, durationMs);
+    lastPaintAtRef.current = 0;
 
     const step = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / durationMs);
       const eased = 1 - Math.pow(1 - progress, 3);
-      const next = Math.round(from + (to - from) * eased);
-      if (next !== displayValueRef.current) {
+      const rawNext = from + (to - from) * eased;
+      const canPaint =
+        progress >= 1 ||
+        lastPaintAtRef.current === 0 ||
+        now - lastPaintAtRef.current >= TOKEN_TICKER_MIN_FRAME_MS;
+      const next =
+        progress >= 1
+          ? to
+          : quantizeTokenDisplayValue(rawNext, to, displayStep);
+
+      if (canPaint && next !== displayValueRef.current) {
         displayValueRef.current = next;
         setDisplayValue(next);
+        lastPaintAtRef.current = now;
       }
       if (progress < 1) {
         frameRef.current = window.requestAnimationFrame(step);
@@ -175,6 +190,28 @@ function useAnimatedNumber(target: number) {
   }, [target]);
 
   return displayValue;
+}
+
+function tokenDisplayStep(delta: number, durationMs: number) {
+  const tokensPerSecond = (delta / durationMs) * 1000;
+  if (tokensPerSecond >= 500 || delta >= 1000) {
+    return 25;
+  }
+  if (tokensPerSecond >= 180 || delta >= 300) {
+    return 10;
+  }
+  if (tokensPerSecond >= 70 || delta >= 120) {
+    return 5;
+  }
+  return 1;
+}
+
+function quantizeTokenDisplayValue(value: number, target: number, step: number) {
+  if (step <= 1) {
+    return Math.round(value);
+  }
+  const rounded = Math.round(value / step) * step;
+  return value <= target ? Math.min(rounded, target) : Math.max(rounded, target);
 }
 
 function formatTokenCount(value: number) {

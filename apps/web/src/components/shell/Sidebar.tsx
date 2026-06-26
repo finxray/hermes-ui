@@ -4,13 +4,13 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
+  Clock,
   Folder,
   FolderPlus,
-  MessageSquare,
   MessageSquarePlus,
+  MoreHorizontal,
   Pin,
   PinOff,
-  Plug,
   RefreshCw,
   RotateCcw,
   Settings
@@ -22,7 +22,23 @@ import type { Project, Session, WorkspaceState } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { formatSessionUpdatedAt } from "@/lib/workspaceStore";
 import { SidebarIconButton, SidebarRow, SidebarStatusDot } from "./SidebarRow";
+import { useSectionNav } from "./SectionNavContext";
+import type { ShellSection } from "./TopBar";
 import styles from "./Sidebar.module.css";
+
+const SECTION_RAIL_LABELS: Partial<Record<ShellSection, string>> = {
+  plugins: "Categories",
+  config: "Sections",
+  keys: "Categories",
+  logs: "Sources"
+};
+
+const SECTION_EMPTY_LABELS: Partial<Record<ShellSection, string>> = {
+  plugins: "No categories",
+  config: "No sections",
+  keys: "No categories",
+  logs: "No sources"
+};
 
 const VISIBLE_CHAT_LIMIT = 5;
 const PINNED_SESSION_IDS_STORAGE_KEY = "hermes-ui.sidebar.pinnedSessionIds";
@@ -40,8 +56,9 @@ type SidebarProps = {
   hermesStatus: NormalizedHermesStatus | null;
   isHermesStatusLoading: boolean;
   isHydrated: boolean;
-  activeSection: "workspace" | "plugins";
-  onSectionChange: (section: "workspace" | "plugins") => void;
+  activeSection: ShellSection;
+  onSectionChange: (section: ShellSection) => void;
+  onWorkspaceSessionSelect?: () => void;
   refreshHermesStatus: () => void;
   runningSessionIds?: string[];
 };
@@ -58,12 +75,14 @@ export function Sidebar({
   isHydrated,
   activeSection,
   onSectionChange,
+  onWorkspaceSessionSelect,
   refreshHermesStatus,
   runningSessionIds = []
 }: SidebarProps) {
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const settingsToggleRef = useRef<HTMLInputElement | null>(null);
   const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+  const sectionNav = useSectionNav();
   const [scrollFade, setScrollFade] = useState({ top: false, bottom: false });
   const [pinnedSessionIds, setPinnedSessionIds] = useStoredStringSet(PINNED_SESSION_IDS_STORAGE_KEY);
   const [collapsedFolderIds, setCollapsedFolderIds] = useStoredStringSet(
@@ -155,35 +174,42 @@ export function Sidebar({
 
   return (
     <aside className={styles.sidebar} data-shell-rail="left" aria-label="Projects and chats">
-      <div className={styles.sidebarHeader}>
-        <div className={styles.quickActions}>
-          <SidebarRow
-            icon={<FolderPlus size={15} />}
-            label="Project"
-            onClick={() => {
-              onSectionChange("workspace");
-              actions.createProject();
-            }}
-          />
-          <SidebarRow
-            icon={<MessageSquarePlus size={15} />}
-            label="New chat"
-            onClick={() => {
-              onSectionChange("workspace");
-              actions.createSession();
-            }}
-          />
-          <SidebarRow
-            active={activeSection === "plugins"}
-            icon={<Plug size={15} />}
-            label="Plugins"
-            onClick={() => onSectionChange("plugins")}
-          />
+      {activeSection === "workspace" ? (
+        <div className={styles.sidebarHeader}>
+          <div className={styles.quickActions}>
+            <SidebarRow
+              icon={<FolderPlus size={15} />}
+              label="Project"
+              onClick={() => {
+                onSectionChange("workspace");
+                actions.createProject();
+              }}
+            />
+            <SidebarRow
+              icon={<MessageSquarePlus size={15} />}
+              label="New chat"
+              onClick={() => {
+                onSectionChange("workspace");
+                actions.createSession();
+              }}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className={styles.scrollRegion}>
       <div ref={scrollBodyRef} className={styles.scrollBody} style={scrollBodyStyle}>
+      {activeSection !== "workspace" ? (
+        <CategoryRail
+          activeCategoryId={sectionNav.activeCategoryId}
+          categories={sectionNav.categoriesForSection(activeSection)}
+          emptyLabel={SECTION_EMPTY_LABELS[activeSection] ?? "No categories"}
+          isPublished={sectionNav.hasPublishedCategories(activeSection)}
+          label={SECTION_RAIL_LABELS[activeSection] ?? "Categories"}
+          onSelect={sectionNav.requestScroll}
+        />
+      ) : (
+      <>
       {pinnedSessions.length > 0 ? (
         <section className={styles.section} aria-labelledby="pinned-heading">
           <FolderHeader
@@ -200,7 +226,10 @@ export function Sidebar({
               isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
               listClassName={styles.list}
               onArchive={(sessionId) => actions.archiveSession(sessionId)}
-              onSelect={(sessionId) => actions.switchSession(sessionId)}
+              onSelect={(sessionId) => {
+                onWorkspaceSessionSelect?.();
+                actions.switchSession(sessionId);
+              }}
               onTogglePin={togglePinnedSession}
               sessions={pinnedSessions}
               showOverflowControl={false}
@@ -210,7 +239,7 @@ export function Sidebar({
       ) : null}
 
       <section className={styles.section} aria-labelledby="projects-heading">
-        <div className={styles.sectionLabel} id="projects-heading">
+        <div className={`${styles.sectionLabel} ${styles.workspaceSectionLabel}`} id="projects-heading">
           <span>Projects</span>
         </div>
         <ul className={styles.list}>
@@ -249,6 +278,7 @@ export function Sidebar({
                         onArchive={(sessionId) => actions.archiveSession(sessionId)}
                         onSelect={(sessionId) => {
                           onSectionChange("workspace");
+                          onWorkspaceSessionSelect?.();
                           actions.switchSession(sessionId);
                         }}
                         onTogglePin={togglePinnedSession}
@@ -264,26 +294,16 @@ export function Sidebar({
       </section>
 
       <section className={styles.section} aria-labelledby="chats-heading">
-        <div className={styles.sectionLabel} id="chats-heading">
-          <span>Recent chats</span>
-        </div>
-        <CollapsibleSessionList
-          activeSessionId={activeSession?.id ?? null}
-          autoExpandActive={false}
-          icon={<MessageSquare size={15} />}
-          isPinned={(sessionId) => pinnedSessionIdSet.has(sessionId)}
-          isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
-          listClassName={styles.list}
-          onArchive={(sessionId) => actions.archiveSession(sessionId)}
-          onSelect={(sessionId) => {
+        <ChatsFolderRow
+          id="chats-heading"
+          onCreateChat={() => {
             onSectionChange("workspace");
-            actions.switchSession(sessionId);
+            actions.createSession();
           }}
-          onTogglePin={togglePinnedSession}
-          previewCount={3}
-          sessions={getRecentChats(allSessions)}
         />
       </section>
+      </>
+      )}
       </div>
       </div>
 
@@ -355,15 +375,50 @@ export function Sidebar({
   );
 }
 
+function CategoryRail({
+  activeCategoryId,
+  categories,
+  emptyLabel,
+  isPublished,
+  label,
+  onSelect
+}: {
+  activeCategoryId: string | null;
+  categories: { id: string; label: string; count: number }[];
+  emptyLabel: string;
+  isPublished: boolean;
+  label: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section className={styles.section} aria-label={label}>
+      <div className={styles.sectionLabel}>
+        <span>{label}</span>
+      </div>
+      {categories.length === 0 ? (
+        <SidebarRow depth={1} disabled label={isPublished ? emptyLabel : "Loading..."} muted />
+      ) : (
+        <ul className={styles.list}>
+          {categories.map((category) => (
+            <li key={category.id}>
+              <SidebarRow
+                active={category.id === activeCategoryId}
+                label={category.label}
+                meta={category.count > 0 ? category.count : undefined}
+                onClick={() => onSelect(category.id)}
+                title={category.count > 0 ? `${category.label} (${category.count})` : category.label}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function getProjectSessions(sessions: Session[], projectId: string) {
   return sessions
     .filter((session) => session.projectId === projectId && !session.archivedAt)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
-function getRecentChats(sessions: Session[]) {
-  return sessions
-    .filter((session) => !session.archivedAt)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
@@ -433,6 +488,86 @@ function FolderHeader({
   );
 }
 
+function ChatsFolderRow({
+  id,
+  onCreateChat
+}: {
+  id: string;
+  onCreateChat: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    function closeOnOutside(event: MouseEvent) {
+      const target = event.target;
+      if (target instanceof Node && !menuRef.current?.contains(target)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", closeOnOutside);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closeOnOutside);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
+
+  return (
+    <div className={styles.chatsFolderRow} data-menu-open={menuOpen ? "true" : "false"} ref={menuRef}>
+      <button
+        className={styles.chatsFolderMain}
+        type="button"
+        aria-expanded="false"
+        aria-labelledby={id}
+      >
+        <span className={styles.chatsFolderTitle} id={id}>
+          Chats
+        </span>
+        <ChevronRight size={15} />
+      </button>
+      <span className={styles.chatsFolderActions}>
+        <SidebarIconButton label="Chat options" onClick={() => setMenuOpen((current) => !current)}>
+          <MoreHorizontal size={15} />
+        </SidebarIconButton>
+        <SidebarIconButton label="New chat" onClick={onCreateChat}>
+          <MessageSquarePlus size={15} />
+        </SidebarIconButton>
+      </span>
+      {menuOpen ? (
+        <div className={styles.chatsMenu} role="menu" aria-label="Chat options">
+          <button className={styles.chatsMenuItem} disabled role="menuitem" type="button">
+            <Archive size={15} />
+            <span>Archive all chats</span>
+          </button>
+          <div className={styles.chatsMenuDivider} />
+          <button className={styles.chatsMenuItem} role="menuitem" type="button">
+            <Folder size={15} />
+            <span>Organize sidebar</span>
+            <ChevronRight size={15} />
+          </button>
+          <button className={styles.chatsMenuItem} role="menuitem" type="button">
+            <Clock size={15} />
+            <span>Sort by</span>
+            <ChevronRight size={15} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CollapsibleSessionList({
   activeSessionId,
   autoExpandActive = true,
@@ -480,6 +615,7 @@ function CollapsibleSessionList({
   function renderSession(session: Session) {
     const pinned = isPinned(session.id);
     const running = isRunning(session.id);
+    const hasUnseenResult = session.id !== activeSessionId && hasUnseenTerminalRun(session);
     return (
       <li key={session.id}>
         <SidebarRow
@@ -490,20 +626,28 @@ function CollapsibleSessionList({
                 label={pinned ? `Unpin ${session.title}` : `Pin ${session.title}`}
                 onClick={() => onTogglePin(session.id)}
               >
-                {pinned ? <PinOff size={15} /> : <Pin size={15} />}
+                {pinned ? <PinOff size={12} /> : <Pin size={12} />}
               </SidebarIconButton>
               <SidebarIconButton
                 label={`Archive ${session.title}`}
                 onClick={() => onArchive(session.id)}
               >
-                <Archive size={15} />
+                <Archive size={12} />
               </SidebarIconButton>
             </>
           }
           depth={depth}
           icon={icon}
           label={session.title?.trim() || "New chat"}
-          meta={running ? <RunningSessionSpinner /> : formatSessionUpdatedAt(session.updatedAt)}
+          meta={
+            running ? (
+              <RunningSessionSpinner />
+            ) : hasUnseenResult ? (
+              <UnseenResultDot />
+            ) : (
+              formatSessionUpdatedAt(session.updatedAt)
+            )
+          }
           onClick={() => onSelect(session.id)}
         />
       </li>
@@ -537,6 +681,29 @@ function CollapsibleSessionList({
 
 function RunningSessionSpinner() {
   return <span className={styles.runningSpinner} aria-label="Chat running" role="status" />;
+}
+
+function UnseenResultDot() {
+  return <span className={styles.unseenResultDot} aria-label="Finished result not seen" role="status" />;
+}
+
+function hasUnseenTerminalRun(session: Session) {
+  const lastViewedMs = Date.parse(session.lastViewedAt ?? session.updatedAt);
+  if (!Number.isFinite(lastViewedMs)) {
+    return false;
+  }
+
+  return (session.runRecords ?? []).some((run) => {
+    if (!isTerminalRunStatus(run.status) || !run.completedAt) {
+      return false;
+    }
+    const completedMs = Date.parse(run.completedAt);
+    return Number.isFinite(completedMs) && completedMs > lastViewedMs;
+  });
+}
+
+function isTerminalRunStatus(status: Session["runRecords"][number]["status"]) {
+  return status === "completed" || status === "stopped" || status === "failed" || status === "cancelled";
 }
 
 function useStoredStringSet(key: string) {

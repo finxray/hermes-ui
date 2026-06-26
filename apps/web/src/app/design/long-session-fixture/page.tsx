@@ -2,6 +2,7 @@
 
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { ContextRail } from "@/components/shell/ContextRail";
+import { SectionNavProvider } from "@/components/shell/SectionNavContext";
 import { Sidebar } from "@/components/shell/Sidebar";
 import {
   LONG_SESSION_ACTIVITY_EVENT_COUNT,
@@ -28,6 +29,7 @@ const fixtureActions = {
   archiveSession: noop,
   createProject: noop,
   createSession: noop,
+  createSessionForProject: noop,
   renameProject: noop,
   renameSession: noop,
   reset: noop,
@@ -84,20 +86,22 @@ export default function LongSessionFixturePage() {
       </section>
 
       <section className={styles.shell} aria-label="Long-session Studio shell fixture">
-        <Sidebar
-          actions={fixtureActions as never}
-          activeSection="workspace"
-          activeProject={longSessionActiveProject}
-          activeSession={longSessionActiveSession}
-          allSessions={longSessionSessions}
-          connectionStatus={longSessionWorkspaceState.connectionStatus}
-          hermesStatus={null}
-          isHermesStatusLoading={false}
-          isHydrated
-          onSectionChange={noop}
-          projects={longSessionProjects}
-          refreshHermesStatus={noop}
-        />
+        <SectionNavProvider>
+          <Sidebar
+            actions={fixtureActions as never}
+            activeSection="workspace"
+            activeProject={longSessionActiveProject}
+            activeSession={longSessionActiveSession}
+            allSessions={longSessionSessions}
+            connectionStatus={longSessionWorkspaceState.connectionStatus}
+            hermesStatus={null}
+            isHermesStatusLoading={false}
+            isHydrated
+            onSectionChange={noop}
+            projects={longSessionProjects}
+            refreshHermesStatus={noop}
+          />
+        </SectionNavProvider>
         <section className={styles.transcriptWrap} aria-label="Chat transcript">
           <ChatTranscript
             activeProject={longSessionActiveProject}

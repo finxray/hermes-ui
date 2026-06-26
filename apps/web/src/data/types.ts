@@ -42,11 +42,34 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   author: string;
+  attachments?: ChatAttachment[];
   createdAt: string;
   content: string;
   references?: string[];
   status?: "complete" | "streaming" | "error" | "mock";
   usage?: ChatUsageMetadata;
+};
+
+export type ChatAttachmentKind =
+  | "image"
+  | "pdf"
+  | "text"
+  | "spreadsheet"
+  | "presentation"
+  | "document"
+  | "archive"
+  | "code"
+  | "unknown";
+
+export type ChatAttachment = {
+  id: string;
+  fileName: string;
+  kind: ChatAttachmentKind;
+  mimeType: string;
+  previewUrl?: string;
+  sizeBytes: number;
+  source: "local";
+  status: "ready" | "needs-upload" | "too-large" | "unsupported";
 };
 
 export type ChatUsageMetadata = {
@@ -252,6 +275,7 @@ export type Session = {
   memoryScope: SessionMemoryScope;
   createdAt: string;
   updatedAt: string;
+  lastViewedAt?: string;
   archivedAt?: string;
   messages: ChatMessage[];
   memoryEvidence: MemoryEvidence[];

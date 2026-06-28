@@ -1,12 +1,17 @@
 .sidebar {
+  composes: scrollbar-hover-context from global;
   --font-body: 16.05px;
   --font-small: 13.91px;
   --font-xs: 12.305px;
-  --sidebar-rail-padding-x: var(--shell-rail-padding-x, 8px);
-  --sidebar-row-padding-x: var(--shell-row-padding-x, clamp(12px, calc(8px + 0.25vw), 18px));
+  --sidebar-rail-padding-left: var(--shell-rail-padding-x, 8px);
+  --sidebar-rail-padding-right: 2px;
+  --sidebar-scroll-gap: 6px;
+  --sidebar-row-padding-x: clamp(7.2px, calc(4.8px + 0.15vw), 10.8px);
   --sidebar-icon-column: var(--icon-sm);
   --sidebar-column-gap: var(--shell-column-gap, 9px);
   --sidebar-meta-column: 44px;
+  --sidebar-action-icon-size: 13px;
+  --sidebar-action-gap: 8px;
   --sidebar-footer-bg: transparent;
   --sidebar-edge-fade-height: 22px;
   --row-height: 32px;
@@ -18,7 +23,7 @@
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  padding: 8px var(--sidebar-rail-padding-x) 0;
+  padding: 8px var(--sidebar-rail-padding-right) 0 var(--sidebar-rail-padding-left);
   background: transparent;
   border: 0;
   contain: layout paint;
@@ -39,16 +44,16 @@
   z-index: 3;
   flex: 1 1 auto;
   min-height: 0;
-  margin-right: calc(-1 * var(--sidebar-rail-padding-x));
 }
 
 .scrollBody {
-  composes: scrollbar-hover-reveal from global;
+  composes: scrollbar-hover-target from global;
+  --scrollbar-track-edge-margin: 2.1px;
   position: relative;
   height: 100%;
   min-height: 0;
   overflow: hidden auto;
-  padding: 6px var(--sidebar-rail-padding-x) 4px 0;
+  padding: 6px var(--sidebar-scroll-gap) 4px 0;
   overscroll-behavior: contain;
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -64,19 +69,6 @@
     #000 calc(100% - var(--scroll-fade-bottom, 0px)),
     transparent 100%
   );
-}
-
-.scrollBody::-webkit-scrollbar-thumb {
-  border-right-width: 1px;
-}
-
-.scrollBody:hover::-webkit-scrollbar-thumb,
-.scrollBody:focus-within::-webkit-scrollbar-thumb {
-  border-right-width: 1px;
-}
-
-.scrollBody::-webkit-scrollbar-thumb:hover {
-  border-right-width: 0;
 }
 
 .scrollBody > .section:first-child {
@@ -283,9 +275,11 @@
 
 .folderActions {
   position: absolute;
+  top: 0;
   right: 8px;
+  bottom: 0;
   display: flex;
-  gap: 2px;
+  gap: var(--sidebar-action-gap);
   align-items: center;
   justify-content: flex-end;
   padding-left: 12px;
@@ -415,8 +409,9 @@
 .chatsFolderActions {
   display: inline-flex;
   flex: 0 0 auto;
+  align-self: stretch;
   align-items: center;
-  gap: 8px;
+  gap: var(--sidebar-action-gap);
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -501,6 +496,87 @@
   background: rgba(255, 255, 255, 0.09);
 }
 
+.sessionRowWrap {
+  position: relative;
+}
+
+.sessionRowWrap[data-menu-open="true"] {
+  z-index: 30;
+}
+
+.sessionMenu {
+  --font-small: 13.91px;
+  position: fixed;
+  z-index: var(--z-floating);
+  display: grid;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden auto;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(52, 52, 53, 0.98);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.28),
+    0 26px 70px rgba(0, 0, 0, 0.52);
+}
+
+.sessionMenuItem {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #f7f7f8;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  line-height: 1.2;
+  text-align: left;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.sessionMenuItem:hover:not(:disabled),
+.sessionMenuItem:focus-visible:not(:disabled) {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sessionMenuItem:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.sessionMenuItem[data-danger="true"] {
+  color: #ff6b6b;
+  opacity: 1;
+}
+
+.sessionMenuItem svg {
+  justify-self: center;
+  width: 17px;
+  height: 17px;
+}
+
+.sessionMenuItem span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionMenuDivider {
+  height: 1px;
+  margin: 7px 8px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
 .runningSpinner {
   display: block;
   width: 13px;
@@ -513,8 +589,8 @@
 
 .unseenResultDot {
   display: inline-block;
-  width: 9px;
-  height: 9px;
+  width: 7.2px;
+  height: 7.2px;
   border-radius: 999px;
   background: #7abfff;
   box-shadow: 0 0 0 1px rgba(122, 191, 255, 0.18);

@@ -61,18 +61,27 @@
 
   /* Z-index scale: keep transient overlays above clipped app panels. */
   --z-floating: 1000;
-  --scrollbar-size: 17.28px;
-  --scrollbar-size-active: 21.6px;
-  --scrollbar-thumb-border: 3.6px;
-  --scrollbar-thumb-border-active: 2px;
-  --scrollbar-thumb-border-hover-active: 1px;
+  --scrollbar-size: 9px;
+  --scrollbar-track-edge-margin: 3px;
+  --scrollbar-right-margin: 2px;
+  --scrollbar-button-top-margin: 5px;
+  --scrollbar-button-bottom-margin: 5px;
+  --scrollbar-size-active: 9px;
+  --scrollbar-size-hover: 9px;
+  --scrollbar-thumb-border: 0px;
+  --scrollbar-thumb-border-active: 0px;
+  --scrollbar-thumb-border-hover-active: 0px;
+  --scrollbar-thumb-radius: 8px;
   --scrollbar-thumb-min-height: 43.2px;
-  --scrollbar-thumb: rgba(180, 176, 183, 0.32);
-  --scrollbar-thumb-hover: rgba(207, 204, 210, 0.46);
+  --scrollbar-thumb: rgba(180, 176, 183, 0.192);
+  --scrollbar-thumb-hover: rgba(207, 204, 210, 0.276);
+  --scrollbar-button: rgba(180, 176, 183, 0.192);
+  --scrollbar-button-size: var(--scrollbar-size);
   --scrollbar-track: transparent;
   --scrollbar-track-hover: transparent;
-  --scrollbar-fade-duration: 1600ms;
-  --scrollbar-scale-duration: 200ms;
+  --scrollbar-transition-duration: 2s;
+  --scrollbar-transition-easing: ease;
+  --scrollbar-arrow-scale: 110%;
 
   /* Activity shimmer keyframes are defined per-component */
 }

@@ -18,7 +18,7 @@ const {
 const { loadWorkspaceFromStore, workspaceStateToSnapshot, snapshotToWorkspaceState } = await import(
   pathToFileURL("apps/web/src/lib/storage/workspace-storage.ts").toString()
 );
-const { WORKSPACE_STORAGE_KEY, createMockWorkspaceState, saveWorkspaceState, workspaceReducer } =
+const { WORKSPACE_STORAGE_KEY, createInitialWorkspaceState, saveWorkspaceState, workspaceReducer } =
   await import(pathToFileURL("apps/web/src/lib/workspaceStore.ts").toString());
 
 let dbCounter = 0;
@@ -61,7 +61,7 @@ console.log("Storage migration checks passed.");
 
 // Build an authentic legacy localStorage blob using the real save path.
 function seedLegacyWorkspace(storage) {
-  let state = createMockWorkspaceState();
+  let state = createInitialWorkspaceState();
   state = workspaceReducer(state, { type: "createSession" });
   const session = state.sessions[0];
   state = workspaceReducer(state, {
@@ -182,7 +182,7 @@ async function checkDoesNotClobberExistingStore() {
 }
 
 function checkWorkspaceRoundTrip() {
-  const state = createMockWorkspaceState();
+  const state = createInitialWorkspaceState();
   const snapshot = workspaceStateToSnapshot(state);
   const restored = snapshotToWorkspaceState(snapshot);
   assert.ok(restored, "round-trip yields a state");

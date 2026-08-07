@@ -47,7 +47,7 @@ The fix: add `setInterval(refresh, 8000)` with cleanup on unmount.
 
 ### Hermes Runtime Model Switching — NOT Supported
 
-Inspected `/home/alexey/.hermes/hermes-agent/gateway/platforms/api_server.py`.
+Inspected `~/.hermes/hermes-agent/gateway/platforms/api_server.py`.
 Routes registered:
 - `GET /v1/models` — read-only model list
 - `GET /v1/capabilities` — reports `admin_config_rw: false`

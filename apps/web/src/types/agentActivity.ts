@@ -20,7 +20,7 @@ export type AgentActivityStatus =
   | "waiting_for_approval"
   | "info";
 
-export type AgentActivitySource = "hermes" | "brain-memory" | "ui" | "mcp" | "unknown";
+export type AgentActivitySource = "hermes" | "ui" | "mcp" | "unknown";
 
 export type AgentActivityEvent = {
   id: string;

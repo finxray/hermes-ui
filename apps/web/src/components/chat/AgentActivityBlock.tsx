@@ -265,9 +265,10 @@ function ToolNoteLine({
   const title = titleForReasoningChunk(event);
   const detail = noteRowDetail(event);
   const active = allowActiveState && isActiveActivityStatus(event.status);
+  const webSearch = isWebSearchActivity(event);
   return (
     <div className={styles.toolNote}>
-      <span className={styles.toolIcon} aria-hidden="true" />
+      <span className={webSearch ? styles.webSearchIcon : styles.toolIcon} aria-hidden="true" />
       <p className={styles.toolNoteLine} data-active={active ? "true" : "false"}>
         <span className={styles.toolNoteTitle}>{title}</span>
         {detail ? <span className={styles.toolNoteTarget}>{detail}</span> : null}
@@ -298,6 +299,7 @@ function NoteGroupRow({
   const latest = events[events.length - 1];
   const latestDetail = noteRowDetail(latest);
   const active = allowActiveState && events.some((event) => isActiveActivityStatus(event.status));
+  const webSearch = isWebSearchActivity(latest);
 
   return (
     <AnimatedDisclosure
@@ -306,7 +308,7 @@ function NoteGroupRow({
       type="command"
       summary={
         <>
-          <span className={styles.toolIcon} aria-hidden="true" />
+          <span className={webSearch ? styles.webSearchIcon : styles.toolIcon} aria-hidden="true" />
           <span className={styles.commandLabel} data-active={active ? "true" : "false"}>{title}</span>
           {latestDetail ? <span className={styles.toolNoteTarget}>{latestDetail}</span> : null}
           <ChevronRight className={styles.commandChevron} size={14} aria-hidden="true" />
@@ -596,6 +598,9 @@ function titleForReasoningChunk(event: AgentActivityEvent) {
     return pickMeaningfulActivityText(event.title) ?? "Used memory";
   }
   if (event.type === "tool") {
+    if (isWebSearchActivity(event)) {
+      return event.status === "running" || event.status === "queued" ? "Searching the web" : "Searched the web";
+    }
     return formatToolActivityTitle(event);
   }
   if (event.type === "approval") {
@@ -605,6 +610,36 @@ function titleForReasoningChunk(event: AgentActivityEvent) {
     return "Error";
   }
   return pickMeaningfulActivityText(event.title) ?? "Activity update";
+}
+
+function isWebSearchActivity(event: AgentActivityEvent) {
+  const toolName = [
+    event.hermes?.toolName,
+    event.title,
+    event.summary,
+    typeof event.details === "object" && event.details && !Array.isArray(event.details)
+      ? String((event.details as Record<string, unknown>).tool_name ?? "")
+      : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const normalized = toolName.trim().toLowerCase().replace(/[\s.-]+/g, "_");
+  if (!normalized) {
+    return false;
+  }
+  return (
+    normalized.includes("web_search") ||
+    normalized.includes("search_web") ||
+    normalized.includes("web_extract") ||
+    normalized.includes("extract_web") ||
+    normalized.includes("web_browse") ||
+    normalized.includes("browse_web") ||
+    normalized.includes("tavily") ||
+    normalized.includes("firecrawl") ||
+    normalized.includes("searxng") ||
+    normalized.includes("exa_search") ||
+    normalized.includes("parallel_search")
+  );
 }
 
 function commandItemRowLabel(item?: CommandItem, allowActiveState = false) {

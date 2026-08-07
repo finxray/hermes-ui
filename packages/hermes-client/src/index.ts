@@ -154,7 +154,7 @@ export async function getHermesStatus(
 
   if (config.enabled === false) {
     return withUiCapabilities({
-      mode: "mock",
+      mode: "unconfigured",
       configured: false,
       reachable: false,
       baseUrl: null,
@@ -266,6 +266,10 @@ export async function getHermesStatus(
     })
   ]);
 
+  const capabilityEndpoints = objectRecord(capabilitiesResult.data?.endpoints);
+  const modelsPath = hasEndpoint(capabilityEndpoints, "model_options")
+    ? "/api/model/options"
+    : "/v1/models";
   const modelsResult = includeModels
     ? await fetchEndpoint({
         apiKey: config.apiKey,
@@ -273,7 +277,7 @@ export async function getHermesStatus(
         base,
         fetchImpl,
         name: "models",
-        path: "/v1/models",
+        path: modelsPath,
         timeoutMs: modelsTimeoutMs
       })
     : null;
@@ -330,11 +334,16 @@ export async function getOpenRouterModelCatalog(options: {
   baseUrl?: string | null;
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
+  sort?: "most-popular";
+  supportedParameters?: string[];
   timeoutMs?: number;
 } = {}): Promise<OpenRouterModelCatalogResult> {
   const checkedAt = new Date().toISOString();
   const fetchImpl = options.fetchImpl ?? fetch;
-  const endpoint = openRouterModelsUrl(options.baseUrl);
+  const endpoint = openRouterModelsUrl(options.baseUrl, {
+    sort: options.sort,
+    supportedParameters: options.supportedParameters
+  });
   const abort = createLinkedAbortController(options.signal, options.timeoutMs ?? 8_000);
   const headers = new Headers({
     Accept: "application/json"
@@ -368,7 +377,7 @@ export async function getOpenRouterModelCatalog(options: {
     const data = await readJsonObject(response);
     return {
       ok: true,
-      models: normalizeOpenRouterModels(data),
+      models: normalizeOpenRouterModels(data, options.sort === "most-popular"),
       checkedAt,
       source: "openrouter",
       error: null
@@ -449,7 +458,7 @@ export async function getLmStudioModelCatalog(options: {
 
 export function normalizeHermesUiCapabilities(
   status: Omit<NormalizedHermesStatus, "uiCapabilities">,
-  options: { configuredDefaultModelId?: string | null; memoryScopeBridgeEnabled?: boolean } = {}
+  options: { configuredDefaultModelId?: string | null } = {}
 ): HermesUiCapabilities {
   const features = objectRecord(status.capabilities?.features);
   const endpoints = objectRecord(status.capabilities?.endpoints);
@@ -458,8 +467,8 @@ export function normalizeHermesUiCapabilities(
     options.configuredDefaultModelId
   );
   const catalogModels = modelDescriptors(status.models).filter((model) => !isPlaceholderHermesModelId(model.id));
-  const selectableModels = preferPublicProviderCatalogModels(
-    catalogModels.filter(isSessionSelectableCatalogModel)
+  const selectableModels = dedupeSelectableModels(
+    preferPublicProviderCatalogModels(catalogModels.filter(isSessionSelectableCatalogModel))
   );
   const rawServerAdvertisedModel =
     configuredDefaultCandidates[0] ||
@@ -474,8 +483,13 @@ export function normalizeHermesUiCapabilities(
   const orderedModels = orderModelsWithDefaultFirst(selectableModels, serverAdvertisedModel);
   const modelsListAvailable = Boolean(status.models) || hasEndpoint(endpoints, "models");
   const sessionModelOverrideObj = objectRecord(status.capabilities?.session_model_override);
-  const explicitOverrideSupported = Boolean(sessionModelOverrideObj?.supported === true);
-  const hasSessionModelEndpoint = hasEndpoint(endpoints, "session_model");
+  const hasLegacySessionModelEndpoint = hasEndpoint(endpoints, "session_model");
+  const hasSessionModelLockEndpoint = hasEndpoint(endpoints, "session_model_lock");
+  const explicitOverrideSupported = Boolean(
+    sessionModelOverrideObj?.supported === true ||
+    (flag(features, "session_model_lock") && hasSessionModelLockEndpoint)
+  );
+  const hasSessionModelEndpoint = hasLegacySessionModelEndpoint || hasSessionModelLockEndpoint;
   const clientSelectable =
     status.mode === "real" &&
     explicitOverrideSupported &&
@@ -570,7 +584,6 @@ export function normalizeHermesUiCapabilities(
       explicitOverrideSupported
     },
     memory: {
-      instructionBridgeActive: options.memoryScopeBridgeEnabled !== false,
       memoryWriteApi: flag(features, "memory_write_api"),
       metadataContextPropagation: "unknown",
       sessionContinuityHeader,
@@ -610,7 +623,7 @@ export async function streamHermesSessionChat(
 
   const fetchImpl = config.fetchImpl ?? fetch;
   const hermesSessionId = sanitizeHermesId(request.context.session.hermesSessionId);
-  const memoryScopeKey = sanitizeHeaderValue(request.context.project.stableKey);
+  const sessionContextKey = sanitizeHeaderValue(request.context.project.stableKey);
   const supportsSessionStream = await checkSessionStreamingCapability({
     apiKey: config.apiKey,
     base,
@@ -676,8 +689,8 @@ export async function streamHermesSessionChat(
     "Content-Type": "application/json"
   });
   applyHermesAuth(headers, config.apiKey);
-  if (memoryScopeKey) {
-    headers.set("X-Hermes-Session-Key", memoryScopeKey);
+  if (sessionContextKey) {
+    headers.set("X-Hermes-Session-Key", sessionContextKey);
   }
 
   let response: Response;
@@ -1102,12 +1115,16 @@ export async function selectHermesModel(
       ok: true,
       sessionId: asString(record?.session_id) || safeSessionId,
       selectedModel:
+        asString(objectRecord(record?.runtime)?.model) ||
         asString(record?.effective_model) ||
         asString(record?.selected_model) ||
         asString(record?.model) ||
         modelId,
       provider:
-        asString(record?.effective_provider) || asString(record?.provider) || null,
+        asString(objectRecord(record?.runtime)?.provider) ||
+        asString(record?.effective_provider) ||
+        asString(record?.provider) ||
+        null,
       scope: asString(record?.scope) || "session",
       error: null
     };
@@ -1148,7 +1165,7 @@ export async function runHermesRunsProbe(
     expectedText?: string;
     instructions?: string;
     memoryMutationRequested?: boolean;
-    memoryScopeKey?: string | null;
+    sessionContextKey?: string | null;
     model?: string | null;
     prompt?: string;
     promptKind?: HermesRunsProbeResult["safety"]["promptKind"];
@@ -1185,7 +1202,7 @@ export async function runHermesRunsProbe(
       events: 0,
       messageDeltaEvents: 0,
       toolEvents: 0,
-      brainMemoryToolEvents: 0,
+      memoryToolEvents: 0,
       approvalEvents: 0
     },
     safety: {
@@ -1290,7 +1307,7 @@ export async function runHermesRunsProbe(
     conversationHistory: options.conversationHistory,
     fetchImpl,
     instructions: options.instructions,
-    memoryScopeKey: options.memoryScopeKey ?? "hermes-ui-runs-probe",
+    sessionContextKey: options.sessionContextKey ?? "hermes-ui-runs-probe",
     model: options.model,
     prompt,
     sessionId,
@@ -1351,8 +1368,7 @@ export async function runHermesRunsProbe(
   const finalStatusName = asString(finalStatus?.status) || createResult.status;
   const combinedText = `${assistantText}\n${output}`;
   const toolEvents = events.filter((event) => event.event.startsWith("tool."));
-  const brainMemoryToolEvents = toolEvents.filter((event) =>
-    normalizeName(event.toolName ?? "").includes("brain_memory") ||
+  const memoryToolEvents = toolEvents.filter((event) =>
     normalizeName(event.toolName ?? "").includes("memory")
   );
   const approvalEvents = events.filter((event) => event.event.startsWith("approval."));
@@ -1375,7 +1391,7 @@ export async function runHermesRunsProbe(
       events: events.length,
       messageDeltaEvents: messageDeltaEvents.length,
       toolEvents: toolEvents.length,
-      brainMemoryToolEvents: brainMemoryToolEvents.length,
+      memoryToolEvents: memoryToolEvents.length,
       approvalEvents: approvalEvents.length
     },
     ok: success,
@@ -1396,7 +1412,6 @@ export async function runHermesRunsExperimentalChat(
   options: {
     expectedText?: string;
     experimentalEnabled: boolean;
-    memoryScopeBridgeEnabled?: boolean;
     timeoutMs?: number;
   }
 ): Promise<HermesRunsExperimentalChatResult> {
@@ -1426,7 +1441,7 @@ export async function runHermesRunsExperimentalChat(
       },
       counts: emptyRunsProbeCounts(),
       context,
-      experimental: experimentalRunsMetadata(false, options.memoryScopeBridgeEnabled !== false),
+      experimental: experimentalRunsMetadata(false),
       safety,
       error: {
         kind: "disabled",
@@ -1442,7 +1457,7 @@ export async function runHermesRunsExperimentalChat(
       expectedText,
       instructions: request.instructions ?? undefined,
       memoryMutationRequested: false,
-      memoryScopeKey: request.context.project.stableKey,
+      sessionContextKey: request.context.project.stableKey,
       model: request.model,
       prompt: request.message,
       promptKind: "chat-only",
@@ -1454,7 +1469,7 @@ export async function runHermesRunsExperimentalChat(
   return {
     ...result,
     context,
-    experimental: experimentalRunsMetadata(true, options.memoryScopeBridgeEnabled !== false),
+    experimental: experimentalRunsMetadata(true),
     safety: experimentalRunsSafety(false)
   };
 }
@@ -1494,7 +1509,7 @@ export async function runHermesRunsStopProbe(
       events: 0,
       messageDeltaEvents: 0,
       toolEvents: 0,
-      brainMemoryToolEvents: 0,
+      memoryToolEvents: 0,
       approvalEvents: 0
     },
     timings: {
@@ -1692,7 +1707,7 @@ export async function runHermesRunsApprovalProbe(
       events: 0,
       messageDeltaEvents: 0,
       toolEvents: 0,
-      brainMemoryToolEvents: 0,
+      memoryToolEvents: 0,
       approvalEvents: 0
     },
     timings: {
@@ -1815,11 +1830,11 @@ export async function runHermesRunsApprovalProbe(
     instructions: [
       "This is an opt-in approval diagnostic for a local Web UI.",
       "Use the terminal tool only for the exact command requested by the user.",
-      "Do not use Brain Memory, files, web browsing, external network resources, or any other tools.",
+      "Do not use memory tools, files, web browsing, external network resources, or any other tools.",
       "If the approval is denied, do not retry and do not attempt a different command.",
       `After the approval decision is resolved, reply exactly ${HERMES_RUNS_APPROVAL_PROBE_EXPECTED_TEXT}.`
     ].join("\n"),
-    memoryScopeKey: "hermes-ui-runs-approval-probe",
+    sessionContextKey: "hermes-ui-runs-approval-probe",
     prompt: HERMES_RUNS_APPROVAL_PROBE_PROMPT,
     sessionId,
     signal: config.signal,
@@ -1956,7 +1971,7 @@ export async function listHermesSessions(
   }
 
   const fetchImpl = config.fetchImpl ?? fetch;
-  const result = await fetchJsonEndpoint({ apiKey: config.apiKey, base, fetchImpl, path: "/api/sessions", signal: config.signal, timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS });
+  const result = await fetchJsonEndpoint({ apiKey: config.apiKey, base, fetchImpl, path: "/api/sessions?limit=200", signal: config.signal, timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS });
   if (!result.ok) {
     return { ok: false, sessions: [], error: result.error };
   }
@@ -1969,8 +1984,12 @@ export async function listHermesSessions(
       id: asString(item.id) || asString(item.session_id),
       title: asString(item.title) || "Untitled session",
       model: asString(item.model) || null,
-      startedAt: asString(item.started_at) || asString(item.created_at) || new Date().toISOString(),
-      endedAt: asString(item.ended_at) || asString(item.end_time) || null,
+      source: asString(item.source) || null,
+      startedAt: firstTimestamp(item.started_at, item.created_at) || new Date().toISOString(),
+      endedAt: firstTimestamp(item.ended_at, item.end_time) || null,
+      lastActiveAt: firstTimestamp(item.last_active, item.updated_at) || null,
+      parentSessionId: asString(item.parent_session_id) || null,
+      preview: asString(item.preview) || null,
       messageCount: typeof item.message_count === "number" ? item.message_count : undefined
     }))
     .filter((session) => Boolean(session.id));
@@ -2643,8 +2662,12 @@ function normalizeHermesSessionDetail(
     id: firstString(item.id, item.session_id) || fallbackId,
     title: firstString(item.title, item.name) || "Untitled session",
     model,
-    startedAt: firstString(item.started_at, item.created_at, item.startedAt) || new Date().toISOString(),
-    endedAt: firstString(item.ended_at, item.end_time, item.endedAt) || null,
+    source: firstString(item.source, item.channel, item.platform) || null,
+    startedAt: firstTimestamp(item.started_at, item.created_at, item.startedAt) || new Date().toISOString(),
+    endedAt: firstTimestamp(item.ended_at, item.end_time, item.endedAt) || null,
+    lastActiveAt: firstTimestamp(item.last_active, item.updated_at, item.lastActiveAt) || null,
+    parentSessionId: firstString(item.parent_session_id, item.parentSessionId) || null,
+    preview: firstString(item.preview, item.summary) || null,
     messageCount: typeof item.message_count === "number"
       ? item.message_count
       : typeof item.messageCount === "number"
@@ -3409,7 +3432,7 @@ async function createHermesRun(args: {
   conversationHistory?: HermesChatRequest["recentMessages"];
   fetchImpl: typeof fetch;
   instructions?: string;
-  memoryScopeKey?: string | null;
+  sessionContextKey?: string | null;
   model?: string | null;
   prompt: string;
   sessionId: string;
@@ -3425,9 +3448,9 @@ async function createHermesRun(args: {
     "Content-Type": "application/json"
   });
   applyHermesAuth(headers, args.apiKey);
-  const memoryScopeKey = sanitizeHeaderValue(args.memoryScopeKey ?? null);
-  if (memoryScopeKey) {
-    headers.set("X-Hermes-Session-Key", memoryScopeKey);
+  const sessionContextKey = sanitizeHeaderValue(args.sessionContextKey ?? null);
+  if (sessionContextKey) {
+    headers.set("X-Hermes-Session-Key", sessionContextKey);
   }
 
   try {
@@ -3500,7 +3523,7 @@ async function runSingleHermesRunsStopAttempt(args: {
       "Do not use tools, memory, commands, files, web browsing, external resources, or approvals.",
       "Only generate the requested counting text."
     ].join("\n"),
-    memoryScopeKey: "hermes-ui-runs-stop-probe",
+    sessionContextKey: "hermes-ui-runs-stop-probe",
     prompt: args.prompt,
     sessionId: args.sessionId,
     signal: args.signal,
@@ -3637,22 +3660,21 @@ function emptyRunsProbeCounts() {
     events: 0,
     messageDeltaEvents: 0,
     toolEvents: 0,
-    brainMemoryToolEvents: 0,
+    memoryToolEvents: 0,
     approvalEvents: 0
   };
 }
 
 function countRunsProbeEvents(events: HermesRunProbeEvent[]) {
   const toolEvents = events.filter((event) => event.event.startsWith("tool."));
-  const brainMemoryToolEvents = toolEvents.filter((event) =>
-    normalizeName(event.toolName ?? "").includes("brain_memory") ||
+  const memoryToolEvents = toolEvents.filter((event) =>
     normalizeName(event.toolName ?? "").includes("memory")
   );
   return {
     events: events.length,
     messageDeltaEvents: events.filter((event) => event.event === "message.delta").length,
     toolEvents: toolEvents.length,
-    brainMemoryToolEvents: brainMemoryToolEvents.length,
+    memoryToolEvents: memoryToolEvents.length,
     approvalEvents: events.filter((event) => event.event.startsWith("approval.")).length
   };
 }
@@ -3663,22 +3685,17 @@ function publicExperimentalRunsContext(request: HermesChatRequest): HermesRunsEx
     projectStableKey: request.context.project.stableKey,
     sessionId: request.context.session.id,
     sessionStableKey: request.context.session.stableKey,
-    hermesSessionId: request.context.session.hermesSessionId,
-    tenantId: request.context.project.tenantId
+    hermesSessionId: request.context.session.hermesSessionId
   };
 }
 
-function experimentalRunsMetadata(
-  enabled: boolean,
-  memoryScopeBridgeEnabled: boolean
-): HermesRunsExperimentalChatResult["experimental"] {
+function experimentalRunsMetadata(enabled: boolean): HermesRunsExperimentalChatResult["experimental"] {
   return {
     featureFlag: "HERMES_UI_EXPERIMENTAL_RUNS_MODE",
     enabled,
     defaultEnabled: false,
     route: "bff-only",
-    productionChatUntouched: true,
-    memoryScopeBridgeEnabled
+    productionChatUntouched: true
   };
 }
 
@@ -3689,7 +3706,6 @@ function experimentalRunsSafety(memoryMutationRequested: boolean): HermesRunsExp
     stopCalled: false,
     approvalCalled: false,
     browserDirectHermes: false,
-    browserDirectBrainMemory: false,
     directStorageAccess: false,
     memoryMutationRequested,
     productionChatUntouched: true
@@ -4867,13 +4883,12 @@ function isEndpointMismatchError(error: HermesChatError) {
 
 function withUiCapabilities(
   status: Omit<NormalizedHermesStatus, "uiCapabilities">,
-  config: Pick<HermesClientConfig, "configuredDefaultModelId" | "memoryScopeBridgeEnabled">
+  config: Pick<HermesClientConfig, "configuredDefaultModelId">
 ): NormalizedHermesStatus {
   return {
     ...status,
     uiCapabilities: normalizeHermesUiCapabilities(status, {
-      configuredDefaultModelId: config.configuredDefaultModelId,
-      memoryScopeBridgeEnabled: config.memoryScopeBridgeEnabled
+      configuredDefaultModelId: config.configuredDefaultModelId
     })
   };
 }
@@ -5149,6 +5164,29 @@ function firstString(...values: unknown[]): string {
   return "";
 }
 
+function firstTimestamp(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const milliseconds = Math.abs(value) < 1_000_000_000_000 ? value * 1000 : value;
+      const date = new Date(milliseconds);
+      if (Number.isFinite(date.getTime())) {
+        return date.toISOString();
+      }
+    }
+    if (typeof value === "string" && value.trim()) {
+      const trimmed = value.trim();
+      const numeric = Number(trimmed);
+      const milliseconds = Number.isFinite(numeric)
+        ? (Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric)
+        : Date.parse(trimmed);
+      if (Number.isFinite(milliseconds)) {
+        return new Date(milliseconds).toISOString();
+      }
+    }
+  }
+  return "";
+}
+
 function optionalBoolean(...values: unknown[]): boolean | null {
   for (const value of values) {
     if (typeof value === "boolean") {
@@ -5209,6 +5247,7 @@ function extractConfiguredDefaultModelIds(
     asString(healthDetailed?.model),
     asString(healthBasic?.default_model),
     asString(healthBasic?.model),
+    asString(modelsRoot?.model),
     asString(modelsRoot?.default_model),
     flaggedDefaultModelId(status.models)
   ].filter((value): value is string => Boolean(value) && !isPlaceholderHermesModelId(value));
@@ -5314,6 +5353,11 @@ function inferCatalogDefaultModelId(availableModels: HermesModelDescriptor[]): s
 }
 
 function modelDescriptors(models: Record<string, unknown> | null): HermesModelDescriptor[] {
+  const optionDescriptors = modelOptionDescriptors(models);
+  if (optionDescriptors.length > 0) {
+    return optionDescriptors;
+  }
+
   const data = models?.data;
   if (!Array.isArray(data)) {
     return [];
@@ -5344,15 +5388,72 @@ function modelDescriptors(models: Record<string, unknown> | null): HermesModelDe
   return descriptors;
 }
 
-function openRouterModelsUrl(baseUrl: string | null | undefined): string {
-  const raw = baseUrl?.trim();
-  if (!raw) {
-    return OPENROUTER_MODELS_URL;
+function modelOptionDescriptors(models: Record<string, unknown> | null): HermesModelDescriptor[] {
+  const providers = models?.providers;
+  if (!Array.isArray(providers)) {
+    return [];
   }
+
+  const orderedProviders = providers
+    .map(objectRecord)
+    .filter((provider): provider is Record<string, unknown> => Boolean(provider?.authenticated === true))
+    .sort((left, right) =>
+      Number(right.is_current === true) - Number(left.is_current === true) ||
+      Number(right.is_user_defined === true) - Number(left.is_user_defined === true)
+    );
+  const seenModelIds = new Set<string>();
+  const descriptors: HermesModelDescriptor[] = [];
+
+  for (const provider of orderedProviders) {
+    const rawProviderKey = asString(provider.slug) || asString(provider.id);
+    const providerKey = normalizeModelOptionsProviderKey(rawProviderKey);
+    const providerLabel = asString(provider.name) || formatHermesProviderLabel(providerKey) || providerKey;
+    for (const id of stringArray(provider.models)) {
+      if (!id || isPlaceholderHermesModelId(id) || seenModelIds.has(id)) {
+        continue;
+      }
+      seenModelIds.add(id);
+      descriptors.push({
+        id,
+        label: formatHermesModelLabel(id),
+        provider: providerLabel,
+        providerKey,
+        selectModelId: id,
+        catalogSource: "hermes-config",
+        selectionScope: "session"
+      });
+    }
+  }
+
+  return descriptors;
+}
+
+function normalizeModelOptionsProviderKey(providerKey: string): string {
+  const normalized = providerKey.trim().toLowerCase();
+  if (normalized === "custom:openrouter" || normalized === "openrouter-configured") {
+    return "openrouter";
+  }
+  return providerKey;
+}
+
+function openRouterModelsUrl(
+  baseUrl: string | null | undefined,
+  options: { sort?: "most-popular"; supportedParameters?: string[] } = {}
+): string {
+  const raw = baseUrl?.trim();
   try {
-    const url = new URL(raw);
+    const url = new URL(raw || OPENROUTER_MODELS_URL);
     if (!url.pathname || url.pathname === "/") {
       url.pathname = "/api/v1/models";
+    }
+    if (options.sort) {
+      url.searchParams.set("sort", options.sort);
+    }
+    const supportedParameters = options.supportedParameters
+      ?.map((parameter) => parameter.trim())
+      .filter(Boolean);
+    if (supportedParameters?.length) {
+      url.searchParams.set("supported_parameters", supportedParameters.join(","));
     }
     return url.toString();
   } catch {
@@ -5376,7 +5477,10 @@ function lmStudioModelsUrl(baseUrl: string | null | undefined): string {
   }
 }
 
-function normalizeOpenRouterModels(data: Record<string, unknown> | null): HermesModelDescriptor[] {
+function normalizeOpenRouterModels(
+  data: Record<string, unknown> | null,
+  preservePopularityOrder = false
+): HermesModelDescriptor[] {
   const items = data?.data;
   if (!Array.isArray(items)) {
     return [];
@@ -5408,6 +5512,7 @@ function normalizeOpenRouterModels(data: Record<string, unknown> | null): Hermes
       inputModalities: stringArray(architecture?.input_modalities),
       outputModalities: stringArray(architecture?.output_modalities),
       supportedParameters: stringArray(record.supported_parameters),
+      openRouterPopularityRank: preservePopularityOrder ? models.length + 1 : undefined,
       pricing: pricing
         ? {
             completion: asString(pricing.completion) || null,
@@ -5419,7 +5524,7 @@ function normalizeOpenRouterModels(data: Record<string, unknown> | null): Hermes
     });
   }
 
-  return models.sort((a, b) => a.label.localeCompare(b.label));
+  return preservePopularityOrder ? models : models.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function normalizeLmStudioModels(data: Record<string, unknown> | null): HermesModelDescriptor[] {
@@ -5565,6 +5670,18 @@ function preferPublicProviderCatalogModels(models: HermesModelDescriptor[]): Her
     if (providerKey === "anthropic" && !id.includes("/") && publicProviderAliases.has(catalogAliasKey(id))) {
       return false;
     }
+    return true;
+  });
+}
+
+function dedupeSelectableModels(models: HermesModelDescriptor[]): HermesModelDescriptor[] {
+  const seenAliases = new Set<string>();
+  return models.filter((model) => {
+    const alias = catalogAliasKey(model.id);
+    if (seenAliases.has(alias)) {
+      return false;
+    }
+    seenAliases.add(alias);
     return true;
   });
 }

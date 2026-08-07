@@ -2,8 +2,22 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Brain Memory Studio",
-  description: "Local Hermes UI and Brain Memory Studio with project-scoped chat and read-only memory inspection."
+  title: "Stoix",
+  description: "Local Hermes Agent workspace with project-scoped chat, plugins, skills, configuration, keys, and logs.",
+  icons: {
+    icon: [
+      {
+        media: "(prefers-color-scheme: light)",
+        type: "image/png",
+        url: "/assets/stoix-helmet-black.png"
+      },
+      {
+        media: "(prefers-color-scheme: dark)",
+        type: "image/png",
+        url: "/assets/stoix-helmet-white.png"
+      }
+    ]
+  }
 };
 
 export default function RootLayout({

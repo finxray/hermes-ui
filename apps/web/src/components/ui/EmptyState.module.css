@@ -2,22 +2,26 @@
   display: grid;
   gap: 10px;
   padding: 18px;
-  border: 1px solid var(--border-glass-soft);
-  border-radius: var(--radius-md);
-  background: var(--bg-glass-soft);
+  border: 0;
+  border-radius: 20px;
+  background: #181819;
   color: var(--text-secondary);
-  box-shadow: var(--glass-highlight);
+  box-shadow: none;
 }
 
 .compact {
   padding: 12px;
-  border-radius: var(--radius-sm);
 }
 
 .title {
   color: var(--text-primary);
   font-size: var(--font-small);
   font-weight: 650;
+}
+
+.empty[data-tone="important"] .title,
+.empty[data-tone="important"] p {
+  color: var(--orange);
 }
 
 .empty p {
@@ -27,20 +31,40 @@
   line-height: 1.5;
 }
 
-.button {
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button,
+.secondaryButton {
   min-height: var(--row-height);
-  justify-self: start;
   padding: 0 14px;
   border: 0;
   border-radius: 17px;
-  background: transparent;
+  background: #262628;
+  box-shadow: none;
   color: var(--text-secondary);
+  cursor: pointer;
   font-size: var(--font-body);
 }
 
 .button:hover,
-.button:focus-visible {
+.button:focus-visible,
+.secondaryButton:hover,
+.secondaryButton:focus-visible {
   outline: 0;
-  background: var(--bg-control-hover);
+  background: #303033;
   color: var(--text-primary);
+}
+
+.button:disabled,
+.secondaryButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.empty[data-tone="important"] .button {
+  color: var(--orange);
 }

@@ -3,7 +3,7 @@
 import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
 import styles from "./TopBar.module.css";
 
-export type ShellSection = "workspace" | "plugins" | "config" | "keys" | "logs";
+export type ShellSection = "workspace" | "plugins" | "config" | "keys" | "logs" | "settings";
 
 const SECTION_ITEMS: { id: ShellSection; label: string }[] = [
   { id: "workspace", label: "Workspace" },
@@ -15,10 +15,8 @@ const SECTION_ITEMS: { id: ShellSection; label: string }[] = [
 
 type TopBarProps = {
   activeSection: ShellSection;
-  canGoBack?: boolean;
   leftToggleId: string;
   leftCollapsed: boolean;
-  onBack?: () => void;
   onSectionChange: (section: ShellSection) => void;
   onRightToggle?: () => void;
   rightToggleId: string;
@@ -28,10 +26,8 @@ type TopBarProps = {
 
 export function TopBar({
   activeSection,
-  canGoBack = false,
   leftToggleId,
   leftCollapsed,
-  onBack,
   onRightToggle,
   onSectionChange,
   rightToggleId,
@@ -43,29 +39,17 @@ export function TopBar({
   };
 
   return (
-    <header className={styles.topbar} aria-label="Brain Memory Studio workspace menu">
+    <header className={styles.topbar} aria-label="Stoix workspace menu">
       <div className={styles.left}>
         <button
-          className={styles.iconButton}
+          className={`${styles.iconButton} ${styles.leadingButton}`}
           aria-label={leftCollapsed ? "Open left sidebar" : "Collapse left sidebar"}
           aria-pressed={!leftCollapsed}
           onClick={() => activateToggle(leftToggleId)}
-          title={leftCollapsed ? "Open left sidebar" : "Collapse left sidebar"}
           type="button"
         >
           <PanelToggleIcon side="left" />
         </button>
-        {canGoBack ? (
-          <button
-            className={styles.backButton}
-            aria-label="Go back"
-            onClick={onBack}
-            title="Go back"
-            type="button"
-          >
-            <span aria-hidden="true" />
-          </button>
-        ) : null}
         <nav className={styles.menu} aria-label="Workspace sections">
           {SECTION_ITEMS.map((item) => (
             <button
@@ -73,7 +57,6 @@ export function TopBar({
               className={`${styles.menuItem} ${activeSection === item.id ? styles.active : ""}`}
               key={item.id}
               onClick={() => onSectionChange(item.id)}
-              title={item.label}
               type="button"
             >
               {item.label}
@@ -87,7 +70,6 @@ export function TopBar({
           aria-label={rightToggleLabel ?? (rightCollapsed ? "Open right context panel" : "Collapse right context panel")}
           aria-pressed={!rightCollapsed}
           onClick={onRightToggle ?? (() => activateToggle(rightToggleId))}
-          title={rightToggleLabel ?? (rightCollapsed ? "Open right context panel" : "Collapse right context panel")}
           type="button"
         >
           <PanelToggleIcon side="right" />

@@ -27,19 +27,17 @@ export function HermesStatusPanel({
   const sessionCheckedAt = sessionModel?.checkedAt
     ? new Date(sessionModel.checkedAt).toLocaleTimeString()
     : null;
-  // A client selection is applied through Hermes' per-session override, which is
-  // "memory only" and is not confirmed as the model that actually generates the
-  // response. Surface that explicitly instead of implying the route is verified.
   const softOverrideActive =
     Boolean(sessionModel) &&
     status?.reachable === true &&
     activeModelState?.selectionStatus === "client-selectable" &&
     (sessionModel?.syncStatus === "synced" || sessionModel?.syncStatus === "turn-ready");
+  const connectionTone = status?.mode === "real" && status.reachable ? "connected" : "attention";
 
   return (
     <section className={styles.section} aria-labelledby="hermes-status-heading">
       <div className={styles.sectionLabel} id="hermes-status-heading">
-        <span>Hermes status</span>
+        <span>Hermes</span>
         <button
           className={`${styles.iconButton}${isRefreshing ? ` ${styles.iconButtonRefreshing}` : ""}`}
           type="button"
@@ -47,22 +45,28 @@ export function HermesStatusPanel({
           onClick={onRefresh}
           disabled={isLoading || isRefreshing}
         >
-          <RefreshCw size={13} aria-hidden="true" />
+          <RefreshCw size={16} aria-hidden="true" />
         </button>
       </div>
-      <div className={styles.card}>
-        <div className={styles.cardTitle}>
+
+      <div className={styles.statusSummary}>
+        <div className={styles.statusHeadline} data-tone={connectionTone}>
+          <span className={styles.statusDot} aria-hidden="true" />
           <span>{statusLabel(status, isLoading)}</span>
-          <span className={styles.pill}>{status?.mode ?? "checking"}</span>
         </div>
-        <div className={styles.metrics}>
-          <Metric label="configured" value={status?.configured ? "Yes" : "No"} />
-          <Metric label="reachable" value={status?.reachable ? "Yes" : "No"} />
-        </div>
-        <div className={styles.cardBody}>
-          {status?.baseUrl ? `Base URL: ${status.baseUrl}` : "Set HERMES_API_BASE_URL to enable real checks."}
-        </div>
-        {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
+        {activeModelState ? (
+          <div className={styles.primaryFields} aria-label="Active Hermes route">
+            <ModelField
+              label="Model"
+              value={sessionModel?.modelLabel ?? activeModelState.currentModelLabel}
+            />
+            <ModelField
+              label="Provider"
+              value={sessionModel?.providerLabel ?? activeModelState.currentProviderLabel}
+            />
+          </div>
+        ) : null}
+
         {sessionModel ? (
           <div
             className={styles.syncStrip}
@@ -77,54 +81,67 @@ export function HermesStatusPanel({
                   : syncStatusLabel(sessionModel.syncStatus)}
               </span>
             </div>
-            <div className={styles.syncPipeline} aria-label="Model sync pipeline">
-              <span className={styles.syncNode}>Hermes</span>
-              <span className={styles.syncLine} aria-hidden="true" />
-              <span className={styles.syncNode}>BFF</span>
-              <span className={styles.syncLine} aria-hidden="true" />
-              <span className={styles.syncNode}>UI</span>
-            </div>
             <div className={styles.meta}>
               {sessionPipelineMeta(sessionModel.syncStatus, sessionCheckedAt, softOverrideActive)}
             </div>
-            {softOverrideActive ? (
-              <div className={styles.caveat}>
-                Hermes stores this as a per-session override but does not report which model
-                actually generates the response — some providers may be ignored and fall back to
-                the server default. If replies don&apos;t match, set the model with the Telegram
-                &ldquo;/model&rdquo; command (persistent) and confirm in your provider&apos;s logs.
-              </div>
-            ) : null}
             {sessionModel.error ? <div className={styles.error}>{sessionModel.error}</div> : null}
           </div>
         ) : null}
-        {activeModelState ? (
-          <div className={styles.fieldGrid} aria-label="Hermes model state">
-            <ModelField label="Model" value={sessionModel?.modelLabel ?? activeModelState.currentModelLabel} />
-            <ModelField label="Provider" value={sessionModel?.providerLabel ?? activeModelState.currentProviderLabel} />
-            <ModelField label="Selection" value={activeModelState.selectionStatus} />
-            <ModelField label="Fast stream" value={activeModelState.fastStreamProfile} />
-            {activeModelDescriptor?.runtime ? (
-              <>
-                <ModelField label="Context" value={formatRuntimeContext(activeModelDescriptor.runtime)} />
-                <ModelField label="Quant" value={formatRuntimeQuantization(activeModelDescriptor.runtime)} />
-                <ModelField label="Runtime" value={formatRuntimeFlags(activeModelDescriptor.runtime)} />
-              </>
+
+        {status?.error ? <div className={styles.error}>{status.error.message}</div> : null}
+
+        <details className={styles.runtimeDetails}>
+          <summary>Runtime details</summary>
+          <div className={styles.detailBody}>
+            <div className={styles.fieldGrid} aria-label="Hermes runtime details">
+              <ModelField label="Mode" value={status?.mode ?? "checking"} />
+              <ModelField label="Configured" value={status?.configured ? "Yes" : "No"} />
+              <ModelField label="Reachable" value={status?.reachable ? "Yes" : "No"} />
+              <ModelField label="Base URL" value={status?.baseUrl ?? "Not configured"} />
+              {activeModelState ? (
+                <>
+                  <ModelField label="Selection" value={activeModelState.selectionStatus} />
+                  <ModelField label="Fast stream" value={activeModelState.fastStreamProfile} />
+                </>
+              ) : null}
+              {activeModelDescriptor?.runtime ? (
+                <>
+                  <ModelField
+                    label="Context"
+                    value={formatRuntimeContext(activeModelDescriptor.runtime)}
+                  />
+                  <ModelField
+                    label="Quantization"
+                    value={formatRuntimeQuantization(activeModelDescriptor.runtime)}
+                  />
+                  <ModelField
+                    label="Runtime"
+                    value={formatRuntimeFlags(activeModelDescriptor.runtime)}
+                  />
+                </>
+              ) : null}
+            </div>
+            {softOverrideActive ? (
+              <p className={styles.caveat}>
+                Hermes accepted this per-session model request but does not confirm which model
+                generated the response. Verify the effective route in provider logs when needed.
+              </p>
             ) : null}
+            {capabilityRows.length > 0 ? (
+              <dl className={styles.capabilityList} aria-label="Hermes capabilities">
+                {capabilityRows.map((row) => (
+                  <div key={row.label}>
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <div className={styles.meta}>Capabilities unavailable until Hermes responds.</div>
+            )}
+            <div className={styles.meta}>Last checked {checkedAt}</div>
           </div>
-        ) : null}
-        {capabilityRows.length > 0 ? (
-          <div className={styles.capabilities} aria-label="Hermes capabilities">
-            {capabilityRows.map((row) => (
-              <span className={styles.pill} key={row.label}>
-                {row.label}: {row.value}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.meta}>Capabilities unavailable until Hermes responds.</div>
-        )}
-        <div className={styles.meta}>Last checked: {checkedAt}</div>
+        </details>
       </div>
     </section>
   );
@@ -135,15 +152,6 @@ function ModelField({ label, value }: { label: string; value: string }) {
     <div className={styles.field}>
       <span className={styles.fieldLabel}>{label}</span>
       <span className={styles.fieldValue}>{value}</span>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.metric}>
-      <div className={styles.metricValue}>{value}</div>
-      <div className={styles.metricLabel}>{label}</div>
     </div>
   );
 }
@@ -165,7 +173,7 @@ function formatRuntimeQuantization(runtime: HermesModelRuntimeMetadata) {
     return "Unknown";
   }
   return typeof runtime.quantizationBits === "number"
-    ? `${runtime.quantization} · ${runtime.quantizationBits}-bit`
+    ? `${runtime.quantization} / ${runtime.quantizationBits}-bit`
     : runtime.quantization;
 }
 
@@ -177,7 +185,7 @@ function formatRuntimeFlags(runtime: HermesModelRuntimeMetadata) {
     typeof config?.evalBatchSize === "number" ? `batch ${config.evalBatchSize}` : null,
     typeof config?.numExperts === "number" ? `${config.numExperts} experts` : null
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : runtime.state ?? "Unknown";
+  return parts.length > 0 ? parts.join(" / ") : runtime.state ?? "Unknown";
 }
 
 function formatCompactContext(value: number) {
@@ -192,21 +200,18 @@ function formatCompactContext(value: number) {
 
 function statusLabel(status: NormalizedHermesStatus | null, isLoading: boolean) {
   if (isLoading && !status) {
-    return "Checking Hermes";
+    return "Checking connection";
   }
   if (!status) {
-    return "Hermes status unavailable";
+    return "Status unavailable";
   }
   if (status.mode === "real" && status.reachable) {
-    return "Hermes connected";
+    return "Connected";
   }
   if (status.mode === "unconfigured") {
-    return "Hermes unconfigured";
+    return "Not configured";
   }
-  if (status.mode === "mock") {
-    return "Hermes mock mode";
-  }
-  return "Hermes unreachable";
+  return "Unavailable";
 }
 
 function sessionPipelineMeta(
@@ -226,79 +231,38 @@ function sessionPipelineMeta(
         ? `Hermes accepted this route at ${sessionCheckedAt}.`
         : "Hermes accepted this route.";
     }
-    return sessionCheckedAt ? `Session verified: ${sessionCheckedAt}` : "Waiting for Hermes session verification.";
+    return sessionCheckedAt ? `Session verified at ${sessionCheckedAt}.` : "Session verified.";
   }
-  return sessionCheckedAt ? `Session verified: ${sessionCheckedAt}` : "Waiting for Hermes session verification.";
+  return sessionCheckedAt ? `Last checked at ${sessionCheckedAt}.` : "Waiting for verification.";
 }
 
 function syncStatusLabel(status: HermesSessionModelSync["syncStatus"]) {
-  if (status === "synced") {
-    return "verified";
-  }
-  if (status === "verifying") {
-    return "switching";
-  }
-  if (status === "loading") {
-    return "checking";
-  }
-  if (status === "fallback") {
-    return "server default";
-  }
-  if (status === "turn-ready") {
-    return "unverified";
-  }
-  if (status === "error") {
-    return "attention";
-  }
+  if (status === "synced") return "verified";
+  if (status === "verifying") return "switching";
+  if (status === "loading") return "checking";
+  if (status === "fallback") return "server default";
+  if (status === "turn-ready") return "unverified";
+  if (status === "error") return "attention";
   return "unavailable";
 }
 
-function getCapabilityRows(status: NormalizedHermesStatus | null, sessionModel?: HermesSessionModelSync | null) {
+function getCapabilityRows(
+  status: NormalizedHermesStatus | null,
+  sessionModel?: HermesSessionModelSync | null
+) {
   const ui = status?.uiCapabilities;
   if (!ui) {
     return [];
   }
 
   return [
-    {
-      label: "session stream",
-      value: ui.chat.sessionStreaming ? "available" : "unavailable"
-    },
-    {
-      label: "runs",
-      value: ui.runs.submission && ui.runs.eventsSse ? "available" : "unavailable"
-    },
-    {
-      label: "stop",
-      value: ui.cancellation.uiState
-    },
-    {
-      label: "approvals",
-      value: ui.approvals.uiState
-    },
-    {
-      label: "tools",
-      value: ui.tools.uiState
-    },
-    {
-      label: "model",
-      value: sessionModel?.modelLabel ?? ui.models.currentModelLabel
-    },
-    {
-      label: "model mode",
-      value: ui.models.selectionStatus
-    },
-    {
-      label: "model selector",
-      value: ui.models.uiState
-    },
-    {
-      label: "memory bridge",
-      value: ui.memory.instructionBridgeActive ? "active" : "inactive"
-    },
-    {
-      label: "files",
-      value: ui.files.uiState
-    }
+    { label: "Session streaming", value: ui.chat.sessionStreaming ? "Available" : "Unavailable" },
+    { label: "Runs", value: ui.runs.submission && ui.runs.eventsSse ? "Available" : "Unavailable" },
+    { label: "Stop", value: ui.cancellation.uiState },
+    { label: "Approvals", value: ui.approvals.uiState },
+    { label: "Tools", value: ui.tools.uiState },
+    { label: "Model", value: sessionModel?.modelLabel ?? ui.models.currentModelLabel },
+    { label: "Model mode", value: ui.models.selectionStatus },
+    { label: "Files", value: ui.files.uiState }
   ];
 }

@@ -29,7 +29,7 @@ The only active local Next server found for these ports was on `127.0.0.1:3000`.
 
 Observed process chain:
 
-- `powershell.exe`: `Set-Location "C:\Users\Alexey\.cursor\projects\hermes-ui\apps\web"; npx next dev -H 127.0.0.1 -p 3000`
+- `powershell.exe`: `Set-Location "<repo-root>\apps\web"; npx next dev -H 127.0.0.1 -p 3000`
 - `node.exe`: `npx next dev -H 127.0.0.1 -p 3000`
 - `cmd.exe`: `next dev -H 127.0.0.1 -p 3000`
 - `node.exe`: `next/dist/bin/next dev -H 127.0.0.1 -p 3000`
@@ -88,7 +88,7 @@ That matches the approved prototype route.
 Current dev server command observed:
 
 ```powershell
-cd C:\Users\Alexey\.cursor\projects\hermes-ui\apps\web
+cd C:\path\to\stoix\apps\web
 npx next dev -H 127.0.0.1 -p 3000
 ```
 
@@ -130,4 +130,3 @@ as the design source, because it still shows the old green production app.
 - `npm run typecheck` passed.
 - `npm run build` passed.
 - `npm audit --audit-level=moderate` passed with `0` vulnerabilities.
-

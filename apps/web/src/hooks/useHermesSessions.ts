@@ -63,8 +63,17 @@ export function useHermesSessions(enabled = true) {
     }
     void load();
     intervalRef.current = setInterval(() => { void load(); }, REFRESH_INTERVAL_MS);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void load();
+      }
+    };
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       mountedRef.current = false;
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
       if (intervalRef.current !== null) {
         clearInterval(intervalRef.current);
       }

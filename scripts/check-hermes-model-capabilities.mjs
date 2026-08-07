@@ -95,6 +95,39 @@ check(
   indexFile?.includes("export async function getHermesSession") ?? false
 );
 check(
+  "Hermes 0.20 model options endpoint is used when advertised",
+  Boolean(
+    indexFile?.includes('hasEndpoint(capabilityEndpoints, "model_options")') &&
+      indexFile?.includes('"/api/model/options"') &&
+      indexFile?.includes("modelOptionDescriptors")
+  ),
+  "Current Hermes advertises its selectable provider catalog through /api/model/options, while /v1/models may contain only hermes-agent."
+);
+check(
+  "Hermes 0.20 session model lock capability enables selection",
+  Boolean(
+    indexFile?.includes('flag(features, "session_model_lock")') &&
+      indexFile?.includes('hasEndpoint(endpoints, "session_model_lock")')
+  ),
+  "Current Hermes uses session_model_lock instead of the legacy session_model_override capability object."
+);
+check(
+  "Hermes 0.20 nested runtime model readback is normalized",
+  Boolean(
+    indexFile?.includes("objectRecord(record?.runtime)?.model") &&
+      indexFile?.includes("objectRecord(record?.runtime)?.provider")
+  ),
+  "POST /api/sessions/{id}/model returns the selected route inside runtime."
+);
+check(
+  "Configured OpenRouter provider aliases normalize to the verified provider family",
+  Boolean(
+    indexFile?.includes("normalizeModelOptionsProviderKey") &&
+      indexFile?.includes('normalized === "custom:openrouter"') &&
+      indexFile?.includes('return "openrouter"')
+  )
+);
+check(
   "getHermesSession reads Hermes session detail endpoint",
   Boolean(
     indexFile?.includes("export async function getHermesSession") &&
@@ -263,14 +296,16 @@ check(
   "Catalog/routing provider keys such as cerebras-gpt-oss-120b and nvidia should display as provider families"
 );
 check(
-  "OpenRouter catalog client fetches and normalizes upstream model list",
+  "OpenRouter catalog client preserves weekly popularity order",
   Boolean(
     indexFile?.includes("export async function getOpenRouterModelCatalog") &&
       indexFile?.includes("https://openrouter.ai/api/v1/models") &&
       indexFile?.includes("normalizeOpenRouterModels") &&
+      indexFile?.includes('sort?: "most-popular"') &&
+      indexFile?.includes("openRouterPopularityRank") &&
       indexFile?.includes('catalogSource: "ui-openrouter"')
   ),
-  "UI-added models should come from a typed server-side OpenRouter catalog client."
+  "UI-added models should come from the typed server-side catalog and retain OpenRouter's ranking."
 );
 check(
   "Loaded LM Studio models are session-selectable while unsafe local runtimes stay filtered",
@@ -406,6 +441,14 @@ check(
       !openRouterCatalogRouteFile?.includes("NEXT_PUBLIC")
   )
 );
+check(
+  "OpenRouter model catalog requests weekly tool-capable ranking",
+  Boolean(
+    openRouterCatalogRouteFile?.includes('sort: "most-popular"') &&
+      openRouterCatalogRouteFile?.includes('supportedParameters: ["tools"]')
+  ),
+  "The Most popular section should follow OpenRouter weekly usage and avoid non-agent models."
+);
 const chatStreamRouteFile = readFile("apps/web/src/app/api/hermes/chat/stream/route.ts");
 const runtimeIdentityFile = readFile("apps/web/src/lib/hermesRuntimeIdentity.ts");
 check(
@@ -457,8 +500,11 @@ check(
   composerFile !== null
 );
 check(
-  "Composer model button is disabled unless canSelectModel",
-  composerFile?.includes("disabled={!canSelectModel}") ?? false,
+  "Composer model button is disabled unless Hermes allows selection",
+  Boolean(
+    composerFile?.includes("const canOpenModelMenu = canSelectModel") &&
+      composerFile?.includes("disabled={!canOpenModelMenu}")
+  ),
   "Model button should only enable when Hermes reports selectable models"
 );
 check(
@@ -466,17 +512,34 @@ check(
   composerFile?.includes("modelState") ?? false
 );
 check(
+  "Composer model selector label is grounded in client-selectable capability",
+  composerFile?.includes("state?.clientSelectable && optionCount > 1") ?? false,
+  "A disabled selector must not claim that model selection is available"
+);
+check(
   "Composer receives onModelSelect prop",
   composerFile?.includes("onModelSelect") ?? false
 );
 check(
-  "Composer renders searchable grouped model browser",
+  "Composer renders searchable Hermes-configured model browser",
   Boolean(
     composerFile?.includes("Search models") &&
-    composerFile?.includes("ModelSection") &&
-      composerFile?.includes('title="OpenRouter"') &&
-      composerFile?.includes("groupModelOptions")
+      composerFile?.includes("ModelSection") &&
+      composerFile?.includes('title="Hermes Configured"') &&
+      composerFile?.includes('model.catalogSource === "hermes-config"') &&
+      composerFile?.includes("groupModelOptions") &&
+      !composerFile?.includes('title="Most popular"')
   )
+);
+check(
+  "Composer caps configured models with More and Less controls",
+  Boolean(
+    composerFile?.includes("CONFIGURED_MODEL_PREVIEW_LIMIT = 10") &&
+      composerFile?.includes("collapseConfiguredModels") &&
+      composerFile?.includes('expanded ? "Less" : "More"') &&
+      composerFile?.includes("isFilteringModels")
+  ),
+  "The default list should stay compact while search and More retain access to every Hermes model."
 );
 check(
   "Composer shows modelLabel in button text",
@@ -536,14 +599,15 @@ check(
   )
 );
 check(
-  "useHermesSessionModel keeps public OpenRouter-only models out of runtime selection",
+  "useHermesSessionModel keeps catalog-only models out of selectable state",
   Boolean(
     sessionModelHookFile?.includes("openRouterModels") &&
       sessionModelHookFile?.includes("mergeOpenRouterModels") &&
-      sessionModelHookFile?.includes("public OpenRouter-only models stay hidden") &&
-      !sessionModelHookFile?.includes("availableModels: [...state.availableModels, ...extras]")
+      sessionModelHookFile?.includes("availableModels: mergedModels") &&
+      !sessionModelHookFile?.includes("OPENROUTER_POPULAR_MODEL_LIMIT") &&
+      !sessionModelHookFile?.includes("availableModels: [...mergedModels, ...extras]")
   ),
-  "Only models advertised by Hermes /v1/models may be selectable; the public OpenRouter catalog is metadata only."
+  "OpenRouter and LM Studio catalogs may enrich Hermes entries but must not add selectable models."
 );
 check(
   "UI-provided catalogs do not become unverified per-turn routes",
@@ -640,7 +704,7 @@ check(
       sessionModelHookFile?.includes("streamSucceededSessionIdsRef") &&
       sessionModelHookFile?.includes("error: null") &&
       chatViewFile?.includes("streamCompletedSuccessfully") &&
-      chatViewFile?.includes("sessionModel.markStreamSucceeded()")
+      (chatViewFile?.match(/sessionModel\.markStreamSucceeded\(\)/g)?.length ?? 0) === 1
   ),
   "A completed assistant stream proves Hermes is reachable and must not leave an old timeout/attention message in the right rail."
 );
@@ -728,6 +792,15 @@ check(
   "GET /v1/models can include Copilot/local/embedding ids that Hermes cannot switch via POST /api/sessions/{id}/model"
 );
 check(
+  "Hermes selectable model catalog removes duplicate aliases",
+  Boolean(
+    indexFile?.includes("dedupeSelectableModels") &&
+      indexFile?.includes("const seenAliases = new Set<string>()") &&
+      indexFile?.includes("const alias = catalogAliasKey(model.id)")
+  ),
+  "Equivalent configured model aliases should appear once while preserving the first Hermes route."
+);
+check(
   "duplicate direct provider aliases defer to routed public catalog entries",
   Boolean(
     indexFile?.includes("preferPublicProviderCatalogModels") &&
@@ -764,7 +837,7 @@ check(
 );
 check(
   "ChatView passes modelState to Composer",
-  chatViewFile?.includes("modelState={providerModelState}") ?? false
+  chatViewFile?.includes("modelState={displayedProviderModelState}") ?? false
 );
 check(
   "ChatView delegates model select to shared session pipeline",
@@ -781,7 +854,7 @@ check(
   "Composer blocks send while session model selection is verifying",
   Boolean(
     composerFile?.includes("!modelSelectInProgress") &&
-      chatViewFile?.includes("if (!activeSession || isGenerating || modelSelectInProgress)")
+      chatViewFile?.includes("if (!activeSession || modelSelectInProgress)")
   )
 );
 

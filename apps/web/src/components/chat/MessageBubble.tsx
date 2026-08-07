@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Pencil } from "@/components/ui/AppIcons";
+import { Copy, FileText } from "@/components/ui/AppIcons";
 import { memo, useMemo } from "react";
 import type { ChatMessage } from "@/data/types";
 import { CollapsibleUserMessage } from "@/components/chat/CollapsibleUserMessage";
@@ -33,6 +33,7 @@ export const MessageBubble = memo(function MessageBubble({
   );
   const showMessageFooter = Boolean(message.content) && !isStreaming;
   const usageParts = isAssistant && showUsageInFooter ? formatUsageParts(message.usage) : [];
+  const messageTime = formatMessageTime(message.createdAt);
 
   if (!isAssistant) {
     return (
@@ -43,67 +44,57 @@ export const MessageBubble = memo(function MessageBubble({
         data-status={message.status ?? "complete"}
       >
         <div className={styles.userStack}>
-          <div className={styles.userBubble}>
-            {message.attachments && message.attachments.length > 0 ? (
-              <div className={styles.messageAttachmentGrid} aria-label="Attached files">
-                {message.attachments.map((attachment) => (
-                  <div
-                    className={styles.messageAttachmentTile}
-                    data-kind={attachment.kind}
-                    draggable={Boolean(attachment.previewUrl)}
-                    key={attachment.id}
-                    onDragStart={(event) => {
-                      if (!attachment.previewUrl) {
-                        return;
-                      }
-                      event.dataTransfer.effectAllowed = "copy";
-                      event.dataTransfer.setData("text/plain", attachment.fileName);
-                      event.dataTransfer.setData(
-                        "DownloadURL",
-                        `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${attachment.previewUrl}`
-                      );
-                    }}
-                    title={`${attachment.fileName} - ${formatFileSize(attachment.sizeBytes)}`}
-                  >
-                    <span className={styles.messageAttachmentPreview} aria-hidden="true">
-                      {attachment.kind === "image" && attachment.previewUrl ? (
-                        <img alt="" src={attachment.previewUrl} />
-                      ) : (
-                        <FileText size={22} />
-                      )}
-                    </span>
-                    <span className={styles.messageAttachmentName}>{attachment.fileName}</span>
-                    <span className={styles.messageAttachmentDetail}>
-                      {attachmentKindLabel(attachment.kind)} · {formatFileSize(attachment.sizeBytes)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            {message.content ? (
+          {message.attachments && message.attachments.length > 0 ? (
+            <div className={styles.messageAttachmentGrid} aria-label="Attached files">
+              {message.attachments.map((attachment) => (
+                <div
+                  className={styles.messageAttachmentTile}
+                  data-kind={attachment.kind}
+                  draggable={Boolean(attachment.previewUrl)}
+                  key={attachment.id}
+                  onDragStart={(event) => {
+                    if (!attachment.previewUrl) {
+                      return;
+                    }
+                    event.dataTransfer.effectAllowed = "copy";
+                    event.dataTransfer.setData("text/plain", attachment.fileName);
+                    event.dataTransfer.setData(
+                      "DownloadURL",
+                      `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${attachment.previewUrl}`
+                    );
+                  }}
+                >
+                  <span className={styles.messageAttachmentPreview} aria-hidden="true">
+                    {attachment.kind === "image" && attachment.previewUrl ? (
+                      <img alt="" src={attachment.previewUrl} />
+                    ) : (
+                      <FileText size={22} />
+                    )}
+                  </span>
+                  <span className={styles.messageAttachmentName}>{attachment.fileName}</span>
+                  <span className={styles.messageAttachmentDetail}>
+                    {attachmentKindLabel(attachment.kind)} · {formatFileSize(attachment.sizeBytes)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {message.content ? (
+            <div className={styles.userBubble}>
               <CollapsibleUserMessage messageId={message.id} paragraphs={userParagraphs} />
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           {showMessageFooter ? (
             <div className={styles.messageFooter} aria-label="Message actions">
-              <span className={styles.messageMeta}>{message.createdAt}</span>
+              <span className={styles.messageMeta}>{messageTime}</span>
               <div className={styles.messageActions}>
                 <CopyTextButton
                   className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
-                  icon={ChatCopyIcon}
+                  icon={Copy}
                   label="Copy message"
                   text={message.content}
                   variant="icon"
                 />
-                <button
-                  aria-label="Edit message coming soon"
-                  className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
-                  disabled
-                  title="Edit message is coming soon."
-                  type="button"
-                >
-                  <Pencil aria-hidden="true" />
-                </button>
               </div>
             </div>
           ) : null}
@@ -141,18 +132,17 @@ export const MessageBubble = memo(function MessageBubble({
             <div className={styles.messageActions}>
               <CopyTextButton
                 className={`${markdownStyles.iconActionButton} ${styles.messageActionButton}`}
-                icon={ChatCopyIcon}
+                icon={Copy}
                 label="Copy message"
                 text={message.content}
                 variant="icon"
               />
             </div>
-            <span className={styles.messageMeta}>{message.createdAt}</span>
+            <span className={styles.messageMeta}>{messageTime}</span>
             {usageParts.map((part) => (
               <span
                 className={styles.usageMeta}
                 key={part.key}
-                title={part.title ?? "Provider or Hermes reported usage."}
               >
                 {part.label}
               </span>
@@ -164,21 +154,25 @@ export const MessageBubble = memo(function MessageBubble({
   );
 });
 
-function ChatCopyIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" {...props}>
-      <rect x="6.2" y="2.7" width="10.6" height="10.6" rx="2.6" stroke="currentColor" strokeWidth="1.65" />
-      <rect x="2.7" y="6.2" width="10.6" height="10.6" rx="2.6" fill="var(--bg-workspace-solid)" />
-      <rect x="2.7" y="6.2" width="10.6" height="10.6" rx="2.6" stroke="currentColor" strokeWidth="1.65" />
-    </svg>
-  );
-}
-
 type UsagePart = {
   key: string;
   label: string;
   title?: string;
 };
+
+function formatMessageTime(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return value;
+  }
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(timestamp);
+}
 
 function formatUsageParts(usage: ChatMessage["usage"]) {
   if (!usage) {

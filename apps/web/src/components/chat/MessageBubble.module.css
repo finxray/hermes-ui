@@ -3,6 +3,16 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   align-items: start;
+  /*
+   * Skip layout/paint for messages outside the viewport. This bounds the
+   * per-frame reflow during pane-width animations (opening the split / context
+   * console) to only the on-screen messages, so a long transcript no longer
+   * janks and "jiggles" while the chat pane resizes. `contain-intrinsic-size:
+   * auto …` caches each message's real rendered size, so off-screen messages
+   * keep an accurate placeholder height and scrolling does not jump.
+   */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
 }
 
 .message[data-role="user"] {
@@ -13,12 +23,17 @@
   justify-items: start;
 }
 
+.message[data-role="assistant"]:has([data-wide="true"]) {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
+
 .userStack {
   display: grid;
   width: fit-content;
   max-width: min(72%, 740px);
   min-width: 0;
-  gap: 6px;
+  gap: 8px;
   justify-items: end;
 }
 
@@ -34,33 +49,52 @@
 
 .messageAttachmentGrid {
   display: flex;
-  max-width: min(100%, 402px);
+  max-width: min(100%, 540px);
   min-width: 0;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 9px;
-  margin-bottom: 10px;
 }
 
 .messageAttachmentTile {
+  position: relative;
   display: grid;
-  width: 118px;
-  height: 118px;
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  width: 220px;
+  height: 72px;
+  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 17px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
-    rgba(12, 12, 13, 0.64);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 14px;
+  background: rgba(30, 30, 31, 0.86);
+}
+
+.messageAttachmentTile[data-kind="image"] {
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  background: rgba(24, 24, 25, 0.9);
 }
 
 .messageAttachmentPreview {
   display: grid;
   min-width: 0;
   min-height: 0;
+  grid-row: 1 / -1;
   place-items: center;
   overflow: hidden;
+  margin: 6px;
+  border-radius: 10px;
+  background: rgba(14, 14, 15, 0.8);
   color: rgba(255, 255, 255, 0.7);
+}
+
+.messageAttachmentTile[data-kind="image"] .messageAttachmentPreview {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: inherit;
 }
 
 .messageAttachmentPreview img {
@@ -73,13 +107,15 @@
 .messageAttachmentDetail {
   min-width: 0;
   overflow: hidden;
-  padding: 0 9px;
+  padding-right: 10px;
+  padding-left: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .messageAttachmentName {
-  padding-top: 7px;
+  align-self: end;
+  padding-bottom: 1px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 12px;
   font-weight: 600;
@@ -87,10 +123,15 @@
 }
 
 .messageAttachmentDetail {
-  padding-bottom: 8px;
+  align-self: start;
+  padding-top: 1px;
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.2;
+}
+
+.messageAttachmentTile[data-kind="image"] :is(.messageAttachmentName, .messageAttachmentDetail) {
+  display: none;
 }
 
 .userBubble .content,

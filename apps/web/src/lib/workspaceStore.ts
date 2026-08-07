@@ -1,15 +1,16 @@
-import { workspaceMock } from "../data/mockWorkspace";
+import { createInitialWorkspace } from "../data/initialWorkspace";
 import type {
   Artifact,
   ChatMessage,
   PersistedActivityEvent,
-  ProjectMemoryScope,
+  ProjectContextScope,
   PersistedWorkspaceState,
   Project,
   RunActivitySummary,
   RunRecord,
   Session,
-  SessionMemoryScope,
+  SessionChannel,
+  SessionContextScope,
   SessionModelPreference,
   ToolEvent,
   WorkspaceState
@@ -17,10 +18,10 @@ import type {
 
 export const WORKSPACE_STORAGE_KEY = "hermes-ui.workspace.v1";
 export const WORKSPACE_STORAGE_VERSION = 1;
-export const DEFAULT_TENANT_ID = "local-dev";
+export const DEFAULT_TENANT_ID = "local";
 export const DEFAULT_USER_DISPLAY_NAME = "You";
 
-const LEGACY_LOCAL_TENANT_ID = "tenant-local";
+const LEGACY_LOCAL_TENANT_IDS = new Set(["tenant-local", "local-dev"]);
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|credential|password|secret|token/i;
 const BEARER_VALUE_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
@@ -30,7 +31,18 @@ type WorkspaceAction =
   | { type: "switchProject"; projectId: string }
   | { type: "switchSession"; sessionId: string }
   | { type: "createProject"; activate?: boolean; name?: string; projectId?: string }
-  | { type: "createSession"; activate?: boolean; projectId?: string; sessionId?: string }
+  | {
+      type: "createSession";
+      activate?: boolean;
+      channel?: SessionChannel;
+      createdAt?: string;
+      hermesSessionId?: string;
+      messages?: ChatMessage[];
+      projectId?: string;
+      sessionId?: string;
+      title?: string;
+      updatedAt?: string;
+    }
   | { type: "renameProject"; projectId: string; name: string }
   | { type: "renameSession"; sessionId: string; title: string }
   | { type: "archiveSession"; sessionId: string }
@@ -53,8 +65,8 @@ type WorkspaceAction =
 
 export type { WorkspaceAction };
 
-export function createMockWorkspaceState(): WorkspaceState {
-  return structuredClone(workspaceMock);
+export function createInitialWorkspaceState(): WorkspaceState {
+  return createInitialWorkspace();
 }
 
 export function workspaceReducer(
@@ -93,7 +105,7 @@ export function workspaceReducer(
     case "setSessionModelPreference":
       return setSessionModelPreference(state, action.sessionId, action.preference);
     case "reset":
-      return createMockWorkspaceState();
+      return createInitialWorkspaceState();
     default:
       return state;
   }
@@ -126,7 +138,7 @@ export function saveWorkspaceState(storage: Storage, state: WorkspaceState) {
 
 function normalizeWorkspace(state: WorkspaceState): WorkspaceState {
   const rawProjects =
-    state.projects.length > 0 ? state.projects : createMockWorkspaceState().projects;
+    state.projects.length > 0 ? state.projects : createInitialWorkspaceState().projects;
   const projects = rawProjects.map((project) => normalizeProject(project));
   const sessions = state.sessions.map((session) => normalizeSession(session, projects));
 
@@ -187,17 +199,17 @@ function createProject(
     state.projects.map((project) => project.name)
   );
   const id = options.projectId ?? `project-${crypto.randomUUID()}`;
-  const memoryScopeKey = makeProjectStableKey(DEFAULT_TENANT_ID, id);
+  const contextScopeKey = makeProjectStableKey(DEFAULT_TENANT_ID, id);
   const project: Project = {
     id,
     name,
-    description: "Local mock project. Rename and add chats when ready.",
+    description: "Local Stoix project.",
     icon: makeProjectIcon(name),
-    memoryScopeKey,
-    memoryScope: makeProjectMemoryScope({
+    contextScopeKey,
+    contextScope: makeProjectContextScope({
       id,
       name,
-      memoryScopeKey
+      contextScopeKey
     }),
     createdAt: now,
     updatedAt: now
@@ -223,37 +235,40 @@ function createSession(
 
   const now = new Date().toISOString();
   const id = options.sessionId ?? `session-${crypto.randomUUID()}`;
-  const hermesSessionId = `hermes-${id}`;
-  const title = makeUniqueTitle(
+  const hermesSessionId = options.hermesSessionId?.trim() || `hermes-${id}`;
+  const requestedTitle = options.title?.trim();
+  const title = requestedTitle || makeUniqueTitle(
     "New chat",
     state.sessions
       .filter((session) => session.projectId === project.id)
       .map((session) => session.title)
   );
+  const createdAt = normalizeTimestamp(options.createdAt) ?? now;
+  const updatedAt = normalizeTimestamp(options.updatedAt) ?? createdAt;
   const session: Session = {
     id,
     projectId: project.id,
     hermesSessionId,
     title,
-    titleSource: "default",
-    summary: "Empty local mock session",
-    memoryScope: makeSessionMemoryScope({
+    titleSource: requestedTitle ? "manual" : "default",
+    summary: "",
+    contextScope: makeSessionContextScope({
       project,
       sessionId: id,
       title
     }),
-    createdAt: now,
-    updatedAt: now,
+    createdAt,
+    updatedAt,
     lastViewedAt: now,
-    messages: [],
-    memoryEvidence: [],
+    messages: options.messages ?? [],
     toolEvents: [],
     runRecords: [],
-    artifacts: []
+    artifacts: [],
+    channel: options.channel
   };
 
   return {
-    ...touchProject(state, project.id, now),
+    ...touchProject(state, project.id, updatedAt),
     activeProjectId: options.activate === false ? state.activeProjectId : project.id,
     activeSessionId: options.activate === false ? state.activeSessionId : session.id,
     sessions: [session, ...state.sessions]
@@ -297,7 +312,7 @@ function renameSession(state: WorkspaceState, sessionId: string, title: string):
             title: cleanTitle,
             titleSource: "manual" as const,
             renamedAt: now,
-            summary: item.messages.length === 0 ? "Empty local mock session" : item.summary,
+            summary: item.messages.length === 0 ? "" : item.summary,
             updatedAt: now
           }
         : item
@@ -554,48 +569,61 @@ function touchProject(state: WorkspaceState, projectId: string, updatedAt: strin
 }
 
 function normalizeProject(project: Project): Project {
-  const memoryScope = project.memoryScope ?? makeProjectMemoryScope(project);
-  const tenantId = normalizeTenantId(memoryScope.tenantId);
+  const legacy = project as Project & {
+    memoryScope?: ProjectContextScope;
+    memoryScopeKey?: string;
+  };
+  const contextScope =
+    project.contextScope ?? legacy.memoryScope ?? makeProjectContextScope(project);
+  const tenantId = normalizeTenantId(contextScope.tenantId);
   const stableProjectKey = normalizeProjectStableKey(
-    memoryScope.stableProjectKey || project.memoryScopeKey,
+    contextScope.stableProjectKey || project.contextScopeKey || legacy.memoryScopeKey,
     tenantId,
     project.id
   );
-  const memoryScopeKey = normalizeProjectStableKey(
-    project.memoryScopeKey || memoryScope.stableProjectKey,
+  const contextScopeKey = normalizeProjectStableKey(
+    project.contextScopeKey || legacy.memoryScopeKey || contextScope.stableProjectKey,
     tenantId,
     project.id
   );
 
   return {
     ...project,
-    memoryScopeKey,
-    memoryScope: {
-      ...memoryScope,
+    description:
+      project.description === "Local mock project. Rename and add chats when ready."
+        ? "Local Stoix project."
+        : project.description,
+    contextScopeKey,
+    contextScope: {
+      ...contextScope,
       tenantId,
-      projectId: memoryScope.projectId || project.id,
+      projectId: contextScope.projectId || project.id,
       stableProjectKey,
-      retrievalProfile: memoryScope.retrievalProfile || "balanced",
-      pinnedMemoryIds: memoryScope.pinnedMemoryIds ?? [],
-      contextPolicy: memoryScope.contextPolicy || "balanced"
+      retrievalProfile: contextScope.retrievalProfile || "balanced",
+      contextPolicy: contextScope.contextPolicy || "balanced"
     }
   };
 }
 
 function normalizeSession(session: Session, projects: Project[]): Session {
   const project = projects.find((item) => item.id === session.projectId);
-  const memoryScope =
-    session.memoryScope ??
-    makeSessionMemoryScope({
+  const legacy = session as Session & {
+    memoryScope?: SessionContextScope;
+    memoryEvidence?: unknown[];
+  };
+  const contextScope =
+    session.contextScope ??
+    legacy.memoryScope ??
+    makeSessionContextScope({
       project,
       sessionId: session.id,
       title: session.title
     });
   const tenantId = normalizeTenantId(
-    memoryScope.tenantId || project?.memoryScope.tenantId || DEFAULT_TENANT_ID
+    contextScope.tenantId || project?.contextScope.tenantId || DEFAULT_TENANT_ID
   );
   const stableSessionKey = normalizeSessionStableKey(
-    memoryScope.stableSessionKey,
+    contextScope.stableSessionKey,
     tenantId,
     session.projectId,
     session.id
@@ -603,20 +631,20 @@ function normalizeSession(session: Session, projects: Project[]): Session {
 
   return {
     ...session,
+    summary: session.summary === "Empty local mock session" ? "" : session.summary,
     hermesSessionId: session.hermesSessionId || `hermes-${session.id}`,
     titleSource: normalizeTitleSource(session),
     lastViewedAt: normalizeTimestamp(session.lastViewedAt) ?? normalizeTimestamp(session.updatedAt),
-    memoryScope: {
-      ...memoryScope,
+    contextScope: {
+      ...contextScope,
       tenantId,
-      projectId: memoryScope.projectId || session.projectId,
-      sessionId: memoryScope.sessionId || session.id,
+      projectId: contextScope.projectId || session.projectId,
+      sessionId: contextScope.sessionId || session.id,
       stableSessionKey,
-      includeProjectContext: memoryScope.includeProjectContext !== false,
-      includeSessionContext: memoryScope.includeSessionContext !== false
+      includeProjectContext: contextScope.includeProjectContext !== false,
+      includeSessionContext: contextScope.includeSessionContext !== false
     },
     messages: session.messages ?? [],
-    memoryEvidence: session.memoryEvidence ?? [],
     toolEvents: session.toolEvents ?? [],
     runRecords: (session.runRecords ?? [])
       .map((run) => normalizeRunRecord(run, session, project))
@@ -624,7 +652,27 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     artifacts: (session.artifacts ?? []).map((artifact) =>
       normalizeArtifact(artifact, session, project)
     ),
-    modelPreference: normalizeSessionModelPreference(session.modelPreference)
+    modelPreference: normalizeSessionModelPreference(session.modelPreference),
+    channel: normalizeSessionChannel(session.channel)
+  };
+}
+
+function normalizeSessionChannel(value: unknown): SessionChannel | undefined {
+  const source = normalizeRecord(value);
+  if (!source) {
+    return undefined;
+  }
+  const channelSource = asString(source.source).trim();
+  const label = asString(source.label).trim();
+  if (!channelSource || !label) {
+    return undefined;
+  }
+  return {
+    source: channelSource,
+    label,
+    external: source.external === true,
+    lastActiveAt: normalizeTimestamp(asString(source.lastActiveAt)) ?? undefined,
+    parentSessionId: asString(source.parentSessionId).trim() || undefined
   };
 }
 
@@ -756,17 +804,21 @@ export function formatSessionUpdatedAt(
   const minuteMs = 60_000;
   const hourMs = 60 * minuteMs;
   const dayMs = 24 * hourMs;
+  const weekMs = 7 * dayMs;
 
   if (diffMs < minuteMs) {
     return "now";
   }
   if (diffMs < hourMs) {
-    return `${Math.floor(diffMs / minuteMs)}min`;
+    return `${Math.floor(diffMs / minuteMs)}m`;
   }
   if (diffMs < dayMs) {
     return `${Math.floor(diffMs / hourMs)}h`;
   }
-  return `${Math.floor(diffMs / dayMs)}d`;
+  if (diffMs < weekMs) {
+    return `${Math.floor(diffMs / dayMs)}d`;
+  }
+  return `${Math.floor(diffMs / weekMs)}w`;
 }
 
 function selectSessionForProject(
@@ -796,27 +848,26 @@ function makeProjectIcon(name: string): string {
     .slice(0, 2);
 }
 
-function makeProjectMemoryScope(project: Pick<Project, "id" | "name"> & Partial<Project>): ProjectMemoryScope {
+function makeProjectContextScope(project: Pick<Project, "id" | "name"> & Partial<Project>): ProjectContextScope {
   const stableProjectKey =
-    project.memoryScopeKey || makeProjectStableKey(DEFAULT_TENANT_ID, project.id);
+    project.contextScopeKey || makeProjectStableKey(DEFAULT_TENANT_ID, project.id);
 
   return {
     tenantId: DEFAULT_TENANT_ID,
     projectId: project.id,
     stableProjectKey,
     retrievalProfile: "balanced",
-    pinnedMemoryIds: [],
     contextPolicy: "balanced",
-    userVisibleSummary: `${project.name} project context is prepared for future Brain Memory retrieval.`
+    userVisibleSummary: `${project.name} project context.`
   };
 }
 
-function makeSessionMemoryScope(args: {
+function makeSessionContextScope(args: {
   project?: Project;
   sessionId: string;
   title: string;
-}): SessionMemoryScope {
-  const tenantId = args.project?.memoryScope.tenantId ?? DEFAULT_TENANT_ID;
+}): SessionContextScope {
+  const tenantId = args.project?.contextScope.tenantId ?? DEFAULT_TENANT_ID;
   const projectId = args.project?.id ?? "project-unknown";
 
   return {
@@ -826,21 +877,21 @@ function makeSessionMemoryScope(args: {
     stableSessionKey: makeSessionStableKey(tenantId, projectId, args.sessionId),
     includeProjectContext: true,
     includeSessionContext: true,
-    userVisibleSummary: `${args.title} session context is prepared for future Brain Memory continuity.`
+    userVisibleSummary: `${args.title} session context.`
   };
 }
 
 function makeProjectStableKey(tenantId: string, projectId: string): string {
-  return `studio:${tenantId}:project:${projectId}`;
+  return `stoix:${tenantId}:project:${projectId}`;
 }
 
 function makeSessionStableKey(tenantId: string, projectId: string, sessionId: string): string {
-  return `studio:${tenantId}:project:${projectId}:session:${sessionId}`;
+  return `stoix:${tenantId}:project:${projectId}:session:${sessionId}`;
 }
 
 function normalizeTenantId(value: string): string {
   const tenantId = value || DEFAULT_TENANT_ID;
-  return tenantId === LEGACY_LOCAL_TENANT_ID ? DEFAULT_TENANT_ID : tenantId;
+  return LEGACY_LOCAL_TENANT_IDS.has(tenantId) ? DEFAULT_TENANT_ID : tenantId;
 }
 
 function normalizeProjectStableKey(
@@ -849,8 +900,10 @@ function normalizeProjectStableKey(
   projectId: string
 ): string {
   const stableKey = value || "";
-  const legacyStableKey = makeProjectStableKey(LEGACY_LOCAL_TENANT_ID, projectId);
-  if (!stableKey || stableKey === legacyStableKey) {
+  const isLegacyStableKey = [...LEGACY_LOCAL_TENANT_IDS].some(
+    (legacyTenantId) => stableKey === makeProjectStableKey(legacyTenantId, projectId)
+  );
+  if (!stableKey || isLegacyStableKey) {
     return makeProjectStableKey(tenantId, projectId);
   }
   return stableKey;
@@ -863,8 +916,11 @@ function normalizeSessionStableKey(
   sessionId: string
 ): string {
   const stableKey = value || "";
-  const legacyStableKey = makeSessionStableKey(LEGACY_LOCAL_TENANT_ID, projectId, sessionId);
-  if (!stableKey || stableKey === legacyStableKey) {
+  const isLegacyStableKey = [...LEGACY_LOCAL_TENANT_IDS].some(
+    (legacyTenantId) =>
+      stableKey === makeSessionStableKey(legacyTenantId, projectId, sessionId)
+  );
+  if (!stableKey || isLegacyStableKey) {
     return makeSessionStableKey(tenantId, projectId, sessionId);
   }
   return stableKey;
@@ -890,9 +946,11 @@ function normalizeArtifactKind(value: unknown): Artifact["kind"] {
 
 function normalizeArtifactSource(value: unknown): Artifact["source"] {
   const normalized = asString(value).trim().toLowerCase();
+  if (normalized.endsWith("-memory")) {
+    return "mcp";
+  }
   if (
     normalized === "hermes" ||
-    normalized === "brain-memory" ||
     normalized === "ui" ||
     normalized === "local" ||
     normalized === "mock"
@@ -1054,9 +1112,11 @@ function normalizePersistedActivityStatus(value: unknown): PersistedActivityEven
 
 function normalizePersistedActivitySource(value: unknown): PersistedActivityEvent["source"] {
   const normalized = asString(value).trim().toLowerCase();
+  if (normalized.endsWith("-memory")) {
+    return "mcp";
+  }
   if (
     normalized === "hermes" ||
-    normalized === "brain-memory" ||
     normalized === "ui" ||
     normalized === "mcp" ||
     normalized === "unknown"

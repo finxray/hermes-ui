@@ -450,13 +450,13 @@ export function ChatTranscript({
           ) : (
             <EmptyState
               title="New chat is empty"
-              body="Send a message to use real Hermes when configured, or a local mock fallback when unavailable."
+              body="Send a message to start a Hermes session."
             />
           )
         ) : !isStartState ? (
           <EmptyState
             title="No chats in this project"
-            body="Projects can exist without sessions. Create a new local mock chat when you want a transcript under this project."
+            body="Create a chat to start a Hermes session in this project."
             actionLabel="New chat"
             onAction={createSession}
           />
@@ -591,7 +591,7 @@ function findCurrentRun(session: Session, generationStartedAt: string | null) {
 function hasRunDisplayActivity(run: RunRecord, liveEventIds: Set<string>) {
   // A real completed/stopped run always persists its elapsed event into
   // activityReplay, so replay/live activity is the qualifier. Do NOT qualify a
-  // run by completedAt alone: an unreachable-Hermes/mock fallback turn is marked
+  // run by completedAt alone: an unreachable-Hermes error turn is marked
   // completed with an empty replay, and must not steal the anchor from the prior
   // run that actually did work.
   return (

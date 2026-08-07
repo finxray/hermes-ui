@@ -1,0 +1,137 @@
+.minimap {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  z-index: 8;
+  display: grid;
+  width: 72px;
+  max-height: min(46vh, 340px);
+  align-content: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.markers {
+  display: grid;
+  width: 66px;
+  max-height: inherit;
+  gap: 4px;
+  align-content: center;
+  pointer-events: auto;
+}
+
+.markerWrap {
+  position: relative;
+  display: flex;
+  min-height: 5px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.markerButton {
+  display: flex;
+  width: 66px;
+  height: 5px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.23);
+  cursor: pointer;
+}
+
+.markerLine {
+  display: block;
+  width: var(--conversation-marker-width, 8px);
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition:
+    width 90ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 120ms ease;
+}
+
+.markers[data-pointer-active="true"] .markerLine {
+  transition: color 120ms ease;
+}
+
+.markerButton:hover,
+.markerButton:focus-visible,
+.markerFocused .markerButton {
+  outline: 0;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.markerButton:hover .markerLine,
+.markerButton:focus-visible .markerLine {
+  width: var(--conversation-marker-width, 30px);
+}
+
+.preview {
+  position: absolute;
+  top: 50%;
+  left: 80px;
+  z-index: 2;
+  display: grid;
+  visibility: hidden;
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 390px));
+  min-width: 320px;
+  gap: 8px;
+  padding: 14px 18px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background: rgba(45, 45, 46, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: translate(6px, -50%);
+  transition:
+    opacity 120ms ease,
+    transform 150ms ease,
+    visibility 0s linear 150ms;
+  pointer-events: none;
+}
+
+.preview strong,
+.preview span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.preview strong {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.35;
+  -webkit-line-clamp: 1;
+}
+
+.preview span {
+  color: var(--text-muted);
+  font-size: var(--font-body);
+  line-height: 1.55;
+  -webkit-line-clamp: 3;
+}
+
+.markerFocused .preview,
+.markerWrap:focus-within .preview {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(0, -50%);
+  transition-delay: 0s;
+}
+
+@media (max-width: 1040px) {
+  .minimap {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markerLine,
+  .preview {
+    transition: none;
+  }
+}

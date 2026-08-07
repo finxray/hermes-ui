@@ -19,7 +19,7 @@ No browser-to-Hermes, browser-to-Gateway, or direct storage path was added.
 ## Hermes Capability Findings
 
 Current verified Hermes API server source/docs from
-`C:\Users\Alexey\AppData\Local\Temp\hermes-agent-slice13a` show:
+`%TEMP%\hermes-agent-slice13a` shows:
 
 - inline image inputs are supported for `/v1/chat/completions` and
   `/v1/responses`;

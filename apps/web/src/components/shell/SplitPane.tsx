@@ -7,11 +7,9 @@ import { ContextRail } from "@/components/shell/ContextRail";
 import { PanelToggleIcon } from "@/components/ui/PanelToggleIcon";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import { formatSessionUpdatedAt } from "@/lib/workspaceStore";
-import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { HermesSessionSummary, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
 import type { Project, Session } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
-import type { TenantScopeDiagnostics } from "@/lib/tenantScopeDiagnostics";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import styles from "./SplitPane.module.css";
 
@@ -25,12 +23,10 @@ type SplitPaneProps = {
   activityEvents: AgentActivityEvent[];
   allSessions: Session[];
   availableSessions: Session[];
-  brainMemoryStatus: NormalizedBrainMemoryStatus | null;
   createSideSession: () => void;
   hermesSessions: HermesSessionSummary[];
   hermesStatus: NormalizedHermesStatus | null;
   hermesSessionModel: HermesSessionModelSync;
-  isBrainMemoryStatusLoading: boolean;
   isHermesSessionsLoading: boolean;
   isHermesStatusLoading: boolean;
   isHermesStatusRefreshing?: boolean;
@@ -39,7 +35,6 @@ type SplitPaneProps = {
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
   onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
   projects: Project[];
-  refreshBrainMemoryStatus: () => void;
   refreshHermesStatus: () => void;
   refreshHermesSessions: () => void;
   returnToSingleChat: () => void;
@@ -49,7 +44,6 @@ type SplitPaneProps = {
   sideActivityEvents: AgentActivityEvent[];
   sideSession: Session | null;
   sideSessionModel: HermesSessionModelSync;
-  tenantScopePosture: TenantScopeDiagnostics["redactedPosture"] | null;
   workspaceActions: WorkspaceActions;
 };
 
@@ -59,12 +53,10 @@ export function SplitPane({
   activityEvents,
   allSessions,
   availableSessions,
-  brainMemoryStatus,
   createSideSession,
   hermesSessions,
   hermesStatus,
   hermesSessionModel,
-  isBrainMemoryStatusLoading,
   isHermesSessionsLoading,
   isHermesStatusLoading,
   isHermesStatusRefreshing = false,
@@ -73,7 +65,6 @@ export function SplitPane({
   onActivityEvent,
   onGeneratingChange,
   projects,
-  refreshBrainMemoryStatus,
   refreshHermesStatus,
   refreshHermesSessions,
   returnToSingleChat,
@@ -83,15 +74,20 @@ export function SplitPane({
   sideActivityEvents,
   sideSession,
   sideSessionModel,
-  tenantScopePosture,
   workspaceActions
 }: SplitPaneProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showAllSideSessions, setShowAllSideSessions] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const sideTitle = sideSession?.title ?? "Side chat";
   const isChatVisible = mode === "chat" || mode === "chat-console";
   const isConsoleVisible = mode === "console" || mode === "chat-console";
   const canCloseSideTab = isChatVisible && Boolean(sideSession);
+  const sideSessionPreviewLimit = 6;
+  const visibleSideSessions = showAllSideSessions
+    ? availableSessions
+    : availableSessions.slice(0, sideSessionPreviewLimit);
+  const hasSideSessionOverflow = availableSessions.length > sideSessionPreviewLimit;
 
   useEffect(() => {
     if (!menuOpen) {
@@ -128,13 +124,16 @@ export function SplitPane({
   const startNewSideSession = () => {
     createSideSession();
     setMenuOpen(false);
+    setShowAllSideSessions(false);
   };
 
   const handleSideTabClick = () => {
     if (sideSession) {
       setMode("chat");
+      setMenuOpen(false);
+      return;
     }
-    setMenuOpen((current) => !current);
+    setMenuOpen(true);
   };
 
   return (
@@ -148,25 +147,43 @@ export function SplitPane({
       <header className={styles.toolbar}>
         <div className={styles.tabGroup} aria-label="Right panel tabs" role="tablist">
           <div className={styles.menuHost} ref={menuRef}>
-            <button
-              aria-controls="studio-side-chat-menu"
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              aria-selected={isChatVisible}
-              className={`${styles.tabButton} ${styles.sideTab} ${isChatVisible ? styles.activeTab : ""}`}
-              data-side-chat-tab="true"
-              onClick={handleSideTabClick}
-              role="tab"
-              title={sideTitle}
-              type="button"
-            >
+            <span className={styles.sideTabWrap}>
+              <button
+                aria-controls="studio-side-chat-menu"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-selected={isChatVisible}
+                className={`${styles.tabButton} ${styles.sideTab} ${isChatVisible ? styles.activeTab : ""}`}
+                data-closable={canCloseSideTab ? "true" : "false"}
+                data-side-chat-tab="true"
+                onClick={handleSideTabClick}
+                onMouseEnter={() => sideSession && setMenuOpen(false)}
+                role="tab"
+                type="button"
+              >
+                {!canCloseSideTab ? <MessageSquarePlus size={14} /> : null}
+                <span>{sideTitle}</span>
+              </button>
               {canCloseSideTab ? (
-                <span className={styles.closeGlyph} aria-hidden="true" />
-              ) : (
-                <MessageSquarePlus size={14} />
-              )}
-              <span>{sideTitle}</span>
-            </button>
+                <button
+                  aria-label={`Close side chat ${sideTitle}`}
+                  className={styles.closeTabButton}
+                  data-side-chat-close="true"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setMenuOpen(false);
+                    setShowAllSideSessions(false);
+                    closeSideSession();
+                  }}
+                  onFocus={() => setMenuOpen(false)}
+                  onMouseEnter={() => setMenuOpen(false)}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  type="button"
+                >
+                  <span className={styles.closeGlyph} aria-hidden="true" />
+                </button>
+              ) : null}
+            </span>
             <button
               aria-label="Open side chat menu"
               aria-controls="studio-side-chat-menu"
@@ -176,9 +193,10 @@ export function SplitPane({
               data-side-chat-add="true"
               onClick={(event) => {
                 event.stopPropagation();
-                setMenuOpen((current) => !current);
+                setMenuOpen(true);
               }}
-              title="Open side chat menu"
+              onFocus={() => setMenuOpen(true)}
+              onMouseEnter={() => setMenuOpen(true)}
               type="button"
             >
               <Plus size={18} />
@@ -193,13 +211,13 @@ export function SplitPane({
                 <div className={styles.menuLabel}>Open in side tab</div>
                 <div className={styles.menuList}>
                   {availableSessions.length > 0 ? (
-                    availableSessions.map((session) => (
+                    visibleSideSessions.map((session) => (
                       <button
                         className={`${styles.menuItem} ${session.id === sideSession?.id ? styles.selectedItem : ""}`}
+                        data-side-chat-session="true"
                         key={session.id}
                         onClick={() => switchToSideSession(session.id)}
                         role="menuitem"
-                        title={session.title}
                         type="button"
                       >
                         <MessageSquare size={14} />
@@ -210,6 +228,18 @@ export function SplitPane({
                   ) : (
                     <div className={styles.menuEmpty}>No chats in this project yet</div>
                   )}
+                  {hasSideSessionOverflow ? (
+                    <button
+                      aria-expanded={showAllSideSessions}
+                      className={styles.menuMore}
+                      onClick={() => setShowAllSideSessions((current) => !current)}
+                      type="button"
+                    >
+                      {showAllSideSessions
+                        ? "Show less"
+                        : `Show more (${availableSessions.length - sideSessionPreviewLimit})`}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -218,10 +248,10 @@ export function SplitPane({
             aria-label={isChatVisible ? "Return to single chat view" : "Context console is open"}
             className={`${styles.tabButton} ${styles.returnButton}`}
             onClick={isChatVisible ? returnToSingleChat : undefined}
-            title={isChatVisible ? "Return to single chat view" : "Context console is open"}
             type="button"
           >
             <PanelToggleIcon side="single" />
+            <span className={styles.returnTooltip} role="tooltip">Single view</span>
           </button>
         </div>
       </header>
@@ -265,18 +295,14 @@ export function SplitPane({
               activeSession={activeSession}
               activityEvents={activityEvents}
               allSessions={allSessions}
-              brainMemoryStatus={brainMemoryStatus}
               hermesSessions={hermesSessions}
               hermesStatus={hermesStatus}
               hermesSessionModel={hermesSessionModel}
-              isBrainMemoryStatusLoading={isBrainMemoryStatusLoading}
               isHermesSessionsLoading={isHermesSessionsLoading}
               isHermesStatusLoading={isHermesStatusLoading}
               isHermesStatusRefreshing={isHermesStatusRefreshing}
-              refreshBrainMemoryStatus={refreshBrainMemoryStatus}
               refreshHermesStatus={refreshHermesStatus}
               refreshHermesSessions={refreshHermesSessions}
-              tenantScopePosture={tenantScopePosture}
               workspaceActions={workspaceActions}
             />
           ) : null}

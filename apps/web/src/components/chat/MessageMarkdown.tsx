@@ -1,8 +1,8 @@
 "use client";
 
 import { Check, Copy, ExternalLink, type LucideIcon } from "@/components/ui/AppIcons";
-import { memo, useMemo, useState } from "react";
-import type { SVGProps } from "react";
+import { Children, isValidElement, memo, useMemo, useState } from "react";
+import type { ReactNode, SVGProps } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypePrism from "rehype-prism-plus";
@@ -71,8 +71,13 @@ export const MessageMarkdown = memo(function MessageMarkdown({
         return <>{children}</>;
       },
       table({ children }) {
+        const columnCount = countTableColumns(children);
         return (
-          <div className={styles.tableScroller}>
+          <div
+            className={styles.tableScroller}
+            data-column-count={columnCount}
+            data-wide={columnCount >= 4 ? "true" : "false"}
+          >
             <table>{children}</table>
           </div>
         );
@@ -147,6 +152,7 @@ export function CopyTextButton({
   const [copied, setCopied] = useState(false);
   const buttonClassName = className ?? styles.iconActionButton;
   const DisplayIcon = copied ? Check : Icon;
+  const hasCopyableText = text.trim().length > 0;
 
   async function handleCopy() {
     const ok = await copyText(text);
@@ -157,19 +163,18 @@ export function CopyTextButton({
     window.setTimeout(() => setCopied(false), 1400);
   }
 
-  return (
+  return hasCopyableText ? (
     <button
       aria-label={copied ? "Copied" : label}
       className={buttonClassName}
       data-copy-action="true"
       onClick={handleCopy}
-      title={copied ? "Copied" : label}
       type="button"
     >
       <DisplayIcon aria-hidden="true" />
       {variant === "pill" ? <span>{copied ? "Copied" : label}</span> : null}
     </button>
-  );
+  ) : null;
 }
 
 const CodeBlock = memo(function CodeBlock({
@@ -224,6 +229,22 @@ async function copyText(text: string) {
 
 function parseLanguage(className?: string) {
   return className?.match(/language-([\w-]+)/)?.[1]?.toLowerCase() ?? "";
+}
+
+function countTableColumns(node: ReactNode): number {
+  for (const child of Children.toArray(node)) {
+    if (!isValidElement<{ children?: ReactNode }>(child)) {
+      continue;
+    }
+    if (child.type === "tr") {
+      return Children.count(child.props.children);
+    }
+    const nestedCount = countTableColumns(child.props.children);
+    if (nestedCount > 0) {
+      return nestedCount;
+    }
+  }
+  return 0;
 }
 
 const HTTP_METHOD_PATTERN = "(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)";

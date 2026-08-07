@@ -389,6 +389,39 @@
   bottom: 3px;
 }
 
+.webSearchIcon {
+  position: relative;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.webSearchIcon::before {
+  width: 14px;
+  height: 14px;
+  border: 1.7px solid currentColor;
+  border-radius: 999px;
+  content: "";
+}
+
+.webSearchIcon::after {
+  position: absolute;
+  width: 6px;
+  height: 14px;
+  border-right: 1.7px solid currentColor;
+  border-left: 1.7px solid currentColor;
+  border-radius: 999px;
+  content: "";
+}
+
+.webSearchIcon {
+  background: linear-gradient(currentColor, currentColor) center / 14px 1.7px no-repeat;
+}
+
 .reasoningTitle,
 .reasoningLine,
 .reasoningEmpty,

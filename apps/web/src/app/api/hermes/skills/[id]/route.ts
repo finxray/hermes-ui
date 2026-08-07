@@ -1,5 +1,6 @@
 import { setHermesSkillEnabled } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
 
 export const dynamic = "force-dynamic";
 
@@ -7,6 +8,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: { kind: "forbidden", message: "Cross-origin requests are not allowed." } }, { status: 403 });
+  }
+
   const { id } = await params;
   const checkedAt = new Date().toISOString();
   const body = await request.json().catch(() => ({}));

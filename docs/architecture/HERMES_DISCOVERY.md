@@ -18,6 +18,34 @@ Local temporary copies were downloaded outside this repo for inspection:
 - `%TEMP%\hermes-agent-discovery\programmatic-integration.md`
 - `%TEMP%\hermes-agent-discovery\api_server.py`
 
+## Live Verification: 2026-08-01
+
+The local Hermes runtime at `127.0.0.1:8642` was probed through its authenticated API surface.
+The following endpoints returned `200`:
+
+- `GET /health`
+- `GET /health/detailed`
+- `GET /v1/models`
+- `GET /v1/capabilities`
+
+The live capabilities document continues to advertise:
+
+- Chat Completions and Responses streaming.
+- Runs submission, status, event SSE, stop, and approval endpoints.
+- Session list, detail, messages, fork, model override, chat, and chat-stream endpoints.
+- Skills and toolsets discovery.
+- `X-Hermes-Session-Id` for Hermes session identity.
+- `X-Hermes-Session-Key` for explicit memory scope.
+
+The session model override remains session-scoped and in-memory. It is not a persistent global
+configuration write, and Hermes does not guarantee that a requested provider is the provider that
+ultimately generated a response. The Web UI must therefore continue to post model selection through
+the BFF, verify session readback where available, and present unconfirmed model routes as requests.
+
+The live runtime reports admin config writes, jobs administration, memory writes, audio, realtime
+voice, and browser CORS as unavailable. These controls must remain absent from the v0.1 UI rather
+than appearing as disabled placeholders.
+
 ## Endpoint Map
 
 Verified in `gateway/platforms/api_server.py` route registration:
@@ -252,6 +280,14 @@ Current source inspection confirms model names are advertised via `/v1/models` a
 
 - Hermes journal verification showed selecting `moonshotai/kimi-k2.6` from the Web UI's OpenRouter catalog resolved to `provider=nvidia base_url=https://integrate.api.nvidia.com/v1 model=moonshotai/kimi-k2.6` and failed with a NVIDIA 401. The Web UI must therefore hide Kimi from HTTP-session selection and fail loudly if a direct BFF call detects this mismatch.
 - User OpenRouter logs confirmed `qwen/qwen3.7-max` requests were actually billed by OpenRouter, even when the assistant self-reported a fallback/default identity. The UI must treat assistant self-identification as untrusted and display only requested route plus provider-log/route-metadata evidence.
+
+2026-08-07 Hermes 0.20 model contract update:
+
+- Current Hermes 0.20 advertises `model_options: true` and `session_model_lock: true` in `/v1/capabilities`, with endpoints `/api/model/options` and `/api/sessions/{session_id}/model`.
+- `/v1/models` can now contain only the compatibility placeholder `hermes-agent`; it is not the authoritative selectable catalog in this contract.
+- Stoix reads authenticated providers and their model lists from `/api/model/options`, while preserving `/v1/models` as the legacy fallback when `model_options` is not advertised.
+- A successful session lock returns its verified route under `runtime.model` and `runtime.provider`. The BFF normalizes that nested readback before accepting a model change.
+- Hermes may label configured OpenRouter as `custom:openrouter`; Stoix normalizes that alias to the `openrouter` provider family for route verification and display.
 
 2026-06-15 Kimi K2.7 Code addition:
 

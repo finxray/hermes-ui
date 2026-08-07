@@ -44,7 +44,7 @@ browser-to-Hermes, or direct storage path was added.
 - WSL distro checked: `Ubuntu`.
 - `hermes-gateway.service`: active.
 - Hermes gateway process observed:
-  `/home/alexey/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main gateway run --replace`.
+  `~/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main gateway run --replace`.
 - Brain Memory MCP child process observed:
   `python -m brain_memory_mcp`.
 - MCP child env posture, redacted:

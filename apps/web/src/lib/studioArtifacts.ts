@@ -94,10 +94,10 @@ function normalizeArtifactKind(value?: string): StudioArtifactKind {
 }
 
 function normalizeArtifactSource(value?: AgentActivitySource | string): StudioArtifactSource {
-  if (value === "hermes" || value === "brain-memory" || value === "ui") {
+  if (value === "hermes" || value === "mcp" || value === "ui") {
     return value;
   }
-  return value === "mcp" ? "hermes" : "mock";
+  return "mock";
 }
 
 function normalizeArtifactStatus(value?: string): StudioArtifactStatus {

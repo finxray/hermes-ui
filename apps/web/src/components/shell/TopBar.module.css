@@ -38,8 +38,8 @@
   margin-left: var(--shell-row-padding-x);
 }
 
-.left > .iconButton {
-  margin-left: -10px;
+.leadingButton {
+  margin-left: -14px;
 }
 
 .right {
@@ -54,8 +54,7 @@
 }
 
 .menuItem,
-.iconButton,
-.backButton {
+.iconButton {
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -84,25 +83,6 @@
   user-select: none;
 }
 
-.backButton {
-  position: relative;
-  display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.backButton span {
-  width: 9px;
-  height: 9px;
-  border-bottom: 2px solid currentColor;
-  border-left: 2px solid currentColor;
-  transform: translateX(2px) rotate(45deg);
-}
-
 .iconButton svg {
   pointer-events: none;
 }
@@ -115,9 +95,7 @@
 }
 
 .iconButton:hover,
-.iconButton:focus-visible,
-.backButton:hover,
-.backButton:focus-visible {
+.iconButton:focus-visible {
   outline: 0;
   background: var(--bg-control-hover);
   color: var(--text-primary);
@@ -130,8 +108,7 @@
   font-weight: 500;
 }
 
-.iconButton:active,
-.backButton:active {
+.iconButton:active {
   transform: scale(0.98);
 }
 

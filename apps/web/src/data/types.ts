@@ -6,17 +6,16 @@ export type ContextPolicy =
 
 export type RetrievalProfile = "balanced" | "precise" | "broad" | "minimal";
 
-export type ProjectMemoryScope = {
+export type ProjectContextScope = {
   tenantId: string;
   projectId: string;
   stableProjectKey: string;
   retrievalProfile: RetrievalProfile;
-  pinnedMemoryIds: string[];
   contextPolicy: ContextPolicy;
   userVisibleSummary?: string;
 };
 
-export type SessionMemoryScope = {
+export type SessionContextScope = {
   tenantId: string;
   projectId: string;
   sessionId: string;
@@ -32,8 +31,8 @@ export type Project = {
   name: string;
   description: string;
   icon: string;
-  memoryScopeKey: string;
-  memoryScope: ProjectMemoryScope;
+  contextScopeKey: string;
+  contextScope: ProjectContextScope;
   createdAt: string;
   updatedAt: string;
 };
@@ -95,16 +94,6 @@ export type ChatUsageMetadata = {
   tokensPerSecond?: number;
 };
 
-export type MemoryEvidence = {
-  id: string;
-  title: string;
-  layer: string;
-  score: string;
-  excerpt: string;
-  source: string;
-  timestamp: string;
-};
-
 export type ToolEvent = {
   id: string;
   name: string;
@@ -154,7 +143,7 @@ export type PersistedActivityEvent = {
   completedAt?: string;
   durationMs?: number;
   collapsedByDefault: boolean;
-  source: "hermes" | "brain-memory" | "ui" | "mcp" | "unknown";
+  source: "hermes" | "ui" | "mcp" | "unknown";
   sourceChannel: RunRecordSourceChannel;
   hermes?: {
     sessionId?: string;
@@ -232,7 +221,7 @@ export type StudioArtifactKind =
 
 export type StudioArtifactSource =
   | "hermes"
-  | "brain-memory"
+  | "mcp"
   | "ui"
   | "local"
   | "mock";
@@ -272,17 +261,25 @@ export type Session = {
   firstUserMessageAt?: string;
   renamedAt?: string;
   summary: string;
-  memoryScope: SessionMemoryScope;
+  contextScope: SessionContextScope;
   createdAt: string;
   updatedAt: string;
   lastViewedAt?: string;
   archivedAt?: string;
   messages: ChatMessage[];
-  memoryEvidence: MemoryEvidence[];
   toolEvents: ToolEvent[];
   runRecords: RunRecord[];
   artifacts: Artifact[];
   modelPreference?: SessionModelPreference;
+  channel?: SessionChannel;
+};
+
+export type SessionChannel = {
+  source: string;
+  label: string;
+  external: boolean;
+  lastActiveAt?: string;
+  parentSessionId?: string;
 };
 
 export type ModelChoice = {
@@ -309,7 +306,6 @@ export type WorkspaceState = {
   modelChoices: ModelChoice[];
   connectionStatus: {
     hermes: string;
-    brainMemory: string;
   };
 };
 

@@ -1,49 +1,29 @@
-# Packaging Docs
+# Packaging
 
-Use this index to choose the right packaging or local-run document.
+Stoix `0.1.0` is distributed as a portable, platform-specific archive. Each
+archive contains the production Next.js server, a pinned Node.js runtime, a
+loopback-only launcher, third-party notices, privacy information, and a SHA-256
+digest. Users do not need Node.js or a source checkout.
 
-## Start Here
+## Current Documents
 
-- `LOCAL_BUNDLE_CHECKLIST_14O.md` - current local MVP / RC checklist. Use this
-  first for the supported local bundle path, healthy server selection, Hermes
-  verification, attach-later Brain Memory, release gates, and deferred items.
-- `PACKAGING_READINESS_14K.md` - readiness manifest and safe release gate.
-- `PACKAGING_MODES.md` - supported and future packaging modes.
+- `PACKAGING_MODES.md` describes the supported portable package.
+- `../release/PUBLISHING.md` is the owner publication runbook.
+- `../release/PACKAGING_AUDIT_0.1.0.md` records the current technical audit.
+- `../release/GITHUB_UPDATES.md` documents daily GitHub update discovery.
+- `../release/RELEASE_NOTES_TEMPLATE.md` is the release-note template.
 
-## Local Startup And Recovery
+## Commands
 
-- `LOCAL_STARTUP_GUIDE.md` - modular startup examples by mode.
-- `STUDIO_WEB_DEV_14J.md` - optional Web UI-only dev-server wrapper.
-- `STUDIO_WEB_DEV_WINDOWS_HARDENING_14N.md` - Windows/WSL wrapper hardening and
-  process lifecycle notes.
-- `../runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md` - detailed local launch runbook.
-- `../runbooks/HEALTHY_STUDIO_SERVER_RECOVERY.md` - manual stale-server
-  recovery workflow.
+```powershell
+npm ci
+npm run release:check
+npm run package:release
+```
 
-## Launcher Reference
+`package:release` builds and smoke-tests the archive for the current operating
+system and architecture. GitHub Actions builds Windows, macOS, and Linux draft
+release assets from a version tag.
 
-- `STUDIO_LAUNCHER_14A.md` - launcher foundation.
-- `STUDIO_LAUNCHER_14B_PORT_DIAGNOSTICS.md` - port and stale-static diagnostics.
-- `STUDIO_LAUNCHER_14C_GUIDED_RECOVERY.md` - print-only recovery guidance and
-  selected base URL behavior.
-- `STUDIO_LAUNCHER_14H_CONTRACT_TESTS.md` - help and launcher contract checks.
-- `STUDIO_LAUNCHER_14I_HEALTHY_SERVER_RECOVERY.md` - healthy-server recovery
-  checkpoint.
-
-## Future Packaging
-
-- `ONE_COMMAND_CLI_PLAN.md` - future one-command CLI plan. This is not
-  implemented yet.
-
-## Release Docs
-
-- `../release/MANUAL_RC_CHECKLIST.md` - manual RC dry-run checklist.
-- `../release/MVP_RC_NOTES.md` - current MVP RC posture.
-- `../release/RELEASE_DECISION_14M.md` - recorded Slice 14M dry run.
-
-## Safety Boundary
-
-The current packaging path does not implement a production installer, final
-one-command GitHub bundle, export/import, Docker/systemd orchestration, managed
-Hermes or Brain Memory installation, memory admin/mutation UI, or direct
-browser-to-Hermes/Brain-Memory access.
+Hermes remains a separately installed runtime. The Stoix launcher never installs,
+updates, starts, or stops Hermes and never executes remote update code.

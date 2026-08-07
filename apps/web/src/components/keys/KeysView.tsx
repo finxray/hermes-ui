@@ -4,9 +4,10 @@ import type { HermesEnvCategory, HermesEnvKey, NormalizedHermesStatus } from "@h
 import type { AppIcon } from "@/components/ui/AppIcons";
 import { Copy, ExternalLink, KeyRound, RefreshCw, Search } from "@/components/ui/AppIcons";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { HermesDashboardRecoveryState } from "@/components/ui/HermesDashboardRecoveryState";
 import { useHermesEnvKeys } from "@/hooks/useHermesEnvKeys";
 import { useSectionAnchors } from "@/hooks/useSectionAnchors";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArceeBrandIcon,
   AzureBrandIcon,
@@ -25,9 +26,10 @@ import styles from "./KeysView.module.css";
 
 type KeysViewProps = {
   hermesStatus: NormalizedHermesStatus | null;
+  onDetailBackChange?: (handler: (() => void) | null) => void;
 };
 
-export function KeysView({ hermesStatus }: KeysViewProps) {
+export function KeysView({ hermesStatus, onDetailBackChange }: KeysViewProps) {
   const canLoad = hermesStatus?.mode === "real" && hermesStatus.reachable;
   const { categories, isLoading, refresh, result } = useHermesEnvKeys(canLoad);
   const [query, setQuery] = useState("");
@@ -47,6 +49,11 @@ export function KeysView({ hermesStatus }: KeysViewProps) {
     [categories]
   );
 
+  useEffect(() => {
+    onDetailBackChange?.(selectedKey ? () => setSelectedKey(null) : null);
+    return () => onDetailBackChange?.(null);
+  }, [onDetailBackChange, selectedKey]);
+
   return (
     <section className={styles.view} aria-labelledby="keys-heading">
       <div className={styles.header}>
@@ -58,35 +65,34 @@ export function KeysView({ hermesStatus }: KeysViewProps) {
               : "Provider, tool, and messaging credentials"}
           </p>
         </div>
-        <div className={styles.headerActions}>
-          <label className={styles.searchBox}>
-            <Search size={14} />
-            <input
-              aria-label="Filter keys"
-              onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder="Filter keys"
-              value={query}
-            />
-          </label>
-          <button
-            aria-label="Refresh keys"
-            className={styles.iconButton}
-            disabled={!canLoad || isLoading}
-            onClick={() => void refresh()}
-            title="Refresh keys"
-            type="button"
-          >
-            <RefreshCw size={15} />
-          </button>
-        </div>
+      </div>
+      <div className={styles.headerActions}>
+        <label className={styles.searchBox}>
+          <Search size={15} />
+          <input
+            aria-label="Filter keys"
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder="Filter keys"
+            value={query}
+          />
+        </label>
+        <button
+          aria-label="Refresh keys"
+          className={styles.iconButton}
+          disabled={!canLoad || isLoading}
+          onClick={() => void refresh()}
+          type="button"
+        >
+          <RefreshCw size={20} />
+        </button>
       </div>
 
       {selectedKey ? (
         <KeyDetailView envKey={selectedKey} onBack={() => setSelectedKey(null)} />
       ) : !canLoad ? (
-        <EmptyState compact title="Keys are unavailable" body="Connect a reachable Hermes runtime to read its credentials." />
+        <EmptyState compact tone="important" title="Keys are unavailable" body="Connect a reachable Hermes runtime to read its credentials." />
       ) : result?.ok === false ? (
-        <EmptyState compact title="Could not load keys" body={result.error.message} />
+        <HermesDashboardRecoveryState onRecovered={refresh} resourceName="Keys" />
       ) : isLoading && categories.length === 0 ? (
         <LoadingRows />
       ) : filtered.length === 0 ? (
@@ -145,6 +151,7 @@ function KeyCard({ envKey, onSelect }: { envKey: HermesEnvKey; onSelect: () => v
       </div>
     </article>
   );
+
 }
 
 function ConfiguredKeysSection({ keys, onSelect }: { keys: HermesEnvKey[]; onSelect: (key: HermesEnvKey) => void }) {
@@ -163,7 +170,6 @@ function ConfiguredKeysSection({ keys, onSelect }: { keys: HermesEnvKey[]; onSel
             type="button"
           >
             <KeyThumbnail className={styles.configuredIcon} visual={visualForKey(key)} />
-            <span className={styles.configuredIconLabel}>{formatKeyTitle(key.name)}</span>
           </button>
         ))}
       </div>
@@ -202,8 +208,14 @@ function KeyDetailView({ envKey, onBack }: { envKey: HermesEnvKey; onBack: () =>
       </div>
       <section className={styles.detailInfo} aria-label="Key information">
         <h2>Information</h2>
-        <DetailRow label="Environment key" value={<CopyValue text={envKey.name} value={envKey.name} />} />
-        <DetailRow label="Value" value={<CopyValue disabled={!envKey.isSet} text={visibleValue} value={visibleValue} />} />
+        <DetailRow
+          label="Environment key"
+          value={<CopyValue text={envKey.name} value={envKey.name} />}
+        />
+        <DetailRow
+          label="Value"
+          value={<CopyValue disabled={!envKey.isSet || envKey.isPassword} text={visibleValue} value={visibleValue} />}
+        />
         <DetailRow label="Category" value={envKey.category} />
         <DetailRow label="State" value={envKey.isSet ? "Configured" : "Not set"} />
         <DetailRow label="Secret type" value={envKey.isPassword ? "Secret" : "Plain value"} />
@@ -259,23 +271,30 @@ function KeyThumbnail({ className, visual }: { className: string; visual: KeyVis
 }
 
 function CopyValue({ disabled = false, text, value }: { disabled?: boolean; text: string; value: string }) {
+  const copyable = isCopyableText(text) && !disabled;
+
   return (
     <span className={styles.copyValue}>
       <code>{value}</code>
-      <button
-        aria-label={`Copy ${text}`}
-        disabled={disabled}
-        onClick={() => {
-          if (!disabled) {
-            void navigator.clipboard?.writeText(text);
-          }
-        }}
-        type="button"
-      >
-        <Copy size={13} />
-      </button>
+      {copyable ? (
+        <button
+          aria-label={`Copy ${text}`}
+          onClick={() => void navigator.clipboard?.writeText(text)}
+          type="button"
+        >
+          <Copy size={13} />
+        </button>
+      ) : null}
     </span>
   );
+}
+
+function isCopyableText(text: string) {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized || ["n/a", "none", "not set", "null", "undefined", "unknown", "unavailable"].includes(normalized)) {
+    return false;
+  }
+  return !/^[*\u2022\u00b7\s]+$/.test(text);
 }
 
 function LoadingRows() {
@@ -348,7 +367,7 @@ function visualForKey(envKey: HermesEnvKey): KeyVisual {
     return { icon: OpenRouterBrandIcon, color: KEY_BRAND_COLORS.openrouter, background: "#171717" };
   }
   if (text.includes("deepseek")) {
-    return { icon: BRAND_ICONS.deepseek, color: KEY_BRAND_COLORS.deepseek, scale: 1.32 };
+    return { icon: BRAND_ICONS.deepseek, color: KEY_BRAND_COLORS.deepseek };
   }
   if (text.includes("qwen")) {
     return { icon: BRAND_ICONS.qwen, color: KEY_BRAND_COLORS.qwen };
@@ -389,7 +408,7 @@ function visualForKey(envKey: HermesEnvKey): KeyVisual {
   if (text.includes("openai") || text.includes("gpt")) {
     return { icon: BRAND_ICONS.openai, color: KEY_BRAND_COLORS.openai };
   }
-  return { icon: KeyRound, color: "#111111", scale: 1.22 };
+  return { icon: KeyRound, color: "#111111" };
 }
 
 function normalizeKeyText(values: Array<string | null | undefined>) {

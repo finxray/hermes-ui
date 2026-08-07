@@ -9,17 +9,16 @@ import {
   Cpu,
   Database,
   FileText,
+  Funnel,
   MessageSquare,
-  MoreHorizontal,
   Plug,
   Plus,
-  RotateCcw,
+  RefreshCw,
   Search,
   Server,
   ShieldCheck,
   Sparkles,
-  Terminal,
-  Trash2
+  Terminal
 } from "@/components/ui/AppIcons";
 import type { AppIcon } from "@/components/ui/AppIcons";
 import {
@@ -88,6 +87,7 @@ import {
 } from "./skillGlyphs";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { HermesDashboardRecoveryState } from "@/components/ui/HermesDashboardRecoveryState";
 import { useHermesPlugins } from "@/hooks/useHermesPlugins";
 import { useHermesSkills } from "@/hooks/useHermesSkills";
 import { useSectionAnchors } from "@/hooks/useSectionAnchors";
@@ -99,6 +99,7 @@ import styles from "./PluginsView.module.css";
 type PluginsViewProps = {
   availableModels?: HermesModelDescriptor[];
   hermesStatus: NormalizedHermesStatus | null;
+  onDetailBackChange?: (handler: (() => void) | null) => void;
 };
 
 type PluginsTab = "plugins" | "skills";
@@ -106,13 +107,16 @@ type CatalogItem = HermesPluginDescriptor | HermesSkillDescriptor;
 type CatalogMode = "browse" | "detail" | "manage" | "routing";
 type SelectedCatalogItem = { item: CatalogItem; kind: PluginsTab; source: string };
 
-export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewProps) {
+export function PluginsView({
+  availableModels = [],
+  hermesStatus,
+  onDetailBackChange
+}: PluginsViewProps) {
   const [activeTab, setActiveTab] = useState<PluginsTab>("plugins");
   const [mode, setMode] = useState<CatalogMode>("browse");
   const [selectedItem, setSelectedItem] = useState<SelectedCatalogItem | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterSource, setFilterSource] = useState("all");
-  const autoSelectedSkillsRef = useRef(false);
   const filterRef = useRef<HTMLSpanElement | null>(null);
   const [manageTab, setManageTab] = useState<PluginsTab>("plugins");
   const [query, setQuery] = useState("");
@@ -171,21 +175,6 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
   }, [sectionNav, title]);
 
   useEffect(() => {
-    if (
-      autoSelectedSkillsRef.current ||
-      activeTab !== "plugins" ||
-      pluginsResult?.ok !== false ||
-      result?.ok !== true ||
-      skills.length === 0
-    ) {
-      return;
-    }
-    autoSelectedSkillsRef.current = true;
-    setActiveTab("skills");
-    setFilterSource("all");
-  }, [activeTab, pluginsResult, result, skills.length]);
-
-  useEffect(() => {
     if (!filterOpen) {
       return;
     }
@@ -198,8 +187,15 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [filterOpen]);
 
+  useEffect(() => {
+    onDetailBackChange?.(mode === "browse" ? null : () => setMode("browse"));
+    return () => onDetailBackChange?.(null);
+  }, [mode, onDetailBackChange]);
+
   if (mode === "routing") {
-    return <ModelRoutingSkillView models={availableModels} onBack={() => setMode("browse")} />;
+    return (
+      <ModelRoutingSkillView models={availableModels} onBack={() => setMode("browse")} />
+    );
   }
 
   if (mode === "detail" && selectedItem) {
@@ -262,8 +258,7 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
 
   return (
     <section className={styles.view} aria-labelledby="plugins-heading">
-      <div className={styles.stickyControls}>
-        <div className={styles.tabs} role="tablist" aria-label="Plugins and skills">
+      <div className={styles.tabs} role="tablist" aria-label="Plugins and skills">
           <button
             className={`${styles.tab} ${activeTab === "plugins" ? styles.activeTab : ""}`}
             type="button"
@@ -288,8 +283,9 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
           >
             Skills
           </button>
-        </div>
+      </div>
 
+      <div className={styles.stickyControls}>
         <div className={styles.searchRow}>
           <label className={styles.searchBox}>
             <Search size={15} />
@@ -308,7 +304,7 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
               aria-label="Filter plugins and skills"
               onClick={() => setFilterOpen((value) => !value)}
             >
-              <FilterLinesIcon size={18} />
+              <Funnel size={18} />
             </button>
             {filterOpen ? (
               <span className={styles.filterMenu} role="menu">
@@ -343,11 +339,10 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
           className={styles.iconButton}
           type="button"
           onClick={() => void activeRefresh()}
-          title="Refresh Hermes metadata"
           aria-label="Refresh Hermes metadata"
           disabled={!canLoadSkills || activeLoading}
         >
-          <RotateCcw size={15} strokeWidth={2.1} />
+          <RefreshCw size={20} />
         </button>
       </div>
 
@@ -365,17 +360,14 @@ export function PluginsView({ availableModels = [], hermesStatus }: PluginsViewP
       {!canLoadSkills ? (
         <EmptyState
           compact
+          tone="important"
           title="Hermes skills are unavailable"
           body="Hermes did not advertise the skills endpoint. Connect a Hermes runtime with /v1/skills enabled to populate this view."
         />
       ) : activeTab === "plugins" && pluginsResult?.ok === false ? (
-        <EmptyState
-          compact
-          title="Hermes plugins are unavailable"
-          body="This Hermes runtime is reachable, but it does not expose the dashboard plugin hub endpoint. Use Skills for the available Hermes capabilities."
-        />
+        <HermesDashboardRecoveryState onRecovered={refreshPlugins} resourceName="Plugins" />
       ) : activeTab === "skills" && result?.ok === false ? (
-        <EmptyState compact title="Could not load Hermes skills" body={result.error.message} />
+        <EmptyState compact tone="important" title="Could not load Hermes skills" body={result.error.message} />
       ) : activeTab === "plugins" ? (
         <PluginsPanel
           enabledPlugins={enabledPlugins}
@@ -663,8 +655,7 @@ function AddedCatalogSection<T extends CatalogItem>({
             type="button"
             aria-label={`Open ${item.title}`}
           >
-            <SkillIcon className={styles.pluginIcon} showNativeTitle={false} skill={item} source={itemCategorySource(item)} />
-            <span className={styles.addedIconLabel}>{item.title}</span>
+            <SkillIcon className={styles.pluginIcon} skill={item} source={itemCategorySource(item)} />
           </button>
         ))}
       </div>
@@ -765,26 +756,7 @@ function ManageCatalogView({
   updatingSkillIds: Set<string>;
 }) {
   const [manageQuery, setManageQuery] = useState("");
-  const [openActionId, setOpenActionId] = useState<string | null>(null);
-  const actionMenuRef = useRef<HTMLSpanElement | null>(null);
   const rows = activeTab === "plugins" ? filterCatalogItems(plugins, manageQuery) : filterCatalogItems(skills, manageQuery);
-
-  useEffect(() => {
-    if (!openActionId) {
-      return;
-    }
-
-    function closeOnOutsidePointer(event: PointerEvent) {
-      const target = event.target;
-      if (target instanceof Node && actionMenuRef.current?.contains(target)) {
-        return;
-      }
-      setOpenActionId(null);
-    }
-
-    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
-  }, [openActionId]);
 
   return (
     <section className={styles.manageView} aria-labelledby="plugin-manage-heading">
@@ -801,25 +773,26 @@ function ManageCatalogView({
       <div className={styles.manageToolbar}>
         <div className={styles.manageTabs} role="tablist" aria-label="Manage catalog">
           <button
+            aria-selected={activeTab === "plugins"}
             className={activeTab === "plugins" ? styles.manageTabActive : styles.manageTab}
             onClick={() => onSelectTab("plugins")}
+            role="tab"
             type="button"
           >
             Plugins <span>{plugins.length}</span>
           </button>
-          <button className={styles.manageTab} disabled type="button">
-            MCPs <span>0</span>
-          </button>
           <button
+            aria-selected={activeTab === "skills"}
             className={activeTab === "skills" ? styles.manageTabActive : styles.manageTab}
             onClick={() => onSelectTab("skills")}
+            role="tab"
             type="button"
           >
             Skills <span>{skills.length}</span>
           </button>
         </div>
         <label className={styles.manageSearch}>
-          <Search size={14} />
+          <Search size={15} />
           <input
             aria-label={`Search ${activeTab}`}
             onChange={(event) => setManageQuery(event.currentTarget.value)}
@@ -839,30 +812,6 @@ function ManageCatalogView({
                 <h3>{item.title}</h3>
                 <p>{item.description ?? item.name}</p>
               </div>
-              <span className={styles.manageActions} ref={openActionId === item.id ? actionMenuRef : null}>
-                <button
-                  aria-expanded={openActionId === item.id}
-                  aria-label={`More actions for ${item.title}`}
-                  className={styles.manageMoreButton}
-                  onClick={() => setOpenActionId((current) => current === item.id ? null : item.id)}
-                  type="button"
-                >
-                  <MoreHorizontal size={15} />
-                </button>
-                {openActionId === item.id ? (
-                  <span className={styles.manageActionMenu} role="menu">
-                    <button
-                      className={styles.manageDeleteButton}
-                      onClick={() => setOpenActionId(null)}
-                      role="menuitem"
-                      type="button"
-                    >
-                      <Trash2 size={14} />
-                      <span>Delete</span>
-                    </button>
-                  </span>
-                ) : null}
-              </span>
               <ManageToggle
                 checked={item.enabled === true}
                 disabled={item.enabled === null}
@@ -984,7 +933,6 @@ function ItemActions({
         className={`${styles.itemStateSlot} ${
           !hasKnownState ? styles.itemStateUnknown : isEnabled ? styles.itemStateEnabled : styles.itemStateDisabled
         }`}
-        title={hasKnownState ? `${item.title} is ${statusLabel.toLowerCase()}` : "Hermes did not report this item state"}
       >
         <span className={styles.itemStatusDot} aria-label={statusLabel} role="img" />
         <button
@@ -999,7 +947,6 @@ function ItemActions({
               void onToggle(!isEnabled);
             }
           }}
-          title={toggleLabel}
           type="button"
         >
           <span />
@@ -1015,7 +962,6 @@ function ItemActions({
               void onToggle(true);
             }
           }}
-          title={addLabel}
           type="button"
           aria-busy={isUpdating}
           aria-label={addLabel}
@@ -1026,7 +972,6 @@ function ItemActions({
         <span
           aria-hidden="true"
           className={styles.pluginActionPlaceholder}
-          title={hasKnownState ? addLabel : "Hermes did not report this item state"}
         />
       )}
     </div>
@@ -1036,13 +981,11 @@ function ItemActions({
 function SkillIcon({
   className,
   label,
-  showNativeTitle = true,
   skill,
   source
 }: {
   className: string;
   label?: string;
-  showNativeTitle?: boolean;
   skill?: CatalogItem;
   source?: string;
 }) {
@@ -1058,7 +1001,6 @@ function SkillIcon({
       className={[className, styles.resolvedIcon, styles[visual.tone], styles.lightIcon].join(" ")}
       aria-hidden="true"
       style={style}
-      title={showNativeTitle ? label ?? skill?.title ?? source : undefined}
     >
       {visual.mark ? <span className={styles.iconMark}>{visual.mark}</span> : <Icon size={30} />}
     </span>
@@ -1396,7 +1338,7 @@ const SEMANTIC_RULES: IconRule[] = [
   { match: ["audit", "code review", "review", "policy", "verification", "inspection"], icon: ShieldCheck, tone: "toneCode" },
   { match: ["test driven", "tdd"], icon: Check, tone: "toneCode" },
   { match: ["arxiv", "research", "paper", "wiki", "blog", "blogwatcher"], icon: BookGlyph, tone: "toneArticle" },
-  { match: ["memory", "brain memory", "obliteratus"], icon: Database, tone: "toneMemory" },
+  { match: ["memory", "obliteratus"], icon: Database, tone: "toneMemory" },
   { match: ["llm", "vllm", "llama", "dspy", "eval", "harness", "serving", "model", "inference", "mlops"], icon: Cpu, tone: "toneData" },
   { match: ["agent", "autonomous", "supervis", "dogfood", "subagent", "yuanbao"], icon: Brain, tone: "toneAgent" },
   { match: ["email", "himalaya", "imap", "mail"], icon: MailGlyph, tone: "toneArticle" },
@@ -1550,14 +1492,6 @@ function SummaryPill({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <b>{value}</b>
     </span>
-  );
-}
-
-function FilterLinesIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 24 24" width={size}>
-      <path d="M5 7h14M8.5 12h7M11 17h2" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-    </svg>
   );
 }
 

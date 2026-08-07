@@ -1,7 +1,7 @@
 # Slice 15A - Live Brain Memory E2E reconnect status
 
 Date: 2026-05-31
-Workspace: `C:\Users\Alexey\.cursor\projects\hermes-ui`
+Workspace: `<repo-root>`
 Start commit: `3f02f81`
 
 ## Purpose
@@ -68,7 +68,7 @@ environment.
 | Hermes API | `http://127.0.0.1:8642/health` | Unreachable |
 | Brain Memory Gateway candidate | `http://127.0.0.1:8080/health` | Unreachable |
 | Brain Memory Gateway candidate | `http://127.0.0.1:8765/health` | Unreachable |
-| Brain Memory repo | `C:\Users\Alexey\.cursor\projects\brain-memory` | Present |
+| Brain Memory repo | `<brain-memory-repo>` | Present |
 | Brain Memory launcher | `scripts\start-brain-memory.ps1` | Present, not executed |
 | Brain Memory launcher | `start-brain-memory.bat` | Present, not executed |
 
@@ -244,7 +244,7 @@ live E2E reconnect.
 Recommended manual prerequisites for Slice 15B:
 
 ```powershell
-cd C:\Users\Alexey\.cursor\projects\brain-memory
+cd C:\path\to\brain-memory
 powershell -ExecutionPolicy Bypass -File .\scripts\start-brain-memory.ps1
 Invoke-RestMethod http://127.0.0.1:8080/health
 Invoke-RestMethod http://127.0.0.1:8080/ready

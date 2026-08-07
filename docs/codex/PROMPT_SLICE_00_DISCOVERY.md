@@ -5,7 +5,7 @@ Use GPT-5.5/Codex with **high reasoning** for this slice.
 You are starting the project at:
 
 ```text
-C:\Users\Alexey\.cursor\projects\hermes-ui
+<repo-root>
 ```
 
 Read these files first:

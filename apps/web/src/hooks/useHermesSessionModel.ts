@@ -100,7 +100,10 @@ export function useHermesSessionModel({
 
   const baseModelState = useMemo(
     () => mergeLmStudioModels(
-      mergeOpenRouterModels(getProviderModelState(hermesStatus, modelChoices), openRouterModels),
+      mergeOpenRouterModels(
+        getProviderModelState(hermesStatus, modelChoices),
+        openRouterModels
+      ),
       lmStudioModels
     ),
     [hermesStatus, lmStudioModels, modelChoices, openRouterModels]
@@ -618,21 +621,15 @@ function mergeOpenRouterModels(
     }
     return mergeOpenRouterModelMetadata(model, metadata);
   });
-  const knownIds = new Set(mergedModels.map((model) => model.id));
-  const hiddenExternalCount = openRouterModels.filter((model) => !knownIds.has(model.id)).length;
   const unchanged = mergedModels.every((model, index) => model === state.availableModels[index]);
-  if (unchanged && hiddenExternalCount === 0) {
+  if (unchanged) {
     return state;
   }
 
   return {
     ...state,
     availableModels: mergedModels,
-    reason:
-      state.reason ||
-      (hiddenExternalCount > 0
-        ? "Hermes controls runtime model switching; public OpenRouter-only models stay hidden until Hermes advertises them through /v1/models."
-        : "Hermes configured OpenRouter models are enriched with public catalog metadata.")
+    reason: state.reason || "Hermes configured models are enriched with public catalog metadata."
   };
 }
 
@@ -648,6 +645,7 @@ function mergeOpenRouterModelMetadata(
     inputModalities: model.inputModalities?.length ? model.inputModalities : metadata.inputModalities,
     outputModalities: model.outputModalities?.length ? model.outputModalities : metadata.outputModalities,
     pricing: model.pricing ?? metadata.pricing,
+    openRouterPopularityRank: metadata.openRouterPopularityRank,
     supportedParameters: mergeModelStringList(model.supportedParameters, metadata.supportedParameters)
   };
 }
@@ -670,19 +668,14 @@ function mergeLmStudioModels(
     const metadata = lmStudioById.get(model.id);
     return metadata ? mergeLmStudioModelMetadata(model, metadata) : model;
   });
-  const knownIds = new Set(mergedModels.map((model) => model.id));
-  const extras = lmStudioModels.filter((model) => !knownIds.has(model.id));
-
-  if (extras.length === 0 && mergedModels.every((model, index) => model === state.availableModels[index])) {
+  if (mergedModels.every((model, index) => model === state.availableModels[index])) {
     return state;
   }
 
   return {
     ...state,
-    availableModels: [...mergedModels, ...extras],
-    reason:
-      state.reason ||
-      "Hermes configured models are shown with additional UI-provided LM Studio runtime metadata."
+    availableModels: mergedModels,
+    reason: state.reason || "Hermes configured models are shown with additional UI-provided LM Studio runtime metadata."
   };
 }
 

@@ -6,15 +6,13 @@ import type {
 } from "@/data/types";
 
 /**
- * UI persistence abstraction for the Hermes UI workspace.
+ * Local persistence abstraction for the Stoix workspace.
  *
- * Brain Memory is an *optional* plugin. The UI must persist its own
- * chat/session/workspace state locally so that it works fully without any
- * Brain Memory gateway. This interface is the seam between the React shell and
- * whatever local store backs it (IndexedDB in the browser, an in-memory noop
- * fallback, or — in the future — a Brain Memory plugin adapter).
+ * Stoix persists its chat/session/workspace state in the browser. This
+ * interface separates the React shell from the browser persistence backend
+ * (IndexedDB, with an in-memory fallback when storage is unavailable).
  *
- * The data model is intentionally normalized into separate record kinds
+ * The data model is normalized into separate record kinds
  * (projects, sessions, workspace meta) rather than one giant blob so the store
  * can read/write individual sessions and grow without rewriting everything.
  */
@@ -25,7 +23,7 @@ export const STORAGE_SCHEMA_VERSION = 1;
 /** Stable identifier for the meta record inside the store. */
 export const WORKSPACE_META_KEY = "workspace";
 
-export type MemoryStoreKind = "indexeddb" | "noop" | "brain-memory-plugin";
+export type MemoryStoreKind = "indexeddb" | "noop";
 
 /**
  * A project is persisted exactly as the workspace reducer models it. The store
@@ -49,7 +47,7 @@ export type WorkspaceMetaRecord = {
   activeProjectId: string;
   activeSessionId: string | null;
   modelChoices: ModelChoice[];
-  connectionStatus: { hermes: string; brainMemory: string };
+  connectionStatus: { hermes: string };
   schemaVersion: number;
   updatedAt: string;
 };

@@ -190,7 +190,7 @@ async function handleAlreadyHealthy(selectedSummary) {
 async function startDevServer() {
   const commandSpec = buildDevCommand();
   printText([
-    "Brain Memory Studio Web UI dev server",
+    "Hermes UI dev server",
     "=====================================",
     `Selected URL: ${baseUrl}`,
     `Starting: ${commandSpec.display}`,
@@ -299,7 +299,7 @@ async function inspectBaseUrl(targetBaseUrl) {
   }
 
   const html = rootResult.text || "";
-  const looksLikeStudio = html.includes("Brain Memory Studio");
+  const looksLikeStudio = html.includes("Hermes UI");
   const oldGreenUiPresent = /old green ui|#00ff00|#0f0\b/i.test(html);
   const assets = extractStaticAssetPaths(html).slice(0, 6);
   const staticAssets = assets.length > 0
@@ -620,7 +620,7 @@ function printText(value) {
 }
 
 function printHelp() {
-  console.log(`Brain Memory Studio Web UI dev server wrapper
+  console.log(`Hermes UI dev server wrapper
 ==============================================
 
 Purpose:
@@ -654,7 +654,7 @@ Behavior:
   - does not kill existing processes;
   - does not delete .next;
   - does not edit env files;
-  - does not manage Hermes, Brain Memory, or system services;
+  - does not manage Hermes or system services;
   - starts only the Web UI workspace Next CLI from apps/web;
   - uses npm.cmd on Windows Node and npm on Linux/WSL/macOS for optional smokes;
   - avoids npm.cmd for the long-running dev server to avoid spawn EINVAL;

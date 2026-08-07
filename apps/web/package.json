@@ -1,26 +1,27 @@
 {
-  "name": "@hermes-ui/web",
+  "name": "@stoix/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hermes-ui/brain-memory-client": "file:../../packages/brain-memory-client",
     "@hermes-ui/hermes-client": "file:../../packages/hermes-client",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "lucide-react": "^1.28.0",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
     "rehype-prism-plus": "^2.0.2",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "typescript": "latest"
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "typescript": "6.0.3"
   }
 }

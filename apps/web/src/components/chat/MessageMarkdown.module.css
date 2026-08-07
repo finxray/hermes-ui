@@ -281,43 +281,71 @@
 }
 
 .tableScroller {
-  overflow: hidden;
+  contain: inline-size;
   overflow-x: auto;
+  width: 100%;
   max-width: 100%;
-  margin: 14px 0;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.012);
-  background-clip: padding-box;
+  margin: 18px 0 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  scrollbar-gutter: stable;
+}
+
+.tableScroller[data-wide="true"] {
+  --table-breakout: clamp(120px, 18vw, 320px);
+  --table-pane-inset: clamp(40px, 4vw, 72px);
+  --table-wide-width: min(
+    calc(100% + var(--table-breakout)),
+    calc(100cqw - var(--table-pane-inset))
+  );
+
+  width: var(--table-wide-width);
+  max-width: none;
+  margin-left: calc((100% - var(--table-wide-width)) / 2);
 }
 
 .tableScroller table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 0.93rem;
+  width: max(100%, max-content);
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: inherit;
+  line-height: 1.45;
 }
 
 .tableScroller th,
 .tableScroller td {
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  max-width: 360px;
+  padding: 13px 28px 13px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
   text-align: left;
   vertical-align: top;
 }
 
+.tableScroller :is(th, td):not(:first-child) {
+  padding-left: 20px;
+}
+
+.tableScroller :is(th, td):last-child {
+  padding-right: 0;
+}
+
 .tableScroller th {
-  background: rgba(255, 255, 255, 0.035);
+  padding-top: 10px;
+  padding-bottom: 11px;
+  border-bottom-color: rgba(255, 255, 255, 0.16);
+  background: transparent;
   color: var(--text-primary);
-  font-weight: 650;
+  font-weight: 620;
+  white-space: nowrap;
 }
 
 .tableScroller tr:last-child td {
   border-bottom: 0;
 }
 
-.tableScroller tbody tr:nth-child(even) td {
-  background: rgba(255, 255, 255, 0.018);
+.tableScroller td {
+  color: var(--markdown-text);
 }
 
 /* Prism token colours — must use :global because rehype-prism-plus emits bare class names */
@@ -450,5 +478,35 @@
   .markdown[data-streaming="true"] > *,
   .markdown[data-streaming="true"] :is(p, li, h1, h2, h3, h4, blockquote) {
     animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .tableScroller[data-wide="true"] {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .tableScroller[data-wide="true"] :is(th, td) {
+    min-width: 140px;
+  }
+
+  .tableScroller[data-wide="true"] :is(th, td):first-child {
+    min-width: 220px;
+  }
+
+  .tableScroller[data-wide="true"] :is(th, td):last-child {
+    min-width: 190px;
+  }
+
+  .tableScroller th,
+  .tableScroller td {
+    max-width: 280px;
+    padding-right: 22px;
+  }
+
+  .tableScroller :is(th, td):not(:first-child) {
+    padding-left: 16px;
   }
 }

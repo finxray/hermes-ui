@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
-  createMockWorkspaceState,
+  createInitialWorkspaceState,
   getVisibleSessions,
   workspaceReducer,
   type WorkspaceAction
@@ -13,10 +13,10 @@ import {
   saveWorkspaceToStore
 } from "@/lib/storage/workspace-storage";
 import type { MemoryStore } from "@/lib/storage/memory-store";
-import type { ChatMessage, RunRecord, SessionModelPreference, ToolEvent } from "@/data/types";
+import type { ChatMessage, RunRecord, SessionChannel, SessionModelPreference, ToolEvent } from "@/data/types";
 
 export function useWorkspaceState() {
-  const [state, dispatch] = useReducer(workspaceReducer, undefined, createMockWorkspaceState);
+  const [state, dispatch] = useReducer(workspaceReducer, undefined, createInitialWorkspaceState);
   const [isHydrated, setIsHydrated] = useState(false);
   const latestStateRef = useRef(state);
   // The MemoryStore is resolved asynchronously (IndexedDB open + migration).
@@ -40,7 +40,7 @@ export function useWorkspaceState() {
           dispatch({ type: "hydrate", state: loaded });
         }
       } catch {
-        // Storage failed to resolve; keep the default mock state so the UI
+        // Storage failed to resolve; keep the clean initial state so the UI
         // remains usable. The provider surfaces a diagnostic separately.
       } finally {
         if (!cancelled) {
@@ -116,14 +116,29 @@ export function useWorkspaceState() {
       createSession: () => dispatch({ type: "createSession" }),
       createSessionForProject: (
         projectId: string,
-        options: { activate?: boolean; sessionId?: string } = {}
+        options: {
+          activate?: boolean;
+          channel?: SessionChannel;
+          createdAt?: string;
+          hermesSessionId?: string;
+          messages?: ChatMessage[];
+          sessionId?: string;
+          title?: string;
+          updatedAt?: string;
+        } = {}
       ) => {
         const sessionId = options.sessionId ?? `session-${crypto.randomUUID()}`;
         dispatch({
           type: "createSession",
           activate: options.activate,
+          channel: options.channel,
+          createdAt: options.createdAt,
+          hermesSessionId: options.hermesSessionId,
+          messages: options.messages,
           projectId,
-          sessionId
+          sessionId,
+          title: options.title,
+          updatedAt: options.updatedAt
         });
         return sessionId;
       },

@@ -42,4 +42,4 @@ Tested in the user's real Windows Chrome at `http://127.0.0.1:3000` with Hermes 
 - Document-level vertical overflow was not detected on desktop.
 - Transcript, sidebar, and right panel scroll areas remained independent.
 
-Screenshot: `C:\Users\Alexey\.cursor\projects\hermes-ui\.codex-log\slice05b-composer-visible-after-send.png`
+Screenshot: `.codex-log/slice05b-composer-visible-after-send.png`

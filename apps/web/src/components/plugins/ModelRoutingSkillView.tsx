@@ -139,7 +139,6 @@ function CategoryModelPicker({
         data-active={value ? "true" : "false"}
         disabled={!hasModels}
         onClick={() => setOpen((current) => !current)}
-        title={hasModels ? buttonLabel : "No Hermes models are available to route to yet."}
         type="button"
       >
         <span className={styles.pickerButtonText}>{hasModels ? buttonLabel : "No models available"}</span>
@@ -178,14 +177,6 @@ function CategoryModelPicker({
               selectedId={value?.catalogModelId ?? null}
               title="Hermes Configured"
             />
-            {groups.openRouter.length > 0 ? (
-              <PickerSection
-                models={groups.openRouter}
-                onSelect={select}
-                selectedId={value?.catalogModelId ?? null}
-                title="OpenRouter"
-              />
-            ) : null}
             {groups.hermes.length === 0 && groups.openRouter.length === 0 ? (
               <div className={styles.pickerEmpty}>No matching models</div>
             ) : null}
@@ -251,8 +242,8 @@ function groupModels(models: HermesModelDescriptor[], query: string) {
   };
 
   return {
-    hermes: models.filter((model) => model.catalogSource !== "ui-openrouter" && matches(model)),
-    openRouter: models.filter((model) => model.catalogSource === "ui-openrouter" && matches(model))
+    hermes: models.filter((model) => model.catalogSource === "hermes-config" && matches(model)),
+    openRouter: []
   };
 }
 

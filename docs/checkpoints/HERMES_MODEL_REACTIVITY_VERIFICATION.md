@@ -170,7 +170,7 @@ curl http://127.0.0.1:3002/api/hermes/status
 
 ```
 [!!] browser-run: browserType.launch: Executable doesn't exist at
-     /home/alexey/.cache/ms-playwright/chromium_headless_shell-1223/...
+     ~/.cache/ms-playwright/chromium_headless_shell-1223/...
 
 npx playwright install
 → ERROR: Playwright does not support chromium on ubuntu26.04-x64
@@ -202,7 +202,7 @@ Node.js and Playwright are installed natively:
 
 ```powershell
 # In Windows PowerShell, from project root:
-cd C:\Users\Alexey\.cursor\projects\hermes-ui
+cd C:\path\to\stoix
 npm run smoke:ui -- --base-url http://127.0.0.1:3002
 npm run smoke:ui:send -- --base-url http://127.0.0.1:3002 --require-hermes
 ```

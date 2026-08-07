@@ -80,8 +80,8 @@
 }
 
 .shell :global(svg) {
-  width: var(--icon-md);
-  height: var(--icon-md);
+  width: var(--control-icon-size, var(--icon-md));
+  height: var(--control-icon-size, var(--icon-md));
   flex: 0 0 auto;
 }
 

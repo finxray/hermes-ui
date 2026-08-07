@@ -14,7 +14,11 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 0 34px;
+  margin: 0;
+}
+
+.header > div:first-child {
+  padding-inline-start: 8px;
 }
 
 .header h1 {
@@ -27,30 +31,25 @@
 .header p {
   margin: 6px 0 0;
   color: var(--text-muted);
-  font-size: var(--font-body);
+  font-size: var(--font-small);
   line-height: 1.35;
 }
 
 .headerActions {
   position: sticky;
-  top: 0;
+  top: 40px;
   z-index: 70;
   display: flex;
   align-items: center;
   gap: 10px;
   flex: none;
-  margin: -8px;
-  padding: 8px;
-  border-radius: 999px;
-  background: linear-gradient(
-    to bottom,
-    rgba(11, 11, 12, 0.96) 0,
-    rgba(11, 11, 12, 0.96) 8px,
-    rgba(11, 11, 12, 0.78) 8px,
-    rgba(11, 11, 12, 0.78) 100%
-  );
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(14px);
+  justify-self: end;
+  margin: -66px -8px 48px 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
   transition:
     background 180ms ease,
     box-shadow 180ms ease,
@@ -60,13 +59,20 @@
 .searchBox {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   width: 234px;
-  padding: 7px 11px;
+  min-height: 40px;
+  padding: 0 13px;
   border: 0;
   border-radius: 999px;
   background: rgba(38, 38, 40, 1);
+  box-shadow: none;
   color: var(--text-muted);
+  transition: box-shadow 180ms ease;
+}
+
+:global([data-section-scrolled="true"]) .searchBox {
+  box-shadow: 0 0 30px 0 rgba(0, 0, 0, 0.38);
 }
 
 .searchBox input {
@@ -79,14 +85,17 @@
 }
 
 .iconButton {
+  --control-icon-size: 20px;
+
   display: grid;
-  width: 31px;
-  height: 31px;
+  width: 40px;
+  height: 40px;
   flex: none;
   place-items: center;
   border: 0;
   border-radius: 999px;
   background: rgba(38, 38, 40, 1);
+  box-shadow: none;
   color: var(--text-secondary);
   cursor: pointer;
   transition:
@@ -98,9 +107,12 @@
 .iconButton:hover:not(:disabled),
 .iconButton:focus-visible:not(:disabled) {
   outline: 0;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--bg-control-hover);
   color: var(--text-primary);
-  transform: translateY(-1px);
+}
+
+.iconButton:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .iconButton:disabled {
@@ -133,7 +145,7 @@
   height: 45px;
   padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -310,22 +322,29 @@
 }
 
 .keyIcon img,
-.detailIcon img,
-.configuredIcon img,
-.promptIcon img {
-  width: 86%;
-  height: 86%;
+.configuredIcon img {
+  width: 76%;
+  height: 76%;
   object-fit: contain;
   transform: scale(var(--key-icon-scale, 1));
   transform-origin: center;
 }
 
-.keyIcon svg,
-.detailIcon svg,
-.configuredIcon svg,
-.promptIcon svg {
-  width: 86%;
-  height: 86%;
+.keyIcon.keyIcon svg,
+.configuredIcon.configuredIcon svg {
+  width: 31px;
+  height: 31px;
+  transform: scale(var(--key-icon-scale, 1));
+  transform-origin: center;
+}
+
+.detailIcon.detailIcon img,
+.promptIcon.promptIcon img,
+.detailIcon.detailIcon svg,
+.promptIcon.promptIcon svg {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
   transform: scale(var(--key-icon-scale, 1));
   transform-origin: center;
 }
@@ -679,28 +698,35 @@
 }
 
 .copyValue button {
-  display: grid;
+  --copy-icon-cutout: rgba(38, 38, 40, 1);
+  --control-icon-size: 13px;
+
+  display: inline-grid;
   width: 26px;
   height: 26px;
   flex: none;
+  align-self: center;
   place-items: center;
+  padding: 0;
   border: 0;
   border-radius: 999px;
   background: rgba(38, 38, 40, 1);
   color: var(--text-secondary);
   cursor: pointer;
+  line-height: 0;
 }
 
-.copyValue button:hover:not(:disabled),
-.copyValue button:focus-visible:not(:disabled) {
+.copyValue button svg {
+  display: block;
+}
+
+.copyValue button:hover,
+.copyValue button:focus-visible {
+  --copy-icon-cutout: rgb(62, 62, 64);
+
   outline: 0;
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
-}
-
-.copyValue button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
 }
 
 .detailLink {

@@ -35,6 +35,8 @@
 
   --accent: #8ee6c6;
   --accent-2: #91b8ff;
+  --status-enabled: #34c759;
+  --unread-blue: #7abfff;
   --orange: #ff7a33;
   --orange-rgb: 255, 122, 51;
   --accent-orange: var(--orange);

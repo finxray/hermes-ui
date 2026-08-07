@@ -69,6 +69,8 @@ export type HermesModelDescriptor = {
   inputModalities?: string[];
   outputModalities?: string[];
   supportedParameters?: string[];
+  /** Weekly OpenRouter usage rank when fetched with the most-popular catalog sort. */
+  openRouterPopularityRank?: number;
   pricing?: {
     prompt?: string | null;
     completion?: string | null;
@@ -165,16 +167,15 @@ export type HermesUiCapabilities = {
     reason: string;
     fastStreamProfile: HermesFastStreamProfile;
     uiState: HermesCapabilityState;
-    /** Explicit capability from Hermes GET /v1/capabilities session_model_override.supported */
+    /** Explicit legacy session override or current session model-lock capability. */
     sessionModelOverrideCapable: boolean;
-    /** True when Hermes explicitly reports session_model_override support */
+    /** True when Hermes explicitly reports a verified session model control path. */
     explicitOverrideSupported: boolean;
   };
   memory: {
     sessionContinuityHeader: string | null;
     sessionKeyHeader: string | null;
     metadataContextPropagation: HermesCapabilityState;
-    instructionBridgeActive: boolean;
     memoryWriteApi: boolean;
   };
   ui: {
@@ -220,7 +221,6 @@ export type HermesClientConfig = {
   dashboardSessionToken?: string | null;
   configuredDefaultModelId?: string | null;
   enabled?: boolean;
-  memoryScopeBridgeEnabled?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
@@ -265,10 +265,6 @@ export type HermesChatContext = {
     id: string;
     title: string;
     stableKey: string;
-    tenantId: string;
-    retrievalProfile: string;
-    contextPolicy: string;
-    pinnedMemoryIds?: string[];
     userVisibleSummary?: string;
   };
   session: {
@@ -419,7 +415,7 @@ export type HermesRunsProbeResult = {
     events: number;
     messageDeltaEvents: number;
     toolEvents: number;
-    brainMemoryToolEvents: number;
+    memoryToolEvents: number;
     approvalEvents: number;
   };
   safety: {
@@ -441,7 +437,6 @@ export type HermesRunsExperimentalChatResult = Omit<HermesRunsProbeResult, "mode
     sessionId: string;
     sessionStableKey: string;
     hermesSessionId: string;
-    tenantId: string;
   };
   experimental: {
     featureFlag: "HERMES_UI_EXPERIMENTAL_RUNS_MODE";
@@ -449,10 +444,8 @@ export type HermesRunsExperimentalChatResult = Omit<HermesRunsProbeResult, "mode
     defaultEnabled: false;
     route: "bff-only";
     productionChatUntouched: true;
-    memoryScopeBridgeEnabled: boolean;
   };
   safety: HermesRunsProbeResult["safety"] & {
-    browserDirectBrainMemory: false;
     directStorageAccess: false;
     productionChatUntouched: true;
   };
@@ -495,7 +488,7 @@ export type HermesRunsStopProbeResult = {
     events: number;
     messageDeltaEvents: number;
     toolEvents: number;
-    brainMemoryToolEvents: number;
+    memoryToolEvents: number;
     approvalEvents: number;
   };
   timings: {
@@ -521,8 +514,12 @@ export type HermesSessionSummary = {
   id: string;
   title: string;
   model: string | null;
+  source: string | null;
   startedAt: string;
   endedAt: string | null;
+  lastActiveAt: string | null;
+  parentSessionId: string | null;
+  preview: string | null;
   messageCount?: number;
 };
 
@@ -782,7 +779,7 @@ export type HermesRunsApprovalProbeResult = {
     events: number;
     messageDeltaEvents: number;
     toolEvents: number;
-    brainMemoryToolEvents: number;
+    memoryToolEvents: number;
     approvalEvents: number;
   };
   timings: {

@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
+  output: "standalone",
+  outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   reactStrictMode: true,
   transpilePackages: ["@hermes-ui/hermes-client"],
   // Next 16 blocks cross-origin dev-resource (HMR/RSC) requests by default. The

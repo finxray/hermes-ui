@@ -218,7 +218,7 @@ Tested in the user's real Windows Chrome at `http://127.0.0.1:3000`.
 Screenshot:
 
 ```text
-C:\Users\Alexey\.cursor\projects\hermes-ui\.codex-log\slice06-brain-memory-console-memory-tab.png
+`.codex-log/slice06-brain-memory-console-memory-tab.png`
 ```
 
 ## Packaging Compatibility Note

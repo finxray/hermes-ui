@@ -240,7 +240,7 @@ Observed:
 The sibling Brain Memory repository was found at:
 
 ```text
-C:\Users\Alexey\.cursor\projects\brain-memory
+C:\path\to\brain-memory
 ```
 
 From that repository root, the documented Windows startup commands are:

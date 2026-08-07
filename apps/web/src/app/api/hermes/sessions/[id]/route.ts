@@ -1,5 +1,6 @@
 import { deleteHermesSession, getHermesSession } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,13 @@ function isHermesSessionNotFound(result: Awaited<ReturnType<typeof getHermesSess
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: { kind: "forbidden", message: "Cross-origin requests are not allowed." } }, { status: 403 });
+  }
+
   const { id } = await params;
   if (!id) {
     return NextResponse.json({ ok: false, error: { kind: "invalid_config", message: "Session id is required." } }, { status: 400 });

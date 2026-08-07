@@ -35,7 +35,7 @@ Expect:
 ## Step 2: Start Web UI (if not running)
 
 ```bash
-cd C:\Users\Alexey\.cursor\projects\hermes-ui
+cd C:\path\to\stoix
 npm run studio:web -- --port 3002
 ```
 

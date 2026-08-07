@@ -519,7 +519,7 @@ export function classifyToolEventSource(
 ): { type: Extract<AgentActivityType, "command" | "memory" | "tool">; source: AgentActivitySource } {
   const normalized = normalizeName(toolName);
   if (isMemoryTool(normalized, payload)) {
-    return { source: "brain-memory", type: "memory" };
+    return { source: "mcp", type: "memory" };
   }
   if (isCommandTool(normalized, payload)) {
     return { source: "mcp", type: "command" };
@@ -660,7 +660,33 @@ function activityTitleForTool(
   if (type === "command") {
     return formatCommandTitle(command, status);
   }
+  if (isWebSearchTool(normalizeName(toolName))) {
+    return status === "running" || status === "queued" ? "Searching the web" : "Searched the web";
+  }
   return toolName || "Hermes tool";
+}
+
+function isWebSearchTool(normalizedToolName: string) {
+  if (
+    normalizedToolName.includes("web_search") ||
+    normalizedToolName.includes("search_web") ||
+    normalizedToolName.includes("web_extract") ||
+    normalizedToolName.includes("extract_web") ||
+    normalizedToolName.includes("web_browse") ||
+    normalizedToolName.includes("browse_web")
+  ) {
+    return true;
+  }
+  if (
+    normalizedToolName.includes("tavily") ||
+    normalizedToolName.includes("firecrawl") ||
+    normalizedToolName.includes("searxng") ||
+    normalizedToolName.includes("exa_search") ||
+    normalizedToolName.includes("parallel_search")
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function createReasoningActivityEvent(
@@ -888,13 +914,9 @@ function titleFromEventType(eventType: string, type: AgentActivityType): string 
 }
 
 function isMemoryTool(normalizedToolName: string, payload: Record<string, unknown>) {
-  const source = normalizeName(asString(payload.source) || asString(payload.server) || asString(payload.tool_source));
   return (
-    normalizedToolName.includes("brain_memory") ||
     normalizedToolName.includes("memory_") ||
-    normalizedToolName.startsWith("memory") ||
-    source.includes("brain_memory") ||
-    source.includes("brain memory")
+    normalizedToolName.startsWith("memory")
   );
 }
 

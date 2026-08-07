@@ -1,9 +1,14 @@
 import { selectHermesModel } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: { kind: "forbidden", message: "Cross-origin requests are not allowed." } }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => ({}));
 
   const sessionId = body?.sessionId || body?.hermesSessionId;

@@ -1,5 +1,5 @@
 .splitPane {
-  --split-pane-toolbar-height: 60px;
+  --split-pane-toolbar-height: 52px;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -25,11 +25,11 @@
   z-index: 8;
   display: flex;
   min-width: 0;
-  min-height: 44px;
-  align-items: center;
+  min-height: var(--split-pane-toolbar-height);
+  align-items: flex-start;
   gap: 8px;
   justify-content: flex-start;
-  padding: 8px 16px;
+  padding: 10px 16px 4px 10px;
   border-bottom: 0;
   background-color: var(--bg-workspace-solid);
 }
@@ -48,9 +48,9 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
-  transform: translateY(4px);
+  transform: none;
 }
 
 .tabGroup > .tabButton:last-child {
@@ -58,6 +58,7 @@
 }
 
 .returnButton {
+  position: relative;
   width: 30px;
   min-width: 30px;
   padding: 0;
@@ -67,6 +68,36 @@
 .returnButton:hover,
 .returnButton:focus-visible {
   background: transparent;
+}
+
+.returnTooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--z-floating);
+  width: max-content;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #2c2c2e;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  color: var(--text-primary);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  white-space: nowrap;
+}
+
+.returnButton:hover .returnTooltip,
+.returnButton:focus-visible .returnTooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .splitPane[data-layout="combined"] .tabGroup {
@@ -89,6 +120,12 @@
   min-width: 0;
   align-items: center;
   gap: 7px;
+}
+
+.sideTabWrap {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
 }
 
 .tabButton,
@@ -122,6 +159,26 @@
 
 .sideTab {
   max-width: min(116px, 26vw);
+}
+
+.sideTab[data-closable="true"] {
+  padding-left: 31px;
+}
+
+.closeTabButton {
+  position: absolute;
+  top: 8px;
+  left: 9px;
+  z-index: 2;
+  display: grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
 }
 
 .tabButton span {
@@ -171,8 +228,8 @@
   background: rgba(155, 155, 162, 1);
   color: var(--bg-workspace-solid);
   transition:
-    background-color 300ms ease,
-    color 300ms ease;
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .closeGlyph::before,
@@ -196,13 +253,19 @@
   transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-.sideTab:hover .closeGlyph,
-.sideTab:focus-visible .closeGlyph {
-  background: var(--text-primary);
+.closeTabButton:hover .closeGlyph,
+.closeTabButton:focus-visible .closeGlyph {
+  background: var(--orange);
   color: var(--bg-workspace-solid);
 }
 
+.closeTabButton:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+}
+
 .sessionMenu {
+  composes: scrollbar-hover-context from global;
   position: absolute;
   top: calc(100% + 7px);
   left: 0;
@@ -264,7 +327,7 @@
 }
 
 .menuList {
-  composes: scrollbar-hover-reveal from global;
+  composes: scrollbar-hover-target from global;
   display: grid;
   max-height: 330px;
   overflow-x: hidden;
@@ -292,6 +355,26 @@
 .menuEmpty {
   color: var(--text-muted);
   font-size: var(--font-small);
+}
+
+.menuMore {
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+}
+
+.menuMore:hover,
+.menuMore:focus-visible {
+  outline: 0;
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
 }
 
 .menuEmpty {
@@ -380,8 +463,8 @@
 
 @media (max-width: 760px) {
   .toolbar {
-    min-height: 44px;
-    padding: 8px 12px;
+    min-height: var(--split-pane-toolbar-height);
+    padding: 10px 16px 4px 10px;
   }
 
   .sideTab {

@@ -35,8 +35,12 @@ expect(composer.includes("function updateDraft(value: string)"), "Composer centr
 expect(composer.includes("draftStorageKey"), "Composer accepts a scoped draft storage key.");
 expect(composer.includes("readComposerDraft") && composer.includes("writeComposerDraft"), "Composer persists unsent draft text.");
 expect(composer.includes("clearComposerDraft"), "Composer clears persisted draft text after send.");
-expect(composer.includes("onChange={(event) => updateDraft(event.currentTarget.value)}"), "Composer textarea onChange updates draft.");
-expect(composer.includes("onInput={(event) => updateDraft(event.currentTarget.value)}"), "Composer textarea onInput mirrors draft for native typing.");
+expect(composer.includes("onChange={(event) => handleDraftInput(event.currentTarget.value)}"), "Composer textarea onChange updates draft safely around voice input.");
+expect(composer.includes("onInput={(event) => handleDraftInput(event.currentTarget.value)}"), "Composer textarea onInput mirrors draft safely around voice input.");
+expect(
+  composer.includes("function handleDraftInput(value: string)") && composer.includes("cancelVoiceInput();"),
+  "Manual typing cancels active voice recognition before updating the draft."
+);
 expect(
   composer.includes("getTrimmedDraft(textareaRef.current, draft).length > 0"),
   "Composer send enablement uses trimmed draft length from DOM/state."
@@ -44,10 +48,18 @@ expect(
 expect(composer.includes("canSend ? styles.ready :"), "Composer send button applies ready styling from canSend.");
 expect(composer.includes('data-ready={canSend ? "true" : "false"}'), "Composer send button exposes data-ready for styling.");
 expect(
-  composer.includes("disabled={isGenerating ? disabled || isStopRequested : !canSend}"),
-  "Composer send disabled state is tied to canSend while idle."
+  composer.includes("disabled={willQueue ? false : isGenerating ? disabled || isStopRequested : !canSend}"),
+  "Composer action stays enabled for valid queued follow-ups and uses canSend while idle."
 );
-expect(composer.includes('type={isGenerating ? "button" : "submit"}'), "Composer uses submit type when idle.");
+expect(
+  composer.includes('type={willQueue ? "submit" : isGenerating ? "button" : "submit"}'),
+  "Composer submits idle and queued messages while keeping the empty-draft generation action as a button."
+);
+expect(
+  composer.includes('event.key === "Escape" && isGenerating') &&
+    composer.includes('aria-keyshortcuts={isGenerating ? "Escape" : undefined}'),
+  "Composer keeps stop generation keyboard-accessible while follow-up queueing is available."
+);
 expect(composer.includes("function focusComposerInput"), "Composer restores input focus after send.");
 expect(composer.includes("disabled={disabled}") && !composer.includes("disabled={disabled || isGenerating}"), "Composer textarea stays editable while a response is generating.");
 expect(chatView.includes("disabled={!activeSession}"), "ChatView only disables composer without an active session.");
@@ -70,6 +82,13 @@ expect(
 expect(
   composerCss.includes(".sendButton:disabled:not(.stopButton)") || composerCss.includes('[data-ready="false"]'),
   "Disabled send styling remains scoped."
+);
+expect(
+  composer.includes("<Mic size={17.16}") &&
+    composerCss.includes(".toolButton.micButton svg") &&
+    composerCss.includes("width: 17.16px") &&
+    composerCss.includes("height: 17.16px"),
+  "Composer microphone keeps its requested 17.16px size without a CSS override changing it."
 );
 
 if (process.env.HERMES_UI_COMPOSER_SEND_PROBE === "1") {

@@ -23,7 +23,7 @@ export type SessionExportPreview = {
     createdAt: string;
     updatedAt: string;
   };
-  memoryScope: Session["memoryScope"];
+  contextScope: Session["contextScope"];
   messages: Session["messages"];
   runs: Array<{
     record: RunRecord;
@@ -254,7 +254,7 @@ export function createSessionExportPreview(
       title: session.title,
       updatedAt: session.updatedAt
     },
-    memoryScope: session.memoryScope,
+    contextScope: session.contextScope,
     messages: session.messages,
     runs: session.runRecords.map((run) => ({
       record: run,

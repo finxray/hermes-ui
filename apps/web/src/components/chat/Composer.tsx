@@ -7,6 +7,7 @@ import {
   FolderPlus,
   GripVertical,
   LoaderCircle,
+  Mic,
   MoreHorizontal,
   Plus,
   Search,
@@ -21,10 +22,19 @@ import { createPortal } from "react-dom";
 import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/hermes-client";
 import { LiveTokenUsageTicker, type LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
 import type { ChatAttachment, ChatAttachmentKind } from "@/data/types";
+import {
+  collectSpeechTranscript,
+  createBrowserSpeechRecognition,
+  insertSpeechTranscript,
+  isBrowserSpeechRecognitionSupported,
+  voiceInputErrorMessage,
+  type BrowserSpeechRecognition
+} from "@/lib/browserVoiceInput";
 import styles from "./Composer.module.css";
 
 const PRIMARY_MENU_WIDTH_PX = Math.round(260 * 1.3 * 1.25);
 const PRIMARY_MENU_GAP_PX = 8;
+const CONFIGURED_MODEL_PREVIEW_LIMIT = 10;
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const ATTACHMENT_ACCEPT =
@@ -103,9 +113,14 @@ export function Composer({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
+  const [showAllConfiguredModels, setShowAllConfiguredModels] = useState(false);
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const [modelMenuStyle, setModelMenuStyle] = useState<CSSProperties | null>(null);
+  const [voiceInputState, setVoiceInputState] = useState<"idle" | "listening">("idle");
+  const [voiceInputHasError, setVoiceInputHasError] = useState(false);
+  const [voiceInputMessage, setVoiceInputMessage] = useState("");
+  const [voiceInputSupported, setVoiceInputSupported] = useState<boolean | null>(null);
   const modelControlRef = useRef<HTMLDivElement>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelButtonTextRef = useRef<HTMLSpanElement>(null);
@@ -116,6 +131,10 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const projectCardRef = useRef<HTMLDivElement>(null);
   const shouldRefocusAfterSendRef = useRef(false);
+  const voiceInputRef = useRef<BrowserSpeechRecognition | null>(null);
+  const voiceInputPrefixRef = useRef("");
+  const voiceInputSuffixRef = useRef("");
+  const voiceInputIgnoreResultsRef = useRef(false);
   const hasDraft = getTrimmedDraft(textareaRef.current, draft).length > 0;
   const sendableAttachments = attachments.filter((attachment) => attachment.status !== "too-large");
   const canSend = (hasDraft || sendableAttachments.length > 0) && !disabled && !modelSelectInProgress;
@@ -127,10 +146,7 @@ export function Composer({
     modelOptions.length > 1 &&
     Boolean(onModelSelect) &&
     !modelSelectInProgress;
-  const canOpenModelMenu =
-    modelOptions.length > 1 &&
-    Boolean(onModelSelect) &&
-    !modelSelectInProgress;
+  const canOpenModelMenu = canSelectModel;
   const showLiveTokenUsage =
     typeof liveTokenUsage?.promptTokens === "number" ||
     typeof liveTokenUsage?.completionTokens === "number";
@@ -139,6 +155,29 @@ export function Composer({
     activeProjectName && activeProjectName.toLowerCase() !== "chats"
       ? activeProjectName
       : "Work in a project";
+  const isVoiceListening = voiceInputState === "listening";
+
+  useEffect(() => {
+    setVoiceInputSupported(isBrowserSpeechRecognitionSupported(window));
+    return () => {
+      voiceInputIgnoreResultsRef.current = true;
+      const recognition = voiceInputRef.current;
+      voiceInputRef.current = null;
+      if (recognition) {
+        recognition.onend = null;
+        recognition.onerror = null;
+        recognition.onresult = null;
+        recognition.onstart = null;
+        recognition.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (disabled && voiceInputRef.current) {
+      cancelVoiceInput();
+    }
+  }, [disabled]);
 
   useLayoutEffect(() => {
     if (!isModelMenuOpen) {
@@ -287,6 +326,113 @@ export function Composer({
     }
   }
 
+  function cancelVoiceInput(message = "") {
+    voiceInputIgnoreResultsRef.current = true;
+    const recognition = voiceInputRef.current;
+    voiceInputRef.current = null;
+    recognition?.abort();
+    setVoiceInputState("idle");
+    setVoiceInputHasError(false);
+    setVoiceInputMessage(message);
+  }
+
+  function handleDraftInput(value: string) {
+    if (voiceInputRef.current) {
+      cancelVoiceInput();
+    }
+    updateDraft(value);
+  }
+
+  function toggleVoiceInput() {
+    if (disabled) {
+      return;
+    }
+
+    if (voiceInputRef.current) {
+      voiceInputRef.current.stop();
+      setVoiceInputMessage("Finishing voice input.");
+      return;
+    }
+
+    const recognition = createBrowserSpeechRecognition(window);
+    if (!recognition) {
+      setVoiceInputSupported(false);
+      setVoiceInputHasError(true);
+      setVoiceInputMessage("Voice input is not supported in this browser.");
+      return;
+    }
+
+    const textarea = textareaRef.current;
+    const currentValue = textarea?.value ?? draft;
+    const selectionStart = textarea?.selectionStart ?? currentValue.length;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    voiceInputPrefixRef.current = currentValue.slice(0, selectionStart);
+    voiceInputSuffixRef.current = currentValue.slice(selectionEnd);
+    voiceInputIgnoreResultsRef.current = false;
+    voiceInputRef.current = recognition;
+
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.lang = document.documentElement.lang || navigator.language || "en-US";
+    recognition.onstart = () => {
+      setVoiceInputState("listening");
+      setVoiceInputHasError(false);
+      setVoiceInputMessage("Listening for speech.");
+    };
+    recognition.onresult = (event) => {
+      if (voiceInputIgnoreResultsRef.current) {
+        return;
+      }
+      const transcript = collectSpeechTranscript(event.results);
+      const nextDraft = insertSpeechTranscript(
+        voiceInputPrefixRef.current,
+        voiceInputSuffixRef.current,
+        transcript
+      );
+      updateDraft(nextDraft.value);
+      window.requestAnimationFrame(() => {
+        const input = textareaRef.current;
+        if (!input) {
+          return;
+        }
+        input.focus({ preventScroll: true });
+        input.setSelectionRange(nextDraft.cursor, nextDraft.cursor);
+      });
+    };
+    recognition.onerror = (event) => {
+      if (voiceInputIgnoreResultsRef.current || event.error === "aborted") {
+        return;
+      }
+      voiceInputIgnoreResultsRef.current = true;
+      voiceInputRef.current = null;
+      setVoiceInputState("idle");
+      setVoiceInputHasError(true);
+      setVoiceInputMessage(voiceInputErrorMessage(event.error));
+    };
+    recognition.onend = () => {
+      if (voiceInputRef.current === recognition) {
+        voiceInputRef.current = null;
+      }
+      setVoiceInputState("idle");
+      if (!voiceInputIgnoreResultsRef.current) {
+        setVoiceInputMessage("Voice input complete.");
+      }
+    };
+
+    try {
+      recognition.start();
+      setVoiceInputState("listening");
+      setVoiceInputHasError(false);
+      setVoiceInputMessage("Starting voice input.");
+    } catch {
+      voiceInputRef.current = null;
+      setVoiceInputState("idle");
+      setVoiceInputHasError(true);
+      setVoiceInputMessage("Voice input could not start.");
+    }
+  }
+
   function clearDraft() {
     setDraft("");
     if (textareaRef.current) {
@@ -298,8 +444,10 @@ export function Composer({
   }
 
   function clearAttachmentsForSend(sentAttachments: ChatAttachment[]) {
+    const sentIds = new Set(sentAttachments.map((attachment) => attachment.id));
+    attachmentsRef.current = attachmentsRef.current.filter((attachment) => !sentIds.has(attachment.id));
     setAttachments((current) =>
-      current.filter((attachment) => !sentAttachments.some((sent) => sent.id === attachment.id))
+      current.filter((attachment) => !sentIds.has(attachment.id))
     );
   }
 
@@ -334,6 +482,7 @@ export function Composer({
     if (!canSubmit) {
       return;
     }
+    cancelVoiceInput();
     clearDraft();
     clearAttachmentsForSend(currentSendableAttachments);
     shouldRefocusAfterSendRef.current = true;
@@ -428,6 +577,7 @@ export function Composer({
 
   function closeModelMenu() {
     setIsModelMenuOpen(false);
+    setShowAllConfiguredModels(false);
   }
 
   function toggleModelMenu() {
@@ -466,11 +616,23 @@ export function Composer({
   }
 
   const modelGroups = groupModelOptions(modelOptions, modelSearch);
+  const isFilteringModels = modelSearch.trim().length > 0;
+  const canToggleConfiguredModels =
+    !isFilteringModels && modelGroups.hermes.length > CONFIGURED_MODEL_PREVIEW_LIMIT;
+  const visibleConfiguredModels =
+    canToggleConfiguredModels && !showAllConfiguredModels
+      ? collapseConfiguredModels(
+          modelGroups.hermes,
+          modelState?.selectedModelId ?? null,
+          CONFIGURED_MODEL_PREVIEW_LIMIT
+        )
+      : modelGroups.hermes;
 
   const modelMenu =
     isModelMenuOpen && modelMenuStyle ? (
       <div
         className={styles.modelMenu}
+        data-filtering={isFilteringModels ? "true" : "false"}
         ref={modelMenuRef}
         role="dialog"
         aria-label="Model browser"
@@ -490,18 +652,16 @@ export function Composer({
           <ModelSection
             title="Hermes Configured"
             count={modelGroups.hermes.length}
-            models={modelGroups.hermes}
+            models={visibleConfiguredModels}
             selectedModelId={modelState?.selectedModelId ?? null}
             onSelect={selectModel}
             headerTone="configured"
-          />
-          <ModelSection
-            title="OpenRouter"
-            count={modelGroups.openRouter.length}
-            models={modelGroups.openRouter}
-            selectedModelId={modelState?.selectedModelId ?? null}
-            onSelect={selectModel}
-            headerTone="configured"
+            expanded={showAllConfiguredModels}
+            onToggleExpanded={
+              canToggleConfiguredModels
+                ? () => setShowAllConfiguredModels((current) => !current)
+                : undefined
+            }
           />
         </div>
       </div>
@@ -535,7 +695,6 @@ export function Composer({
                     className={`${styles.followUpAction} ${styles.steerAction}`}
                     type="button"
                     onClick={() => onPrioritizeQueuedMessage?.(message.id)}
-                    title={index === 0 ? "This follow-up is next." : "Send this follow-up next."}
                   >
                     <CornerDownRight size={18} aria-hidden="true" />
                     <span>Steer</span>
@@ -545,7 +704,6 @@ export function Composer({
                     type="button"
                     aria-label="Remove queued follow-up"
                     onClick={() => onRemoveQueuedMessage?.(message.id)}
-                    title="Remove"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -554,7 +712,6 @@ export function Composer({
                     type="button"
                     aria-label="Move queued follow-up later"
                     onClick={() => onDeferQueuedMessage?.(message.id)}
-                    title="Send later"
                   >
                     <MoreHorizontal size={18} />
                   </button>
@@ -611,10 +768,20 @@ export function Composer({
                   : "Message Hermes…"
               }
               value={draft}
-              onChange={(event) => updateDraft(event.currentTarget.value)}
-              onInput={(event) => updateDraft(event.currentTarget.value)}
+              onChange={(event) => handleDraftInput(event.currentTarget.value)}
+              onInput={(event) => handleDraftInput(event.currentTarget.value)}
               onPaste={handlePaste}
               onKeyDown={(event) => {
+                if (event.key === "Escape" && isVoiceListening) {
+                  event.preventDefault();
+                  cancelVoiceInput("Voice input stopped.");
+                  return;
+                }
+                if (event.key === "Escape" && isGenerating) {
+                  event.preventDefault();
+                  stopGeneration();
+                  return;
+                }
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   event.currentTarget.form?.requestSubmit();
@@ -627,7 +794,6 @@ export function Composer({
                   className={`${styles.toolButton} ${styles.plusButton}`}
                   type="button"
                   aria-label="Add photos, PDFs, documents, text, screenshots, and other files"
-                  title="Add photos, PDFs, documents, text, screenshots, and other files."
                   disabled={disabled}
                   onClick={openFilePicker}
                 >
@@ -642,7 +808,6 @@ export function Composer({
                       aria-expanded={canOpenModelMenu ? isModelMenuOpen : undefined}
                       aria-haspopup={canOpenModelMenu ? "listbox" : undefined}
                       aria-label={modelButtonLabel(modelState, modelOptions.length)}
-                      title={modelSelectorTitle(modelState, modelOptions.length)}
                       disabled={!canOpenModelMenu}
                       onClick={toggleModelMenu}
                     >
@@ -671,16 +836,28 @@ export function Composer({
                 <button
                   className={`${styles.toolButton} ${styles.micButton}`}
                   type="button"
-                  aria-label="Voice input coming soon"
-                  title="Voice input is coming soon."
-                  disabled
+                  aria-label={
+                    voiceInputSupported === false
+                      ? "Voice input is not supported in this browser"
+                      : isVoiceListening
+                        ? "Stop voice input"
+                        : "Start voice input"
+                  }
+                  aria-pressed={isVoiceListening}
+                  data-listening={isVoiceListening ? "true" : "false"}
+                  disabled={disabled || voiceInputSupported !== true}
+                  onClick={toggleVoiceInput}
                 >
-                  <span className={styles.micIcon} aria-hidden="true">
-                    <span className={styles.micCapsule} />
-                    <span className={styles.micYoke} />
-                    <span className={styles.micStem} />
-                  </span>
+                  <Mic size={17.16} strokeWidth={2} />
                 </button>
+                <span
+                  className={styles.voiceInputStatus}
+                  data-visible={voiceInputHasError ? "true" : "false"}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {voiceInputMessage}
+                </span>
                 <button
                   className={[
                     styles.sendButton,
@@ -694,14 +871,8 @@ export function Composer({
                   type={willQueue ? "submit" : isGenerating ? "button" : "submit"}
                   disabled={willQueue ? false : isGenerating ? disabled || isStopRequested : !canSend}
                   aria-label={willQueue ? "Queue next message" : isGenerating ? "Stop generation" : "Send message"}
+                  aria-keyshortcuts={isGenerating ? "Escape" : undefined}
                   onClick={willQueue ? undefined : isGenerating ? stopGeneration : undefined}
-                  title={
-                    willQueue
-                      ? "Queue this message to send after the current response."
-                      : isGenerating
-                        ? stopControlTitle(stopControlState)
-                        : undefined
-                  }
                 >
                   {willQueue ? <ArrowUp size={17} /> : isGenerating ? <Square size={13} fill="currentColor" /> : <ArrowUp size={17} />}
                 </button>
@@ -831,32 +1002,37 @@ function AttachmentTile({
           `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${attachment.previewUrl}`
         );
       }}
-      title={`${attachment.fileName} - ${formatFileSize(attachment.sizeBytes)}`}
     >
       <div className={styles.attachmentPreview} aria-hidden="true">
         {isImage ? (
           <img alt="" src={attachment.previewUrl} />
         ) : (
           <span className={styles.attachmentGlyph}>
-            <FileText size={24} />
+            {attachment.kind === "pdf" ? (
+              <span className={styles.attachmentPdfGlyph}>
+                <span>PDF</span>
+              </span>
+            ) : (
+              <FileText size={30} />
+            )}
           </span>
         )}
       </div>
-      <div className={styles.attachmentMeta}>
-        <span className={styles.attachmentName}>{attachment.fileName}</span>
-        <span className={styles.attachmentDetail}>
-          {attachment.status === "too-large"
-            ? "Too large"
-            : `${attachmentKindLabel(attachment.kind)} · ${formatFileSize(attachment.sizeBytes)}`}
-        </span>
-      </div>
+      {!isImage ? (
+        <div className={styles.attachmentMeta}>
+          <span className={styles.attachmentName}>{attachment.fileName}</span>
+          <span className={styles.attachmentDetail}>
+            {attachment.status === "too-large" ? "Too large" : attachmentTypeLabel(attachment)}
+          </span>
+        </div>
+      ) : null}
       <button
         className={styles.attachmentRemove}
         type="button"
         aria-label={`Remove ${attachment.fileName}`}
         onClick={onRemove}
       >
-        <X size={14} />
+        <X size={9} strokeWidth={2} />
       </button>
     </div>
   );
@@ -864,16 +1040,20 @@ function AttachmentTile({
 
 function ModelSection({
   count,
+  expanded = false,
   headerTone = "default",
   models,
   onSelect,
+  onToggleExpanded,
   selectedModelId,
   title
 }: {
   count: number;
+  expanded?: boolean;
   headerTone?: "default" | "configured";
   models: NonNullable<HermesUiCapabilities["models"]["availableModels"]>;
   onSelect: (modelId: string) => void;
+  onToggleExpanded?: () => void;
   selectedModelId: string | null;
   title: string;
 }) {
@@ -909,13 +1089,6 @@ function ModelSection({
                 disabled={disabled}
                 key={`${model.catalogSource ?? "model"}:${model.id}`}
                 onClick={disabled ? undefined : () => onSelect(model.id)}
-                title={
-                  disabled
-                    ? `${model.id} - not loaded in LM Studio`
-                    : model.provider
-                      ? `${model.id} (${model.provider})`
-                      : model.id
-                }
               >
                 <span className={styles.modelOptionLabel}>{model.label}</span>
                 <span className={styles.modelOptionProvider}>
@@ -933,6 +1106,17 @@ function ModelSection({
           <div className={styles.modelEmptyState}>No matching models</div>
         )}
       </div>
+      {onToggleExpanded ? (
+        <button
+          className={styles.modelSectionToggle}
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggleExpanded}
+        >
+          <span>{expanded ? "Less" : "More"}</span>
+          <ChevronDown aria-hidden="true" data-expanded={expanded ? "true" : "false"} size={13} />
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -967,9 +1151,25 @@ function groupModelOptions(
   };
 
   return {
-    hermes: options.filter((model) => model.catalogSource !== "ui-openrouter" && matches(model)),
-    openRouter: options.filter((model) => model.catalogSource === "ui-openrouter" && matches(model))
+    hermes: options.filter((model) => model.catalogSource === "hermes-config" && matches(model)),
+    popular: []
   };
+}
+
+function collapseConfiguredModels(
+  models: HermesUiCapabilities["models"]["availableModels"],
+  selectedModelId: string | null,
+  limit: number
+) {
+  const visible = models.slice(0, limit);
+  if (!selectedModelId || visible.some((model) => model.id === selectedModelId)) {
+    return visible;
+  }
+  const selected = models.find((model) => model.id === selectedModelId);
+  if (!selected || limit < 1) {
+    return visible;
+  }
+  return [...visible.slice(0, limit - 1), selected];
 }
 
 function formatContextLength(value: number) {
@@ -1100,42 +1300,32 @@ function fallbackMimeType(kind: ChatAttachmentKind) {
   return "application/octet-stream";
 }
 
-function attachmentKindLabel(kind: ChatAttachmentKind) {
-  switch (kind) {
+function attachmentTypeLabel(attachment: ChatAttachment) {
+  const extension = attachment.fileName.split(".").pop();
+  if (extension && extension !== attachment.fileName && extension.length <= 8) {
+    return extension.toUpperCase();
+  }
+
+  switch (attachment.kind) {
     case "image":
-      return "Image";
+      return "IMAGE";
     case "pdf":
       return "PDF";
     case "text":
-      return "Text";
+      return "TXT";
     case "spreadsheet":
-      return "Sheet";
+      return "SHEET";
     case "presentation":
-      return "Slides";
+      return "SLIDES";
     case "document":
-      return "Document";
+      return "DOC";
     case "archive":
-      return "Archive";
+      return "ARCHIVE";
     case "code":
-      return "Code";
+      return "CODE";
     default:
-      return "File";
+      return "FILE";
   }
-}
-
-function formatFileSize(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return "0 B";
-  }
-  const units = ["B", "KB", "MB", "GB"] as const;
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
-  return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
 function readComposerDraft(key: string) {
@@ -1167,7 +1357,7 @@ function clearComposerDraft(key: string) {
 }
 
 function modelButtonLabel(state?: HermesUiCapabilities["models"], optionCount = 0) {
-  if (optionCount > 1) {
+  if (state?.clientSelectable && optionCount > 1) {
     return "Select Hermes model";
   }
   if (state?.clientSelectable && optionCount === 1) {
@@ -1184,7 +1374,7 @@ function modelSelectorTitle(state?: HermesUiCapabilities["models"], optionCount 
     return "Runtime model switching is available through the verified Hermes BFF path.";
   }
   if (optionCount > 1) {
-    return state.reason || "Browse configured Hermes models; runtime selection is verified by the Hermes BFF path.";
+    return state.reason || "Hermes advertises multiple models, but runtime switching is not available for this session.";
   }
   if (state.clientSelectable && optionCount === 1) {
     return "Hermes has one configured model; there is nothing to switch for this session.";

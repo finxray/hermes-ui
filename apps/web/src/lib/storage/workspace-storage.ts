@@ -1,4 +1,4 @@
-import { createMockWorkspaceState } from "@/lib/workspaceStore";
+import { createInitialWorkspaceState } from "@/lib/workspaceStore";
 import type { WorkspaceState } from "@/data/types";
 import {
   STORAGE_SCHEMA_VERSION,
@@ -24,7 +24,7 @@ export function workspaceStateToSnapshot(state: WorkspaceState): MemoryStoreSnap
     activeProjectId: state.activeProjectId,
     activeSessionId: state.activeSessionId,
     modelChoices: state.modelChoices ?? [],
-    connectionStatus: state.connectionStatus ?? { hermes: "", brainMemory: "" },
+    connectionStatus: state.connectionStatus ?? { hermes: "" },
     schemaVersion: STORAGE_SCHEMA_VERSION,
     updatedAt: new Date().toISOString()
   };
@@ -41,18 +41,18 @@ export function workspaceStateToSnapshot(state: WorkspaceState): MemoryStoreSnap
 /** Recompose workspace state from a stored snapshot, filling runtime defaults. */
 export function snapshotToWorkspaceState(snapshot: MemoryStoreSnapshot): WorkspaceState | null {
   // A snapshot with no projects is not a restorable workspace; let the caller
-  // keep the default mock state instead.
+  // keep the clean initial workspace state instead.
   if (snapshot.projects.length === 0 && snapshot.sessions.length === 0 && !snapshot.meta) {
     return null;
   }
 
-  const defaults = createMockWorkspaceState();
+  const defaults = createInitialWorkspaceState();
   return {
     activeProjectId: snapshot.meta?.activeProjectId ?? defaults.activeProjectId,
     activeSessionId: snapshot.meta?.activeSessionId ?? null,
     projects: snapshot.projects,
     sessions: snapshot.sessions,
-    // modelChoices/connectionStatus are runtime-ish; fall back to mock defaults
+    // modelChoices/connectionStatus are runtime-ish; fall back to initial defaults
     // so a snapshot from an older schema still produces a valid state.
     modelChoices:
       snapshot.meta?.modelChoices && snapshot.meta.modelChoices.length > 0

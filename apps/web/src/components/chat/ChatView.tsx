@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
+import { ConversationMinimap } from "@/components/chat/ConversationMinimap";
 import { Composer } from "@/components/chat/Composer";
 import {
   computeRunElapsed,
@@ -32,6 +33,7 @@ import type {
   ToolEvent
 } from "@/data/types";
 import type { useWorkspaceState } from "@/hooks/useWorkspaceState";
+import { useScrollOverflowTarget } from "@/hooks/useScrollOverflowTarget";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import type { LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
 import styles from "./ChatView.module.css";
@@ -113,6 +115,7 @@ export function ChatView({
   const liveTokenPulseRef = useRef<number | null>(null);
   const liveTokenClearTimerRef = useRef<number | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const startStageRef = useRef<HTMLDivElement>(null);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
   const isProjectScopedStart = activeProject.name.trim().toLowerCase() !== CHATS_PROJECT_NAME.toLowerCase();
@@ -131,6 +134,9 @@ export function ChatView({
         .filter((turn) => turn.sessionId === activeSession.id)
         .map(({ attachments, id, content }) => ({ attachments, id, content }))
     : [];
+
+  useScrollOverflowTarget(scrollViewportRef, !isStartState);
+  useScrollOverflowTarget(startStageRef, isStartState);
 
   useEffect(() => {
     if (!activeSession) {
@@ -225,7 +231,7 @@ export function ChatView({
         { label: "Workspace", value: "hermes-ui" },
         { label: "Project", value: activeProject.name },
         { label: "Session", value: activeSession.title },
-        { label: "Scope", value: activeProject.memoryScope.stableProjectKey },
+        { label: "Scope", value: activeProject.contextScope.stableProjectKey },
         { label: "Route", value: "Browser -> BFF -> Hermes" }
       ]
     : [
@@ -493,10 +499,10 @@ export function ChatView({
 
     try {
     if (!canUseRealHermes(hermesStatus)) {
-      const fallback = mockUnavailableResponse(hermesStatus, isHermesStatusLoading);
-      workspaceActions.updateMessage(session.id, assistantId, fallback, "mock", [
-        "Local mock fallback",
-        "BFF boundary preserved"
+      const unavailableMessage = hermesUnavailableMessage(hermesStatus, isHermesStatusLoading);
+      workspaceActions.updateMessage(session.id, assistantId, unavailableMessage, "error", [
+        "Hermes unavailable",
+        "No agent request was sent"
       ]);
       const completedAt = new Date().toISOString();
       updateRunRecord({
@@ -508,8 +514,6 @@ export function ChatView({
       });
       return;
     }
-
-    sessionModel.markStreamSucceeded();
 
     estimatedPromptTokens = estimatePromptTokensForRequest({
       message: content,
@@ -687,22 +691,18 @@ export function ChatView({
           project: {
             id: activeProject.id,
             title: activeProject.name,
-            stableKey: activeProject.memoryScope.stableProjectKey,
-            tenantId: activeProject.memoryScope.tenantId,
-            retrievalProfile: activeProject.memoryScope.retrievalProfile,
-            contextPolicy: activeProject.memoryScope.contextPolicy,
-            pinnedMemoryIds: activeProject.memoryScope.pinnedMemoryIds,
-            userVisibleSummary: activeProject.memoryScope.userVisibleSummary
+            stableKey: activeProject.contextScope.stableProjectKey,
+            userVisibleSummary: activeProject.contextScope.userVisibleSummary
           },
           session: {
             id: session.id,
             title: session.title,
-            stableKey: session.memoryScope.stableSessionKey,
+            stableKey: session.contextScope.stableSessionKey,
             hermesSessionId: resolveHermesSessionId(session),
-            includeProjectContext: session.memoryScope.includeProjectContext,
-            includeSessionContext: session.memoryScope.includeSessionContext,
-            lastContextRefreshAt: session.memoryScope.lastContextRefreshAt,
-            userVisibleSummary: session.memoryScope.userVisibleSummary
+            includeProjectContext: session.contextScope.includeProjectContext,
+            includeSessionContext: session.contextScope.includeSessionContext,
+            lastContextRefreshAt: session.contextScope.lastContextRefreshAt,
+            userVisibleSummary: session.contextScope.userVisibleSummary
           },
           ui: {
             source: "hermes-ui",
@@ -744,7 +744,7 @@ export function ChatView({
             pendingCompletion = {
               references: [
                 "Hermes session stream",
-                activeProject.memoryScope.stableProjectKey
+                activeProject.contextScope.stableProjectKey
               ],
               usage: responseTokenUsage
             };
@@ -1086,7 +1086,7 @@ export function ChatView({
               title={activeSession?.title ?? "No chat selected"}
             />
           ) : null}
-          <div className={styles.startStage}>
+          <div ref={startStageRef} className={styles.startStage}>
             <div className={styles.startStack}>
               <h2 className={styles.startPrompt}>{startPrompt}</h2>
               <div ref={composerWrapRef} className={styles.composerAnchor}>
@@ -1154,6 +1154,12 @@ export function ChatView({
               <div className={styles.scrollFadeBottom} aria-hidden="true" />
             </div>
           </div>
+          {variant === "main" && !isSplitViewOpen && activeSession ? (
+            <ConversationMinimap
+              messages={activeSession.messages}
+              scrollViewportRef={scrollViewportRef}
+            />
+          ) : null}
           <div ref={composerWrapRef} className={`${styles.composerAnchor} ${styles.composerDock}`}>
             <Composer
               contextItems={composerContextItems}
@@ -1371,20 +1377,20 @@ function summarizeRunPrompt(content: string): string {
   return clean.length > 96 ? `${clean.slice(0, 93)}...` : clean;
 }
 
-function mockUnavailableResponse(
+function hermesUnavailableMessage(
   status: NormalizedHermesStatus | null,
   isLoading: boolean
 ): string {
   if (isLoading && !status) {
-    return "Hermes status is still checking, so this turn was kept local. No real agent call was made.";
+    return "Hermes is still connecting. Your message was saved, but no agent request was sent. Retry when the connection is ready.";
   }
   if (!status || status.mode === "unconfigured") {
-    return "Hermes is not configured for this Studio process. I saved your message locally and used a mock response instead of calling the agent.";
+    return "Hermes is not configured for this UI process. Your message was saved, but no agent request was sent.";
   }
   if (status.mode === "mock") {
-    return "Real Hermes chat is disabled for this UI process, so this response is a local mock fallback.";
+    return "Hermes chat is disabled for this UI process. Enable the real Hermes connection before retrying.";
   }
-  return "Hermes is currently unreachable. Your message stayed in this local session; retry after the status panel reports connected.";
+  return "Hermes is currently unreachable. Your message was saved; retry after the Console reports connected.";
 }
 
 function emptyHermesResponseMessage(modelLabel: string): string {
@@ -1407,11 +1413,11 @@ function estimatePromptTokensForRequest({
   const promptText = [
     message,
     project.name,
-    project.memoryScope.stableProjectKey,
-    project.memoryScope.userVisibleSummary,
+    project.contextScope.stableProjectKey,
+    project.contextScope.userVisibleSummary,
     session.title,
-    session.memoryScope.stableSessionKey,
-    session.memoryScope.userVisibleSummary,
+    session.contextScope.stableSessionKey,
+    session.contextScope.userVisibleSummary,
     ...attachments.map((attachment) =>
       `${attachment.fileName} ${attachment.kind} ${attachment.mimeType} ${attachment.sizeBytes}`
     ),

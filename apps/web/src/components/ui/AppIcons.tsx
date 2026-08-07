@@ -124,10 +124,34 @@ export const Clock = makeIcon([
 
 export const Clock3 = Clock;
 
-export const Copy = makeIcon([
-  { d: "M8 8.5c0-1 .7-1.7 1.7-1.7h7.1c1 0 1.7.7 1.7 1.7v7.8c0 1-.7 1.7-1.7 1.7H9.7c-1 0-1.7-.7-1.7-1.7V8.5Z" },
-  { d: "M5.6 14.2H5c-1 0-1.6-.7-1.6-1.7V5.7C3.4 4.7 4.1 4 5 4h7c1 0 1.7.7 1.7 1.6v.5" }
-]);
+export const Copy: AppIcon = ({
+  "aria-hidden": ariaHidden,
+  height,
+  size = 16,
+  strokeWidth = 1.65,
+  width,
+  ...props
+}) => (
+  <svg
+    aria-hidden={ariaHidden ?? true}
+    fill="none"
+    height={height ?? size}
+    viewBox="0 0 20 20"
+    width={width ?? size}
+    {...props}
+  >
+    <rect x="6.2" y="2.7" width="10.6" height="10.6" rx="2.6" stroke="currentColor" strokeWidth={strokeWidth} />
+    <rect
+      x="2.7"
+      y="6.2"
+      width="10.6"
+      height="10.6"
+      rx="2.6"
+      fill="var(--copy-icon-cutout, var(--bg-workspace-solid, #0b0b0c))"
+    />
+    <rect x="2.7" y="6.2" width="10.6" height="10.6" rx="2.6" stroke="currentColor" strokeWidth={strokeWidth} />
+  </svg>
+);
 
 export const Cpu = makeIcon([
   { element: "rect", props: { x: 7, y: 7, width: 10, height: 10, rx: 2 } },
@@ -155,6 +179,13 @@ export const FileText = makeIcon([
 export const Folder = makeIcon([
   { d: "M3.5 7.4c0-1.2.8-2 2-2h3.3c.5 0 .9.2 1.3.6l1 1c.3.3.7.4 1.2.4h6.2c1.2 0 2 .8 2 2v1" },
   { d: "M3.5 10.2c.1-1.1.9-1.8 2.1-1.8h12.8c1.4 0 2.2.9 2 2.3l-.7 5.9c-.2 1.3-1 2-2.4 2H5.7c-1.4 0-2.2-.8-2.2-2.2v-6.2Z" }
+]);
+
+export const Funnel = makeIcon([
+  {
+    d: "M4.2 4h15.6c1.2 0 1.8 1.5 1 2.35L14.5 13v5.4l-5 3V13L3.2 6.35C2.4 5.5 3 4 4.2 4Z",
+    props: { strokeWidth: 2.35 }
+  }
 ]);
 
 export const FolderGit2 = makeIcon([
@@ -201,6 +232,16 @@ export const MessageSquarePlus = makeIcon([
   { d: "M5.7 5h12.6c1.1 0 1.7.7 1.7 1.7v8.6c0 1.1-.7 1.7-1.7 1.7H9l-4.7 3v-3.7c-.7-.3-1-1-1-1.8V6.7C3.3 5.7 4 5 5.7 5Z" },
   { d: "M12 8.6v5.2M9.4 11.2h5.2" }
 ]);
+
+export const NewChat = makeIcon(
+  [
+    {
+      d: "M2.669 11.333V8.667c0-.922 0-1.655.048-2.244.048-.597.15-1.106.387-1.571l.155-.276a4 4 0 0 1 1.593-1.472l.177-.083c.418-.179.872-.263 1.395-.305.589-.048 1.32-.048 2.243-.048h.5a.665.665 0 0 1 0 1.33h-.5c-.944 0-1.613 0-2.135.043-.386.032-.66.085-.876.162l-.2.086a2.67 2.67 0 0 0-1.064.982l-.102.184c-.126.247-.206.562-.248 1.076-.043.523-.043 1.192-.043 2.136v2.666c0 .944 0 1.613.043 2.136.042.514.122.829.248 1.076l.102.184c.257.418.624.758 1.064.982l.2.086c.217.077.49.13.876.161.522.043 1.19.044 2.135.044h2.667c.944 0 1.612-.001 2.135-.044.514-.042.829-.121 1.076-.247l.184-.104c.418-.256.759-.623.983-1.062l.086-.2c.077-.217.13-.49.16-.876.043-.523.044-1.192.044-2.136v-.5a.665.665 0 0 1 1.33 0v.5c0 .922.001 1.655-.047 2.244-.043.522-.127.977-.306 1.395l-.083.176a4 4 0 0 1-1.471 1.593l-.276.154c-.466.238-.975.34-1.572.39-.59.047-1.321.047-2.243.047H8.667c-.923 0-1.654 0-2.243-.048-.523-.043-.977-.126-1.395-.305l-.177-.084a4 4 0 0 1-1.593-1.471l-.155-.276c-.237-.465-.339-.974-.387-1.57-.049-.59-.048-1.322-.048-2.245m10.796-8.22a2.43 2.43 0 0 1 3.255.167l.167.185c.727.892.727 2.18 0 3.071l-.168.185-5.046 5.048a4 4 0 0 1-1.945 1.072l-.317.058-1.817.26a.665.665 0 0 1-.752-.753l.26-1.816.058-.319a4 4 0 0 1 1.072-1.944L13.28 3.28zm2.314 1.108a1.103 1.103 0 0 0-1.476-.076l-.084.076-5.046 5.048a2.67 2.67 0 0 0-.716 1.296l-.04.212-.134.939.94-.134.211-.039a2.67 2.67 0 0 0 1.298-.716L15.78 5.78l.076-.084c.33-.404.33-.988 0-1.392z",
+      props: { fill: "currentColor", stroke: "none" }
+    }
+  ],
+  "0 0 20 20"
+);
 
 export const MoreHorizontal = makeIcon([
   { element: "circle", props: { cx: 6.6, cy: 12, r: 1 } },
@@ -269,19 +310,12 @@ export const Plus = makeIcon([
   { d: "M12 5v14M5 12h14" }
 ]);
 
-// Source: https://pngtree.com/freepng/refresh-icon-3d-render-symbol_6068296.html
-export const RefreshCw: AppIcon = ({ "aria-hidden": ariaHidden, className, height, size = 16, style, width }) => (
-  <img
-    aria-hidden={ariaHidden ?? true}
-    alt=""
-    className={className}
-    draggable={false}
-    height={height ?? size}
-    src="/assets/icons/pngtree-refresh-icon-3d-render-symbol-6068296.png"
-    style={{ display: "block", objectFit: "contain", ...style }}
-    width={width ?? size}
-  />
-);
+export const RefreshCw = makeIcon([
+  {
+    d: "M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.69 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8ZM6 12c0-1.01.25-1.97.69-2.8L5.23 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3c-3.31 0-6-2.69-6-6Z",
+    props: { fill: "currentColor", stroke: "none", transform: "rotate(90 12 12)" }
+  }
+]);
 
 export const RotateCcw = makeIcon([
   { d: "M4.5 5v5h5" },
@@ -347,6 +381,13 @@ export const Trash2 = makeIcon([
   { d: "M9.5 6.5V4.8c0-.8.5-1.3 1.3-1.3h2.4c.8 0 1.3.5 1.3 1.3v1.7" },
   { d: "M6.8 6.5 7.6 19c.1 1 .8 1.6 1.8 1.6h5.2c1 0 1.7-.6 1.8-1.6l.8-12.5" },
   { d: "M10 10v6M14 10v6" }
+]);
+
+export const UserPlus = makeIcon([
+  { d: "M15.5 19.2c0-2.5-1.9-4.2-4.7-4.2H8.6c-2.8 0-4.7 1.7-4.7 4.2" },
+  { d: "M6.7 7.7a3.1 3.1 0 1 0 6.2 0 3.1 3.1 0 0 0-6.2 0Z" },
+  { d: "M18 7.5v5" },
+  { d: "M15.5 10h5" }
 ]);
 
 export const X = makeIcon([

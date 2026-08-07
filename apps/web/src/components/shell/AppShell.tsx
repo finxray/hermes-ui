@@ -1,23 +1,27 @@
 "use client";
 
 import { ChatView } from "@/components/chat/ChatView";
+import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ConfigView } from "@/components/config/ConfigView";
 import { KeysView } from "@/components/keys/KeysView";
 import { LogsView } from "@/components/logs/LogsView";
 import { PluginsView } from "@/components/plugins/PluginsView";
-import { SectionNavProvider } from "@/components/shell/SectionNavContext";
+import { SettingsView } from "@/components/settings/SettingsView";
+import { SectionNavProvider, useSectionNav } from "@/components/shell/SectionNavContext";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { SplitPane, type RightPaneMode } from "@/components/shell/SplitPane";
 import { TopBar, type ShellSection } from "@/components/shell/TopBar";
-import { useBrainMemoryStatus } from "@/hooks/useBrainMemoryStatus";
+import { useAppUpdate } from "@/hooks/useAppUpdate";
 import { useHermesSessionModel } from "@/hooks/useHermesSessionModel";
 import { useHermesStatus } from "@/hooks/useHermesStatus";
 import { useHermesSessions } from "@/hooks/useHermesSessions";
 import { useLmStudioModels } from "@/hooks/useLmStudioModels";
 import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
-import { useTenantScopeDiagnosticsPosture } from "@/hooks/useTenantScopeDiagnosticsPosture";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
+import { fetchHermesSessionMessages } from "@/lib/hermesSessionsClient";
+import { makeSessionChannel, normalizeHermesMessages } from "@/lib/sessionChannels";
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import type { HermesSessionSummary } from "@hermes-ui/hermes-client";
 import type { AgentActivityEvent } from "@/types/agentActivity";
 import mainWindowStyles from "./MainWindow.module.css";
 import styles from "./AppShell.module.css";
@@ -45,7 +49,9 @@ export function AppShell() {
 }
 
 function AppShellInner() {
-  const { actions, activeProject, activeProjectSessions, activeSession, isHydrated, state } = useWorkspaceState();
+  const sectionNav = useSectionNav();
+  const { actions, activeProject, activeProjectSessions, activeSession, state } = useWorkspaceState();
+  const appUpdate = useAppUpdate();
   const hermesStatus = useHermesStatus();
   const lmStudioModels = useLmStudioModels();
   const openRouterModels = useOpenRouterModels();
@@ -73,20 +79,23 @@ function AppShellInner() {
     persistSessionModelPreference: actions.setSessionModelPreference,
     refreshHermesStatus: hermesStatus.refresh
   });
-  const brainMemoryStatus = useBrainMemoryStatus();
-  const tenantScopePosture = useTenantScopeDiagnosticsPosture();
   const [activeSection, setActiveSection] = useState<ShellSection>("workspace");
   const [sectionHistory, setSectionHistory] = useState<ShellSection[]>([]);
+  const [detailBackSection, setDetailBackSection] = useState<ShellSection | null>(null);
+  const detailBackRef = useRef<(() => void) | null>(null);
   const [activityEventsBySession, setActivityEventsBySession] = useState<Record<string, AgentActivityEvent[]>>({});
   const [generatingSessionIds, setGeneratingSessionIds] = useState<string[]>([]);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(true);
   const [leftRailWidth, setLeftRailWidth] = useState<number | null>(null);
   const [rightRailWidth, setRightRailWidth] = useState<number | null>(null);
+  const [sectionScrolled, setSectionScrolled] = useState(false);
   const shellRef = useRef<HTMLElement | null>(null);
+  const sectionScrollRef = useRef<HTMLDivElement | null>(null);
   const leftRailDefaultWidthRef = useRef<number | null>(null);
   const rightRailDefaultWidthRef = useRef<number | null>(null);
   const rightRevealFrameRef = useRef<number | null>(null);
+  const channelSyncKeyRef = useRef<string | null>(null);
   const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
   const sideActivityEvents = sideSession ? (activityEventsBySession[sideSession.id] ?? []) : [];
   const sidebarActiveSession =
@@ -94,6 +103,81 @@ function AppShellInner() {
       ? sideSession
       : activeSession;
   const shellStyle: ShellStyle = {};
+  const sectionWindowTitle =
+    sectionNav.labelForSection(activeSection) ??
+    ({ plugins: "Plugins", config: "Config", keys: "Keys", logs: "Logs", settings: "Settings" } as const)[
+      activeSection as Exclude<ShellSection, "workspace">
+    ];
+
+  useEffect(() => {
+    if (activeSection === "settings" && appUpdate.hasUnseenUpdate) {
+      appUpdate.markUpdateSeen();
+    }
+  }, [activeSection, appUpdate.hasUnseenUpdate, appUpdate.markUpdateSeen]);
+
+  const ensureHermesSession = useCallback(async (
+    summary: HermesSessionSummary,
+    options: { activate: boolean }
+  ) => {
+    const existingSession = state.sessions.find(
+      (session) => session.hermesSessionId === summary.id && !session.archivedAt
+    );
+    if (existingSession) {
+      if (options.activate) {
+        actions.switchSession(existingSession.id);
+      }
+      if (existingSession.messages.length === 0) {
+        const result = await fetchHermesSessionMessages(summary.id);
+        if (result.ok) {
+          actions.loadHermesMessages(existingSession.id, normalizeHermesMessages(result.messages));
+        }
+      }
+      return existingSession.id;
+    }
+
+    const result = await fetchHermesSessionMessages(summary.id);
+    const sessionId = actions.createSessionForProject(activeProject.id, {
+      activate: options.activate,
+      channel: makeSessionChannel(summary),
+      createdAt: summary.startedAt,
+      hermesSessionId: summary.id,
+      messages: result.ok ? normalizeHermesMessages(result.messages) : [],
+      title: summary.title || "Untitled session",
+      updatedAt: summary.lastActiveAt ?? summary.endedAt ?? summary.startedAt
+    });
+    channelSyncKeyRef.current = makeChannelSyncKey(summary);
+    return sessionId;
+  }, [actions, activeProject.id, state.sessions]);
+
+  const openHermesSession = useCallback(async (summary: HermesSessionSummary) => {
+    await ensureHermesSession(summary, { activate: true });
+  }, [ensureHermesSession]);
+
+  useEffect(() => {
+    if (!activeSession?.channel?.external || generatingSessionIds.includes(activeSession.id)) {
+      return;
+    }
+    const summary = hermesSessions.sessions.find(
+      (session) => session.id === activeSession.hermesSessionId
+    );
+    if (!summary) {
+      return;
+    }
+    const syncKey = makeChannelSyncKey(summary);
+    if (channelSyncKeyRef.current === syncKey) {
+      return;
+    }
+    channelSyncKeyRef.current = syncKey;
+    let cancelled = false;
+    void fetchHermesSessionMessages(summary.id).then((result) => {
+      if (!cancelled && result.ok) {
+        actions.loadHermesMessages(activeSession.id, normalizeHermesMessages(result.messages));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [actions, activeSession, generatingSessionIds, hermesSessions.sessions]);
 
   if (leftRailWidth !== null) {
     shellStyle["--rail-width-left"] = `${Math.round(leftRailWidth)}px`;
@@ -412,7 +496,7 @@ function AppShellInner() {
   function closeSideSession() {
     setSideSessionId(null);
     setRightPaneMode("console");
-    setFocusedChatPane("main");
+    hideRightRail();
   }
 
   function activateSection(section: ShellSection) {
@@ -427,6 +511,10 @@ function AppShellInner() {
   }
 
   function navigateBack() {
+    if (detailBackSection === activeSection && detailBackRef.current) {
+      detailBackRef.current();
+      return;
+    }
     const previous = sectionHistory[sectionHistory.length - 1] ?? "workspace";
     setSectionHistory((current) => current.slice(0, -1));
     setActiveSection(previous);
@@ -434,6 +522,39 @@ function AppShellInner() {
       hideRightRail();
     }
   }
+
+  const registerDetailBack = useCallback((section: ShellSection, handler: (() => void) | null) => {
+    detailBackRef.current = handler;
+    setDetailBackSection(handler ? section : null);
+  }, []);
+
+  useEffect(() => {
+    const element = sectionScrollRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateScrolledState = () => {
+      setSectionScrolled(activeSection !== "workspace" && element.scrollTop > 4);
+    };
+
+    updateScrolledState();
+    element.addEventListener("scroll", updateScrolledState, { passive: true });
+    return () => element.removeEventListener("scroll", updateScrolledState);
+  }, [activeSection]);
+
+  const registerPluginsBack = useCallback(
+    (handler: (() => void) | null) => registerDetailBack("plugins", handler),
+    [registerDetailBack]
+  );
+  const registerConfigBack = useCallback(
+    (handler: (() => void) | null) => registerDetailBack("config", handler),
+    [registerDetailBack]
+  );
+  const registerKeysBack = useCallback(
+    (handler: (() => void) | null) => registerDetailBack("keys", handler),
+    [registerDetailBack]
+  );
 
   return (
     <main
@@ -469,10 +590,8 @@ function AppShellInner() {
       />
       <TopBar
         activeSection={activeSection}
-        canGoBack={sectionHistory.length > 0}
         leftToggleId="studio-left-rail-toggle"
         leftCollapsed={leftCollapsed}
-        onBack={navigateBack}
         onSectionChange={activateSection}
         onRightToggle={toggleConsolePanel}
         rightToggleId="studio-right-rail-toggle"
@@ -489,11 +608,15 @@ function AppShellInner() {
         activeProject={activeProject}
         activeSession={sidebarActiveSession}
         allSessions={state.sessions}
-        connectionStatus={state.connectionStatus}
         hermesStatus={hermesStatus.status}
+        hermesSessions={hermesSessions.sessions}
+        hasUnseenUpdate={appUpdate.hasUnseenUpdate}
         isHermesStatusLoading={hermesStatus.isLoading}
-        isHydrated={isHydrated}
         onSectionChange={activateSection}
+        onEnsureHermesSession={(summary) => ensureHermesSession(summary, { activate: false })}
+        onHermesSessionSelect={(summary) => {
+          void openHermesSession(summary);
+        }}
         onWorkspaceSessionSelect={() => setFocusedChatPane("main")}
         projects={state.projects}
         runningSessionIds={generatingSessionIds}
@@ -518,32 +641,56 @@ function AppShellInner() {
             activeSection !== "workspace" ? ` ${mainWindowStyles.chatPaneScrollable}` : ""
           }`}
           data-scrollable={activeSection !== "workspace" ? "true" : "false"}
+          data-section-scrolled={sectionScrolled ? "true" : "false"}
           data-shell-chat-pane="true"
+          ref={sectionScrollRef}
         >
-          {activeSection === "plugins" ? (
-            <PluginsView
-              availableModels={hermesSessionModel.modelState.availableModels}
-              hermesStatus={hermesStatus.status}
-            />
-          ) : activeSection === "keys" ? (
-            <KeysView hermesStatus={hermesStatus.status} />
-          ) : activeSection === "logs" ? (
-            <LogsView hermesStatus={hermesStatus.status} />
-          ) : activeSection === "config" ? (
-            <ConfigView
-              activeProject={activeProject}
-              activeSession={activeSession}
-              brainMemoryStatus={brainMemoryStatus.status}
-              hermesStatus={hermesStatus.status}
-              isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
-              isHermesStatusLoading={hermesStatus.isLoading}
-              onRefreshBrainMemory={() => {
-                void brainMemoryStatus.refresh();
-              }}
-              onRefreshHermes={() => {
-                void hermesStatus.refresh({ refreshModels: true });
-              }}
-            />
+          {activeSection !== "workspace" ? (
+            <div
+              className={`${mainWindowStyles.sectionPage} ${
+                activeSection === "logs" ? mainWindowStyles.logsSectionPage : ""
+              }`}
+            >
+              <div className={mainWindowStyles.sectionWindowHeader}>
+                <ChatHeader onBack={navigateBack} title={sectionWindowTitle ?? activeSection} />
+              </div>
+              {activeSection === "plugins" ? (
+                <PluginsView
+                  availableModels={hermesSessionModel.modelState.availableModels.filter(
+                    (model) => model.catalogSource !== "ui-openrouter"
+                  )}
+                  hermesStatus={hermesStatus.status}
+                  onDetailBackChange={registerPluginsBack}
+                />
+              ) : activeSection === "keys" ? (
+                <KeysView hermesStatus={hermesStatus.status} onDetailBackChange={registerKeysBack} />
+              ) : activeSection === "logs" ? (
+                <LogsView hermesStatus={hermesStatus.status} />
+              ) : activeSection === "settings" ? (
+                <SettingsView
+                  activeProject={activeProject}
+                  appUpdate={appUpdate}
+                  hermesStatus={hermesStatus.status}
+                  isHermesStatusLoading={hermesStatus.isLoading}
+                  onNavigate={activateSection}
+                  onRefreshHermes={() => {
+                    void hermesStatus.refresh({ refreshModels: true });
+                  }}
+                  onResetWorkspace={actions.reset}
+                  projects={state.projects}
+                  sessions={state.sessions}
+                />
+              ) : (
+                <ConfigView
+                  hermesStatus={hermesStatus.status}
+                  isHermesStatusLoading={hermesStatus.isLoading}
+                  onRefreshHermes={() => {
+                    void hermesStatus.refresh({ refreshModels: true });
+                  }}
+                  onDetailBackChange={registerConfigBack}
+                />
+              )}
+            </div>
           ) : (
             <ChatView
               activeProject={activeProject}
@@ -577,13 +724,11 @@ function AppShellInner() {
           availableSessions={activeProjectSessions}
           projects={state.projects}
           allSessions={state.sessions}
-          brainMemoryStatus={brainMemoryStatus.status}
           closeSideSession={closeSideSession}
           createSideSession={createSideSession}
           hermesSessions={hermesSessions.sessions}
           hermesStatus={hermesStatus.status}
           hermesSessionModel={hermesSessionModel}
-          isBrainMemoryStatusLoading={brainMemoryStatus.isLoading}
           isHermesSessionsLoading={hermesSessions.isLoading}
           isHermesStatusLoading={hermesStatus.isLoading}
           isHermesStatusRefreshing={hermesStatus.isRefreshing}
@@ -591,7 +736,6 @@ function AppShellInner() {
           onActivateSideChat={() => setFocusedChatPane("side")}
           onActivityEvent={appendActivityEvent}
           onGeneratingChange={markSessionGenerating}
-          refreshBrainMemoryStatus={brainMemoryStatus.refresh}
           refreshHermesStatus={() => {
             void hermesStatus.refresh({ refreshModels: true });
           }}
@@ -602,10 +746,13 @@ function AppShellInner() {
           sideActivityEvents={sideActivityEvents}
           sideSession={sideSession}
           sideSessionModel={sideSessionModel}
-          tenantScopePosture={tenantScopePosture.posture}
           workspaceActions={actions}
         />
       </div>
     </main>
   );
+}
+
+function makeChannelSyncKey(summary: HermesSessionSummary): string {
+  return [summary.id, summary.messageCount ?? "", summary.lastActiveAt ?? summary.endedAt ?? ""].join(":");
 }

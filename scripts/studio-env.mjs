@@ -10,10 +10,7 @@ const args = parseArgs(process.argv.slice(2));
 
 const modes = {
   "web-ui-only": "web-ui-only.env.example",
-  "web-ui-with-hermes": "web-ui-with-hermes.env.example",
-  bundle: "bundle-with-brain-memory.env.example",
-  "bundle-with-brain-memory": "bundle-with-brain-memory.env.example",
-  "attach-brain-memory-later": "attach-brain-memory-later.env.example"
+  "web-ui-with-hermes": "web-ui-with-hermes.env.example"
 };
 
 if (args.list) {

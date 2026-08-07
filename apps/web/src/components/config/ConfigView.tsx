@@ -1,14 +1,13 @@
 "use client";
 
-import type { NormalizedBrainMemoryStatus } from "@hermes-ui/brain-memory-client";
 import type { HermesConfigField, HermesConfigSection, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import type { Project, Session } from "@/data/types";
 import { CheckCircle2, Copy, Cpu, Database, KeyRound, RefreshCw, Search, Terminal } from "@/components/ui/AppIcons";
 import type { AppIcon } from "@/components/ui/AppIcons";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { HermesDashboardRecoveryState } from "@/components/ui/HermesDashboardRecoveryState";
 import { useHermesConfig } from "@/hooks/useHermesConfig";
 import { useSectionAnchors } from "@/hooks/useSectionAnchors";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   ArceeBrandIcon,
   AzureBrandIcon,
@@ -26,19 +25,16 @@ import { BRAND_ICONS } from "@/components/plugins/skillGlyphs";
 import styles from "./ConfigView.module.css";
 
 type ConfigViewProps = {
-  activeProject: Project;
-  activeSession: Session | null;
-  brainMemoryStatus: NormalizedBrainMemoryStatus | null;
   hermesStatus: NormalizedHermesStatus | null;
-  isBrainMemoryStatusLoading: boolean;
   isHermesStatusLoading: boolean;
-  onRefreshBrainMemory: () => void;
   onRefreshHermes: () => void;
+  onDetailBackChange?: (handler: (() => void) | null) => void;
 };
 
 export function ConfigView({
   hermesStatus,
   isHermesStatusLoading,
+  onDetailBackChange,
   onRefreshHermes
 }: ConfigViewProps) {
   const canLoadConfig = hermesStatus?.mode === "real" && hermesStatus.reachable;
@@ -55,6 +51,11 @@ export function ConfigView({
   const register = useSectionAnchors("config", railCategories);
   const totalFields = sections.reduce((count, section) => count + section.fields.length, 0);
 
+  useEffect(() => {
+    onDetailBackChange?.(selectedField ? () => setSelectedField(null) : null);
+    return () => onDetailBackChange?.(null);
+  }, [onDetailBackChange, selectedField]);
+
   return (
     <section className={styles.view} aria-labelledby="config-heading">
       <div className={styles.header}>
@@ -66,39 +67,38 @@ export function ConfigView({
               : "Runtime, memory, and active scope"}
           </p>
         </div>
-        <div className={styles.headerActions}>
-          {canLoadConfig ? (
-            <label className={styles.searchBox}>
-              <Search size={14} />
-              <input
-                aria-label="Filter settings"
-                onChange={(event) => setQuery(event.currentTarget.value)}
-                placeholder="Filter settings"
-                value={query}
-              />
-            </label>
-          ) : null}
-          <button
-            aria-label="Refresh Hermes config"
-            className={styles.iconButton}
-            disabled={isHermesStatusLoading || isLoading}
-            onClick={() => {
-              onRefreshHermes();
-              void refresh();
-            }}
-            title="Refresh Hermes config"
-            type="button"
-          >
-            <RefreshCw size={15} />
-          </button>
-        </div>
+      </div>
+      <div className={styles.headerActions}>
+        {canLoadConfig ? (
+          <label className={styles.searchBox}>
+            <Search size={15} />
+            <input
+              aria-label="Filter settings"
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder="Filter settings"
+              value={query}
+            />
+          </label>
+        ) : null}
+        <button
+          aria-label="Refresh Hermes config"
+          className={styles.iconButton}
+          disabled={isHermesStatusLoading || isLoading}
+          onClick={() => {
+            onRefreshHermes();
+            void refresh();
+          }}
+          type="button"
+        >
+          <RefreshCw size={20} />
+        </button>
       </div>
 
       <div className={styles.stack}>
         {selectedField ? (
           <ConfigFieldDetailView field={selectedField} onBack={() => setSelectedField(null)} />
         ) : !canLoadConfig ? null : result?.ok === false ? (
-          <EmptyState compact title="Could not load Hermes config" body={result.error.message} />
+          <HermesDashboardRecoveryState onRecovered={refresh} resourceName="Config" />
         ) : isLoading && sections.length === 0 ? (
           <LoadingRows />
         ) : filteredSections.length === 0 ? (
@@ -168,9 +168,7 @@ function ConfigFieldValue({ field }: { field: HermesConfigField }) {
       return <span className={styles.notSet}>None</span>;
     }
     return (
-      <span className={styles.scalarValue} title={field.value.join(", ")}>
-        {field.value.join(", ")}
-      </span>
+      <span className={styles.scalarValue}>{field.value.join(", ")}</span>
     );
   }
 
@@ -178,11 +176,7 @@ function ConfigFieldValue({ field }: { field: HermesConfigField }) {
     return <span className={styles.notSet}>Not set</span>;
   }
 
-  return (
-    <span className={styles.scalarValue} title={String(field.value)}>
-      {String(field.value)}
-    </span>
-  );
+  return <span className={styles.scalarValue}>{String(field.value)}</span>;
 }
 
 function ConfigFieldDetailView({ field, onBack }: { field: HermesConfigField; onBack: () => void }) {
@@ -219,6 +213,7 @@ function ConfigFieldDetailView({ field, onBack }: { field: HermesConfigField; on
       </div>
       <section className={styles.detailInfo} aria-label="Config information">
         <h2>Information</h2>
+        {field.description ? <DetailRow label="Description" value={field.description} /> : null}
         <DetailRow label="Key" value={<CopyValue text={field.key} value={field.key} />} />
         <DetailRow label="Value" value={<CopyValue disabled={!field.isSet} text={value} value={value} />} />
         <DetailRow label="Type" value={field.type} />
@@ -239,23 +234,27 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 function CopyValue({ disabled = false, text, value }: { disabled?: boolean; text: string; value: string }) {
+  const copyable = isCopyableText(text) && !disabled;
+
   return (
     <span className={styles.copyValue}>
       <code>{value}</code>
-      <button
-        aria-label={`Copy ${text}`}
-        disabled={disabled}
-        onClick={() => {
-          if (!disabled) {
-            void navigator.clipboard?.writeText(text);
-          }
-        }}
-        type="button"
-      >
-        <Copy size={13} />
-      </button>
+      {copyable ? (
+        <button
+          aria-label={`Copy ${text}`}
+          onClick={() => void navigator.clipboard?.writeText(text)}
+          type="button"
+        >
+          <Copy size={13} />
+        </button>
+      ) : null}
     </span>
   );
+}
+
+function isCopyableText(text: string) {
+  const normalized = text.trim().toLowerCase();
+  return Boolean(normalized) && !["n/a", "none", "not set", "null", "undefined", "unknown", "unavailable"].includes(normalized);
 }
 
 function LoadingRows() {
@@ -341,18 +340,18 @@ function visualForConfigField(field: HermesConfigField): ConfigVisual {
 
   const text = metadataText;
   if (text.includes("terminal") || text.includes("shell") || text.includes("command")) {
-    return { icon: Terminal, color: "#111111", scale: 1.22 };
+    return { icon: Terminal, color: "#111111" };
   }
   if (text.includes("memory") || text.includes("database") || text.includes("store")) {
-    return { icon: Database, color: "#111111", scale: 1.22 };
+    return { icon: Database, color: "#111111" };
   }
   if (text.includes("key") || text.includes("auth") || text.includes("token")) {
-    return { icon: KeyRound, color: "#111111", scale: 1.22 };
+    return { icon: KeyRound, color: "#111111" };
   }
   if (field.type === "boolean") {
-    return { icon: CheckCircle2, color: "#111111", scale: 1.22 };
+    return { icon: CheckCircle2, color: "#111111" };
   }
-  return { icon: Cpu, color: "#111111", scale: 1.22 };
+  return { icon: Cpu, color: "#111111" };
 }
 
 function visualForProviderText(text: string): ConfigVisual | null {
@@ -372,7 +371,7 @@ function visualForProviderText(text: string): ConfigVisual | null {
     return { icon: OpenRouterBrandIcon, color: CONFIG_BRAND_COLORS.openrouter, background: "#171717" };
   }
   if (text.includes("deepseek")) {
-    return { icon: BRAND_ICONS.deepseek, color: CONFIG_BRAND_COLORS.deepseek, scale: 1.32 };
+    return { icon: BRAND_ICONS.deepseek, color: CONFIG_BRAND_COLORS.deepseek };
   }
   if (text.includes("qwen")) {
     return { icon: BRAND_ICONS.qwen, color: CONFIG_BRAND_COLORS.qwen };

@@ -16,9 +16,6 @@ import { NoopMemoryStore } from "./noop-memory-store";
  *      doesn't survive reload. A non-disruptive warning is exposed via
  *      {@link getStorageDiagnostics} for the settings/dev panel only.
  *
- * Brain Memory is NOT part of this path — it is an optional plugin and the UI
- * never depends on it for persistence (see brain-memory-plugin-store.ts).
- *
  * The store is resolved once and cached for the lifetime of the page. Migration
  * from legacy localStorage runs as part of setup, exactly once.
  */

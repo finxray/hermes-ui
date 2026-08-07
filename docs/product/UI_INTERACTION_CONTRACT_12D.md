@@ -78,14 +78,14 @@ Audited UI elements: 40
 | 36 | Top menu | Help section | Placeholder | Disabled and labelled as coming soon. |
 | 37 | Composer | Attach context | Placeholder | Disabled; context attachment controls are deferred. |
 | 38 | Composer | Provider/model selector | Placeholder | Disabled; shows server-configured Hermes model state until runtime switching is verified through the BFF. |
-| 39 | Composer | Voice input | Placeholder | Disabled; voice input is deferred. |
+| 39 | Composer | Voice input | Working (browser capability) | Uses browser speech recognition for live interim/final dictation into the local draft. The browser owns microphone permission and speech-service availability; Stoix does not receive or persist microphone audio. |
 | 40 | Composer | Stop generation | Working | Enabled during generation in Slice 13G; aborts the active browser-to-BFF stream and records a cancelled UI activity marker. Server-side `/v1/runs/{run_id}/stop` remains deferred. |
 
 ## P0/P1 Findings
 
 - P0: none found.
 - P1: top menu items looked clickable but had no handlers. Fixed by disabling deferred items and labelling them as coming soon.
-- P1: composer utility controls looked actionable but had no handlers. Fixed by disabling attach/model/voice controls and labelling them as placeholders.
+- P1: composer utility controls looked actionable but had no handlers. Attach/model placeholders remain capability-gated; voice input now uses an honest browser-supported dictation path and disables itself when that capability is unavailable.
 - P1: the stop icon implied real cancellation during generation. Slice 13G replaced the disabled placeholder with an honest client/BFF stream abort control and documents that server-side run stop is still deferred.
 
 ## Smoke Harness Updates

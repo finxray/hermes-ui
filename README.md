@@ -1,107 +1,78 @@
-# Hermes UI + Brain Memory Studio
+# Stoix
 
-Local ChatGPT-like workspace for Hermes Agent with optional, Gateway-mediated
-Brain Memory inspection.
+Stoix is a local Web UI for [Hermes Agent](https://github.com/NousResearch/hermes-agent).
+It provides project-scoped chats, streaming responses, model selection, plugins,
+skills, configuration, API-key management, logs, local workspace persistence,
+and continuation of Hermes conversations started in external channels.
 
-## Current Shape
+Stoix is presentation and orchestration software. Hermes remains the agent
+runtime, and all browser requests to Hermes pass through the Stoix server-side
+BFF. Brain Memory is not bundled with Stoix `0.1.0`; it may be offered later as
+an independently installed Hermes skill or plugin.
 
-- Next.js/React Web UI in `apps/web`.
-- Server-side BFF routes for Hermes and Brain Memory status/search.
-- Hermes chat streaming through the BFF.
-- Brain Memory console foundation, read-only and optional.
-- No direct browser-to-Hermes or browser-to-Brain-Memory calls.
-- No direct Postgres, Redis, Qdrant, RAGLight, or storage access.
+## Run From Source
 
-## Packaging Modes
-
-- **Web UI standalone:** run the Web UI with Hermes. Brain Memory is optional
-  and can stay disabled.
-- **Brain Memory standalone:** Brain Memory remains usable as its own
-  backend/MCP/Gateway project without this Web UI.
-- **Recommended bundle mode:** future Web UI + Brain Memory setup for users who
-  want persistent project/session memory.
-- **Attach Brain Memory later:** start with Web UI standalone, then configure a
-  Brain Memory Gateway URL when ready.
-
-See `docs/packaging/PACKAGING_MODES.md`.
-
-Brain Memory `/ui/**` may use two auth layers: an optional
-`BRAIN_MEMORY_UI_API_KEY` bearer gate, and a tenant-bound
-`BRAIN_MEMORY_GATEWAY_MEMORY_API_KEY` for read-only memory search. The UI sends
-both only from the server-side BFF.
-
-## Local Development
-
-Local MVP quick start:
+Requirements: Node.js 24, npm 11, and a separately installed Hermes runtime.
 
 ```powershell
-npm install
-npm run studio:launch -- --check
-npm run studio:web -- --port 3002 --open
-npm run studio:launch -- --check --base-url http://127.0.0.1:3002
-npm run smoke:ui -- --base-url http://127.0.0.1:3002
-npm run smoke:mvp -- --base-url http://127.0.0.1:3002
+npm ci
+Copy-Item .env.example apps/web/.env.local
+npm run dev
 ```
 
-Use `3002` when the default `3000` server is stale, occupied, or confusing. If
-`3000` is already healthy, use `http://127.0.0.1:3000` consistently instead.
+Stoix opens on `http://127.0.0.1:3000`. Its default Hermes endpoint is
+`http://127.0.0.1:8642`. Put a required `HERMES_API_KEY` only in the ignored
+`apps/web/.env.local`; never place credentials in a committed env template.
 
-The app opens at `http://127.0.0.1:3000`. The expected Hermes API URL is
-`http://127.0.0.1:8642`; Brain Memory Gateway is optional and usually expected
-at `http://127.0.0.1:8080` when live.
-
-Start with `docs/packaging/LOCAL_BUNDLE_CHECKLIST_14O.md` for the current local
-bundle checklist. For the detailed launch flow, service modes, smoke matrix,
-stale-server troubleshooting, browser scaling notes, and secrets guidance, see
-`docs/runbooks/MVP_LOCAL_LAUNCH_RUNBOOK.md`. For packaging status, see
-`docs/packaging/PACKAGING_READINESS_14K.md` and `docs/packaging/README.md`.
-
-## Packaging Readiness
-
-The current packaging posture is MVP/demo-ready for local Web UI use after the
-release gate passes, but it is not a production installer or final one-command
-GitHub distribution yet.
-
-Safe release gate:
+## Production Build
 
 ```powershell
-npm run check:packaging
 npm run release:check
+npm run package:release
 ```
 
-Browser and live-service smokes remain separate because they require a healthy
-selected Web UI base URL and, for live gates, already-running Hermes or Brain
-Memory services.
+`package:release` creates a versioned portable archive and SHA-256 file under
+`artifacts/release/`, then launches the bundled runtime and probes the production
+UI and Hermes status route. The archive includes a pinned Node runtime, so end
+users do not need Node.js.
 
-For release preparation, see `docs/release/MANUAL_RC_CHECKLIST.md` and
-`docs/release/RELEASE_NOTES_TEMPLATE.md`. Current MVP candidate notes live in
-`docs/release/MVP_RC_NOTES.md`. Slice 17D adds the local RC release notes,
-handoff manifest, and private developer handoff guide:
-`docs/release/MVP_LOCAL_RC_RELEASE_NOTES_17D.md`,
-`docs/packaging/LOCAL_HANDOFF_MANIFEST_17D.md`, and
-`docs/release/PRIVATE_DEVELOPER_HANDOFF_17D.md`. Slice 17A records the MVP completion audit and
-final live smoke checklist in `docs/release/MVP_COMPLETION_AUDIT_17A.md` and
-`docs/release/FINAL_MVP_LIVE_SMOKE_CHECKLIST_17A.md`. Slice 17B records the
-final MVP RC browser/live smoke decision in
-`docs/release/RELEASE_DECISION_17B.md`. Read-only Brain Memory release claims
-should also follow the comprehensive Slice 17C E2E baseline in
-`docs/release/MVP_COMPREHENSIVE_E2E_17C.md` and
-`docs/product/BRAIN_MEMORY_READ_ONLY_QA_GATE_15L.md`.
+The launcher binds only to `127.0.0.1`, opens the default browser, and stores its
+private configuration outside the application directory:
 
-The MVP production execution path is still the Hermes session stream through
-`/api/hermes/chat/stream`. Production Runs, Agent access selector UI, approval
-buttons, memory mutation/admin UI, export/import, provider/model runtime
-switching, artifact upload/download, and production installer work remain
-post-MVP unless a later slice explicitly resumes them.
+- Windows: `%APPDATA%\Stoix\config.env`
+- macOS: `~/Library/Application Support/Stoix/config.env`
+- Linux: `$XDG_CONFIG_HOME/stoix/config.env` or `~/.config/stoix/config.env`
 
-## Boundary
+Hermes must be installed and started separately. User chats and projects remain
+in the browser profile's IndexedDB and are not replaced with application files.
 
-The UI is not the agent runtime and not the memory authority.
+## Channel Continuity
 
-```text
-Browser UI -> Next.js BFF -> Hermes API server
-Browser UI -> Next.js BFF -> Brain Memory Gateway UI/read-only endpoints
-```
+When Hermes reports session source metadata, Stoix shows external conversations
+in a dedicated folder for each platform, with the platform glyph replacing the
+folder icon. Opening a channel chat continues that canonical Hermes session from
+the desktop without creating a duplicate thread under the active local project.
+Channel history refreshes periodically and whenever the Stoix window regains
+focus. Explicit CLI-style handoff back to a platform is not exposed because
+Hermes does not currently provide that operation through its HTTP API.
 
-Hermes remains the agent runtime. Brain Memory Gateway remains the memory
-authority.
+## Updates
+
+Stoix checks the stable `finxray/hermes-ui` GitHub Releases channel at most once
+every 24 hours. A blue dot beside Settings indicates an unseen release. Manual
+checks report whether the current version is up to date. Downloading remains an
+explicit user action; Stoix `0.1.0` does not execute remote scripts or silently
+replace itself.
+
+See [GitHub update channel](docs/release/GITHUB_UPDATES.md),
+[packaging audit](docs/release/PACKAGING_AUDIT_0.1.0.md), and
+[publishing guide](docs/release/PUBLISHING.md).
+
+## Security Boundary
+
+- Browser code never receives the Hermes API key.
+- Mutation routes reject cross-origin requests.
+- The production server and Hermes Dashboard recovery bind to loopback.
+- No database or agent-runtime state is implemented in the UI.
+- Release checks accept GitHub metadata or an approved HTTPS/loopback manifest;
+  they do not install software.

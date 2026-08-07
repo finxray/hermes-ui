@@ -201,7 +201,7 @@ git revert 7e76330b1  # Reverts the gateway/run.py and api_server.py changes
 
 **Web UI:**
 ```bash
-cd /mnt/c/Users/Alexey/.cursor/projects/hermes-ui
+cd /mnt/c/path/to/stoix
 git revert 69fbadf  # Reverts all Web UI model switching changes
 ```
 

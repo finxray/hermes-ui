@@ -10,9 +10,10 @@ type SidebarRowProps = {
   label: ReactNode;
   meta?: ReactNode;
   muted?: boolean;
+  onBlur?: () => void;
   onClick?: () => void;
+  onFocus?: () => void;
   secondary?: ReactNode;
-  title?: string;
 };
 
 export function SidebarRow({
@@ -24,9 +25,10 @@ export function SidebarRow({
   label,
   meta,
   muted = false,
+  onBlur,
   onClick,
-  secondary,
-  title
+  onFocus,
+  secondary
 }: SidebarRowProps) {
   const className = [
     styles.row,
@@ -41,13 +43,13 @@ export function SidebarRow({
 
   const metaSlot = (
     <span className={styles.metaSlot}>
-      {meta ? <span className={styles.meta}>{meta}</span> : null}
+      {meta ? <span className={styles.meta} data-sidebar-row-meta="true">{meta}</span> : null}
     </span>
   );
   const actionMetaSlot = actions ? (
     <span className={`${styles.metaSlot} ${styles.actionMetaSlot}`}>
-      {meta ? <span className={styles.meta}>{meta}</span> : null}
-      <span className={styles.actions}>{actions}</span>
+      {meta ? <span className={styles.meta} data-sidebar-row-meta="true">{meta}</span> : null}
+      <span className={styles.actions} data-sidebar-row-actions="true">{actions}</span>
     </span>
   ) : null;
 
@@ -66,12 +68,14 @@ export function SidebarRow({
 
   if (onClick && actions) {
     return (
-      <div className={className} data-depth={depth} title={title}>
+      <div className={className} data-depth={depth}>
         <button
           aria-current={active ? "page" : undefined}
           className={styles.contentButton}
           disabled={disabled}
+          onBlur={onBlur}
           onClick={onClick}
+          onFocus={onFocus}
           type="button"
         >
           {content}
@@ -88,8 +92,9 @@ export function SidebarRow({
         className={className}
         data-depth={depth}
         disabled={disabled}
+        onBlur={onBlur}
         onClick={onClick}
-        title={title}
+        onFocus={onFocus}
         type="button"
       >
         {content}
@@ -98,7 +103,7 @@ export function SidebarRow({
   }
 
   return (
-    <div className={className} data-depth={depth} title={title}>
+    <div className={className} data-depth={depth}>
       {content}
     </div>
   );
@@ -107,21 +112,25 @@ export function SidebarRow({
 export function SidebarIconButton({
   children,
   label,
-  onClick
+  onClick,
+  size = "default"
 }: {
   children: ReactNode;
   label: string;
   onClick: () => void;
+  size?: "default" | "compact";
 }) {
   return (
     <button
       className={styles.actionButton}
       type="button"
       aria-label={label}
+      data-action-size={size}
       data-sidebar-row-action="true"
       onClick={(event) => {
         event.stopPropagation();
         onClick();
+        event.currentTarget.blur();
       }}
     >
       {children}

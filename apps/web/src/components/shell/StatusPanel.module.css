@@ -1,5 +1,5 @@
 .section {
-  margin-bottom: 44px;
+  margin-bottom: 36px;
 }
 
 .sectionLabel {
@@ -8,62 +8,68 @@
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 14px;
-  color: var(--text-muted);
-  font-size: var(--font-small);
-  font-weight: 650;
-}
-
-.card {
-  display: grid;
-  gap: 16px;
-  background: transparent;
-}
-
-.cardTitle {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--text-primary);
-  font-size: var(--font-xs);
-  font-weight: 650;
-}
-
-.cardBody,
-.meta {
   color: var(--text-secondary);
   font-size: var(--font-small);
-  line-height: 1.5;
+  font-weight: 650;
 }
 
-.meta {
-  color: var(--text-muted);
+.statusSummary {
+  display: grid;
+  gap: 16px;
 }
 
-.metrics {
+.statusHeadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-primary);
+  font-size: var(--font-small);
+  font-weight: 650;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.statusHeadline[data-tone="connected"] .statusDot {
+  background: var(--status-enabled);
+}
+
+.statusHeadline[data-tone="attention"] .statusDot {
+  background: var(--orange);
+}
+
+.primaryFields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 16px;
 }
 
 .fieldGrid {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .field {
   display: grid;
-  gap: 4px;
   min-width: 0;
-  padding: 4px 0 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  gap: 3px;
+}
+
+.fieldGrid .field {
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
 .fieldLabel {
   color: var(--text-muted);
   font-size: var(--font-xs);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.2;
-  text-transform: uppercase;
 }
 
 .fieldValue {
@@ -73,49 +79,12 @@
   line-height: 1.35;
 }
 
-.metric {
-  padding: 10px 12px;
-  border: 1px solid var(--border-glass-soft);
-  border-radius: 14px;
-  background: var(--bg-glass-soft);
-}
-
-.metricValue {
-  color: var(--text-primary);
-  font-size: var(--font-body);
-  font-weight: 680;
-}
-
-.metricLabel {
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: var(--font-xs);
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 20px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--font-small);
-  white-space: nowrap;
-}
-
-.capabilities {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-}
-
 .syncStrip {
   display: grid;
-  gap: 10px;
+  gap: 5px;
   padding: 12px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
 }
 
 .syncTop {
@@ -123,9 +92,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: var(--font-small);
-  font-weight: 650;
+  font-weight: 620;
 }
 
 .syncState {
@@ -135,97 +104,105 @@
   text-transform: uppercase;
 }
 
-.syncPipeline {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12px, 28px) minmax(0, 1fr) minmax(12px, 28px) minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-}
-
-.syncNode {
-  display: inline-flex;
-  width: 100%;
-  min-width: 0;
-  min-height: 24px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
-  color: var(--text-secondary);
-  font-size: var(--font-xs);
-  font-weight: 650;
-  box-sizing: border-box;
-}
-
-.syncLine {
-  height: 1px;
-  min-width: 12px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(170, 220, 255, 0.42));
-}
-
-.syncStrip[data-state="synced"] .syncState,
-.syncStrip[data-state="synced"] .syncNode {
-  color: #d8f8e4;
-}
-
-.syncStrip[data-state="verifying"] .syncState,
-.syncStrip[data-state="loading"] .syncState {
-  color: #c8dcff;
-}
-
-.syncStrip[data-state="error"] .syncState {
-  color: var(--notice);
-}
-
-.syncStrip[data-state="fallback"] .syncState {
-  color: #f4d7a1;
-}
-
-/* A client-selected model is a soft, memory-only override that Hermes does not
-   confirm as the generating model. Tint the badge as a caution even when the
-   pipeline reports "synced", and never show it as reassuring green. */
+.syncStrip[data-state="error"] .syncState,
+.syncStrip[data-state="fallback"] .syncState,
 .syncStrip[data-unconfirmed="true"] .syncState {
-  color: #f4d7a1;
+  color: var(--orange);
 }
 
-.syncStrip[data-unconfirmed="true"] .syncNode {
-  color: var(--text-secondary);
+.meta {
+  color: var(--text-muted);
+  font-size: var(--font-small);
+  line-height: 1.45;
 }
 
+.error,
 .caveat {
-  color: #f4d7a1;
+  margin: 0;
+  color: var(--orange);
   font-size: var(--font-small);
   line-height: 1.45;
 }
 
-.error {
-  padding: 2px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--notice);
+.runtimeDetails {
+  color: var(--text-secondary);
   font-size: var(--font-small);
-  line-height: 1.45;
+}
+
+.runtimeDetails summary {
+  width: max-content;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 620;
+}
+
+.runtimeDetails summary:hover,
+.runtimeDetails summary:focus-visible {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.detailBody {
+  display: grid;
+  gap: 16px;
+  padding-top: 12px;
+}
+
+.capabilityList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.capabilityList > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.capabilityList dt,
+.capabilityList dd {
+  margin: 0;
+  font-size: var(--font-small);
+}
+
+.capabilityList dt {
+  color: var(--text-muted);
+}
+
+.capabilityList dd {
+  color: var(--text-secondary);
+  text-align: right;
 }
 
 .iconButton {
   display: grid;
-  width: calc(var(--control-height) * 0.68);
-  height: calc(var(--control-height) * 0.68);
+  width: 36px;
+  height: 36px;
+  flex: none;
   place-items: center;
+  padding: 0;
   border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-muted);
+  border-radius: 999px;
+  background: rgba(38, 38, 40, 1);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
-.iconButton:hover,
-.iconButton:focus-visible {
+.iconButton:hover:not(:disabled),
+.iconButton:focus-visible:not(:disabled) {
   outline: 0;
-  background: var(--bg-control-hover);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.iconButton:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 @keyframes statusPanelSpin {
@@ -235,12 +212,11 @@
 
 .iconButtonRefreshing svg {
   animation: statusPanelSpin 1s linear infinite;
-  opacity: 0.55;
+  opacity: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .iconButtonRefreshing svg {
     animation: none;
-    opacity: 0.55;
   }
 }

@@ -1,4 +1,5 @@
 .mainWindow {
+  composes: scrollbar-hover-context from global;
   grid-area: main-window;
   position: relative;
   display: block;
@@ -27,17 +28,45 @@
 }
 
 .chatPaneScrollable {
-  composes: scrollbar-hover-reveal from global;
+  composes: scrollbar-hover-target from global;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .chatPane > * {
   position: relative;
   min-width: 0;
   min-height: 0;
+}
+
+.chatPane:not(.chatPaneScrollable) > * {
   height: 100%;
+}
+
+.chatPaneScrollable > * {
+  min-height: 100%;
+}
+
+.sectionPage {
+  --section-window-header-height: 43px;
+  min-height: 100%;
+}
+
+.logsSectionPage {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sectionWindowHeader {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  min-height: var(--section-window-header-height);
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .rightResizeHandle {
@@ -51,7 +80,7 @@
   border: 0;
   background: transparent;
   cursor: col-resize;
-  transform: translateX(6px);
+  transform: translateX(100%);
   transition:
     right var(--rail-right-transition-duration, 280ms) cubic-bezier(0.22, 1, 0.36, 1),
     opacity 160ms ease;

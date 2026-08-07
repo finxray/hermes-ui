@@ -34,5 +34,12 @@ Thumbs.db
 .codex-log/
 artifacts/
 
+# Local icon-reference downloads used during visual QA; never publish them.
+assets/icons/arrow-up-pack/
+assets/icons/noun-triangle-rounded-512.png
+.claude/
+.playwright-cli/
+output/
+
 # packaged roadmap/source drops
 *.zip

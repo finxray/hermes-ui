@@ -6,8 +6,9 @@ import {
   type HermesChatRequest
 } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
-import { buildMemoryScopeBridgeInstruction } from "@/lib/memoryScopeBridge";
 import { buildHermesRuntimeIdentityInstruction } from "@/lib/hermesRuntimeIdentity";
+import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
+import { relayHermesSessionReply } from "@/server/hermesChannelRelay";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +19,10 @@ const MAX_HISTORY_ITEMS = 12;
 const MAX_ATTACHMENT_ITEMS = 20;
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: { kind: "forbidden", message: "Cross-origin requests are not allowed." } }, { status: 403 });
+  }
+
   const parsed = await readChatRequest(request);
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
@@ -38,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return new Response(result.stream, {
+  return new Response(relayExternalChannelCompletion(result.stream, result.hermesSessionId), {
     headers: {
       "Cache-Control": "no-store, no-transform",
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -46,6 +51,81 @@ export async function POST(request: Request) {
       "X-Hermes-Session-Id": result.hermesSessionId
     }
   });
+}
+
+function relayExternalChannelCompletion(
+  upstream: ReadableStream<Uint8Array>,
+  hermesSessionId: string
+): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = upstream.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalAssistantText = "";
+      let streamFailed = false;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split(/\r?\n\r?\n/);
+          buffer = frames.pop() ?? "";
+          for (const frame of frames) {
+            const event = parseStreamFrame(frame);
+            if (event?.type === "message_done") {
+              const message = readObject(event.message);
+              if (typeof message?.content === "string" && message.content.trim()) {
+                finalAssistantText = message.content;
+              }
+            } else if (event?.type === "error") {
+              streamFailed = true;
+            }
+          }
+        }
+
+        if (!streamFailed && finalAssistantText.trim()) {
+          try {
+            const relay = await relayHermesSessionReply(
+              {
+                apiKey: process.env.HERMES_API_KEY,
+                baseUrl: process.env.HERMES_API_BASE_URL,
+                enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
+                timeoutMs: 8_000
+              },
+              hermesSessionId,
+              finalAssistantText
+            );
+            if (!relay.delivered && relay.channel) {
+              console.warn(`Stoix could not relay the completed response to ${relay.channel}: ${relay.reason}`);
+            }
+          } catch (error) {
+            console.warn("Stoix external-channel relay failed:", error instanceof Error ? error.message : error);
+          }
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  });
+}
+
+function parseStreamFrame(frame: string): Record<string, unknown> | null {
+  const data = frame
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n");
+  if (!data) return null;
+  try {
+    return readObject(JSON.parse(data));
+  } catch {
+    return null;
+  }
 }
 
 type ParseResult =
@@ -91,8 +171,7 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
       context,
       instructions: joinInstructions(
         buildHermesRuntimeIdentityInstruction({ model, modelRuntime, provider }),
-        buildAttachmentInstruction(attachments),
-        isMemoryScopeBridgeEnabled() ? buildMemoryScopeBridgeInstruction(context) : null
+        buildAttachmentInstruction(attachments)
       ),
       attachments,
       message,
@@ -121,10 +200,6 @@ function buildAttachmentInstruction(attachments: HermesChatRequest["attachments"
     "Attached file metadata:",
     summary
   ].join("\n");
-}
-
-function isMemoryScopeBridgeEnabled(): boolean {
-  return process.env.HERMES_UI_ENABLE_MEMORY_SCOPE_BRIDGE !== "false";
 }
 
 function badRequest(kind: "bad_response", message: string): ParseResult {
@@ -218,7 +293,6 @@ function readContext(value: unknown): HermesChatContext | null {
   const projectId = cleanString(project.id, 256);
   const projectTitle = cleanString(project.title, 256);
   const projectStableKey = cleanString(project.stableKey, 256);
-  const tenantId = cleanString(project.tenantId, 256);
   const sessionId = cleanString(session.id, 256);
   const sessionTitle = cleanString(session.title, 256);
   const sessionStableKey = cleanString(session.stableKey, 256);
@@ -229,7 +303,6 @@ function readContext(value: unknown): HermesChatContext | null {
     !projectId ||
     !projectTitle ||
     !projectStableKey ||
-    !tenantId ||
     !sessionId ||
     !sessionTitle ||
     !sessionStableKey ||
@@ -244,10 +317,6 @@ function readContext(value: unknown): HermesChatContext | null {
       id: projectId,
       title: projectTitle,
       stableKey: projectStableKey,
-      tenantId,
-      retrievalProfile: cleanString(project.retrievalProfile, 64) || "balanced",
-      contextPolicy: cleanString(project.contextPolicy, 64) || "balanced",
-      pinnedMemoryIds: readStringArray(project.pinnedMemoryIds, 24, 256),
       userVisibleSummary: cleanOptionalString(project.userVisibleSummary, 512) ?? undefined
     },
     session: {
@@ -271,16 +340,6 @@ function readObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
-
-function readStringArray(value: unknown, maxItems: number, maxLength: number): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .map((item) => cleanString(item, maxLength))
-    .filter(Boolean)
-    .slice(0, maxItems);
 }
 
 function readAttachments(value: unknown): HermesChatRequest["attachments"] {

@@ -19,7 +19,10 @@ Date: 2026-08-05
   including source icons, persisted metadata, periodic/focus refresh, and a
   release contract check.
 - GitHub Actions release gate on all three operating systems.
-- Tag-triggered cross-platform packaging into a draft GitHub Release.
+- Tag-triggered native packaging for Windows x64, Linux x64, macOS Apple
+  Silicon, and macOS Intel into a draft GitHub Release.
+- Expected platform and architecture assertions prevent runner-label changes
+  from silently producing a mislabeled release archive.
 - Tracked-secret and packaged-secret scanning plus dependency audit.
 
 ## Locally Verified

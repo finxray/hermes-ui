@@ -22,8 +22,9 @@ Before publishing the first public release:
 2. Run `npm ci` and `npm run package:release` locally.
 3. Review `git diff` and commit from a clean release branch.
 4. Create and push an annotated tag, for example `v0.1.0`.
-5. The `Package release` workflow builds and smoke-tests Windows, macOS, and
-   Linux archives, attaches SHA-256 files, and creates a draft GitHub Release.
+5. The `Package release` workflow builds and smoke-tests Windows x64, Linux x64,
+   macOS Apple Silicon, and macOS Intel archives, attaches SHA-256 files, and
+   creates a draft GitHub Release.
 6. Download every archive from the draft and test it on a clean machine.
 7. Add the approved license, privacy link, release notes, and known limitations.
 8. Apply required code signatures/notarization and replace unsigned assets when

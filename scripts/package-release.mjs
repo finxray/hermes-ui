@@ -23,9 +23,21 @@ const platform = process.platform;
 const arch = process.arch;
 const supportedPlatforms = new Set(["darwin", "linux", "win32"]);
 const supportedArchitectures = new Set(["arm64", "x64"]);
+const expectedPlatform = process.env.STOIX_RELEASE_PLATFORM;
+const expectedArchitecture = process.env.STOIX_RELEASE_ARCH;
 
 if (!supportedPlatforms.has(platform) || !supportedArchitectures.has(arch)) {
   throw new Error(`Unsupported release target: ${platform}-${arch}`);
+}
+if (expectedPlatform && platform !== expectedPlatform) {
+  throw new Error(
+    `Release runner platform mismatch: expected ${expectedPlatform}, received ${platform}.`
+  );
+}
+if (expectedArchitecture && arch !== expectedArchitecture) {
+  throw new Error(
+    `Release runner architecture mismatch: expected ${expectedArchitecture}, received ${arch}.`
+  );
 }
 if (!releaseNodeVersion || process.versions.node !== releaseNodeVersion) {
   throw new Error(

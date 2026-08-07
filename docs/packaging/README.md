@@ -22,8 +22,16 @@ npm run package:release
 ```
 
 `package:release` builds and smoke-tests the archive for the current operating
-system and architecture. GitHub Actions builds Windows, macOS, and Linux draft
-release assets from a version tag.
+system and architecture. GitHub Actions builds these native draft-release assets
+from a version tag:
+
+- `stoix-<version>-win32-x64.zip`
+- `stoix-<version>-linux-x64.zip`
+- `stoix-<version>-darwin-arm64.zip` for Apple Silicon Macs
+- `stoix-<version>-darwin-x64.zip` for Intel Macs
+
+Each matrix job asserts its expected platform and architecture before packaging,
+then launches the bundled runtime on that same operating system.
 
 Hermes remains a separately installed runtime. The Stoix launcher never installs,
 updates, starts, or stops Hermes and never executes remote update code.

@@ -41,9 +41,9 @@
   width: fit-content;
   max-width: 100%;
   min-width: 0;
-  padding: 10px 18px;
-  border-radius: 20px;
-  background: rgba(38, 38, 38, 0.5);
+  padding: 7px 13px;
+  border-radius: 16px;
+  background: rgba(38, 38, 40, 0.7);
   box-sizing: border-box;
 }
 

@@ -192,12 +192,24 @@
   transition: background 150ms ease, color 150ms ease, transform 150ms ease;
 }
 
+.refreshButton,
+.refreshButton:hover:not(:disabled),
+.refreshButton:focus-visible:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+}
+
 .iconButton:hover:not(:disabled),
 .iconButton:focus-visible:not(:disabled) {
   outline: 0;
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
   transform: translateY(-1px);
+}
+
+.refreshButton:hover:not(:disabled),
+.refreshButton:focus-visible:not(:disabled) {
+  background: transparent;
 }
 
 .iconButton:disabled {

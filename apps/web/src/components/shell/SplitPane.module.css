@@ -5,7 +5,7 @@
   min-height: 0;
   height: 100%;
   contain: layout paint;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background-color: var(--bg-workspace-solid);
   border-left: var(--border-window-outline-width) solid var(--border-window-separator);
@@ -94,7 +94,12 @@
   white-space: nowrap;
 }
 
-.returnButton:hover .returnTooltip,
+.returnButton:hover .returnTooltip {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 2s;
+}
+
 .returnButton:focus-visible .returnTooltip {
   opacity: 1;
   transform: translateY(0);
@@ -255,7 +260,7 @@
 
 .closeTabButton:hover .closeGlyph,
 .closeTabButton:focus-visible .closeGlyph {
-  background: var(--orange);
+  background: var(--danger);
   color: var(--bg-workspace-solid);
 }
 
@@ -275,7 +280,7 @@
   max-height: min(480px, calc(100vh - 130px));
   overflow: hidden;
   padding: 8px;
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-overlay-subtle);
   border-radius: 16px;
   background: #1f1f20;
   box-shadow: 0 18px 54px rgba(0, 0, 0, 0.36);
@@ -428,10 +433,6 @@
 .chatPane {
   box-sizing: border-box;
   background-color: var(--bg-workspace-solid);
-}
-
-.splitPane[data-layout="combined"] .chatPane {
-  padding-top: var(--split-pane-toolbar-height);
 }
 
 .consolePane {

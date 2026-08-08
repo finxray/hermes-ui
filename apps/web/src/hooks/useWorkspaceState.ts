@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   createInitialWorkspaceState,
   getVisibleSessions,
@@ -19,11 +19,27 @@ export function useWorkspaceState() {
   const [state, dispatch] = useReducer(workspaceReducer, undefined, createInitialWorkspaceState);
   const [isHydrated, setIsHydrated] = useState(false);
   const latestStateRef = useRef(state);
+  const isHydratedRef = useRef(false);
+  const pendingHydrationActionsRef = useRef<WorkspaceAction[]>([]);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   // The MemoryStore is resolved asynchronously (IndexedDB open + migration).
   // We hold the resolved instance here so save effects can reuse it.
   const storeRef = useRef<MemoryStore | null>(null);
 
   latestStateRef.current = state;
+
+  const dispatchWorkspaceAction = useCallback((action: WorkspaceAction) => {
+    if (!isHydratedRef.current) {
+      pendingHydrationActionsRef.current.push(action);
+    }
+    dispatch(action);
+  }, []);
+
+  const enqueueSave = useCallback((store: MemoryStore, nextState = latestStateRef.current) => {
+    saveQueueRef.current = saveQueueRef.current
+      .catch(() => undefined)
+      .then(() => saveWorkspaceToStore(store, nextState));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,12 +54,17 @@ export function useWorkspaceState() {
         const loaded = await loadWorkspaceFromStore(store);
         if (!cancelled && loaded) {
           dispatch({ type: "hydrate", state: loaded });
+          for (const action of pendingHydrationActionsRef.current) {
+            dispatch(action);
+          }
         }
       } catch {
         // Storage failed to resolve; keep the clean initial state so the UI
         // remains usable. The provider surfaces a diagnostic separately.
       } finally {
         if (!cancelled) {
+          pendingHydrationActionsRef.current = [];
+          isHydratedRef.current = true;
           setIsHydrated(true);
         }
       }
@@ -62,12 +83,12 @@ export function useWorkspaceState() {
     const timeout = window.setTimeout(() => {
       const store = storeRef.current;
       if (store) {
-        void saveWorkspaceToStore(store, latestStateRef.current);
+        enqueueSave(store);
       }
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [isHydrated, state]);
+  }, [enqueueSave, isHydrated, state]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -80,7 +101,7 @@ export function useWorkspaceState() {
     const flush = () => {
       const store = storeRef.current;
       if (store) {
-        void saveWorkspaceToStore(store, latestStateRef.current);
+        enqueueSave(store);
       }
     };
     window.addEventListener("pagehide", flush);
@@ -89,7 +110,7 @@ export function useWorkspaceState() {
       window.removeEventListener("pagehide", flush);
       window.removeEventListener("beforeunload", flush);
     };
-  }, [isHydrated]);
+  }, [enqueueSave, isHydrated]);
 
   const activeProject =
     state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0];
@@ -102,18 +123,20 @@ export function useWorkspaceState() {
   const actions = useMemo(
     () => ({
       appendMessage: (sessionId: string, message: ChatMessage) =>
-        dispatch({ type: "appendMessage", sessionId, message }),
+        dispatchWorkspaceAction({ type: "appendMessage", sessionId, message }),
       appendRunRecord: (sessionId: string, run: RunRecord) =>
-        dispatch({ type: "appendRunRecord", sessionId, run }),
+        dispatchWorkspaceAction({ type: "appendRunRecord", sessionId, run }),
       appendToolEvent: (sessionId: string, event: ToolEvent) =>
-        dispatch({ type: "appendToolEvent", sessionId, event }),
-      archiveSession: (sessionId: string) => dispatch({ type: "archiveSession", sessionId }),
+        dispatchWorkspaceAction({ type: "appendToolEvent", sessionId, event }),
+      archiveSession: (sessionId: string) => dispatchWorkspaceAction({ type: "archiveSession", sessionId }),
+      archiveProjectSessions: (projectId: string) =>
+        dispatchWorkspaceAction({ type: "archiveProjectSessions", projectId }),
       createProject: (options: { activate?: boolean; name?: string; projectId?: string } = {}) => {
         const projectId = options.projectId ?? `project-${crypto.randomUUID()}`;
-        dispatch({ type: "createProject", ...options, projectId });
+        dispatchWorkspaceAction({ type: "createProject", ...options, projectId });
         return projectId;
       },
-      createSession: () => dispatch({ type: "createSession" }),
+      createSession: () => dispatchWorkspaceAction({ type: "createSession" }),
       createSessionForProject: (
         projectId: string,
         options: {
@@ -128,7 +151,7 @@ export function useWorkspaceState() {
         } = {}
       ) => {
         const sessionId = options.sessionId ?? `session-${crypto.randomUUID()}`;
-        dispatch({
+        dispatchWorkspaceAction({
           type: "createSession",
           activate: options.activate,
           channel: options.channel,
@@ -142,16 +165,17 @@ export function useWorkspaceState() {
         });
         return sessionId;
       },
-      dispatch: (action: WorkspaceAction) => dispatch(action),
+      dispatch: dispatchWorkspaceAction,
       renameProject: (projectId: string, name: string) =>
-        dispatch({ type: "renameProject", projectId, name }),
+        dispatchWorkspaceAction({ type: "renameProject", projectId, name }),
       renameSession: (sessionId: string, title: string) =>
-        dispatch({ type: "renameSession", sessionId, title }),
-      reset: () => dispatch({ type: "reset" }),
-      switchProject: (projectId: string) => dispatch({ type: "switchProject", projectId }),
-      switchSession: (sessionId: string) => dispatch({ type: "switchSession", sessionId }),
+        dispatchWorkspaceAction({ type: "renameSession", sessionId, title }),
+      removeProject: (projectId: string) => dispatchWorkspaceAction({ type: "removeProject", projectId }),
+      reset: () => dispatchWorkspaceAction({ type: "reset" }),
+      switchProject: (projectId: string) => dispatchWorkspaceAction({ type: "switchProject", projectId }),
+      switchSession: (sessionId: string) => dispatchWorkspaceAction({ type: "switchSession", sessionId }),
       updateRunRecord: (sessionId: string, runId: string, patch: Partial<RunRecord>) =>
-        dispatch({ type: "updateRunRecord", sessionId, runId, patch }),
+        dispatchWorkspaceAction({ type: "updateRunRecord", sessionId, runId, patch }),
       updateMessage: (
         sessionId: string,
         messageId: string,
@@ -160,7 +184,7 @@ export function useWorkspaceState() {
         references?: string[],
         usage?: ChatMessage["usage"]
       ) =>
-        dispatch({
+        dispatchWorkspaceAction({
           type: "updateMessage",
           sessionId,
           messageId,
@@ -170,11 +194,11 @@ export function useWorkspaceState() {
           usage
         }),
       loadHermesMessages: (sessionId: string, messages: ChatMessage[]) =>
-        dispatch({ type: "loadHermesMessages", sessionId, messages }),
+        dispatchWorkspaceAction({ type: "loadHermesMessages", sessionId, messages }),
       setSessionModelPreference: (sessionId: string, preference: SessionModelPreference) =>
-        dispatch({ type: "setSessionModelPreference", sessionId, preference })
+        dispatchWorkspaceAction({ type: "setSessionModelPreference", sessionId, preference })
     }),
-    []
+    [dispatchWorkspaceAction]
   );
 
   return {

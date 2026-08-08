@@ -1,5 +1,5 @@
 .wrap {
-  --composer-radius: 27px;
+  --composer-radius: 22px;
 
   position: relative;
   z-index: 3;
@@ -25,7 +25,7 @@
 
 .composer {
   --composer-control-idle: rgba(155, 155, 162, 1);
-  --composer-plus-idle: rgba(155, 155, 162, 1);
+  --composer-plus-idle: rgba(255, 255, 255, 0.9);
   --composer-placeholder: rgba(155, 155, 162, 1);
   --composer-send-idle-bg: rgba(155, 155, 162, 1);
   --composer-send-idle-fg: rgba(38, 38, 40, 1);
@@ -175,8 +175,8 @@
 }
 
 .boxContent {
-  --composer-content-inset-x: 15px;
-  --composer-content-inset-right: 10px;
+  --composer-content-inset-x: 12px;
+  --composer-content-inset-right: 8px;
 
   position: relative;
   z-index: 3;
@@ -185,7 +185,7 @@
   gap: 10px;
   overflow: visible;
   border-radius: inherit;
-  padding: 9px var(--composer-content-inset-right) 10px var(--composer-content-inset-x);
+  padding: 7px var(--composer-content-inset-right) 8px var(--composer-content-inset-x);
 }
 
 .fileInput {
@@ -488,8 +488,8 @@
 }
 
 .toolButton.plusButton svg {
-  width: 21px;
-  height: 21px;
+  width: 18.9px;
+  height: 18.9px;
   stroke-width: 2px;
 }
 
@@ -569,7 +569,7 @@
 .modelButtonText {
   min-width: 0;
   overflow: hidden;
-  color: var(--orange);
+  color: var(--unread-blue);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -590,17 +590,17 @@
 .modelButton:focus-visible {
   outline: 0;
   background: transparent;
-  color: var(--orange);
+  color: var(--unread-blue);
 }
 
 .modelButton:disabled {
   cursor: default;
   opacity: 1;
-  color: var(--orange);
+  color: var(--unread-blue);
 }
 
 .modelButton svg {
-  color: var(--orange);
+  color: var(--unread-blue);
 }
 
 .modelMenu {
@@ -619,9 +619,9 @@
   max-height: var(--model-menu-max-height, 50vh);
   padding: 6px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-overlay-subtle);
   border-radius: 14px;
-  background: rgba(28, 28, 30, 1);
+  background: var(--bg-overlay-solid);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.35),
     0 12px 32px rgba(0, 0, 0, 0.42);
@@ -663,6 +663,7 @@
 
 .modelSections {
   composes: scrollbar-hover-target from global;
+  composes: scrollbar-menu-target from global;
   display: grid;
   align-content: start;
   min-height: 0;
@@ -768,7 +769,7 @@
 
 .modelOption[aria-selected="true"] {
   background: transparent;
-  color: var(--orange);
+  color: var(--unread-blue);
 }
 
 /* Installed-but-unloaded local models are shown so they are discoverable, but
@@ -788,7 +789,7 @@
 }
 
 .modelOption[aria-selected="true"] svg {
-  color: var(--orange);
+  color: var(--unread-blue);
 }
 
 .modelOptionLabel {
@@ -814,7 +815,7 @@
 }
 
 .modelOption[aria-selected="true"] .modelOptionProvider {
-  color: var(--orange);
+  color: var(--unread-blue);
 }
 
 .modelEmptyState {
@@ -865,14 +866,14 @@
 }
 
 .stopButton svg {
-  transform: scale(1.4);
+  transform: scale(1.1984);
   transform-origin: center;
 }
 
 .projectCard {
   position: relative;
   display: flex;
-  width: 99%;
+  width: 97%;
   min-width: 0;
   justify-content: flex-start;
   margin: -24px auto 0;
@@ -931,6 +932,7 @@
 }
 
 .projectMenu {
+  composes: scrollbar-menu-target from global;
   position: absolute;
   bottom: calc(100% + 10px);
   left: 14px;
@@ -940,9 +942,9 @@
   max-height: min(320px, 52vh);
   overflow: auto;
   padding: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-overlay-subtle);
   border-radius: 14px;
-  background: rgba(28, 28, 30, 1);
+  background: var(--bg-overlay-solid);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.35),
     0 12px 32px rgba(0, 0, 0, 0.42);

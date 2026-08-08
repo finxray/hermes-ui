@@ -30,6 +30,42 @@ try {
   check(!(await page.locator("body").innerText()).includes("Brain Memory"), "core workspace has no Brain Memory UI");
   await checkOverflow(page, "workspace desktop");
 
+  const activeTab = page.getByRole("tab").first();
+  const tabFontSize = Number.parseFloat(await activeTab.evaluate((element) => getComputedStyle(element).fontSize));
+  await page.getByRole("button", { name: /Add chat tab in left pane/ }).click();
+  const addChatMenu = page.getByRole("menu", { name: /Add chat to left pane/ });
+  await addChatMenu.waitFor();
+  const addMenuMetrics = await addChatMenu.evaluate((menu) => {
+    const firstItem = menu.querySelector('[role="menuitem"]');
+    const firstIcon = firstItem?.querySelector("svg");
+    return {
+      fontSize: firstItem ? Number.parseFloat(getComputedStyle(firstItem).fontSize) : 0,
+      iconSize: firstIcon?.getBoundingClientRect().width ?? 0,
+      itemHeight: firstItem?.getBoundingClientRect().height ?? 0,
+      width: menu.getBoundingClientRect().width
+    };
+  });
+  check(Math.abs(addMenuMetrics.fontSize - tabFontSize) < 0.05, "tab picker font matches the tab title");
+  check(addMenuMetrics.itemHeight <= 32, "tab picker uses compact rows");
+  check(addMenuMetrics.iconSize <= 14.1, "tab picker uses compact icons");
+  check(addMenuMetrics.width <= 250.1, "tab picker uses compact width");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: /Chat actions for/ }).first().click();
+  const chatActionsMenu = page.getByRole("menu", { name: "Chat actions" });
+  await chatActionsMenu.waitFor();
+  const commandMetrics = await chatActionsMenu.locator('[role="menuitem"]').evaluateAll((items) =>
+    items.map((item) => ({
+      fontSize: Number.parseFloat(getComputedStyle(item).fontSize),
+      iconSize: item.querySelector("svg")?.getBoundingClientRect().width ?? 0,
+      itemHeight: item.getBoundingClientRect().height
+    }))
+  );
+  check(commandMetrics.every((item) => Math.abs(item.fontSize - tabFontSize) < 0.05), "chat menu font matches the tab title");
+  check(commandMetrics.every((item) => item.itemHeight <= 30.1), "chat menu uses compact rows");
+  check(commandMetrics.every((item) => item.iconSize <= 14.1), "chat menu uses compact icons");
+  await page.keyboard.press("Escape");
+
   await page.getByRole("button", { name: "Plugins", exact: true }).click();
   await page.locator("#plugins-heading").filter({ hasText: "Plugins" }).waitFor();
   const controlsBefore = await page.getByLabel("Search plugins and skills").boundingBox();

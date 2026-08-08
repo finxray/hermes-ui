@@ -67,7 +67,7 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
         </div>
         <button
           aria-label="Refresh logs"
-          className={`${styles.iconButton}${isLoading ? ` ${styles.refreshing}` : ""}`}
+          className={`${styles.iconButton} ${styles.refreshButton}${isLoading ? ` ${styles.refreshing}` : ""}`}
           disabled={!canLoad || isLoading}
           onClick={() => void refresh()}
           type="button"

@@ -2,6 +2,7 @@
 
 import { ChatView } from "@/components/chat/ChatView";
 import { ChatHeader } from "@/components/chat/ChatHeader";
+import type { ChatPaneId, ChatTabMove } from "@/components/chat/ChatPaneTabs";
 import { ConfigView } from "@/components/config/ConfigView";
 import { KeysView } from "@/components/keys/KeysView";
 import { LogsView } from "@/components/logs/LogsView";
@@ -20,6 +21,13 @@ import { useOpenRouterModels } from "@/hooks/useOpenRouterModels";
 import { useWorkspaceState } from "@/hooks/useWorkspaceState";
 import { fetchHermesSessionMessages } from "@/lib/hermesSessionsClient";
 import { makeSessionChannel, normalizeHermesMessages } from "@/lib/sessionChannels";
+import {
+  appendUniqueTab,
+  insertUniqueTab,
+  reorderTab,
+  resolveSidebarTargetPane,
+  selectSidebarTab
+} from "@/lib/chatTabState";
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import type { HermesSessionSummary } from "@hermes-ui/hermes-client";
 import type { AgentActivityEvent } from "@/types/agentActivity";
@@ -50,7 +58,7 @@ export function AppShell() {
 
 function AppShellInner() {
   const sectionNav = useSectionNav();
-  const { actions, activeProject, activeProjectSessions, activeSession, state } = useWorkspaceState();
+  const { actions, activeProject, activeSession, state } = useWorkspaceState();
   const appUpdate = useAppUpdate();
   const hermesStatus = useHermesStatus();
   const lmStudioModels = useLmStudioModels();
@@ -66,10 +74,23 @@ function AppShellInner() {
     refreshHermesStatus: hermesStatus.refresh
   });
   const [sideSessionId, setSideSessionId] = useState<string | null>(null);
+  const [mainTabIds, setMainTabIds] = useState<string[]>([]);
+  const [sideTabIds, setSideTabIds] = useState<string[]>([]);
+  const [singlePane, setSinglePane] = useState<ChatPaneId | null>(null);
   const [focusedChatPane, setFocusedChatPane] = useState<"main" | "side">("main");
   const [rightPaneMode, setRightPaneMode] = useState<RightPaneMode>("console");
+  const mainTabs = mainTabIds
+    .map((sessionId) => state.sessions.find((session) => session.id === sessionId && !session.archivedAt))
+    .filter((session): session is NonNullable<typeof session> => Boolean(session));
+  const sideTabOrder = sideSessionId && !sideTabIds.includes(sideSessionId)
+    ? [...sideTabIds, sideSessionId]
+    : sideTabIds;
+  const sideTabs = sideTabOrder
+    .map((sessionId) => state.sessions.find((session) => session.id === sessionId && !session.archivedAt))
+    .filter((session): session is NonNullable<typeof session> => Boolean(session));
   const sideSession =
-    activeProjectSessions.find((session) => session.id === sideSessionId && !session.archivedAt) ?? null;
+    state.sessions.find((session) => session.id === sideSessionId && !session.archivedAt) ?? null;
+  const sideProject = state.projects.find((project) => project.id === sideSession?.projectId) ?? activeProject;
   const sideSessionModel = useHermesSessionModel({
     activeSession: sideSession,
     hermesStatus: hermesStatus.status,
@@ -89,13 +110,19 @@ function AppShellInner() {
   const [rightCollapsed, setRightCollapsed] = useState(true);
   const [leftRailWidth, setLeftRailWidth] = useState<number | null>(null);
   const [rightRailWidth, setRightRailWidth] = useState<number | null>(null);
+  const [promotingSideSessionId, setPromotingSideSessionId] = useState<string | null>(null);
   const [sectionScrolled, setSectionScrolled] = useState(false);
   const shellRef = useRef<HTMLElement | null>(null);
   const sectionScrollRef = useRef<HTMLDivElement | null>(null);
   const leftRailDefaultWidthRef = useRef<number | null>(null);
   const rightRailDefaultWidthRef = useRef<number | null>(null);
+  const activeResizeCleanupRef = useRef<(() => void) | null>(null);
   const rightRevealFrameRef = useRef<number | null>(null);
+  const splitWidthBeforeSingleRef = useRef<number | null>(null);
   const channelSyncKeyRef = useRef<string | null>(null);
+  const activeMainSessionIdRef = useRef<string | null>(activeSession?.id ?? null);
+  const hermesOpenRequestRef = useRef(0);
+  const openWorkspaceSessionRef = useRef<(sessionId: string) => void>(() => undefined);
   const activeActivityEvents = activeSession ? (activityEventsBySession[activeSession.id] ?? []) : [];
   const sideActivityEvents = sideSession ? (activityEventsBySession[sideSession.id] ?? []) : [];
   const sidebarActiveSession =
@@ -108,6 +135,25 @@ function AppShellInner() {
     ({ plugins: "Plugins", config: "Config", keys: "Keys", logs: "Logs", settings: "Settings" } as const)[
       activeSection as Exclude<ShellSection, "workspace">
     ];
+
+  useEffect(() => {
+    if (!activeSession) {
+      activeMainSessionIdRef.current = null;
+      return;
+    }
+    const previousSessionId = activeMainSessionIdRef.current;
+    setMainTabIds((current) => selectSidebarTab(current, previousSessionId, activeSession.id));
+    activeMainSessionIdRef.current = activeSession.id;
+  }, [activeSession]);
+
+  useEffect(() => {
+    const availableIds = new Set(state.sessions.filter((session) => !session.archivedAt).map((session) => session.id));
+    setMainTabIds((current) => current.filter((id) => availableIds.has(id)));
+    setSideTabIds((current) => current.filter((id) => availableIds.has(id)));
+    if (sideSessionId && !availableIds.has(sideSessionId)) {
+      setSideSessionId(null);
+    }
+  }, [sideSessionId, state.sessions]);
 
   useEffect(() => {
     if (activeSection === "settings" && appUpdate.hasUnseenUpdate) {
@@ -150,7 +196,11 @@ function AppShellInner() {
   }, [actions, activeProject.id, state.sessions]);
 
   const openHermesSession = useCallback(async (summary: HermesSessionSummary) => {
-    await ensureHermesSession(summary, { activate: true });
+    const requestId = ++hermesOpenRequestRef.current;
+    const sessionId = await ensureHermesSession(summary, { activate: false });
+    if (sessionId && requestId === hermesOpenRequestRef.current) {
+      openWorkspaceSessionRef.current(sessionId);
+    }
   }, [ensureHermesSession]);
 
   useEffect(() => {
@@ -218,12 +268,82 @@ function AppShellInner() {
 
   useEffect(() => {
     return () => {
+      activeResizeCleanupRef.current?.();
       if (rightRevealFrameRef.current !== null) {
         window.cancelAnimationFrame(rightRevealFrameRef.current);
         rightRevealFrameRef.current = null;
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!promotingSideSessionId) {
+      return;
+    }
+
+    const rightRail = shellRef.current?.querySelector<HTMLElement>("[data-shell-rail='right']");
+    if (!rightRail) {
+      actions.switchSession(promotingSideSessionId);
+      setMainTabIds((current) => appendUniqueTab(current, promotingSideSessionId));
+      setSideTabIds((current) => {
+        const remaining = current.filter((id) => id !== promotingSideSessionId);
+        setSideSessionId(remaining[0] ?? null);
+        return remaining;
+      });
+      setRightPaneMode("console");
+      setRightCollapsed(true);
+      setSinglePane(null);
+      setFocusedChatPane("main");
+      resetRightRailWidth();
+      setPromotingSideSessionId(null);
+      return;
+    }
+
+    let finished = false;
+    let handoffFrame: number | null = null;
+
+    const finishPromotion = () => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      actions.switchSession(promotingSideSessionId);
+      setMainTabIds((current) => appendUniqueTab(current, promotingSideSessionId));
+      setSideTabIds((current) => {
+        const remaining = current.filter((id) => id !== promotingSideSessionId);
+        setSideSessionId(remaining[0] ?? null);
+        return remaining;
+      });
+      setFocusedChatPane("main");
+      handoffFrame = window.requestAnimationFrame(() => {
+        setRightCollapsed(true);
+        setRightPaneMode("console");
+        setSinglePane(null);
+        resetRightRailWidth();
+        setPromotingSideSessionId(null);
+      });
+    };
+
+    const finishOnWidthTransition = (event: TransitionEvent) => {
+      if (event.target === rightRail && event.propertyName === "width") {
+        finishPromotion();
+      }
+    };
+
+    rightRail.addEventListener("transitionend", finishOnWidthTransition);
+    const fallbackTimer = window.setTimeout(
+      finishPromotion,
+      computeRightPanelTransition(rightRail.getBoundingClientRect().width) + 120
+    );
+
+    return () => {
+      rightRail.removeEventListener("transitionend", finishOnWidthTransition);
+      window.clearTimeout(fallbackTimer);
+      if (handoffFrame !== null) {
+        window.cancelAnimationFrame(handoffFrame);
+      }
+    };
+  }, [actions, promotingSideSessionId]);
 
   function revealRightRailAfterRender() {
     if (!rightCollapsed) {
@@ -257,6 +377,9 @@ function AppShellInner() {
       return;
     }
 
+    activeResizeCleanupRef.current?.();
+    const resizeHandle = event.currentTarget;
+    const pointerId = event.pointerId;
     const sidebar = shellRef.current?.querySelector<HTMLElement>("[data-shell-rail='left']");
     const startWidth = leftRailWidth ?? sidebar?.getBoundingClientRect().width ?? 260;
     const defaultWidth = leftRailDefaultWidthRef.current ?? startWidth;
@@ -267,27 +390,42 @@ function AppShellInner() {
     let nextWidth = startWidth;
     let animationFrame: number | null = null;
     let foldedDuringDrag = false;
+    let resizeActive = true;
 
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeHandle.setPointerCapture(pointerId);
     document.body.dataset.shellResizing = "true";
 
-    const handleMove = (moveEvent: PointerEvent) => {
+    function cleanupResize() {
+      if (!resizeActive) {
+        return;
+      }
+      resizeActive = false;
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+      delete document.body.dataset.shellResizing;
+      document.removeEventListener("pointermove", handleMove);
+      document.removeEventListener("pointerup", stopResize);
+      document.removeEventListener("pointercancel", stopResize);
+      if (resizeHandle.hasPointerCapture(pointerId)) {
+        resizeHandle.releasePointerCapture(pointerId);
+      }
+      if (activeResizeCleanupRef.current === cleanupResize) {
+        activeResizeCleanupRef.current = null;
+      }
+    }
+
+    function handleMove(moveEvent: PointerEvent) {
       const rawNextWidth = startWidth + moveEvent.clientX - startX;
 
       if (rawNextWidth <= minWidth + 1) {
         foldedDuringDrag = true;
-        if (animationFrame !== null) {
-          window.cancelAnimationFrame(animationFrame);
-          animationFrame = null;
-        }
         shellRef.current?.style.removeProperty("--rail-width-left");
         setLeftRailWidth(null);
         setLeftCollapsed(true);
-        delete document.body.dataset.shellResizing;
-        document.removeEventListener("pointermove", handleMove);
-        document.removeEventListener("pointerup", stopResize);
-        document.removeEventListener("pointercancel", stopResize);
+        cleanupResize();
         return;
       }
 
@@ -301,16 +439,11 @@ function AppShellInner() {
         shellRef.current?.style.setProperty("--rail-width-left", `${Math.round(nextWidth)}px`);
         animationFrame = null;
       });
-    };
+    }
 
-    const stopResize = () => {
+    function stopResize() {
       if (foldedDuringDrag) {
         return;
-      }
-
-      if (animationFrame !== null) {
-        window.cancelAnimationFrame(animationFrame);
-        animationFrame = null;
       }
 
       if (nextWidth <= minWidth + 1) {
@@ -321,12 +454,10 @@ function AppShellInner() {
         shellRef.current?.style.setProperty("--rail-width-left", `${Math.round(nextWidth)}px`);
         setLeftRailWidth(nextWidth);
       }
-      delete document.body.dataset.shellResizing;
-      document.removeEventListener("pointermove", handleMove);
-      document.removeEventListener("pointerup", stopResize);
-      document.removeEventListener("pointercancel", stopResize);
-    };
+      cleanupResize();
+    }
 
+    activeResizeCleanupRef.current = cleanupResize;
     document.addEventListener("pointermove", handleMove);
     document.addEventListener("pointerup", stopResize);
     document.addEventListener("pointercancel", stopResize);
@@ -337,6 +468,9 @@ function AppShellInner() {
       return;
     }
 
+    activeResizeCleanupRef.current?.();
+    const resizeHandle = event.currentTarget;
+    const pointerId = event.pointerId;
     const mainWindow = shellRef.current?.querySelector<HTMLElement>("[data-shell-main-window='true']");
     const contextRail = mainWindow?.querySelector<HTMLElement>("[data-shell-rail='right']");
     const startWidth = rightRailWidth ?? contextRail?.getBoundingClientRect().width ?? 414;
@@ -351,12 +485,34 @@ function AppShellInner() {
     const startX = event.clientX;
     let nextWidth = startWidth;
     let animationFrame: number | null = null;
+    let resizeActive = true;
 
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeHandle.setPointerCapture(pointerId);
     document.body.dataset.shellResizing = "true";
 
-    const handleMove = (moveEvent: PointerEvent) => {
+    function cleanupResize() {
+      if (!resizeActive) {
+        return;
+      }
+      resizeActive = false;
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+      delete document.body.dataset.shellResizing;
+      document.removeEventListener("pointermove", handleMove);
+      document.removeEventListener("pointerup", stopResize);
+      document.removeEventListener("pointercancel", stopResize);
+      if (resizeHandle.hasPointerCapture(pointerId)) {
+        resizeHandle.releasePointerCapture(pointerId);
+      }
+      if (activeResizeCleanupRef.current === cleanupResize) {
+        activeResizeCleanupRef.current = null;
+      }
+    }
+
+    function handleMove(moveEvent: PointerEvent) {
       nextWidth = clampPanelWidth(startWidth - (moveEvent.clientX - startX), minWidth, maxWidth);
 
       if (animationFrame !== null) {
@@ -367,40 +523,37 @@ function AppShellInner() {
         shellRef.current?.style.setProperty("--rail-width-right", `${Math.round(nextWidth)}px`);
         animationFrame = null;
       });
-    };
+    }
 
-    const stopResize = () => {
-      if (animationFrame !== null) {
-        window.cancelAnimationFrame(animationFrame);
-        animationFrame = null;
-      }
-
+    function stopResize() {
       shellRef.current?.style.setProperty("--rail-width-right", `${Math.round(nextWidth)}px`);
       shellRef.current?.style.setProperty(
         "--rail-right-transition-duration",
         `${computeRightPanelTransition(nextWidth)}ms`
       );
       setRightRailWidth(nextWidth);
-      delete document.body.dataset.shellResizing;
-      document.removeEventListener("pointermove", handleMove);
-      document.removeEventListener("pointerup", stopResize);
-      document.removeEventListener("pointercancel", stopResize);
-    };
+      cleanupResize();
+    }
 
+    activeResizeCleanupRef.current = cleanupResize;
     document.addEventListener("pointermove", handleMove);
     document.addEventListener("pointerup", stopResize);
     document.addEventListener("pointercancel", stopResize);
   }
 
   function splitMainWindowEvenly() {
+    setSinglePane(null);
     setRightPaneMode("chat");
     setFocusedChatPane("side");
-    if (!sideSession) {
+    if (!sideSession && sideTabs[0]) {
+      setSideSessionId(sideTabs[0].id);
+    } else if (!sideSession) {
       const sessionId = actions.createSessionForProject(activeProject.id, { activate: false });
       if (activeSession?.modelPreference) {
         actions.setSessionModelPreference(sessionId, activeSession.modelPreference);
       }
       setSideSessionId(sessionId);
+      setSideTabIds((current) => appendUniqueTab(current, sessionId));
     }
 
     const mainWindow = shellRef.current?.querySelector<HTMLElement>("[data-shell-main-window='true']");
@@ -441,12 +594,18 @@ function AppShellInner() {
   }
 
   function toggleMainWindowSplit() {
-    if (!rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console")) {
-      hideRightRail();
+    if (rightCollapsed || rightPaneMode === "console") {
+      splitMainWindowEvenly();
       return;
     }
+    focusMainPane();
+  }
 
-    splitMainWindowEvenly();
+  function promoteSideChatToMain() {
+    if (rightCollapsed || !sideSession || promotingSideSessionId) {
+      return;
+    }
+    setPromotingSideSessionId(sideSession.id);
   }
 
   function toggleConsolePanel() {
@@ -481,6 +640,7 @@ function AppShellInner() {
       actions.setSessionModelPreference(sessionId, activeSession.modelPreference);
     }
     setSideSessionId(sessionId);
+    setSideTabIds((current) => appendUniqueTab(current, sessionId));
     setRightPaneMode("chat");
     setFocusedChatPane("side");
     revealRightRailAfterRender();
@@ -488,15 +648,238 @@ function AppShellInner() {
 
   function selectSideSession(sessionId: string) {
     setSideSessionId(sessionId);
+    setSideTabIds((current) => appendUniqueTab(current, sessionId));
+    setMainTabIds((current) => current.filter((id) => id !== sessionId));
     setRightPaneMode("chat");
     setFocusedChatPane("side");
     revealRightRailAfterRender();
   }
 
-  function closeSideSession() {
-    setSideSessionId(null);
-    setRightPaneMode("console");
+  function createMainSession() {
+    const sessionId = actions.createSessionForProject(activeProject.id, { activate: true });
+    if (activeSession?.modelPreference) {
+      actions.setSessionModelPreference(sessionId, activeSession.modelPreference);
+    }
+    setMainTabIds((current) => appendUniqueTab(current, sessionId));
+    setFocusedChatPane("main");
+  }
+
+  function createWorkspaceSession(projectId = activeProject.id) {
+    if (focusedChatPane === "side") {
+      const sessionId = actions.createSessionForProject(projectId, { activate: false });
+      if (activeSession?.modelPreference) {
+        actions.setSessionModelPreference(sessionId, activeSession.modelPreference);
+      }
+      setSideSessionId(sessionId);
+      setSideTabIds((current) => appendUniqueTab(current, sessionId));
+      setMainTabIds((current) => current.filter((id) => id !== sessionId));
+      setRightPaneMode("chat");
+      setFocusedChatPane("side");
+      revealRightRailAfterRender();
+      return;
+    }
+
+    const sessionId = actions.createSessionForProject(projectId, { activate: true });
+    setMainTabIds((current) => appendUniqueTab(current, sessionId));
+    setFocusedChatPane("main");
+  }
+
+  async function addHermesSessionToPane(summary: HermesSessionSummary, pane: ChatPaneId) {
+    const sessionId = await ensureHermesSession(summary, { activate: pane === "main" });
+    if (!sessionId) {
+      return;
+    }
+    if (pane === "main") {
+      setMainTabIds((current) => appendUniqueTab(current, sessionId));
+      setSideTabIds((current) => current.filter((id) => id !== sessionId));
+      actions.switchSession(sessionId);
+      setFocusedChatPane("main");
+      return;
+    }
+    setSideSessionId(sessionId);
+    setSideTabIds((current) => appendUniqueTab(current, sessionId));
+    setMainTabIds((current) => current.filter((id) => id !== sessionId));
+    setRightPaneMode("chat");
+    setFocusedChatPane("side");
+    revealRightRailAfterRender();
+  }
+
+  function selectMainSession(sessionId: string) {
+    setMainTabIds((current) => appendUniqueTab(current, sessionId));
+    setSideTabIds((current) => current.filter((id) => id !== sessionId));
+    actions.switchSession(sessionId);
+    setFocusedChatPane("main");
+  }
+
+  function openWorkspaceSession(sessionId: string) {
+    hermesOpenRequestRef.current += 1;
+    const targetPane = resolveSidebarTargetPane(
+      mainTabIds,
+      sideTabIds,
+      focusedChatPane,
+      sessionId
+    );
+    if (targetPane === "main") {
+      selectMainSession(sessionId);
+      return;
+    }
+    setSideTabIds((current) => selectSidebarTab(current, sideSessionId, sessionId));
+    setMainTabIds((current) => current.filter((id) => id !== sessionId));
+    setSideSessionId(sessionId);
+    setRightPaneMode("chat");
+    setFocusedChatPane("side");
+    revealRightRailAfterRender();
+  }
+
+  openWorkspaceSessionRef.current = openWorkspaceSession;
+
+  function closeChatTab(pane: ChatPaneId, sessionId: string) {
+    if (pane === "main") {
+      const index = mainTabIds.indexOf(sessionId);
+      const remaining = mainTabIds.filter((id) => id !== sessionId);
+      setMainTabIds(remaining);
+      if (activeSession?.id !== sessionId) {
+        return;
+      }
+      const replacement = remaining[Math.min(Math.max(index, 0), remaining.length - 1)];
+      if (replacement) {
+        actions.switchSession(replacement);
+      } else if (sideSession) {
+        promoteSideChatToMain();
+      } else {
+        createMainSession();
+      }
+      return;
+    }
+
+    const index = sideTabIds.indexOf(sessionId);
+    const remaining = sideTabIds.filter((id) => id !== sessionId);
+    setSideTabIds(remaining);
+    if (sideSessionId !== sessionId) {
+      return;
+    }
+    const replacement = remaining[Math.min(Math.max(index, 0), remaining.length - 1)] ?? null;
+    setSideSessionId(replacement);
+    if (!replacement) {
+      setSinglePane(null);
+      setRightPaneMode("console");
+      hideRightRail();
+    }
+  }
+
+  function moveChatTab(move: ChatTabMove) {
+    if (move.sourcePane === move.targetPane) {
+      if (move.targetPane === "main") {
+        setMainTabIds((current) => reorderTab(current, move.sessionId, move.targetIndex));
+      } else {
+        setSideTabIds((current) => reorderTab(current, move.sessionId, move.targetIndex));
+      }
+      return;
+    }
+
+    if (move.targetPane === "side") {
+      const remainingMain = mainTabIds.filter((id) => id !== move.sessionId);
+      setMainTabIds(remainingMain);
+      setSideTabIds((current) => insertUniqueTab(current, move.sessionId, move.targetIndex));
+      setSideSessionId(move.sessionId);
+      setRightPaneMode("chat");
+      setFocusedChatPane("side");
+      setSinglePane(null);
+      if (activeSession?.id === move.sessionId) {
+        const replacement = remainingMain[0];
+        if (replacement) {
+          actions.switchSession(replacement);
+        } else {
+          createMainSession();
+        }
+      }
+      if (rightCollapsed) {
+        const mainWindow = shellRef.current?.querySelector<HTMLElement>("[data-shell-main-window='true']");
+        const nextWidth = Math.round((mainWindow?.getBoundingClientRect().width ?? window.innerWidth) / 2);
+        shellRef.current?.style.setProperty("--rail-width-right", `${nextWidth}px`);
+        shellRef.current?.style.setProperty(
+          "--rail-right-transition-duration",
+          `${computeRightPanelTransition(nextWidth)}ms`
+        );
+        setRightRailWidth(nextWidth);
+        revealRightRailAfterRender();
+      }
+      return;
+    }
+
+    const remainingSide = sideTabIds.filter((id) => id !== move.sessionId);
+    setSideTabIds(remainingSide);
+    setMainTabIds((current) => insertUniqueTab(current, move.sessionId, move.targetIndex));
+    actions.switchSession(move.sessionId);
+    setFocusedChatPane("main");
+    if (sideSessionId === move.sessionId) {
+      setSideSessionId(remainingSide[0] ?? null);
+    }
+    if (remainingSide.length === 0) {
+      setSinglePane(null);
+      setRightPaneMode("console");
+      hideRightRail();
+    }
+  }
+
+  function rememberSplitWidth() {
+    const rightRail = shellRef.current?.querySelector<HTMLElement>("[data-shell-rail='right']");
+    splitWidthBeforeSingleRef.current =
+      rightRailWidth ?? rightRail?.getBoundingClientRect().width ?? splitWidthBeforeSingleRef.current;
+  }
+
+  function restoreSplitView() {
+    setSinglePane(null);
+    setRightPaneMode("chat");
+    const rememberedWidth = splitWidthBeforeSingleRef.current;
+    if (rememberedWidth) {
+      shellRef.current?.style.setProperty("--rail-width-right", `${Math.round(rememberedWidth)}px`);
+      shellRef.current?.style.setProperty(
+        "--rail-right-transition-duration",
+        `${computeRightPanelTransition(rememberedWidth)}ms`
+      );
+      setRightRailWidth(rememberedWidth);
+      revealRightRailAfterRender();
+      return;
+    }
+    splitMainWindowEvenly();
+  }
+
+  function focusMainPane() {
+    if (singlePane === "main" || rightCollapsed) {
+      if (sideTabs.length === 0) {
+        splitMainWindowEvenly();
+      } else {
+        restoreSplitView();
+      }
+      return;
+    }
+    rememberSplitWidth();
+    setSinglePane("main");
     hideRightRail();
+  }
+
+  function focusSidePane() {
+    if (singlePane === "side") {
+      restoreSplitView();
+      return;
+    }
+    if (!sideSession) {
+      createSideSession();
+    }
+    rememberSplitWidth();
+    const mainWindow = shellRef.current?.querySelector<HTMLElement>("[data-shell-main-window='true']");
+    const nextWidth = Math.round(mainWindow?.getBoundingClientRect().width ?? window.innerWidth);
+    shellRef.current?.style.setProperty("--rail-width-right", `${nextWidth}px`);
+    shellRef.current?.style.setProperty(
+      "--rail-right-transition-duration",
+      `${computeRightPanelTransition(nextWidth)}ms`
+    );
+    setRightRailWidth(nextWidth);
+    setRightPaneMode("chat");
+    setRightCollapsed(false);
+    setSinglePane("side");
+    setFocusedChatPane("side");
   }
 
   function activateSection(section: ShellSection) {
@@ -560,6 +943,7 @@ function AppShellInner() {
     <main
       className={styles.shell}
       data-left-collapsed={leftCollapsed ? "true" : "false"}
+      data-promoting-side-chat={promotingSideSessionId ? "true" : "false"}
       data-right-collapsed={rightCollapsed ? "true" : "false"}
       ref={shellRef}
       style={shellStyle}
@@ -607,17 +991,19 @@ function AppShellInner() {
         activeSection={activeSection}
         activeProject={activeProject}
         activeSession={sidebarActiveSession}
+        visibleSessionIds={[activeSession?.id, sideSession?.id].filter((id): id is string => Boolean(id))}
         allSessions={state.sessions}
         hermesStatus={hermesStatus.status}
         hermesSessions={hermesSessions.sessions}
         hasUnseenUpdate={appUpdate.hasUnseenUpdate}
         isHermesStatusLoading={hermesStatus.isLoading}
+        onCreateWorkspaceSession={createWorkspaceSession}
         onSectionChange={activateSection}
         onEnsureHermesSession={(summary) => ensureHermesSession(summary, { activate: false })}
         onHermesSessionSelect={(summary) => {
           void openHermesSession(summary);
         }}
-        onWorkspaceSessionSelect={() => setFocusedChatPane("main")}
+        onWorkspaceSessionSelect={openWorkspaceSession}
         projects={state.projects}
         runningSessionIds={generatingSessionIds}
         refreshHermesStatus={() => {
@@ -633,6 +1019,8 @@ function AppShellInner() {
       />
       <div
         className={mainWindowStyles.mainWindow}
+        data-promoting-side-chat={promotingSideSessionId ? "true" : "false"}
+        data-single-pane={singlePane ?? "split"}
         data-shell-main-window="true"
         data-right-collapsed={rightCollapsed ? "true" : "false"}
       >
@@ -645,6 +1033,47 @@ function AppShellInner() {
           data-shell-chat-pane="true"
           ref={sectionScrollRef}
         >
+          <div
+            className={mainWindowStyles.workspacePage}
+            hidden={activeSection !== "workspace"}
+          >
+            <ChatView
+              activeProject={activeProject}
+              activeSession={activeSession}
+              activityEvents={activeActivityEvents}
+              createSession={createMainSession}
+              hermesStatus={hermesStatus.status}
+              isHermesStatusLoading={hermesStatus.isLoading}
+              isSplitViewOpen={!rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console")}
+              onActivate={() => setFocusedChatPane("main")}
+              onActivityEvent={appendActivityEvent}
+              onCloseMainInSplit={sideSession ? promoteSideChatToMain : undefined}
+              onGeneratingChange={markSessionGenerating}
+              onSplitView={toggleMainWindowSplit}
+              projects={state.projects}
+              sessionModel={hermesSessionModel}
+              tabs={{
+                activeSessionId: activeSession?.id ?? null,
+                availableChannelSessions: hermesSessions.sessions,
+                availableSessions: state.sessions,
+                isSingleView: rightCollapsed || singlePane === "main",
+                onAdd: createMainSession,
+                onAddChannelSession: (summary) => {
+                  void addHermesSessionToPane(summary, "main");
+                },
+                onArchive: actions.archiveSession,
+                onClose: (sessionId) => closeChatTab("main", sessionId),
+                onMove: moveChatTab,
+                onRename: actions.renameSession,
+                onSelect: selectMainSession,
+                onToggleView: focusMainPane,
+                pane: "main",
+                projects: state.projects,
+                sessions: mainTabs
+              }}
+              workspaceActions={actions}
+            />
+          </div>
           {activeSection !== "workspace" ? (
             <div
               className={`${mainWindowStyles.sectionPage} ${
@@ -691,24 +1120,7 @@ function AppShellInner() {
                 />
               )}
             </div>
-          ) : (
-            <ChatView
-              activeProject={activeProject}
-              activeSession={activeSession}
-              activityEvents={activeActivityEvents}
-              createSession={actions.createSession}
-              hermesStatus={hermesStatus.status}
-              isHermesStatusLoading={hermesStatus.isLoading}
-              isSplitViewOpen={!rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console")}
-              onActivate={() => setFocusedChatPane("main")}
-              onActivityEvent={appendActivityEvent}
-              onGeneratingChange={markSessionGenerating}
-              onSplitView={toggleMainWindowSplit}
-              projects={state.projects}
-              sessionModel={hermesSessionModel}
-              workspaceActions={actions}
-            />
-          )}
+          ) : null}
         </div>
         <button
           aria-label="Resize right context panel"
@@ -718,13 +1130,11 @@ function AppShellInner() {
           type="button"
         />
         <SplitPane
-          activeProject={activeProject}
+          activeProject={sideProject}
           activeSession={activeSession}
           activityEvents={activeActivityEvents}
-          availableSessions={activeProjectSessions}
           projects={state.projects}
           allSessions={state.sessions}
-          closeSideSession={closeSideSession}
           createSideSession={createSideSession}
           hermesSessions={hermesSessions.sessions}
           hermesStatus={hermesStatus.status}
@@ -740,12 +1150,28 @@ function AppShellInner() {
             void hermesStatus.refresh({ refreshModels: true });
           }}
           refreshHermesSessions={hermesSessions.refresh}
-          returnToSingleChat={hideRightRail}
-          selectSideSession={selectSideSession}
-          setMode={setRightPaneMode}
           sideActivityEvents={sideActivityEvents}
           sideSession={sideSession}
           sideSessionModel={sideSessionModel}
+          tabs={{
+            activeSessionId: sideSessionId,
+            availableChannelSessions: hermesSessions.sessions,
+            availableSessions: state.sessions,
+            isSingleView: singlePane === "side",
+            onAdd: createSideSession,
+            onAddChannelSession: (summary) => {
+              void addHermesSessionToPane(summary, "side");
+            },
+            onArchive: actions.archiveSession,
+            onClose: (sessionId) => closeChatTab("side", sessionId),
+            onMove: moveChatTab,
+            onRename: actions.renameSession,
+            onSelect: selectSideSession,
+            onToggleView: focusSidePane,
+            pane: "side",
+            projects: state.projects,
+            sessions: sideTabs
+          }}
           workspaceActions={actions}
         />
       </div>

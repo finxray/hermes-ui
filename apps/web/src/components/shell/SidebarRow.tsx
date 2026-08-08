@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { OverflowFadeText } from "./OverflowFadeText";
 import styles from "./SidebarRow.module.css";
 
 type SidebarRowProps = {
@@ -59,7 +60,7 @@ export function SidebarRow({
         {icon}
       </span>
       <span className={styles.text}>
-        <span className={styles.label}>{label}</span>
+        <OverflowFadeText className={styles.label}>{label}</OverflowFadeText>
         {secondary ? <span className={styles.secondary}>{secondary}</span> : null}
       </span>
       {meta ? metaSlot : null}
@@ -112,13 +113,17 @@ export function SidebarRow({
 export function SidebarIconButton({
   children,
   label,
+  onMouseEnter,
   onClick,
-  size = "default"
+  size = "default",
+  tooltip
 }: {
   children: ReactNode;
   label: string;
+  onMouseEnter?: () => void;
   onClick: () => void;
   size?: "default" | "compact";
+  tooltip?: string;
 }) {
   return (
     <button
@@ -127,6 +132,7 @@ export function SidebarIconButton({
       aria-label={label}
       data-action-size={size}
       data-sidebar-row-action="true"
+      onMouseEnter={onMouseEnter}
       onClick={(event) => {
         event.stopPropagation();
         onClick();
@@ -134,6 +140,7 @@ export function SidebarIconButton({
       }}
     >
       {children}
+      {tooltip ? <span className={styles.actionTooltip} role="tooltip">{tooltip}</span> : null}
     </button>
   );
 }

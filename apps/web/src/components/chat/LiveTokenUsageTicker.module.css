@@ -50,7 +50,7 @@
 }
 
 .metric[data-kind="out"] {
-  --token-metric-fg: var(--notice);
+  --token-metric-fg: var(--unread-blue);
 }
 
 .metricValueWrap {

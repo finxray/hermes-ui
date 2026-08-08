@@ -116,6 +116,12 @@
     transform 140ms ease;
 }
 
+.refreshButton,
+.refreshButton:hover:not(:disabled),
+.refreshButton:focus-visible:not(:disabled) {
+  background: transparent;
+}
+
 .filterButton {
   outline: 0;
   background: transparent;
@@ -197,7 +203,7 @@
   display: grid;
   width: min(292px, 86vw);
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.105);
+  border: 1px solid var(--border-overlay-subtle);
   border-radius: 14px;
   background: rgba(38, 38, 40, 0.98);
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);

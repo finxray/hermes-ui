@@ -58,15 +58,11 @@ export const AlertTriangle = makeIcon([
   { element: "line", props: { x1: 12, x2: 12.01, y1: 17, y2: 17 } }
 ]);
 
-export const Archive = makeIcon(
-  [
-    {
-      d: "M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v1.5A1.75 1.75 0 0 1 14.25 6H1.75A1.75 1.75 0 0 1 0 4.25ZM1.75 7a.75.75 0 0 1 .75.75v5.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-5.5a.75.75 0 0 1 1.5 0v5.5A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25v-5.5A.75.75 0 0 1 1.75 7Zm0-4.5a.25.25 0 0 0-.25.25v1.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-1.5a.25.25 0 0 0-.25-.25ZM6.25 8h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1 0-1.5Z",
-      props: { fill: "currentColor", stroke: "none" }
-    }
-  ],
-  "0 0 16 16"
-);
+export const Archive = makeIcon([
+  { element: "rect", props: { x: 3, y: 4.25, width: 18, height: 3.5, rx: 1.5 } },
+  { d: "M4 8.25v9.5A2.25 2.25 0 0 0 6.25 20h11.5A2.25 2.25 0 0 0 20 17.75v-9.5" },
+  { d: "M10 12h4" }
+]);
 
 export const ArrowUp = makeIcon([
   { d: "M12 20V5" },
@@ -266,9 +262,13 @@ export const PanelRightClose = makeIcon([
   { d: "M15.06 9.15v5.7" }
 ]);
 
+export const PanelSingle = makeIcon([
+  { element: "rect", props: { x: 4.8, y: 6, width: 14.4, height: 12, rx: 3.6 } }
+]);
+
 export const PanelSplit = makeIcon([
   { element: "rect", props: { x: 4.8, y: 6, width: 14.4, height: 12, rx: 3.6 } },
-  { d: "M12 6.95v10.1" }
+  { d: "M12 9.15v5.7" }
 ]);
 
 export const Pencil = makeIcon([
@@ -317,10 +317,8 @@ export const RefreshCw = makeIcon([
   }
 ]);
 
-export const RotateCcw = makeIcon([
-  { d: "M4.5 5v5h5" },
-  { d: "M4.9 10A7.2 7.2 0 1 0 7 4.9L4.5 7.4" }
-]);
+// Reset and refresh intentionally share the supplied two-arrow silhouette.
+export const RotateCcw = RefreshCw;
 
 export const Search = makeIcon([
   { element: "circle", props: { cx: 10.8, cy: 10.8, r: 6.3 } },
@@ -362,7 +360,7 @@ export const Sparkles = makeIcon([
 ]);
 
 export const Square = makeIcon([
-  { element: "rect", props: { x: 6.5, y: 6.5, width: 11, height: 11, rx: 2 } }
+  { element: "rect", props: { x: 6.5, y: 6.5, width: 11, height: 11, rx: 0 } }
 ]);
 
 export const Terminal = makeIcon([

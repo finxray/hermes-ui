@@ -167,7 +167,7 @@
 }
 
 .tokenPart[data-kind="out"] {
-  color: var(--notice);
+  color: var(--unread-blue);
 }
 
 .workedSummary:hover .workedLabel,
@@ -536,9 +536,9 @@
   min-width: 0;
   max-height: 292px;
   overflow: auto;
-  padding: 14px 18px 12px;
+  padding: 7px 13px;
   border-radius: 20px;
-  background: rgba(42, 42, 42, 0.9);
+  background: rgba(38, 38, 40, 0.7);
   color: var(--text-secondary);
 }
 

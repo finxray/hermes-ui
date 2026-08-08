@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, UIEvent } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
-import { ChatHeader } from "@/components/chat/ChatHeader";
+import { ChatHeader, type ChatHeaderTabs } from "@/components/chat/ChatHeader";
 import { ChatTranscript } from "@/components/chat/ChatTranscript";
 import { ConversationMinimap } from "@/components/chat/ConversationMinimap";
 import { Composer } from "@/components/chat/Composer";
@@ -64,11 +64,13 @@ type ChatViewProps = {
   isSplitViewOpen?: boolean;
   onActivate?: () => void;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
+  onCloseMainInSplit?: () => void;
   onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
   onSplitView?: () => void;
   projects: Project[];
   sessionModel: HermesSessionModelSync;
   showHeader?: boolean;
+  tabs?: ChatHeaderTabs;
   variant?: "main" | "side";
   workspaceActions: WorkspaceActions;
 };
@@ -83,18 +85,20 @@ export function ChatView({
   isSplitViewOpen = false,
   onActivate,
   onActivityEvent,
+  onCloseMainInSplit,
   onGeneratingChange,
   onSplitView,
   projects,
   sessionModel,
   showHeader = true,
+  tabs,
   variant = "main",
   workspaceActions
 }: ChatViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStopRequested, setIsStopRequested] = useState(false);
-  const [assistantHasContent, setAssistantHasContent] = useState(false);
   const [isFinalizingResponse, setIsFinalizingResponse] = useState(false);
+  const [isTranscriptUnderTabs, setIsTranscriptUnderTabs] = useState(false);
   const [liveTokenUsage, setLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [visibleLiveTokenUsage, setVisibleLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
@@ -114,14 +118,13 @@ export function ChatView({
   const authoritativePromptTokensRef = useRef(false);
   const liveTokenPulseRef = useRef<number | null>(null);
   const liveTokenClearTimerRef = useRef<number | null>(null);
+  const liveTokenResetTimerRef = useRef<number | null>(null);
+  const queuedTurnTimerRef = useRef<number | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const isTranscriptUnderTabsRef = useRef(false);
   const startStageRef = useRef<HTMLDivElement>(null);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
-  const isProjectScopedStart = activeProject.name.trim().toLowerCase() !== CHATS_PROJECT_NAME.toLowerCase();
-  const startPrompt = isProjectScopedStart
-    ? `What should we build in ${activeProject.name}?`
-    : "What should we work on?";
   const composerClearancePx = useComposerInset(scrollViewportRef, composerWrapRef, !isStartState);
   const providerModelState = sessionModel.modelState;
   const modelLabel = sessionModel.modelLabel;
@@ -137,6 +140,45 @@ export function ChatView({
 
   useScrollOverflowTarget(scrollViewportRef, !isStartState);
   useScrollOverflowTarget(startStageRef, isStartState);
+
+  useEffect(() => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const syncScrollbarGutter = () => {
+      const viewportBounds = viewport.getBoundingClientRect();
+      const topChrome = viewport.querySelector<HTMLElement>("[data-chat-top-chrome='true']");
+      const contentRight = topChrome?.getBoundingClientRect().right ?? viewportBounds.left + viewport.clientWidth;
+      const gutter = Math.max(0, viewportBounds.right - contentRight);
+      viewport.style.setProperty("--chat-scrollbar-gutter", `${gutter}px`);
+    };
+
+    syncScrollbarGutter();
+    const observer = new ResizeObserver(syncScrollbarGutter);
+    observer.observe(viewport);
+    const topChrome = viewport.querySelector<HTMLElement>("[data-chat-top-chrome='true']");
+    if (topChrome) {
+      observer.observe(topChrome);
+    }
+    return () => observer.disconnect();
+  }, [isStartState]);
+
+  useEffect(() => {
+    isTranscriptUnderTabsRef.current = false;
+    setIsTranscriptUnderTabs(false);
+  }, [activeSession?.id, isStartState]);
+
+  function handleTranscriptScroll(event: UIEvent<HTMLDivElement>) {
+    const nextIsUnderTabs = event.currentTarget.scrollTop > 2;
+    if (nextIsUnderTabs === isTranscriptUnderTabsRef.current) {
+      return;
+    }
+
+    isTranscriptUnderTabsRef.current = nextIsUnderTabs;
+    setIsTranscriptUnderTabs(nextIsUnderTabs);
+  }
 
   useEffect(() => {
     if (!activeSession) {
@@ -182,7 +224,37 @@ export function ChatView({
       window.clearTimeout(liveTokenClearTimerRef.current);
       liveTokenClearTimerRef.current = null;
     }
+    if (liveTokenResetTimerRef.current !== null) {
+      window.clearTimeout(liveTokenResetTimerRef.current);
+      liveTokenResetTimerRef.current = null;
+    }
+    if (queuedTurnTimerRef.current !== null) {
+      window.clearTimeout(queuedTurnTimerRef.current);
+      queuedTurnTimerRef.current = null;
+    }
   }, [activeSession?.id]);
+
+  useEffect(() => () => {
+    activeStreamControllerRef.current?.abort();
+    if (liveTokenPulseRef.current !== null) {
+      window.clearInterval(liveTokenPulseRef.current);
+    }
+    if (flushTimeoutRef.current !== null) {
+      window.clearTimeout(flushTimeoutRef.current);
+    }
+    if (flushFrameRef.current !== null) {
+      window.cancelAnimationFrame(flushFrameRef.current);
+    }
+    if (liveTokenClearTimerRef.current !== null) {
+      window.clearTimeout(liveTokenClearTimerRef.current);
+    }
+    if (liveTokenResetTimerRef.current !== null) {
+      window.clearTimeout(liveTokenResetTimerRef.current);
+    }
+    if (queuedTurnTimerRef.current !== null) {
+      window.clearTimeout(queuedTurnTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (isGenerating || modelSelectInProgress || !activeSession) {
@@ -192,9 +264,13 @@ export function ChatView({
     if (!nextQueuedTurn) {
       return;
     }
+    if (queuedTurnTimerRef.current !== null) {
+      return;
+    }
 
     setQueuedTurns((current) => current.filter((turn) => turn.id !== nextQueuedTurn.id));
-    window.setTimeout(() => {
+    queuedTurnTimerRef.current = window.setTimeout(() => {
+      queuedTurnTimerRef.current = null;
       void handleSend(nextQueuedTurn.content, nextQueuedTurn.attachments ?? []);
     }, 0);
   }, [activeSession?.id, isGenerating, modelSelectInProgress, queuedTurns]);
@@ -486,7 +562,6 @@ export function ChatView({
       activityReplay: [],
       activitySummary: runSummary
     });
-    setAssistantHasContent(false);
     assistantHasContentRef.current = false;
     setIsGenerating(true);
     generationStarted = true;
@@ -544,7 +619,6 @@ export function ChatView({
     const markAssistantHasContent = () => {
       if (!assistantHasContentRef.current) {
         assistantHasContentRef.current = true;
-        setAssistantHasContent(true);
       }
     };
 
@@ -911,13 +985,17 @@ export function ChatView({
           };
           setLiveTokenUsage(finalLiveTokenUsage);
           setVisibleLiveTokenUsage(finalLiveTokenUsage);
-          window.setTimeout(() => {
+          if (liveTokenResetTimerRef.current !== null) {
+            window.clearTimeout(liveTokenResetTimerRef.current);
+          }
+          liveTokenResetTimerRef.current = window.setTimeout(() => {
             setLiveTokenUsage((current) =>
               current?.promptTokens === finalLiveTokenUsage.promptTokens &&
               current?.completionTokens === finalLiveTokenUsage.completionTokens
                 ? null
                 : current
             );
+            liveTokenResetTimerRef.current = null;
           }, 0);
         } else {
           setLiveTokenUsage(null);
@@ -936,6 +1014,16 @@ export function ChatView({
     stopRequestedRef.current = true;
     setIsStopRequested(true);
     activeStreamControllerRef.current?.abort();
+  }
+
+  function renameActiveSession() {
+    if (!activeSession) {
+      return;
+    }
+    const nextTitle = window.prompt("Rename chat", activeSession.title);
+    if (nextTitle?.trim()) {
+      workspaceActions.renameSession(activeSession.id, nextTitle.trim());
+    }
   }
 
   function openProjectFromComposer(projectId: string) {
@@ -1072,8 +1160,10 @@ export function ChatView({
       data-start-state={isStartState ? "true" : "false"}
       data-show-header={showHeader ? "true" : "false"}
       data-variant={variant}
+      data-chat-pane={tabs?.pane}
       onFocusCapture={onActivate}
       onPointerDown={onActivate}
+      onPointerEnter={onActivate}
       aria-label="Chat workspace"
     >
       {isStartState ? (
@@ -1082,13 +1172,16 @@ export function ChatView({
           {showHeader ? (
             <ChatHeader
               isSplitViewOpen={isSplitViewOpen}
+              onArchive={activeSession ? () => workspaceActions.archiveSession(activeSession.id) : undefined}
+              onCloseMainInSplit={onCloseMainInSplit}
+              onRename={activeSession ? renameActiveSession : undefined}
               onSplitView={onSplitView}
+              tabs={tabs}
               title={activeSession?.title ?? "No chat selected"}
             />
           ) : null}
           <div ref={startStageRef} className={styles.startStage}>
             <div className={styles.startStack}>
-              <h2 className={styles.startPrompt}>{startPrompt}</h2>
               <div ref={composerWrapRef} className={styles.composerAnchor}>
                 <Composer
                   contextItems={composerContextItems}
@@ -1123,16 +1216,25 @@ export function ChatView({
             ref={scrollViewportRef}
             className={styles.scrollViewport}
             data-chat-scroll-viewport="true"
+            onScroll={handleTranscriptScroll}
             aria-label="Chat transcript"
           >
             {showTopChrome ? (
-              <div className={styles.topChrome}>
+              <div
+                className={styles.topChrome}
+                data-chat-top-chrome="true"
+                data-content-overlap={showHeader && isTranscriptUnderTabs ? "true" : "false"}
+              >
                 {showHeaderFade ? <div className={styles.contentFadeLayer} style={headerFadeStyle} aria-hidden="true" /> : null}
                 {showHeader ? (
                   <div className={styles.headerLayer}>
                     <ChatHeader
                       isSplitViewOpen={isSplitViewOpen}
+                      onArchive={activeSession ? () => workspaceActions.archiveSession(activeSession.id) : undefined}
+                      onCloseMainInSplit={onCloseMainInSplit}
+                      onRename={activeSession ? renameActiveSession : undefined}
                       onSplitView={onSplitView}
+                      tabs={tabs}
                       title={activeSession?.title ?? "No chat selected"}
                     />
                   </div>
@@ -1154,7 +1256,7 @@ export function ChatView({
               <div className={styles.scrollFadeBottom} aria-hidden="true" />
             </div>
           </div>
-          {variant === "main" && !isSplitViewOpen && activeSession ? (
+          {variant === "main" && activeSession ? (
             <ConversationMinimap
               messages={activeSession.messages}
               scrollViewportRef={scrollViewportRef}

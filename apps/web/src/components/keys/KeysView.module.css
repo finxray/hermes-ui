@@ -104,6 +104,12 @@
     transform 150ms ease;
 }
 
+.refreshButton,
+.refreshButton:hover:not(:disabled),
+.refreshButton:focus-visible:not(:disabled) {
+  background: transparent;
+}
+
 .iconButton:hover:not(:disabled),
 .iconButton:focus-visible:not(:disabled) {
   outline: 0;

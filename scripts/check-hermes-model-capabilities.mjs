@@ -153,16 +153,27 @@ check(
   "Chat turns must honor the UI-selected model via POST /api/sessions/{id}/model, not only session create"
 );
 check(
-  "streamHermesSessionChat forwards selected model in chat stream body",
+  "streamHermesSessionChat keeps the verified session model route authoritative",
   Boolean(
     indexFile?.includes("/api/sessions/${encodeURIComponent(hermesSessionId)}/chat/stream") &&
-      indexFile?.includes("Current Hermes API-server routing is verified through the session") &&
-      indexFile?.includes("model: runtimeModelId || undefined") &&
-      indexFile?.includes("provider: request.provider || undefined") &&
+      indexFile?.includes("The model endpoint above is the routing authority") &&
+      !indexFile?.includes("model: runtimeModelId || undefined") &&
+      !indexFile?.includes("provider: request.provider || undefined") &&
       indexFile?.includes("requested_model: runtimeModelId ?? null") &&
       indexFile?.includes("model_selection_scope: request.modelSelectionScope ?? null")
   ),
-  "The chat body may carry selected-model metadata, but routing must have been verified through the session model endpoint first."
+  "Hermes 0.20 must route through the verified session lock instead of reinterpreting duplicate turn-level fields."
+);
+check(
+  "Hermes 0.20 local-provider alias mismatches are narrowly tolerated after assistant output",
+  Boolean(
+    indexFile?.includes("isLocalLmStudioProvider") &&
+      indexFile?.includes("shouldSuppressHermesStreamError") &&
+      indexFile?.includes("hasAssistantText: streamState.hasAssistantText") &&
+      indexFile?.includes("localAliasMismatchSuppressed") &&
+      indexFile?.includes("content: streamState.assistantText")
+  ),
+  "Only Hermes' exact alias-versus-canonical mismatch may be ignored after real assistant text, which must still complete as a normal UI message."
 );
 check(
   "streamHermesSessionChat does not silently fall back to unverified OpenRouter routing",
@@ -179,8 +190,8 @@ check(
     typesFile?.includes('modelSelectionScope?: "session" | "turn" | null') &&
       !indexFile?.includes('request.modelSelectionScope !== "turn"') &&
       indexFile?.includes("if (runtimeModelId)") &&
-      indexFile?.includes("model: runtimeModelId || undefined") &&
-      indexFile?.includes("provider: request.provider || undefined")
+      indexFile?.includes("await selectHermesModel(config, hermesSessionId, runtimeModelId") &&
+      indexFile?.includes("requested_model: runtimeModelId ?? null")
   ),
   "Even legacy turn-scoped requests must fail honestly if Hermes cannot verify the selected model for the session."
 );

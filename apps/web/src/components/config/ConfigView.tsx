@@ -82,7 +82,7 @@ export function ConfigView({
         ) : null}
         <button
           aria-label="Refresh Hermes config"
-          className={styles.iconButton}
+          className={`${styles.iconButton} ${styles.refreshButton}`}
           disabled={isHermesStatusLoading || isLoading}
           onClick={() => {
             onRefreshHermes();

@@ -42,7 +42,7 @@
 
 .markerLine {
   display: block;
-  width: var(--conversation-marker-width, 8px);
+  width: var(--conversation-marker-width, 6.8px);
   height: 2px;
   border-radius: 999px;
   background: currentColor;
@@ -62,15 +62,19 @@
   color: rgba(255, 255, 255, 0.94);
 }
 
+.markerButton[aria-current="location"] {
+  color: rgba(255, 255, 255, 0.84);
+}
+
 .markerButton:hover .markerLine,
 .markerButton:focus-visible .markerLine {
-  width: var(--conversation-marker-width, 30px);
+  width: var(--conversation-marker-width, 25.5px);
 }
 
 .preview {
   position: absolute;
   top: 50%;
-  left: 80px;
+  left: 36px;
   z-index: 2;
   display: grid;
   visibility: hidden;
@@ -79,16 +83,15 @@
   min-width: 320px;
   gap: 8px;
   padding: 14px 18px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-overlay-subtle);
   border-radius: 18px;
-  background: rgba(45, 45, 46, 0.98);
+  background: var(--bg-overlay-solid);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
   color: var(--text-secondary);
   opacity: 0;
-  transform: translate(6px, -50%);
+  transform: translateY(-50%);
   transition:
     opacity 120ms ease,
-    transform 150ms ease,
     visibility 0s linear 150ms;
   pointer-events: none;
 }
@@ -119,7 +122,6 @@
 .markerWrap:focus-within .preview {
   visibility: visible;
   opacity: 1;
-  transform: translate(0, -50%);
   transition-delay: 0s;
 }
 

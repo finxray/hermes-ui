@@ -22,11 +22,13 @@
   --bg-glass-strong: rgba(28, 30, 35, 0.82);
   --bg-glass-soft: rgba(255, 255, 255, 0.045);
   --bg-glass-hover: rgba(255, 255, 255, 0.072);
+  --bg-overlay-solid: rgba(28, 28, 30, 1);
 
   --border-soft: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
   --border-glass: rgba(255, 255, 255, 0.12);
   --border-glass-soft: rgba(255, 255, 255, 0.07);
+  --border-overlay-subtle: rgba(255, 255, 255, 0.045);
 
   --text-primary: #f4f4f5;
   --text-secondary: #c2c6ce;

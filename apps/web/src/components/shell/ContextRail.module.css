@@ -128,6 +128,11 @@
   color: var(--text-primary);
 }
 
+.sectionRefresh:hover:not(:disabled),
+.sectionRefresh:focus-visible {
+  background: transparent;
+}
+
 .sectionRefresh:disabled {
   cursor: default;
   opacity: 0.45;
@@ -420,6 +425,13 @@
   color: var(--text-muted);
   font-size: var(--font-small);
   line-height: 1.35;
+}
+
+.sectionRefresh,
+.sectionRefresh:hover:not(:disabled),
+.sectionRefresh:focus-visible {
+  background: transparent;
+  box-shadow: none;
 }
 
 .showMoreButton {

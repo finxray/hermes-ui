@@ -46,6 +46,11 @@ import type {
   HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
+import {
+  isLocalLmStudioProvider,
+  shouldSuppressHermesStreamError,
+  type HermesStreamCompatibilityContext
+} from "./compatibility.ts";
 
 const DEFAULT_TIMEOUT_MS = 3500;
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -700,11 +705,9 @@ export async function streamHermesSessionChat(
         conversation_history: request.recentMessages ?? [],
         input: request.message,
         instructions: request.instructions || undefined,
-        // Current Hermes API-server routing is verified through the session
-        // model endpoint above. These fields are preserved for diagnostics and
-        // for future Hermes versions that may expose provider-aware chat routes.
-        model: runtimeModelId || undefined,
-        provider: request.provider || undefined,
+        // Hermes 0.20 treats repeated turn-level model fields as a raw route,
+        // bypassing the verified session lock and falling back to its default
+        // provider. The model endpoint above is the routing authority.
         metadata: {
           context: request.context,
           attachments: request.attachments ?? [],
@@ -753,6 +756,9 @@ export async function streamHermesSessionChat(
       abort,
       runtimeModelId
         ? emptyAssistantModelFallback(runtimeModelId, request.provider)
+        : undefined,
+      runtimeModelId && isLocalLmStudioProvider(request.provider)
+        ? { model: runtimeModelId, provider: request.provider?.trim() ?? "" }
         : undefined
     )
   };
@@ -2909,7 +2915,7 @@ export function normalizeHermesSseEvent(
   }
 
   if (eventName === "response.output_text.delta" || eventName === "output_text.delta") {
-    const delta = firstString(data.delta, data.text, data.content, data.output_text);
+    const delta = firstRawString(data.delta, data.text, data.content, data.output_text);
     return delta ? { type: "message_delta", delta, messageId, runId } : null;
   }
 
@@ -3079,7 +3085,7 @@ function normalizeOpenAiCompatibleStreamEvent(
   }
 
   if (dataType === "response.output_text.delta" || dataType === "output_text.delta") {
-    const delta = firstString(data.delta, data.text, data.content, data.output_text);
+    const delta = firstRawString(data.delta, data.text, data.content, data.output_text);
     return delta ? { type: "message_delta", delta, messageId, runId } : null;
   }
   if (dataType === "response.output_text.done" || dataType === "output_text.done") {
@@ -5164,6 +5170,15 @@ function firstString(...values: unknown[]): string {
   return "";
 }
 
+function firstRawString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+  return "";
+}
+
 function firstTimestamp(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "number" && Number.isFinite(value)) {
@@ -5984,7 +5999,8 @@ function sanitizeHeaderValue(value: string | null): string | null {
 function normalizeHermesSseStream(
   upstream: ReadableStream<Uint8Array>,
   abort: LinkedAbortController,
-  emptyAssistantFallback?: string
+  emptyAssistantFallback?: string,
+  localProviderCompatibility?: HermesStreamCompatibilityContext
 ) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -5995,8 +6011,11 @@ function normalizeHermesSseStream(
       let buffer = "";
       let doneSent = false;
       const streamState = {
+        assistantText: "",
         emptyAssistantFallback,
-        hasAssistantText: false
+        hasAssistantText: false,
+        localAliasMismatchSuppressed: false,
+        localProviderCompatibility
       };
 
       try {
@@ -6048,19 +6067,39 @@ function writeNormalizedFrame(
   encoder: TextEncoder,
   frame: string,
   streamState?: {
+    assistantText: string;
     emptyAssistantFallback?: string;
     hasAssistantText: boolean;
+    localAliasMismatchSuppressed: boolean;
+    localProviderCompatibility?: HermesStreamCompatibilityContext;
+    messageId?: string;
+    runId?: string;
   }
 ): boolean {
   const parsed = parseSseFrame(frame);
   if (!parsed) {
     return false;
   }
+  if (
+    streamState &&
+    shouldSuppressHermesStreamError({
+      compatibility: streamState.localProviderCompatibility,
+      eventName: parsed.eventName,
+      hasAssistantText: streamState.hasAssistantText,
+      payload: parsed.payload
+    })
+  ) {
+    streamState.localAliasMismatchSuppressed = true;
+    return false;
+  }
   let normalized = normalizeHermesSseEvent(parsed.eventName, parsed.payload);
   if (normalized) {
     if (normalized.type === "message_delta" && normalized.delta.trim()) {
       if (streamState) {
+        streamState.assistantText += normalized.delta;
         streamState.hasAssistantText = true;
+        streamState.messageId = normalized.messageId ?? streamState.messageId;
+        streamState.runId = normalized.runId ?? streamState.runId;
       }
     }
     if (normalized.type === "message_done") {
@@ -6082,6 +6121,17 @@ function writeNormalizedFrame(
     }
     if (normalized.type === "done") {
       writeEmptyAssistantFallback(controller, encoder, streamState);
+      if (streamState?.localAliasMismatchSuppressed && streamState.assistantText.trim()) {
+        writeUiSse(controller, encoder, {
+          type: "message_done",
+          message: {
+            role: "assistant",
+            content: streamState.assistantText
+          },
+          messageId: streamState.messageId,
+          runId: streamState.runId
+        });
+      }
     }
     writeUiSse(controller, encoder, normalized);
     const runUsageMetadata = normalizeRunEventUsageMetadata(normalized);

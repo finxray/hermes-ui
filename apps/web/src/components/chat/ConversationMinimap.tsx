@@ -13,6 +13,8 @@ import type { ChatMessage } from "@/data/types";
 import styles from "./ConversationMinimap.module.css";
 
 const MAX_VISIBLE_TURNS = 24;
+const MIN_VISIBLE_TURNS = 5;
+const SCROLL_END_TOLERANCE_PX = 3;
 
 type ConversationMinimapProps = {
   messages: ChatMessage[];
@@ -44,7 +46,7 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
 
   useEffect(() => {
     const viewport = scrollViewportRef.current;
-    if (!viewport || turns.length === 0) {
+    if (!viewport || turns.length < MIN_VISIBLE_TURNS) {
       setActiveTurnId(null);
       return;
     }
@@ -53,6 +55,12 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
 
     const updateActiveTurn = () => {
       frame = null;
+      if (isViewportAtEnd(viewport)) {
+        const lastTurnId = turns.at(-1)?.anchorMessageId ?? null;
+        setActiveTurnId((current) => current === lastTurnId ? current : lastTurnId);
+        return;
+      }
+
       const viewportRect = viewport.getBoundingClientRect();
       const readingLine = viewportRect.top + Math.min(180, viewport.clientHeight * 0.32);
       let nextTurnId = turns[0]?.anchorMessageId ?? null;
@@ -101,12 +109,14 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
     }
   }, []);
 
-  if (turns.length < 2) {
+  if (visibleTurns.length < MIN_VISIBLE_TURNS) {
     return null;
   }
 
   const activeVisibleTurn = resolveVisibleActiveTurn(visibleTurns, turns, activeTurnId);
   const focusPosition = pointerPosition ?? keyboardFocusIndex;
+  const isPointerHovering = pointerPosition !== null;
+  const compactMarkers = visibleTurns.length < 10;
 
   const updatePointerPosition = (event: ReactMouseEvent<HTMLDivElement>) => {
     const geometry = pointerGeometryRef.current ?? measurePointerGeometry(event.currentTarget);
@@ -167,12 +177,13 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
         {visibleTurns.map((turn, visibleIndex) => {
           const title = previewTitle(turn);
           const body = previewBody(turn);
-          const isActive = turn.anchorMessageId === activeVisibleTurn?.anchorMessageId;
+          const isActive = !isPointerHovering && turn.anchorMessageId === activeVisibleTurn?.anchorMessageId;
           const isFocused = focusPosition !== null && Math.round(focusPosition) === visibleIndex;
           const markerStyle = {
-            "--conversation-marker-width": `${focusPosition === null ? 8 : focusedMarkerWidth(
+            "--conversation-marker-width": `${focusPosition === null ? (compactMarkers ? 5.2 : 6.8) : focusedMarkerWidth(
               Math.abs(visibleIndex - focusPosition),
-              visibleTurns.length
+              visibleTurns.length,
+              compactMarkers
             )}px`
           } as CSSProperties;
 
@@ -202,6 +213,11 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
   );
 }
 
+function isViewportAtEnd(viewport: HTMLElement) {
+  const remainingScroll = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop;
+  return remainingScroll <= SCROLL_END_TOLERANCE_PX;
+}
+
 function measurePointerGeometry(container: HTMLDivElement): PointerGeometry | null {
   const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>("button"));
   const first = buttons[0];
@@ -219,9 +235,9 @@ function measurePointerGeometry(container: HTMLDivElement): PointerGeometry | nu
   };
 }
 
-function focusedMarkerWidth(distance: number, markerCount: number) {
-  const baseWidth = 8;
-  const expansion = 24;
+function focusedMarkerWidth(distance: number, markerCount: number, compact: boolean) {
+  const baseWidth = compact ? 5.2 : 6.8;
+  const expansion = compact ? 15.6 : 20.4;
   const spread = Math.max(1.8, Math.min(4, markerCount * 0.16));
   const width = baseWidth + expansion * Math.exp(-(distance ** 2) / (2 * spread ** 2));
   return Math.round(width * 10) / 10;

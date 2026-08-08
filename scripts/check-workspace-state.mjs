@@ -33,6 +33,7 @@ const { createSessionExportPreview } = replayHelpers;
 const base = createInitialWorkspaceState();
 
 checkRenamePreservesStableKeys();
+checkProjectActions();
 checkUniqueDefaultTitles();
 checkFirstUserMessageTitleCleanup();
 checkManualRenameWins();
@@ -79,6 +80,45 @@ function checkRenamePreservesStableKeys() {
   assert.equal(renamedSession?.hermesSessionId, session.hermesSessionId);
   assert.equal(renamedSession?.titleSource, "manual");
   assert(renamedSession?.renamedAt, "manual rename should record renamedAt");
+}
+
+function checkProjectActions() {
+  const project = base.projects[0];
+  const archived = workspaceReducer(
+    { ...base, activeProjectId: project.id },
+    { type: "archiveProjectSessions", projectId: project.id }
+  );
+  assert.equal(
+    archived.sessions.filter((session) => session.projectId === project.id && !session.archivedAt).length,
+    0,
+    "archiveProjectSessions archives every visible chat in the project"
+  );
+  assert.equal(archived.activeSessionId, null);
+
+  const withRemovableProject = workspaceReducer(base, {
+    type: "createProject",
+    name: "Removable project"
+  });
+  const removableProject = withRemovableProject.projects[0];
+  const removed = workspaceReducer(withRemovableProject, {
+    type: "removeProject",
+    projectId: removableProject.id
+  });
+  assert.equal(removed.projects.some((item) => item.id === removableProject.id), false);
+  assert.equal(removed.sessions.some((session) => session.projectId === removableProject.id), false);
+  assert(removed.projects.some((item) => item.id === removed.activeProjectId));
+
+  const onlyProject = {
+    ...base,
+    activeProjectId: project.id,
+    projects: [project],
+    sessions: base.sessions.filter((session) => session.projectId === project.id)
+  };
+  assert.deepEqual(
+    workspaceReducer(onlyProject, { type: "removeProject", projectId: project.id }),
+    onlyProject,
+    "the last project cannot be removed"
+  );
 }
 
 function checkUniqueDefaultTitles() {
@@ -131,6 +171,46 @@ function checkFirstUserMessageTitleCleanup() {
   assert(updated?.firstUserMessageAt, "first-message auto-title should record firstUserMessageAt");
   assert.equal(updated?.contextScope.stableSessionKey, stableSessionKey);
   assert.equal(updated?.hermesSessionId, hermesSessionId);
+
+  state = workspaceReducer(state, { type: "createSession" });
+  const longTitleSession = state.sessions[0];
+  const longPrompt =
+    "Open new tab on my chrome existing window and keep the current workspace visible while the page loads";
+  state = workspaceReducer(state, {
+    type: "appendMessage",
+    sessionId: longTitleSession.id,
+    message: {
+      id: "msg-check-long-title",
+      role: "user",
+      author: "User",
+      createdAt: "12:01",
+      content: longPrompt,
+      status: "complete"
+    }
+  });
+
+  const longTitle = state.sessions.find((item) => item.id === longTitleSession.id)?.title;
+  assert.equal(longTitle, "Open Chrome tab");
+  assert.equal(longTitle?.includes("..."), false, "auto-titles must rely on UI fading");
+
+  state = workspaceReducer(state, { type: "createSession" });
+  const modelInquirySession = state.sessions[0];
+  state = workspaceReducer(state, {
+    type: "appendMessage",
+    sessionId: modelInquirySession.id,
+    message: {
+      id: "msg-check-model-title",
+      role: "user",
+      author: "User",
+      createdAt: "12:02",
+      content: "What model are you currently using?",
+      status: "complete"
+    }
+  });
+  assert.equal(
+    state.sessions.find((item) => item.id === modelInquirySession.id)?.title,
+    "Model inquiry"
+  );
 }
 
 function checkManualRenameWins() {
@@ -316,6 +396,32 @@ function checkNormalizationFillsTitleMetadata() {
 
   const manualNormalized = workspaceReducer(base, { type: "hydrate", state: manualLegacy });
   assert.equal(manualNormalized.sessions[0].titleSource, "manual");
+
+  let generatedState = workspaceReducer(base, { type: "createSession" });
+  const generatedSession = generatedState.sessions[0];
+  const originalPrompt =
+    "How many concurrent tasks can run while the existing workspace remains responsive";
+  generatedState = workspaceReducer(generatedState, {
+    type: "appendMessage",
+    sessionId: generatedSession.id,
+    message: {
+      id: "msg-legacy-title",
+      role: "user",
+      author: "User",
+      createdAt: "12:02",
+      content: originalPrompt,
+      status: "complete"
+    }
+  });
+  const legacyGenerated = structuredClone(generatedState);
+  const legacySession = legacyGenerated.sessions.find((item) => item.id === generatedSession.id);
+  legacySession.title = `${originalPrompt.slice(0, 31).trimEnd()}...`;
+  legacySession.titleSource = "manual";
+
+  const migrated = workspaceReducer(base, { type: "hydrate", state: legacyGenerated });
+  const migratedSession = migrated.sessions.find((item) => item.id === generatedSession.id);
+  assert.equal(migratedSession?.titleSource, "first-message");
+  assert.equal(migratedSession?.title, "Concurrent tasks inquiry");
 }
 
 function checkRunRecordPersistence() {

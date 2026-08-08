@@ -39,7 +39,7 @@ export function HermesStatusPanel({
       <div className={styles.sectionLabel} id="hermes-status-heading">
         <span>Hermes</span>
         <button
-          className={`${styles.iconButton}${isRefreshing ? ` ${styles.iconButtonRefreshing}` : ""}`}
+          className={`${styles.iconButton} ${styles.refreshButton}${isRefreshing ? ` ${styles.iconButtonRefreshing}` : ""}`}
           type="button"
           aria-label="Refresh Hermes status"
           onClick={onRefresh}

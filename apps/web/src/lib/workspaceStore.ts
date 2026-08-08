@@ -44,6 +44,8 @@ type WorkspaceAction =
       updatedAt?: string;
     }
   | { type: "renameProject"; projectId: string; name: string }
+  | { type: "archiveProjectSessions"; projectId: string }
+  | { type: "removeProject"; projectId: string }
   | { type: "renameSession"; sessionId: string; title: string }
   | { type: "archiveSession"; sessionId: string }
   | { type: "appendMessage"; sessionId: string; message: ChatMessage }
@@ -86,6 +88,10 @@ export function workspaceReducer(
       return createSession(state, action);
     case "renameProject":
       return renameProject(state, action.projectId, action.name);
+    case "archiveProjectSessions":
+      return archiveProjectSessions(state, action.projectId);
+    case "removeProject":
+      return removeProject(state, action.projectId);
     case "renameSession":
       return renameSession(state, action.sessionId, action.title);
     case "archiveSession":
@@ -293,6 +299,52 @@ function renameProject(state: WorkspaceState, projectId: string, name: string): 
           }
         : project
     )
+  };
+}
+
+function archiveProjectSessions(state: WorkspaceState, projectId: string): WorkspaceState {
+  if (!state.projects.some((project) => project.id === projectId)) {
+    return state;
+  }
+
+  const now = new Date().toISOString();
+  const sessions = state.sessions.map((session) =>
+    session.projectId === projectId && !session.archivedAt
+      ? { ...session, archivedAt: now, updatedAt: now }
+      : session
+  );
+
+  return {
+    ...touchProject(state, projectId, now),
+    activeSessionId: state.activeProjectId === projectId
+      ? null
+      : selectSessionForProject(sessions, state.activeProjectId, state.activeSessionId)?.id ?? null,
+    sessions
+  };
+}
+
+function removeProject(state: WorkspaceState, projectId: string): WorkspaceState {
+  if (state.projects.length <= 1 || !state.projects.some((project) => project.id === projectId)) {
+    return state;
+  }
+
+  const projects = state.projects.filter((project) => project.id !== projectId);
+  const sessions = state.sessions.filter((session) => session.projectId !== projectId);
+  const activeProjectId = state.activeProjectId === projectId
+    ? selectMostRecentProject(projects)?.id ?? projects[0]?.id ?? ""
+    : state.activeProjectId;
+  const activeSessionId = selectSessionForProject(
+    sessions,
+    activeProjectId,
+    state.activeProjectId === projectId ? null : state.activeSessionId
+  )?.id ?? null;
+
+  return {
+    ...state,
+    activeProjectId,
+    activeSessionId,
+    projects,
+    sessions
   };
 }
 
@@ -628,12 +680,19 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     session.projectId,
     session.id
   );
+  const titleSource = normalizeTitleSource(session);
+  const firstUserMessage = session.messages?.find((message) => message.role === "user");
+  const title =
+    titleSource === "first-message" && firstUserMessage
+      ? summarizeTitle(firstUserMessage.content)
+      : session.title;
 
   return {
     ...session,
+    title,
     summary: session.summary === "Empty local mock session" ? "" : session.summary,
     hermesSessionId: session.hermesSessionId || `hermes-${session.id}`,
-    titleSource: normalizeTitleSource(session),
+    titleSource,
     lastViewedAt: normalizeTimestamp(session.lastViewedAt) ?? normalizeTimestamp(session.updatedAt),
     contextScope: {
       ...contextScope,
@@ -1326,6 +1385,23 @@ function markSessionViewed(sessions: Session[], sessionId: string, viewedAt: str
 }
 
 function normalizeTitleSource(session: Session): NonNullable<Session["titleSource"]> {
+  const firstUserMessage = session.messages?.find((message) => message.role === "user");
+  if (firstUserMessage) {
+    const generatedTitle = summarizeTitle(firstUserMessage.content);
+    const legacyGeneratedTitle = summarizeLegacyTitle(firstUserMessage.content);
+    const legacyOverflowTitle =
+      legacyGeneratedTitle.length > 34
+        ? `${legacyGeneratedTitle.slice(0, 31).trimEnd()}...`
+        : legacyGeneratedTitle;
+    if (
+      session.title === generatedTitle ||
+      session.title === legacyGeneratedTitle ||
+      session.title === legacyOverflowTitle
+    ) {
+      return "first-message";
+    }
+  }
+
   if (session.titleSource) {
     return session.titleSource;
   }
@@ -1333,16 +1409,47 @@ function normalizeTitleSource(session: Session): NonNullable<Session["titleSourc
     return "default";
   }
 
-  const firstUserMessage = session.messages?.find((message) => message.role === "user");
-  if (firstUserMessage && summarizeTitle(firstUserMessage.content) === session.title) {
-    return "first-message";
-  }
-
   return "manual";
 }
 
 function summarizeTitle(content: string): string {
-  const clean = content
+  const clean = cleanTitleContent(content);
+  const commandTitle = summarizeCommandTitle(clean);
+  if (commandTitle) {
+    return commandTitle;
+  }
+
+  const compact = compactTitleContent(clean);
+  if (!compact) {
+    return "New chat";
+  }
+
+  const inquiryTitle = summarizeInquiryTitle(clean, compact);
+  if (inquiryTitle) {
+    return inquiryTitle;
+  }
+
+  return shortenTitlePhrase(compact);
+}
+
+function summarizeLegacyTitle(content: string): string {
+  const clean = cleanTitleContent(content);
+  const commandTitle = summarizeLegacyCommandTitle(clean);
+  if (commandTitle) {
+    return commandTitle;
+  }
+
+  const compact = compactTitleContent(clean);
+  if (!compact) {
+    return "New chat";
+  }
+
+  const title = `${compact[0].toUpperCase()}${compact.slice(1)}`;
+  return title.slice(0, 160).trimEnd();
+}
+
+function cleanTitleContent(content: string) {
+  return content
     .replace(/^(please\s+)?(can|could|would)\s+you\s+/i, "")
     .replace(/^(please\s+)/i, "")
     .replace(/\b(in|under)\s+\d+\s+(words?|sentences?|chars?|characters?)\b/gi, "")
@@ -1350,32 +1457,51 @@ function summarizeTitle(content: string): string {
     .replace(/[`"'()[\]{}<>]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
 
-  const commandTitle = summarizeCommandTitle(clean);
-  if (commandTitle) {
-    return commandTitle;
-  }
-
-  const firstSentence = clean
+function compactTitleContent(content: string) {
+  const firstSentence = content
     .split(/[.!?\n]/)
     .map((part) => part.trim())
-    .find(Boolean) ?? clean;
-  const compact = firstSentence
+    .find(Boolean) ?? content;
+  return firstSentence
     .replace(/^(i\s+need\s+to|i\s+need|we\s+need\s+to|we\s+need|let'?s|please)\s+/i, "")
     .replace(/\b(the|this|that|below|following)\b\s*$/i, "")
     .replace(/[?!.,:;]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
 
-  if (!compact) {
-    return "New chat";
+function summarizeInquiryTitle(content: string, compact: string): string | null {
+  if (!/^(how|what|which|who|when|where|why|is|are|do|does|did|will|should)\b/i.test(content)) {
+    return null;
   }
 
-  const title = `${compact[0].toUpperCase()}${compact.slice(1)}`;
-  return title.length > 34 ? `${title.slice(0, 31).trimEnd()}...` : title;
+  if (/\b(?:conc[a-z]*rent|concurrency)\b/i.test(compact) && /\btasks?\b/i.test(compact)) {
+    return "Concurrent tasks inquiry";
+  }
+  if (/\bmodels?\b/i.test(compact)) {
+    return "Model inquiry";
+  }
+
+  const topic = compact
+    .replace(/^(?:how\s+(?:many|much|does|do|did|can|could|should|would|is|are|to)|what\s+(?:is|are|was|were|does|do|did|can|could|should|would)|which|who|when|where|why|is|are|do|does|did|will|should)\s+/i, "")
+    .replace(/\b(?:can|could|would|should|does|do|did|is|are|will)\b.*$/i, "")
+    .trim();
+  return topic ? shortenTitlePhrase(`${topic} inquiry`, 3, 36) : "General inquiry";
 }
 
 function summarizeCommandTitle(content: string): string | null {
+  if (/^open\b/i.test(content) && /\btab\b/i.test(content) && /\bchrome\b/i.test(content)) {
+    return "Open Chrome tab";
+  }
+  if (/^open\b/i.test(content) && /\btab\b/i.test(content) && /\bbrowser\b/i.test(content)) {
+    return "Open browser tab";
+  }
+  return summarizeLegacyCommandTitle(content);
+}
+
+function summarizeLegacyCommandTitle(content: string): string | null {
   const lower = content.toLowerCase();
   if (/\b(summarise|summarize|summary)\b/.test(lower)) {
     return "Summarize text";
@@ -1396,6 +1522,15 @@ function summarizeCommandTitle(content: string): string | null {
     return "Explain topic";
   }
   return null;
+}
+
+function shortenTitlePhrase(value: string, maxWords = 4, maxCharacters = 36) {
+  const words = value.split(/\s+/).filter(Boolean).slice(0, maxWords);
+  while (words.length > 1 && words.join(" ").length > maxCharacters) {
+    words.pop();
+  }
+  const title = words.join(" ").slice(0, maxCharacters).trimEnd();
+  return title ? `${title[0].toUpperCase()}${title.slice(1)}` : "New chat";
 }
 
 function summarizeMessage(content: string): string {

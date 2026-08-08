@@ -1,5 +1,6 @@
 .workspace {
   composes: scrollbar-hover-context from global;
+  --chat-header-control-size: 28px;
   --chat-fade-bg: var(--bg-workspace-solid);
   --font-body: 14.3px;
   --font-small: 12.65px;
@@ -37,6 +38,7 @@
   flex-direction: column;
   overflow-x: auto;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   box-sizing: border-box;
   pointer-events: auto;
@@ -51,6 +53,31 @@
   flex: none;
   min-width: 0;
   pointer-events: none;
+}
+
+.topChrome::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: calc(100% + 30px);
+  background: linear-gradient(
+    to bottom,
+    var(--chat-fade-bg) 0%,
+    var(--chat-fade-bg) 52%,
+    rgba(14, 14, 15, 0.86) 68%,
+    rgba(14, 14, 15, 0.46) 84%,
+    transparent 100%
+  );
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out;
+}
+
+.topChrome[data-content-overlap="true"]::after {
+  opacity: 1;
 }
 
 .headerLayer {
@@ -152,6 +179,14 @@
 }
 
 .header {
+  --chat-header-right-padding: max(
+    0px,
+    calc(
+      var(--shell-right-control-inset, 14px) +
+        (var(--control-height, 34px) - var(--chat-header-control-size)) / 2 -
+        var(--chat-scrollbar-gutter, 0px)
+    )
+  );
   position: relative;
   z-index: 2;
   display: block;
@@ -159,7 +194,12 @@
   min-width: 0;
   min-height: auto;
   margin: 0;
-  padding: 10px 16px 4px 10px;
+  padding: 10px var(--chat-header-right-padding) 4px
+    calc(
+      var(--shell-leading-panel-icon-inset, 13px) -
+        (28px - var(--panel-toggle-icon-size, 19.968px)) / 2 -
+        var(--border-window-outline-width, 1px)
+    );
   border: 0;
   background: transparent;
   background-color: transparent;
@@ -198,11 +238,89 @@
     0 1px 10px rgba(14, 14, 15, 0.78);
 }
 
+.headerActions {
+  position: relative;
+  display: flex;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+}
+
+.headerMoreButton {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: color 140ms ease, opacity 120ms ease;
+}
+
+.headerTitle:hover .headerMoreButton,
+.headerTitle:focus-within .headerMoreButton,
+.header:hover .headerMoreButton,
+.header:focus-within .headerMoreButton {
+  opacity: 1;
+}
+
+.headerMoreButton:hover,
+.headerMoreButton:focus-visible {
+  outline: 0;
+  color: var(--text-primary);
+}
+
+.headerMenu {
+  position: fixed;
+  z-index: var(--z-floating);
+  display: grid;
+  width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border-overlay-subtle);
+  border-radius: 12px;
+  background: #1f1f20;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+}
+
+.headerMenu button {
+  display: grid;
+  grid-template-columns: var(--overlay-menu-icon-size, 14px) minmax(0, 1fr);
+  min-height: var(--overlay-menu-row-height, 30px);
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-body);
+  text-align: left;
+}
+
+.headerMenu button:hover,
+.headerMenu button:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.headerMenu button svg {
+  width: var(--overlay-menu-icon-size, 14px);
+  height: var(--overlay-menu-icon-size, 14px);
+  color: var(--text-secondary);
+}
+
 .headerSplitButton {
   position: relative;
   display: grid;
   width: 28px;
   height: 28px;
+  box-sizing: border-box;
   flex: 0 0 auto;
   place-items: center;
   margin-top: 0;
@@ -260,7 +378,12 @@
   white-space: nowrap;
 }
 
-.headerSplitButton:hover .headerSplitTooltip,
+.headerSplitButton:hover .headerSplitTooltip {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 2s;
+}
+
 .headerSplitButton:focus-visible .headerSplitTooltip {
   opacity: 1;
   transform: translateY(0);
@@ -315,17 +438,7 @@
   display: grid;
   width: 100%;
   max-width: calc(var(--composer-width) + 20px);
-  gap: 30px;
-  transform: translateY(-6vh);
-}
-
-.startPrompt {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: clamp(24px, 2.1vw, 34px);
-  font-weight: 440;
-  line-height: 1.2;
-  text-align: center;
+  transform: translateY(calc(-6vh + 30px));
 }
 
 .startStack .composerAnchor {
@@ -363,7 +476,12 @@
 
 @media (max-width: 760px) {
   .header {
-    padding: 10px 16px 10px 10px;
+    padding: 10px var(--chat-header-right-padding) 10px
+      calc(
+        var(--shell-leading-panel-icon-inset, 13px) -
+          (28px - var(--panel-toggle-icon-size, 19.968px)) / 2 -
+          var(--border-window-outline-width, 1px)
+      );
   }
 
   .transcript {
@@ -377,11 +495,6 @@
   }
 
   .startStack {
-    gap: 22px;
-    transform: none;
-  }
-
-  .startPrompt {
-    font-size: 25px;
+    transform: translateY(47px);
   }
 }

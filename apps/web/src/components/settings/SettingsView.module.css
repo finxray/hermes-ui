@@ -55,6 +55,12 @@
   --control-icon-size: 20px;
 }
 
+.refreshButton,
+.refreshButton:hover:not(:disabled),
+.refreshButton:focus-visible:not(:disabled) {
+  background: transparent;
+}
+
 .rowIconButton {
   --control-icon-size: 20px;
 }
@@ -298,6 +304,7 @@
   .inlineRefreshing {
     animation: none;
   }
+
 }
 
 @media (max-width: 760px) {

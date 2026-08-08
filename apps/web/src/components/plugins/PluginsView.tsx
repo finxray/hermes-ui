@@ -336,7 +336,7 @@ export function PluginsView({
           <p>{subtitle}</p>
         </div>
         <button
-          className={styles.iconButton}
+          className={`${styles.iconButton} ${styles.refreshButton}`}
           type="button"
           onClick={() => void activeRefresh()}
           aria-label="Refresh Hermes metadata"
@@ -484,10 +484,10 @@ function PluginsPanel({
             <h2>{prettyCategory(group.source)}</h2>
           </div>
           <div className={styles.grid}>
-            {group.items.map((plugin) => (
+            {group.items.map((plugin, index) => (
               <PluginCard
                 isUpdating={updatingIds.has(plugin.id)}
-                key={plugin.id}
+                key={`${group.source}:${plugin.id}:${index}`}
                 onSelect={() => onSelect(plugin, group.source)}
                 onToggle={onToggle}
                 plugin={plugin}
@@ -560,10 +560,10 @@ function SkillsPanel({
             <h2>{prettyCategory(group.source)}</h2>
           </div>
           <div className={styles.grid}>
-            {group.items.map((skill) => (
+            {group.items.map((skill, index) => (
               <SkillCard
                 isUpdating={updatingSkillIds.has(skill.id)}
-                key={skill.id}
+                key={`${group.source}:${skill.id}:${index}`}
                 onSelect={() => onSelect(skill, group.source)}
                 onToggle={onToggle}
                 skill={skill}

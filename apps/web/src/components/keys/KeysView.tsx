@@ -78,7 +78,7 @@ export function KeysView({ hermesStatus, onDetailBackChange }: KeysViewProps) {
         </label>
         <button
           aria-label="Refresh keys"
-          className={styles.iconButton}
+          className={`${styles.iconButton} ${styles.refreshButton}`}
           disabled={!canLoad || isLoading}
           onClick={() => void refresh()}
           type="button"

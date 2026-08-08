@@ -685,6 +685,7 @@ function mergeLmStudioModelMetadata(
 ): HermesModelDescriptor {
   return {
     ...model,
+    availability: metadata.availability ?? model.availability,
     contextLength: metadata.contextLength ?? model.contextLength,
     description: model.description ?? metadata.description,
     inputModalities: model.inputModalities?.length ? model.inputModalities : metadata.inputModalities,
@@ -719,8 +720,11 @@ function resolveOutgoingModelRequest(
   if (!catalogModelId) {
     return null;
   }
-  const request = resolveModelSelectRequest(catalogModelId, state.availableModels);
   const selectedModel = state.availableModels.find((model) => model.id === catalogModelId);
+  if (selectedModel?.availability === "not-loaded") {
+    return null;
+  }
+  const request = resolveModelSelectRequest(catalogModelId, state.availableModels);
   return request
     ? {
         ...request,
@@ -769,6 +773,9 @@ function applySessionSelectedModel(
     return state;
   }
   const selected = state.availableModels.find((model) => model.id === runtimeModelId);
+  if (selected?.availability === "not-loaded") {
+    return state;
+  }
   return {
     ...state,
     currentModelLabel: selected?.label ?? runtimeModelId,

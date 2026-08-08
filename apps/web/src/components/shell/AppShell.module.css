@@ -11,6 +11,7 @@
   --icon-sm: 14px;
   --icon-md: 16px;
   --icon-lg: 20px;
+  --panel-toggle-icon-size: calc(var(--icon-md) * 1.248);
   --control-height: 34px;
   --row-height: 36px;
   --topbar-height: auto;
@@ -18,6 +19,11 @@
   --shell-row-padding-x: clamp(12px, calc(8px + 0.25vw), 18px);
   --shell-column-gap: 9px;
   --shell-left-icon-inset: calc(var(--shell-rail-padding-x) + var(--shell-row-padding-x));
+  --shell-leading-panel-icon-inset: calc(
+    var(--shell-rail-padding-x) + var(--shell-row-padding-x) - 14px +
+      (var(--control-height) - var(--panel-toggle-icon-size)) / 2
+  );
+  --shell-right-control-inset: 14px;
   --shell-left-text-inset: calc(
     var(--shell-left-icon-inset) + var(--icon-sm) + var(--shell-column-gap)
   );

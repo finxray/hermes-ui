@@ -1,8 +1,9 @@
 "use client";
 
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import { ChevronRight, Cog, Cpu, Download, KeyRound, RefreshCw, RotateCcw, ScrollText } from "lucide-react";
+import { ChevronRight, Cog, Cpu, Download, KeyRound, ScrollText } from "lucide-react";
 import appPackage from "../../../package.json";
+import { RefreshCw, RotateCcw } from "@/components/ui/AppIcons";
 import type { Project, Session } from "@/data/types";
 import type { AppUpdateController } from "@/hooks/useAppUpdate";
 import { useSectionAnchors } from "@/hooks/useSectionAnchors";
@@ -68,7 +69,7 @@ export function SettingsView({
         </div>
         <button
           aria-label="Refresh connections"
-          className={`${styles.iconButton}${isHermesStatusLoading ? ` ${styles.refreshing}` : ""}`}
+          className={`${styles.iconButton} ${styles.refreshButton}${isHermesStatusLoading ? ` ${styles.refreshing}` : ""}`}
           disabled={isHermesStatusLoading}
           onClick={refreshConnections}
           type="button"
@@ -266,7 +267,7 @@ function ConnectionRow({
         <span className={styles.status} data-tone={tone}><span aria-hidden="true" />{status}</span>
         <button
           aria-label={`Refresh ${label} status`}
-          className={`${styles.rowIconButton}${isLoading ? ` ${styles.refreshing}` : ""}`}
+          className={`${styles.rowIconButton} ${styles.refreshButton}${isLoading ? ` ${styles.refreshing}` : ""}`}
           disabled={isLoading}
           onClick={onRefresh}
           type="button"

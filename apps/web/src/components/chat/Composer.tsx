@@ -631,7 +631,8 @@ export function Composer({
   const modelMenu =
     isModelMenuOpen && modelMenuStyle ? (
       <div
-        className={styles.modelMenu}
+        className={`${styles.modelMenu} stoix-portal-menu`}
+        data-overlay-context="chat"
         data-filtering={isFilteringModels ? "true" : "false"}
         ref={modelMenuRef}
         role="dialog"

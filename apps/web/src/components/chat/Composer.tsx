@@ -63,6 +63,7 @@ type ComposerProps = {
   onDeferQueuedMessage?: (id: string) => void;
   onPrioritizeQueuedMessage?: (id: string) => void;
   onRemoveQueuedMessage?: (id: string) => void;
+  onSteerQueuedMessage?: (id: string) => void;
   onSend: (message: string, attachments: ChatAttachment[]) => void;
   onStop?: () => void;
   projectControls?: ProjectComposerControls;
@@ -102,6 +103,7 @@ export function Composer({
   onDeferQueuedMessage,
   onPrioritizeQueuedMessage,
   onRemoveQueuedMessage,
+  onSteerQueuedMessage,
   onSend,
   onStop,
   projectControls,
@@ -121,6 +123,7 @@ export function Composer({
   const [voiceInputHasError, setVoiceInputHasError] = useState(false);
   const [voiceInputMessage, setVoiceInputMessage] = useState("");
   const [voiceInputSupported, setVoiceInputSupported] = useState<boolean | null>(null);
+  const [queueMenu, setQueueMenu] = useState<{ bottom: number; id: string; right: number } | null>(null);
   const modelControlRef = useRef<HTMLDivElement>(null);
   const modelButtonRef = useRef<HTMLButtonElement>(null);
   const modelButtonTextRef = useRef<HTMLSpanElement>(null);
@@ -130,6 +133,8 @@ export function Composer({
   const attachmentsRef = useRef<ChatAttachment[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const projectCardRef = useRef<HTMLDivElement>(null);
+  const queueMenuRef = useRef<HTMLDivElement>(null);
+  const queueMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const shouldRefocusAfterSendRef = useRef(false);
   const voiceInputRef = useRef<BrowserSpeechRecognition | null>(null);
   const voiceInputPrefixRef = useRef("");
@@ -269,6 +274,51 @@ export function Composer({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isProjectMenuOpen]);
+
+  useEffect(() => {
+    if (!queueMenu) {
+      return;
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      queueMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    });
+
+    function closeQueueMenu(restoreFocus = false) {
+      setQueueMenu(null);
+      if (restoreFocus) {
+        queueMenuTriggerRef.current?.focus();
+      }
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target && (queueMenuRef.current?.contains(target) || queueMenuTriggerRef.current?.contains(target))) {
+        return;
+      }
+      closeQueueMenu();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeQueueMenu(true);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [queueMenu]);
+
+  useEffect(() => {
+    if (queueMenu && !queuedMessages.some((message) => message.id === queueMenu.id)) {
+      setQueueMenu(null);
+    }
+  }, [queueMenu, queuedMessages]);
 
   useEffect(() => {
     if (!shouldRefocusAfterSendRef.current || disabled) {
@@ -540,6 +590,25 @@ export function Composer({
     onStop?.();
   }
 
+  function toggleQueueMenu(id: string, trigger: HTMLButtonElement) {
+    if (queueMenu?.id === id) {
+      setQueueMenu(null);
+      return;
+    }
+    const bounds = trigger.getBoundingClientRect();
+    queueMenuTriggerRef.current = trigger;
+    setQueueMenu({
+      bottom: window.innerHeight - bounds.top + 5,
+      id,
+      right: Math.max(8, window.innerWidth - bounds.right)
+    });
+  }
+
+  function runQueueAction(action: ((id: string) => void) | undefined, id: string) {
+    setQueueMenu(null);
+    action?.(id);
+  }
+
   function getModelMenuPosition(): ModelMenuStyle | null {
     const trigger = modelButtonRef.current ?? modelControlRef.current;
     if (!trigger) {
@@ -677,6 +746,47 @@ export function Composer({
       data-project-menu-open={isProjectMenuOpen ? "true" : "false"}
     >
       {modelMenu && typeof document !== "undefined" ? createPortal(modelMenu, document.body) : null}
+      {queueMenu && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className={`${styles.followUpMenu} stoix-portal-menu`}
+              data-overlay-context="chat"
+              ref={queueMenuRef}
+              role="menu"
+              aria-label="Queued follow-up options"
+              style={{ bottom: queueMenu.bottom, right: queueMenu.right }}
+            >
+              <button
+                className={styles.followUpMenuItem}
+                type="button"
+                role="menuitem"
+                onClick={() => runQueueAction(onPrioritizeQueuedMessage, queueMenu.id)}
+              >
+                <CornerDownRight size={15} aria-hidden="true" />
+                <span>Send next</span>
+              </button>
+              <button
+                className={styles.followUpMenuItem}
+                type="button"
+                role="menuitem"
+                onClick={() => runQueueAction(onDeferQueuedMessage, queueMenu.id)}
+              >
+                <GripVertical size={15} aria-hidden="true" />
+                <span>Move to end</span>
+              </button>
+              <button
+                className={`${styles.followUpMenuItem} ${styles.followUpMenuDanger}`}
+                type="button"
+                role="menuitem"
+                onClick={() => runQueueAction(onRemoveQueuedMessage, queueMenu.id)}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                <span>Remove</span>
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
       <form className={styles.composer} aria-label="Message composer" onSubmit={submit}>
         {hasQueuedMessages ? (
           <ol className={styles.followUpQueue} aria-label="Queued follow-up messages">
@@ -687,15 +797,14 @@ export function Composer({
                 </span>
                 <span className={styles.followUpText}>{message.content}</span>
                 {message.attachments && message.attachments.length > 0 ? (
-                  <span className={styles.followUpAttachmentCount}>
-                    {message.attachments.length} file{message.attachments.length === 1 ? "" : "s"}
-                  </span>
+                  <FollowUpAttachmentPreview attachments={message.attachments} />
                 ) : null}
                 <span className={styles.followUpActions}>
                   <button
                     className={`${styles.followUpAction} ${styles.steerAction}`}
                     type="button"
-                    onClick={() => onPrioritizeQueuedMessage?.(message.id)}
+                    aria-label="Steer active response with this follow-up"
+                    onClick={() => onSteerQueuedMessage?.(message.id)}
                   >
                     <CornerDownRight size={18} aria-hidden="true" />
                     <span>Steer</span>
@@ -711,8 +820,10 @@ export function Composer({
                   <button
                     className={styles.followUpIconAction}
                     type="button"
-                    aria-label="Move queued follow-up later"
-                    onClick={() => onDeferQueuedMessage?.(message.id)}
+                    aria-label="Queued follow-up options"
+                    aria-expanded={queueMenu?.id === message.id}
+                    aria-haspopup="menu"
+                    onClick={(event) => toggleQueueMenu(message.id, event.currentTarget)}
                   >
                     <MoreHorizontal size={18} />
                   </button>
@@ -975,6 +1086,32 @@ function AttachmentTray({
         />
       ))}
     </div>
+  );
+}
+
+function FollowUpAttachmentPreview({ attachments }: { attachments: ChatAttachment[] }) {
+  const preview = attachments.find(
+    (attachment) => attachment.kind === "image" && Boolean(attachment.previewUrl)
+  );
+
+  if (!preview?.previewUrl) {
+    return (
+      <span className={styles.followUpAttachmentCount}>
+        {attachments.length} file{attachments.length === 1 ? "" : "s"}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={styles.followUpAttachmentPreview}
+      title={`${preview.fileName}${attachments.length > 1 ? ` and ${attachments.length - 1} more` : ""}`}
+    >
+      <img src={preview.previewUrl} alt="" />
+      {attachments.length > 1 ? (
+        <span className={styles.followUpAttachmentBadge}>+{attachments.length - 1}</span>
+      ) : null}
+    </span>
   );
 }
 

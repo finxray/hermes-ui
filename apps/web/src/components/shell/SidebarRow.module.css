@@ -213,43 +213,21 @@
 }
 
 .actionTooltip {
-  position: absolute;
-  z-index: 20;
-  bottom: calc(100% + 9px);
-  left: 50%;
+  position: fixed;
+  z-index: var(--z-floating);
   width: max-content;
   max-width: 150px;
   padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-overlay-subtle);
   border-radius: 8px;
-  background: #29292b;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  background: var(--bg-overlay-solid, #1f1f20);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
   color: var(--text-primary);
   font-size: var(--font-small);
   font-weight: 450;
   line-height: 1.2;
-  opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 3px);
-  transition: opacity 120ms ease, transform 120ms ease;
   white-space: nowrap;
-}
-
-.actionButton:last-child .actionTooltip {
-  right: -8px;
-  left: auto;
-  transform: translateY(3px);
-}
-
-.actionButton:hover .actionTooltip,
-.actionButton:focus-visible .actionTooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.actionButton:last-child:hover .actionTooltip,
-.actionButton:last-child:focus-visible .actionTooltip {
-  transform: translateY(0);
 }
 
 .actionButton svg {
@@ -279,12 +257,6 @@
   background-color: transparent;
   background-image: none;
   color: var(--text-secondary);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .actionTooltip {
-    transition: none;
-  }
 }
 
 .statusDot {

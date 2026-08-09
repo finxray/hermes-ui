@@ -28,6 +28,16 @@ try {
   if (faviconHref) await assertHttpOk(new URL(faviconHref, baseUrl), "Stoix favicon");
   check(await page.getByRole("form", { name: "Message composer" }).isVisible(), "workspace composer is visible");
   check(!(await page.locator("body").innerText()).includes("Brain Memory"), "core workspace has no Brain Memory UI");
+  const focusPersistentScrollbarRule = await page.evaluate(() =>
+    Array.from(document.styleSheets).some((sheet) =>
+      Array.from(sheet.cssRules).some(
+        (rule) =>
+          rule instanceof CSSStyleRule &&
+          rule.selectorText?.includes(".scrollbar-hover-context:focus-within")
+      )
+    )
+  );
+  check(!focusPersistentScrollbarRule, "panel scrollbars are hover-only and do not persist with focus");
   await checkOverflow(page, "workspace desktop");
 
   const activeTab = page.getByRole("tab").first();

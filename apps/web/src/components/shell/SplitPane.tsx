@@ -26,6 +26,7 @@ type SplitPaneProps = {
   isHermesSessionsLoading: boolean;
   isHermesStatusLoading: boolean;
   isHermesStatusRefreshing?: boolean;
+  isFocused?: boolean;
   mode: RightPaneMode;
   onActivateSideChat?: () => void;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
@@ -52,6 +53,7 @@ export function SplitPane({
   isHermesSessionsLoading,
   isHermesStatusLoading,
   isHermesStatusRefreshing = false,
+  isFocused = false,
   mode,
   onActivateSideChat,
   onActivityEvent,
@@ -91,6 +93,7 @@ export function SplitPane({
               createSession={createSideSession}
               hermesStatus={hermesStatus}
               isHermesStatusLoading={isHermesStatusLoading}
+              isFocused={isFocused}
               isSplitViewOpen={isChatVisible}
               onActivate={onActivateSideChat}
               onActivityEvent={onActivityEvent}

@@ -180,7 +180,7 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
           const isActive = !isPointerHovering && turn.anchorMessageId === activeVisibleTurn?.anchorMessageId;
           const isFocused = focusPosition !== null && Math.round(focusPosition) === visibleIndex;
           const markerStyle = {
-            "--conversation-marker-width": `${focusPosition === null ? (compactMarkers ? 5.2 : 6.8) : focusedMarkerWidth(
+            "--conversation-marker-width": `${focusPosition === null ? 6.8 : focusedMarkerWidth(
               Math.abs(visibleIndex - focusPosition),
               visibleTurns.length,
               compactMarkers

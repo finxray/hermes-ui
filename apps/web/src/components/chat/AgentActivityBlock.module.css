@@ -167,7 +167,7 @@
 }
 
 .tokenPart[data-kind="out"] {
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 .workedSummary:hover .workedLabel,

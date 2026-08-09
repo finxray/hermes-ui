@@ -22,12 +22,14 @@ export function selectSidebarTab(ids: string[], activeId: string | null, session
     return ids;
   }
 
-  const activeIndex = activeId ? ids.indexOf(activeId) : -1;
-  if (activeIndex < 0) {
-    return appendUniqueTab(ids, sessionId);
+  if (ids.length === 0) {
+    return [sessionId];
   }
 
-  return ids.map((id, index) => (index === activeIndex ? sessionId : id));
+  const activeIndex = activeId ? ids.indexOf(activeId) : -1;
+  const replacementIndex = activeIndex >= 0 ? activeIndex : ids.length - 1;
+
+  return ids.map((id, index) => (index === replacementIndex ? sessionId : id));
 }
 
 export function resolveSidebarTargetPane(
@@ -43,4 +45,24 @@ export function resolveSidebarTargetPane(
     return "main" as const;
   }
   return focusedPane;
+}
+
+export function resolveSidebarSelectedSessionIds({
+  activeSessionId,
+  sideChatIsVisible,
+  sideSessionId,
+  singlePane
+}: {
+  activeSessionId: string | null | undefined;
+  sideChatIsVisible: boolean;
+  sideSessionId: string | null | undefined;
+  singlePane: "main" | "side" | null;
+}) {
+  const ids = singlePane === "side"
+    ? [sideSessionId]
+    : singlePane === "main" || !sideChatIsVisible
+      ? [activeSessionId]
+      : [activeSessionId, sideSessionId];
+
+  return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
 }

@@ -25,6 +25,7 @@ import {
   appendUniqueTab,
   insertUniqueTab,
   reorderTab,
+  resolveSidebarSelectedSessionIds,
   resolveSidebarTargetPane,
   selectSidebarTab
 } from "@/lib/chatTabState";
@@ -129,6 +130,14 @@ function AppShellInner() {
     focusedChatPane === "side" && !rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console") && sideSession
       ? sideSession
       : activeSession;
+  const sideChatIsVisible =
+    !rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console");
+  const sidebarSelectedSessionIds = resolveSidebarSelectedSessionIds({
+    activeSessionId: activeSession?.id,
+    sideChatIsVisible,
+    sideSessionId: sideSession?.id,
+    singlePane
+  });
   const shellStyle: ShellStyle = {};
   const sectionWindowTitle =
     sectionNav.labelForSection(activeSection) ??
@@ -711,6 +720,14 @@ function AppShellInner() {
     setFocusedChatPane("main");
   }
 
+  function focusPaneComposer(pane: ChatPaneId) {
+    window.requestAnimationFrame(() => {
+      shellRef.current
+        ?.querySelector<HTMLTextAreaElement>(`[data-chat-pane='${pane}'] textarea[aria-label='Message']`)
+        ?.focus({ preventScroll: true });
+    });
+  }
+
   function openWorkspaceSession(sessionId: string) {
     hermesOpenRequestRef.current += 1;
     const targetPane = resolveSidebarTargetPane(
@@ -720,7 +737,11 @@ function AppShellInner() {
       sessionId
     );
     if (targetPane === "main") {
-      selectMainSession(sessionId);
+      setMainTabIds((current) => selectSidebarTab(current, activeSession?.id ?? null, sessionId));
+      setSideTabIds((current) => current.filter((id) => id !== sessionId));
+      actions.switchSession(sessionId);
+      setFocusedChatPane("main");
+      focusPaneComposer("main");
       return;
     }
     setSideTabIds((current) => selectSidebarTab(current, sideSessionId, sessionId));
@@ -729,6 +750,7 @@ function AppShellInner() {
     setRightPaneMode("chat");
     setFocusedChatPane("side");
     revealRightRailAfterRender();
+    focusPaneComposer("side");
   }
 
   openWorkspaceSessionRef.current = openWorkspaceSession;
@@ -991,6 +1013,7 @@ function AppShellInner() {
         activeSection={activeSection}
         activeProject={activeProject}
         activeSession={sidebarActiveSession}
+        selectedSessionIds={sidebarSelectedSessionIds}
         visibleSessionIds={[activeSession?.id, sideSession?.id].filter((id): id is string => Boolean(id))}
         allSessions={state.sessions}
         hermesStatus={hermesStatus.status}
@@ -1019,7 +1042,9 @@ function AppShellInner() {
       />
       <div
         className={mainWindowStyles.mainWindow}
+        data-focused-pane={focusedChatPane}
         data-promoting-side-chat={promotingSideSessionId ? "true" : "false"}
+        data-right-pane-mode={rightPaneMode}
         data-single-pane={singlePane ?? "split"}
         data-shell-main-window="true"
         data-right-collapsed={rightCollapsed ? "true" : "false"}
@@ -1044,6 +1069,7 @@ function AppShellInner() {
               createSession={createMainSession}
               hermesStatus={hermesStatus.status}
               isHermesStatusLoading={hermesStatus.isLoading}
+              isFocused={focusedChatPane === "main"}
               isSplitViewOpen={!rightCollapsed && (rightPaneMode === "chat" || rightPaneMode === "chat-console")}
               onActivate={() => setFocusedChatPane("main")}
               onActivityEvent={appendActivityEvent}
@@ -1142,6 +1168,7 @@ function AppShellInner() {
           isHermesSessionsLoading={hermesSessions.isLoading}
           isHermesStatusLoading={hermesStatus.isLoading}
           isHermesStatusRefreshing={hermesStatus.isRefreshing}
+          isFocused={focusedChatPane === "side"}
           mode={rightPaneMode}
           onActivateSideChat={() => setFocusedChatPane("side")}
           onActivityEvent={appendActivityEvent}

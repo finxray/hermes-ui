@@ -48,6 +48,7 @@ import type {
 } from "./types";
 import {
   isLocalLmStudioProvider,
+  sessionTokenUsageDelta,
   shouldSuppressHermesStreamError,
   type HermesStreamCompatibilityContext
 } from "./compatibility.ts";
@@ -688,6 +689,18 @@ export async function streamHermesSessionChat(
     }
   }
 
+  const recoverSessionUsage = isLocalLmStudioProvider(request.provider);
+  const sessionUsageBaseline = recoverSessionUsage
+    ? await readHermesSessionUsageSnapshot({
+        apiKey: config.apiKey,
+        base,
+        fetchImpl,
+        sessionId: hermesSessionId,
+        signal: config.signal,
+        timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+      })
+    : undefined;
+
   const abort = createLinkedAbortController(config.signal, config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const headers = new Headers({
     Accept: "text/event-stream",
@@ -759,6 +772,20 @@ export async function streamHermesSessionChat(
         : undefined,
       runtimeModelId && isLocalLmStudioProvider(request.provider)
         ? { model: runtimeModelId, provider: request.provider?.trim() ?? "" }
+        : undefined,
+      sessionUsageBaseline
+        ? async () =>
+            sessionTokenUsageDelta(
+              sessionUsageBaseline,
+              await readHermesSessionUsageSnapshot({
+                apiKey: config.apiKey,
+                base,
+                fetchImpl,
+                sessionId: hermesSessionId,
+                signal: config.signal,
+                timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS
+              })
+            )
         : undefined
     )
   };
@@ -2581,6 +2608,38 @@ export async function getHermesSession(
     sessionId: safeId,
     error: null
   };
+}
+
+async function readHermesSessionUsageSnapshot(args: {
+  apiKey?: string | null;
+  base: URL;
+  fetchImpl: typeof fetch;
+  sessionId: string;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}): Promise<HermesTokenUsage | undefined> {
+  const result = await fetchJsonEndpoint({
+    apiKey: args.apiKey,
+    base: args.base,
+    fetchImpl: args.fetchImpl,
+    path: `/api/sessions/${encodeURIComponent(args.sessionId)}`,
+    signal: args.signal,
+    timeoutMs: args.timeoutMs
+  });
+  if (!result.ok) {
+    return undefined;
+  }
+
+  const record =
+    objectRecord(result.data.session) ??
+    objectRecord(result.data.data) ??
+    objectRecord(result.data);
+  return record
+    ? normalizeTokenUsage({
+        ...record,
+        source: "hermes_usage"
+      })
+    : undefined;
 }
 
 export async function getHermesSessionMessages(
@@ -6000,7 +6059,8 @@ function normalizeHermesSseStream(
   upstream: ReadableStream<Uint8Array>,
   abort: LinkedAbortController,
   emptyAssistantFallback?: string,
-  localProviderCompatibility?: HermesStreamCompatibilityContext
+  localProviderCompatibility?: HermesStreamCompatibilityContext,
+  resolveFallbackUsage?: () => Promise<HermesTokenUsage | undefined>
 ) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -6013,9 +6073,14 @@ function normalizeHermesSseStream(
       const streamState = {
         assistantText: "",
         emptyAssistantFallback,
+        deferDone: Boolean(resolveFallbackUsage),
+        hasAuthoritativeCompletionUsage: false,
+        hasAuthoritativePromptUsage: false,
         hasAssistantText: false,
         localAliasMismatchSuppressed: false,
-        localProviderCompatibility
+        localProviderCompatibility,
+        messageId: undefined as string | undefined,
+        runId: undefined as string | undefined
       };
 
       try {
@@ -6036,8 +6101,38 @@ function normalizeHermesSseStream(
         if (buffer.trim()) {
           doneSent = writeNormalizedFrame(controller, encoder, buffer, streamState) || doneSent;
         }
+        if (
+          resolveFallbackUsage &&
+          (!streamState.hasAuthoritativePromptUsage || !streamState.hasAuthoritativeCompletionUsage)
+        ) {
+          const fallbackUsage = await resolveFallbackUsage();
+          const recoveredUsage = fallbackUsage ? { ...fallbackUsage } : undefined;
+          if (recoveredUsage && streamState.hasAuthoritativePromptUsage) {
+            delete recoveredUsage.promptTokens;
+          }
+          if (recoveredUsage && streamState.hasAuthoritativeCompletionUsage) {
+            delete recoveredUsage.completionTokens;
+          }
+          if (recoveredUsage && (streamState.hasAuthoritativePromptUsage || streamState.hasAuthoritativeCompletionUsage)) {
+            delete recoveredUsage.totalTokens;
+          }
+          if (
+            recoveredUsage &&
+            (typeof recoveredUsage.promptTokens === "number" ||
+              typeof recoveredUsage.completionTokens === "number")
+          ) {
+            writeUiSse(controller, encoder, {
+              type: "metadata",
+              messageId: streamState.messageId,
+              runId: streamState.runId,
+              usage: recoveredUsage
+            });
+          }
+        }
         if (!doneSent) {
           writeEmptyAssistantFallback(controller, encoder, streamState);
+        }
+        if (streamState.deferDone || !doneSent) {
           writeUiSse(controller, encoder, { type: "done" });
         }
       } catch (error) {
@@ -6049,7 +6144,7 @@ function normalizeHermesSseStream(
               message: "Hermes stream ended unexpectedly."
             }
           });
-          if (!doneSent) {
+          if (streamState.deferDone || !doneSent) {
             writeUiSse(controller, encoder, { type: "done" });
           }
         }
@@ -6068,7 +6163,10 @@ function writeNormalizedFrame(
   frame: string,
   streamState?: {
     assistantText: string;
+    deferDone: boolean;
     emptyAssistantFallback?: string;
+    hasAuthoritativeCompletionUsage: boolean;
+    hasAuthoritativePromptUsage: boolean;
     hasAssistantText: boolean;
     localAliasMismatchSuppressed: boolean;
     localProviderCompatibility?: HermesStreamCompatibilityContext;
@@ -6119,6 +6217,14 @@ function writeNormalizedFrame(
         streamState.hasAssistantText = true;
       }
     }
+    if (streamState && (normalized.type === "message_done" || normalized.type === "metadata")) {
+      if (typeof normalized.usage?.promptTokens === "number") {
+        streamState.hasAuthoritativePromptUsage = true;
+      }
+      if (typeof normalized.usage?.completionTokens === "number") {
+        streamState.hasAuthoritativeCompletionUsage = true;
+      }
+    }
     if (normalized.type === "done") {
       writeEmptyAssistantFallback(controller, encoder, streamState);
       if (streamState?.localAliasMismatchSuppressed && streamState.assistantText.trim()) {
@@ -6132,10 +6238,21 @@ function writeNormalizedFrame(
           runId: streamState.runId
         });
       }
+      if (streamState?.deferDone) {
+        return true;
+      }
     }
     writeUiSse(controller, encoder, normalized);
     const runUsageMetadata = normalizeRunEventUsageMetadata(normalized);
     if (runUsageMetadata) {
+      if (streamState) {
+        if (typeof runUsageMetadata.usage?.promptTokens === "number") {
+          streamState.hasAuthoritativePromptUsage = true;
+        }
+        if (typeof runUsageMetadata.usage?.completionTokens === "number") {
+          streamState.hasAuthoritativeCompletionUsage = true;
+        }
+      }
       writeUiSse(controller, encoder, runUsageMetadata);
     }
     return normalized.type === "done";
@@ -6217,7 +6334,9 @@ function splitLongStreamUnit(value: string) {
   return blocks;
 }
 
-function normalizeRunEventUsageMetadata(event: HermesChatStreamEvent): HermesChatStreamEvent | null {
+function normalizeRunEventUsageMetadata(
+  event: HermesChatStreamEvent
+): Extract<HermesChatStreamEvent, { type: "metadata" }> | null {
   if (event.type !== "run_event") {
     return null;
   }

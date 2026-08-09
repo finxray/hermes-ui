@@ -30,6 +30,7 @@
 
 .tabWrap {
   --tab-max-width: 116px;
+  --tab-content-offset-y: -1px;
   position: relative;
   display: flex;
   width: max-content;
@@ -38,7 +39,7 @@
   height: 28px;
   flex: 0 0 auto;
   align-items: center;
-  border-radius: 15px;
+  border-radius: 15.84px;
   opacity: 1;
   transition:
     width 220ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -65,6 +66,11 @@
   background: transparent;
 }
 
+.viewport > .tabSequence:only-child .tabWrap:hover,
+.viewport > .tabSequence:only-child .tabWrap:focus-within {
+  background: var(--bg-control-hover);
+}
+
 .tabWrap:hover {
   background: var(--bg-control-hover);
 }
@@ -74,13 +80,15 @@
 }
 
 .tabButton {
+  position: relative;
+  top: var(--tab-content-offset-y);
   display: flex;
   width: max-content;
   min-width: 0;
   max-width: var(--tab-max-width);
   height: 28px;
   align-items: center;
-  padding: 0 31px 0 29px;
+  padding: 0 53px 0 10px;
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -113,8 +121,8 @@
 
 .moreButton {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: calc(6px + var(--tab-content-offset-y));
+  right: 28px;
   display: grid;
   width: 18px;
   height: 18px;
@@ -294,8 +302,8 @@
 
 .closeButton {
   position: absolute;
-  top: 6px;
-  left: 6px;
+  top: calc(6px + var(--tab-content-offset-y));
+  right: 6px;
   display: grid;
   width: 18px;
   height: 18px;
@@ -317,16 +325,25 @@
   margin-left: auto;
 }
 
-.tabWrap[data-active="true"] .closeButton,
 .tabWrap:hover .closeButton,
 .closeButton:focus-visible {
   opacity: 1;
 }
 
-.closeButton:hover,
-.closeButton:focus-visible {
+/* Selected tabs with a visible background keep their close control discoverable. */
+.tabWrap[data-has-background="true"] .closeButton {
+  opacity: 1;
+}
+
+.closeButton:hover {
   outline: 0;
   color: var(--danger);
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.closeButton:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--text-primary) 45%, transparent);
+  outline-offset: 1px;
 }
 
 .closeButton:active {
@@ -368,7 +385,7 @@
   max-width: var(--drop-slot-width);
   height: 28px;
   flex: 0 0 var(--drop-slot-width);
-  border-radius: 15px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.035);
   pointer-events: none;
   animation: dropSlotIn 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -465,7 +482,7 @@
   align-items: center;
   gap: 5px;
   padding: 0 6px;
-  border-radius: 15px;
+  border-radius: 12px;
   background: var(--bg-control-hover, #29292b);
   font-size: 12.65px;
   font-weight: 400;

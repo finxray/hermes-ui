@@ -10,7 +10,7 @@
  * webkit customization stays active in this Chromium runtime).
  *   - Track gutter is a FIXED width — it does not grow on hover.
  *   - idle: transparent thumb and hidden arrow buttons
- *   - panel context hover/focus-within + scrollable target: thumb and buttons fade in
+ *   - panel context hover + scrollable target: thumb and buttons fade in
  */
 *::-webkit-scrollbar {
   width: var(--scrollbar-size);
@@ -37,15 +37,23 @@
     border-width var(--scrollbar-transition-duration) var(--scrollbar-transition-easing);
 }
 
-.scrollbar-hover-context:hover .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-thumb,
-.scrollbar-hover-context:focus-within .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-thumb {
+[data-chat-pane][data-focused="false"] [data-chat-scroll-viewport]::-webkit-scrollbar-thumb {
+  background-color: transparent !important;
+  transition: none;
+}
+
+[data-chat-pane][data-focused="false"] [data-chat-scroll-viewport]::-webkit-scrollbar-button {
+  background-image: none !important;
+  opacity: 0 !important;
+  transition: none;
+}
+
+.scrollbar-hover-context:hover .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-thumb {
   background-color: var(--scrollbar-thumb);
   border-width: var(--scrollbar-thumb-border-active);
 }
 
 .scrollbar-hover-context:hover
-  .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-thumb:hover,
-.scrollbar-hover-context:focus-within
   .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-thumb-hover);
   border-width: var(--scrollbar-thumb-border-hover-active);
@@ -66,14 +74,12 @@
   opacity: 0;
 }
 
-.scrollbar-hover-context:not(:hover):not(:focus-within)
-  .scrollbar-hover-target::-webkit-scrollbar-button:single-button {
+.scrollbar-hover-context:not(:hover) .scrollbar-hover-target::-webkit-scrollbar-button:single-button {
   background-image: none;
   opacity: 0;
 }
 
-.scrollbar-hover-context:hover .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button,
-.scrollbar-hover-context:focus-within
+.scrollbar-hover-context:hover
   .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button {
   opacity: 1;
   background-size: var(--scrollbar-arrow-scale) var(--scrollbar-arrow-scale);
@@ -106,29 +112,21 @@
 }
 
 .scrollbar-hover-context:hover
-  .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:vertical:increment,
-.scrollbar-hover-context:focus-within
   .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:vertical:increment {
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2035%2035%22%3E%3Cg%20transform%3D%22rotate(180%2017.5%2017.5)%22%3E%3Cpath%20fill%3D%22rgba(180%2C%20176%2C%20183%2C%200.192)%22%20d%3D%22M6.109%2032h22.783c4.027%200%206.465-4.448%204.3-7.843L21.8%206.295c-2.005-3.144-6.596-3.144-8.601%200L1.808%2024.157C-0.357%2027.552%202.082%2032%206.109%2032z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
 }
 
 .scrollbar-hover-context:hover
-  .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:vertical:decrement,
-.scrollbar-hover-context:focus-within
   .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:vertical:decrement {
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2035%2035%22%3E%3Cpath%20fill%3D%22rgba(180%2C%20176%2C%20183%2C%200.192)%22%20d%3D%22M6.109%2032h22.783c4.027%200%206.465-4.448%204.3-7.843L21.8%206.295c-2.005-3.144-6.596-3.144-8.601%200L1.808%2024.157C-0.357%2027.552%202.082%2032%206.109%2032z%22%2F%3E%3C%2Fsvg%3E");
 }
 
 .scrollbar-hover-context:hover
-  .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:horizontal:increment,
-.scrollbar-hover-context:focus-within
   .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:horizontal:increment {
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2035%2035%22%3E%3Cg%20transform%3D%22rotate(90%2017.5%2017.5)%22%3E%3Cpath%20fill%3D%22rgba(180%2C%20176%2C%20183%2C%200.192)%22%20d%3D%22M6.109%2032h22.783c4.027%200%206.465-4.448%204.3-7.843L21.8%206.295c-2.005-3.144-6.596-3.144-8.601%200L1.808%2024.157C-0.357%2027.552%202.082%2032%206.109%2032z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
 }
 
 .scrollbar-hover-context:hover
-  .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:horizontal:decrement,
-.scrollbar-hover-context:focus-within
   .scrollbar-hover-target[data-scrollable="true"]::-webkit-scrollbar-button:single-button:horizontal:decrement {
   background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2035%2035%22%3E%3Cg%20transform%3D%22rotate(-90%2017.5%2017.5)%22%3E%3Cpath%20fill%3D%22rgba(180%2C%20176%2C%20183%2C%200.192)%22%20d%3D%22M6.109%2032h22.783c4.027%200%206.465-4.448%204.3-7.843L21.8%206.295c-2.005-3.144-6.596-3.144-8.601%200L1.808%2024.157C-0.357%2027.552%202.082%2032%206.109%2032z%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
 }
@@ -207,7 +205,7 @@ textarea:disabled {
   background: rgba(142, 230, 198, 0.25);
 }
 
-/* Panel regions that reveal nested scrollbars on hover/focus. */
+/* Panel regions that reveal nested scrollbars only while hovered. */
 .scrollbar-hover-context {
   scrollbar-color: auto;
 }

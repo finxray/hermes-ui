@@ -42,7 +42,7 @@
   max-width: 100%;
   min-width: 0;
   padding: 7px 13px;
-  border-radius: 16px;
+  border-radius: 12.8px;
   background: rgba(38, 38, 40, 0.7);
   box-sizing: border-box;
 }
@@ -193,6 +193,10 @@
 
 .usageMeta {
   line-height: 1.35;
+}
+
+.usageMeta[data-kind="out"] {
+  color: var(--orange);
 }
 
 .messageActions {

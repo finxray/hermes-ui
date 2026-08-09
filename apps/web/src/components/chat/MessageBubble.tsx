@@ -142,7 +142,9 @@ export const MessageBubble = memo(function MessageBubble({
             {usageParts.map((part) => (
               <span
                 className={styles.usageMeta}
+                data-kind={part.kind}
                 key={part.key}
+                title={part.title}
               >
                 {part.label}
               </span>
@@ -155,6 +157,7 @@ export const MessageBubble = memo(function MessageBubble({
 });
 
 type UsagePart = {
+  kind: "in" | "out";
   key: string;
   label: string;
   title?: string;
@@ -182,10 +185,10 @@ function formatUsageParts(usage: ChatMessage["usage"]) {
   const parts: UsagePart[] = [];
   const usageTitle = usage.source === "estimated" ? "Estimated token usage." : "Provider or Hermes reported usage.";
   if (typeof usage.promptTokens === "number") {
-    parts.push({ key: "in", label: `${formatCompactTokenCount(usage.promptTokens)} in`, title: usageTitle });
+    parts.push({ key: "in", kind: "in", label: `${formatCompactTokenCount(usage.promptTokens)} in`, title: usageTitle });
   }
   if (typeof usage.completionTokens === "number") {
-    parts.push({ key: "out", label: `${formatCompactTokenCount(usage.completionTokens)} out`, title: usageTitle });
+    parts.push({ key: "out", kind: "out", label: `${formatCompactTokenCount(usage.completionTokens)} out`, title: usageTitle });
   }
   return parts;
 }

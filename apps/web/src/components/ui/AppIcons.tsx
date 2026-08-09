@@ -263,7 +263,8 @@ export const PanelRightClose = makeIcon([
 ]);
 
 export const PanelSingle = makeIcon([
-  { element: "rect", props: { x: 4.8, y: 6, width: 14.4, height: 12, rx: 3.6 } }
+  { d: "M11 17H7v-4" },
+  { d: "M13 7h4v4" }
 ]);
 
 export const PanelSplit = makeIcon([

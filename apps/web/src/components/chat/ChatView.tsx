@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, UIEvent } from "react";
 import { useComposerInset } from "@/hooks/useComposerInset";
 import { ChatHeader, type ChatHeaderTabs } from "@/components/chat/ChatHeader";
@@ -42,17 +42,8 @@ type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 type ActivityRecorder = (sessionId: string, event: AgentActivityEvent) => void;
 type QueuedTurn = QueuedComposerMessage & { attachments?: ChatAttachment[]; sessionId: string };
 const STREAM_FLUSH_INTERVAL_MS = 32;
-const ESTIMATED_CHARS_PER_TOKEN = 4;
-const ESTIMATED_ACTIVITY_CHARS_PER_TOKEN = 6;
-const ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND = 2.5;
-const LIVE_TOKEN_ESTIMATE_INTERVAL_MS = 650;
-const LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS = 512;
 const LIVE_TOKEN_AFTERGLOW_MS = 15_000;
 const CHATS_PROJECT_NAME = "Chats";
-// How many completed tool cycles it takes for the live "in" estimate to climb
-// all the way to the prior turn's prompt total (a tool loop re-sends the full
-// context each request, so prompt grows roughly per cycle).
-const PROMPT_CLIMB_EXPECTED_CYCLES = 6;
 
 type ChatViewProps = {
   activeProject: Project;
@@ -61,6 +52,7 @@ type ChatViewProps = {
   createSession: () => void;
   hermesStatus: NormalizedHermesStatus | null;
   isHermesStatusLoading: boolean;
+  isFocused?: boolean;
   isSplitViewOpen?: boolean;
   onActivate?: () => void;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
@@ -82,6 +74,7 @@ export function ChatView({
   createSession,
   hermesStatus,
   isHermesStatusLoading,
+  isFocused = true,
   isSplitViewOpen = false,
   onActivate,
   onActivityEvent,
@@ -99,6 +92,7 @@ export function ChatView({
   const [isStopRequested, setIsStopRequested] = useState(false);
   const [isFinalizingResponse, setIsFinalizingResponse] = useState(false);
   const [isTranscriptUnderTabs, setIsTranscriptUnderTabs] = useState(false);
+  const [doTabsOverlapTranscript, setDoTabsOverlapTranscript] = useState(false);
   const [liveTokenUsage, setLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [visibleLiveTokenUsage, setVisibleLiveTokenUsage] = useState<LiveTokenUsageSnapshot | null>(null);
   const [generationStartedAt, setGenerationStartedAt] = useState<string | null>(null);
@@ -114,14 +108,12 @@ export function ChatView({
   const assistantHasContentRef = useRef(false);
   const stopRequestedRef = useRef(false);
   const activitySequenceRef = useRef(0);
-  const authoritativeCompletionTokensRef = useRef(false);
-  const authoritativePromptTokensRef = useRef(false);
-  const liveTokenPulseRef = useRef<number | null>(null);
   const liveTokenClearTimerRef = useRef<number | null>(null);
   const liveTokenResetTimerRef = useRef<number | null>(null);
   const queuedTurnTimerRef = useRef<number | null>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const isTranscriptUnderTabsRef = useRef(false);
+  const tabsOverlapTranscriptRef = useRef(false);
   const startStageRef = useRef<HTMLDivElement>(null);
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const isStartState = Boolean(activeSession && activeSession.messages.length === 0);
@@ -140,6 +132,56 @@ export function ChatView({
 
   useScrollOverflowTarget(scrollViewportRef, !isStartState);
   useScrollOverflowTarget(startStageRef, isStartState);
+
+  useLayoutEffect(() => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport || isStartState || !showHeader || !tabs) {
+      tabsOverlapTranscriptRef.current = false;
+      setDoTabsOverlapTranscript(false);
+      return;
+    }
+
+    const tabViewport = viewport.querySelector<HTMLElement>("[data-chat-tab-viewport='true']");
+    const transcriptColumn = viewport.querySelector<HTMLElement>("[data-chat-transcript-column='true']");
+    if (!tabViewport || !transcriptColumn) {
+      tabsOverlapTranscriptRef.current = false;
+      setDoTabsOverlapTranscript(false);
+      return;
+    }
+
+    let measureFrame: number | null = null;
+    const measureOverlap = () => {
+      measureFrame = null;
+      const tabsBounds = tabViewport.getBoundingClientRect();
+      const transcriptBounds = transcriptColumn.getBoundingClientRect();
+      const nextOverlap =
+        tabsBounds.right > transcriptBounds.left + 1 &&
+        tabsBounds.left < transcriptBounds.right - 1;
+      if (nextOverlap === tabsOverlapTranscriptRef.current) {
+        return;
+      }
+      tabsOverlapTranscriptRef.current = nextOverlap;
+      setDoTabsOverlapTranscript(nextOverlap);
+    };
+    const scheduleMeasurement = () => {
+      if (measureFrame === null) {
+        measureFrame = window.requestAnimationFrame(measureOverlap);
+      }
+    };
+
+    measureOverlap();
+    const observer = new ResizeObserver(scheduleMeasurement);
+    observer.observe(viewport);
+    observer.observe(tabViewport);
+    observer.observe(transcriptColumn);
+
+    return () => {
+      observer.disconnect();
+      if (measureFrame !== null) {
+        window.cancelAnimationFrame(measureFrame);
+      }
+    };
+  }, [isStartState, showHeader, Boolean(tabs)]);
 
   useEffect(() => {
     const viewport = scrollViewportRef.current;
@@ -204,10 +246,6 @@ export function ChatView({
     stopRequestedRef.current = false;
     activeStreamControllerRef.current?.abort();
     activeStreamControllerRef.current = null;
-    if (liveTokenPulseRef.current !== null) {
-      window.clearInterval(liveTokenPulseRef.current);
-      liveTokenPulseRef.current = null;
-    }
     if (flushTimeoutRef.current !== null) {
       window.clearTimeout(flushTimeoutRef.current);
       flushTimeoutRef.current = null;
@@ -218,8 +256,6 @@ export function ChatView({
     }
     assistantHasContentRef.current = false;
     activitySequenceRef.current = 0;
-    authoritativeCompletionTokensRef.current = false;
-    authoritativePromptTokensRef.current = false;
     if (liveTokenClearTimerRef.current !== null) {
       window.clearTimeout(liveTokenClearTimerRef.current);
       liveTokenClearTimerRef.current = null;
@@ -236,9 +272,6 @@ export function ChatView({
 
   useEffect(() => () => {
     activeStreamControllerRef.current?.abort();
-    if (liveTokenPulseRef.current !== null) {
-      window.clearInterval(liveTokenPulseRef.current);
-    }
     if (flushTimeoutRef.current !== null) {
       window.clearTimeout(flushTimeoutRef.current);
     }
@@ -354,16 +387,6 @@ export function ChatView({
     let hermesRunId: string | undefined;
     let responseTokenUsage: HermesTokenUsage | undefined;
     const usageAccumulator = createTokenUsageAccumulator();
-    let estimatedPromptTokens = 0;
-    let estimatedActivityChars = 0;
-    // The visible text is a tiny fraction of the real prompt — most of it is the
-    // context Hermes injects server-side (memory, tool defs, system) and, in a
-    // tool loop, the full conversation re-sent each request. The client can't see
-    // that, so the live "in" estimate climbs toward the prior turn's prompt total
-    // (a good proxy, since context carries forward) as command cycles complete,
-    // instead of sitting flat at the visible-text estimate and snapping at the end.
-    const priorTurnPromptTokens = recentAuthoritativePromptTokens(session.messages);
-    let toolCycleCount = 0;
     let accumulated = "";
     // Assistant text arrives one turn at a time. We hold each turn rather than
     // streaming it immediately: if tool/command activity follows, the turn was
@@ -373,23 +396,14 @@ export function ChatView({
     let currentTurnText = "";
     let lastAnswerCandidateText = "";
     let streamCompletedSuccessfully = false;
-    const liveEstimateStartedAtMs = performance.now();
-
     const nextActivitySequence = () => activitySequenceRef.current++;
 
     const syncLiveTokenUsage = (usage: HermesTokenUsage | undefined) => {
-      if (!usage) {
+      if (!usage || usage.source === "estimated") {
         return;
       }
       if (typeof usage.promptTokens !== "number" && typeof usage.completionTokens !== "number") {
         return;
-      }
-      const usageIsEstimated = usage.source === "estimated";
-      if (!usageIsEstimated && typeof usage.promptTokens === "number") {
-        authoritativePromptTokensRef.current = true;
-      }
-      if (!usageIsEstimated && typeof usage.completionTokens === "number") {
-        authoritativeCompletionTokensRef.current = true;
       }
       setLiveTokenUsage((current) => ({
         promptTokens: usage.promptTokens ?? current?.promptTokens,
@@ -402,113 +416,13 @@ export function ChatView({
       // id) instead of replacing it with the latest sample, so multi-request
       // runs report the run total rather than one request's `in`/`out` counts.
       const normalized = normalizeActivityTokenUsage(usage);
+      if (!normalized || normalized.source === "estimated") {
+        return responseTokenUsage;
+      }
       const aggregate = usageAccumulator.add(normalized);
       responseTokenUsage = annotateTokenUsageRoute(aggregate ?? responseTokenUsage, modelRequest);
       syncLiveTokenUsage(responseTokenUsage);
       return responseTokenUsage;
-    };
-
-    const stopLiveTokenPulse = () => {
-      if (liveTokenPulseRef.current !== null) {
-        window.clearInterval(liveTokenPulseRef.current);
-        liveTokenPulseRef.current = null;
-      }
-    };
-
-    const estimateLiveCompletionTokens = () => {
-      const visibleTextTokens = estimateTokenCount(accumulated);
-      const activityTokens = Math.ceil(estimatedActivityChars / ESTIMATED_ACTIVITY_CHARS_PER_TOKEN);
-      const elapsedTokens = Math.min(
-        LIVE_TOKEN_ESTIMATE_MAX_THINKING_TOKENS,
-        Math.floor(((performance.now() - liveEstimateStartedAtMs) / 1000) * ESTIMATED_THINKING_OUTPUT_TOKENS_PER_SECOND)
-      );
-      return Math.max(visibleTextTokens, activityTokens + elapsedTokens);
-    };
-
-    const estimateLivePromptTokens = () => {
-      const activityPromptTokens = Math.ceil(estimatedActivityChars / ESTIMATED_CHARS_PER_TOKEN);
-      const generatedContextTokens = Math.ceil(accumulated.length / ESTIMATED_CHARS_PER_TOKEN);
-      const visibleEstimate = estimatedPromptTokens + activityPromptTokens + generatedContextTokens;
-      // Climb toward the prior turn's prompt total as tool cycles complete, so a
-      // multi-request run's "in" rises during streaming instead of snapping at the
-      // end. Stays at/under the prior total so authoritative usage only corrects
-      // upward for heavier turns; lighter turns settle when the real value lands.
-      if (priorTurnPromptTokens > visibleEstimate) {
-        const cycleProgress = Math.min(1, toolCycleCount / PROMPT_CLIMB_EXPECTED_CYCLES);
-        const climbed = visibleEstimate + Math.round((priorTurnPromptTokens - visibleEstimate) * cycleProgress);
-        return Math.max(0, climbed);
-      }
-      return Math.max(0, visibleEstimate);
-    };
-
-    const withEstimatedTokenFallback = (usage: HermesTokenUsage | undefined) => {
-      const next: HermesTokenUsage = usage ? { ...usage } : {};
-      let usedEstimate = false;
-
-      if (typeof next.promptTokens !== "number" && estimatedPromptTokens > 0) {
-        next.promptTokens = estimatedPromptTokens;
-        usedEstimate = true;
-      }
-
-      if (typeof next.completionTokens !== "number") {
-        next.completionTokens = estimateLiveCompletionTokens();
-        usedEstimate = true;
-      }
-
-      if (
-        typeof next.totalTokens !== "number" &&
-        (typeof next.promptTokens === "number" || typeof next.completionTokens === "number")
-      ) {
-        next.totalTokens = (next.promptTokens ?? 0) + (next.completionTokens ?? 0);
-      }
-
-      if (usedEstimate) {
-        next.source = "estimated";
-      }
-
-      return next;
-    };
-
-    const syncEstimatedLiveTokenUsage = () => {
-      const promptTokens = estimateLivePromptTokens();
-      const completionTokens = estimateLiveCompletionTokens();
-      setLiveTokenUsage((current) => {
-        const nextPromptTokens = authoritativePromptTokensRef.current
-          ? Math.max(current?.promptTokens ?? 0, promptTokens)
-          : promptTokens;
-        const nextCompletionTokens = authoritativeCompletionTokensRef.current
-          ? current?.completionTokens
-          : completionTokens;
-        if (current?.promptTokens === nextPromptTokens && current?.completionTokens === nextCompletionTokens) {
-          return current;
-        }
-        return {
-          promptTokens: nextPromptTokens,
-          completionTokens: nextCompletionTokens
-        };
-      });
-    };
-
-    const startLiveTokenPulse = () => {
-      stopLiveTokenPulse();
-      liveTokenPulseRef.current = window.setInterval(syncEstimatedLiveTokenUsage, LIVE_TOKEN_ESTIMATE_INTERVAL_MS);
-    };
-
-    const addActivityTokenEstimate = (activityEvent: AgentActivityEvent) => {
-      const parts = [
-        activityEvent.title,
-        activityEvent.summary,
-        activityEvent.hermes?.eventType,
-        activityEvent.hermes?.toolName,
-        activityEvent.command?.toolName,
-        activityEvent.command?.command,
-        activityEvent.command?.args?.join(" "),
-        activityEvent.artifact?.title,
-        activityEvent.artifact?.path
-      ].filter(Boolean);
-
-      estimatedActivityChars += Math.min(parts.join("\n").length, 900);
-      syncEstimatedLiveTokenUsage();
     };
 
     const updateRunRecord = (patch: Partial<RunRecord>) => {
@@ -530,17 +444,6 @@ export function ChatView({
         activitySummary: runSummary,
         hermesRunId
       });
-    };
-
-    // Reasoning text is internal intermediate output and is never surfaced in
-    // the activity flow. We only keep its size feeding the live token estimate
-    // so usage still advances while the model is thinking.
-    const handleReasoningStreamEvent = (_eventName: string, base: AgentActivityEvent) => {
-      const reasoningText = base.metadata?.rawReasoningTextRendered === true ? (base.summary ?? "") : "";
-      if (reasoningText) {
-        estimatedActivityChars += Math.min(reasoningText.length, 900);
-        syncEstimatedLiveTokenUsage();
-      }
     };
 
     workspaceActions.appendMessage(session.id, userMessage);
@@ -567,8 +470,7 @@ export function ChatView({
     generationStarted = true;
     setGenerationStartedAt(runStartedAt);
     setLiveTokenUsage(null);
-    authoritativeCompletionTokensRef.current = false;
-    authoritativePromptTokensRef.current = false;
+    setVisibleLiveTokenUsage(null);
     setIsStopRequested(false);
     stopRequestedRef.current = false;
 
@@ -589,20 +491,6 @@ export function ChatView({
       });
       return;
     }
-
-    estimatedPromptTokens = estimatePromptTokensForRequest({
-      message: content,
-      attachments,
-      project: activeProject,
-      recentMessages: session.messages.slice(-12),
-      session
-    });
-    setLiveTokenUsage({
-      completionTokens: 0,
-      promptTokens: estimatedPromptTokens
-    });
-    startLiveTokenPulse();
-    syncEstimatedLiveTokenUsage();
 
     const streamController = new AbortController();
     activeStreamControllerRef.current = streamController;
@@ -647,7 +535,6 @@ export function ChatView({
       usage?: HermesTokenUsage
     ) => {
       lastFlushAtRef.current = performance.now();
-      syncEstimatedLiveTokenUsage();
       commitAssistantMessage(status, references, usage);
     };
 
@@ -739,10 +626,12 @@ export function ChatView({
       cancelPendingFlush();
       const nextCompletion = pendingCompletion;
       pendingCompletion = null;
-      const completionUsage = withEstimatedTokenFallback(
-        // Prefer the live run aggregate so usage that arrived after message_done
-        // (trailing metadata / run-usage events) is still folded into the total.
-        annotateTokenUsageRoute(responseTokenUsage ?? nextCompletion.usage, modelRequest)
+      // Prefer the live run aggregate so usage that arrived after message_done
+      // (trailing metadata / run-usage events) is still folded into the total.
+      const completionCandidate = responseTokenUsage ?? nextCompletion.usage;
+      const completionUsage = annotateTokenUsageRoute(
+        completionCandidate?.source === "estimated" ? undefined : completionCandidate,
+        modelRequest
       );
       responseTokenUsage = completionUsage;
       syncLiveTokenUsage(responseTokenUsage);
@@ -833,21 +722,10 @@ export function ChatView({
               sequence: nextActivitySequence()
             });
             if (activityEvent) {
-              if (event.type === "run_event" && isReasoningRunEventName(event.name)) {
-                handleReasoningStreamEvent(event.name, activityEvent);
-              } else {
+              if (!(event.type === "run_event" && isReasoningRunEventName(event.name))) {
                 if (activityEndsIntermediateTurn(activityEvent)) {
                   discardIntermediateTurn();
                 }
-                if (
-                  activityEvent.status === "completed" &&
-                  (activityEvent.type === "command" || activityEvent.command || activityEvent.type === "tool")
-                ) {
-                  // Each finished command/tool roughly corresponds to one more
-                  // upstream request that re-sends the full context.
-                  toolCycleCount += 1;
-                }
-                addActivityTokenEstimate(activityEvent);
                 recordRunActivity(session.id, activityEvent);
                 workspaceActions.appendToolEvent(session.id, toToolEvent(activityEvent));
               }
@@ -863,7 +741,6 @@ export function ChatView({
               sequence: nextActivitySequence()
             });
             if (activityEvent) {
-              addActivityTokenEstimate(activityEvent);
               recordRunActivity(session.id, activityEvent);
             }
             commitAssistantMessage("error", ["Hermes stream error"]);
@@ -924,7 +801,7 @@ export function ChatView({
     await completePendingAssistantMessage(completedAt);
 
     if (!completedAssistant && !hadStreamError && accumulated) {
-      responseTokenUsage = withEstimatedTokenFallback(annotateTokenUsageRoute(responseTokenUsage, modelRequest));
+      responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
       syncLiveTokenUsage(responseTokenUsage);
       completeAssistantMessage(["Hermes session stream"], responseTokenUsage);
     } else if (emptyAssistantText) {
@@ -941,7 +818,7 @@ export function ChatView({
     }
 
     if (!emptyAssistantText) {
-      responseTokenUsage = withEstimatedTokenFallback(annotateTokenUsageRoute(responseTokenUsage, modelRequest));
+      responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
       syncLiveTokenUsage(responseTokenUsage);
     } else {
       responseTokenUsage = annotateTokenUsageRoute(responseTokenUsage, modelRequest);
@@ -960,7 +837,6 @@ export function ChatView({
     });
     streamCompletedSuccessfully = !hadStreamError && !emptyAssistantText && !stopRequestedRef.current;
     } finally {
-      stopLiveTokenPulse();
       if (generationStarted) {
         if (streamCompletedSuccessfully) {
           sessionModel.markStreamSucceeded();
@@ -1074,6 +950,11 @@ export function ChatView({
     });
   }
 
+  function steerQueuedTurn(id: string) {
+    prioritizeQueuedTurn(id);
+    handleStop();
+  }
+
   function deferQueuedTurn(id: string) {
     setQueuedTurns((current) => {
       const target = current.find((turn) => turn.id === id);
@@ -1151,7 +1032,7 @@ export function ChatView({
   const headerFadeStyle = {
     "--chat-top-overlay-height": isSplitViewOpen ? "67px" : "34px"
   } as CSSProperties;
-  const showHeaderFade = showHeader || isSplitViewOpen;
+  const showHeaderFade = showHeader && doTabsOverlapTranscript;
   const showTopChrome = showHeader || showHeaderFade;
 
   return (
@@ -1161,9 +1042,9 @@ export function ChatView({
       data-show-header={showHeader ? "true" : "false"}
       data-variant={variant}
       data-chat-pane={tabs?.pane}
+      data-focused={isFocused ? "true" : "false"}
       onFocusCapture={onActivate}
-      onPointerDown={onActivate}
-      onPointerEnter={onActivate}
+      onPointerDownCapture={onActivate}
       aria-label="Chat workspace"
     >
       {isStartState ? (
@@ -1201,6 +1082,7 @@ export function ChatView({
                   onDeferQueuedMessage={deferQueuedTurn}
                   onPrioritizeQueuedMessage={prioritizeQueuedTurn}
                   onRemoveQueuedMessage={removeQueuedTurn}
+                  onSteerQueuedMessage={steerQueuedTurn}
                   projectControls={projectControls}
                   queuedMessages={visibleQueuedMessages}
                   showContextPanel={false}
@@ -1223,7 +1105,7 @@ export function ChatView({
               <div
                 className={styles.topChrome}
                 data-chat-top-chrome="true"
-                data-content-overlap={showHeader && isTranscriptUnderTabs ? "true" : "false"}
+                data-content-overlap={showHeaderFade && isTranscriptUnderTabs ? "true" : "false"}
               >
                 {showHeaderFade ? <div className={styles.contentFadeLayer} style={headerFadeStyle} aria-hidden="true" /> : null}
                 {showHeader ? (
@@ -1256,7 +1138,7 @@ export function ChatView({
               <div className={styles.scrollFadeBottom} aria-hidden="true" />
             </div>
           </div>
-          {variant === "main" && activeSession ? (
+          {activeSession ? (
             <ConversationMinimap
               messages={activeSession.messages}
               scrollViewportRef={scrollViewportRef}
@@ -1280,6 +1162,7 @@ export function ChatView({
               onDeferQueuedMessage={deferQueuedTurn}
               onPrioritizeQueuedMessage={prioritizeQueuedTurn}
               onRemoveQueuedMessage={removeQueuedTurn}
+              onSteerQueuedMessage={steerQueuedTurn}
               queuedMessages={visibleQueuedMessages}
               showContextPanel={false}
               stopControlState={hermesStatus?.uiCapabilities.ui.stopControl}
@@ -1498,64 +1381,6 @@ function hermesUnavailableMessage(
 function emptyHermesResponseMessage(modelLabel: string): string {
   return `Hermes completed the turn without returning assistant text for ${modelLabel}. The selected provider may be unavailable or misrouted; try another model or check Hermes provider configuration.`;
 }
-
-function estimatePromptTokensForRequest({
-  attachments = [],
-  message,
-  project,
-  recentMessages,
-  session
-}: {
-  attachments?: ChatAttachment[];
-  message: string;
-  project: Project;
-  recentMessages: ChatMessage[];
-  session: Session;
-}) {
-  const promptText = [
-    message,
-    project.name,
-    project.contextScope.stableProjectKey,
-    project.contextScope.userVisibleSummary,
-    session.title,
-    session.contextScope.stableSessionKey,
-    session.contextScope.userVisibleSummary,
-    ...attachments.map((attachment) =>
-      `${attachment.fileName} ${attachment.kind} ${attachment.mimeType} ${attachment.sizeBytes}`
-    ),
-    ...recentMessages.map((item) => item.content)
-  ]
-    .filter(Boolean)
-    .join("\n");
-  return estimateTokenCount(promptText);
-}
-
-function recentAuthoritativePromptTokens(messages: ChatMessage[]): number {
-  // The most recent assistant turn's reported prompt size is the best proxy for
-  // the next turn's prompt: conversation + injected context carry forward and
-  // generally only grow. Estimated usage is skipped so we calibrate off real
-  // provider-reported totals only.
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.role !== "assistant") {
-      continue;
-    }
-    const usage = message.usage;
-    if (usage && usage.source !== "estimated" && typeof usage.promptTokens === "number" && usage.promptTokens > 0) {
-      return usage.promptTokens;
-    }
-  }
-  return 0;
-}
-
-function estimateTokenCount(value: string) {
-  const clean = value.replace(/\s+/g, " ").trim();
-  if (!clean) {
-    return 0;
-  }
-  return Math.max(1, Math.ceil(clean.length / ESTIMATED_CHARS_PER_TOKEN));
-}
-
 
 function composerDraftStorageKey(variant: ChatViewProps["variant"], sessionId: string) {
   return `hermes-ui:composer-draft:v1:${variant ?? "main"}:${sessionId}`;

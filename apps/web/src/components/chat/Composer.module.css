@@ -42,30 +42,22 @@
   position: relative;
   z-index: 1;
   display: grid;
+  width: 97%;
   min-width: 0;
   max-height: 92px;
   gap: 1px;
-  margin: 0;
+  margin: 0 auto -12px;
   overflow: auto;
-  padding: 8px 15px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.035);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4.5px 12px 16.5px;
+  border: 0;
   border-radius: var(--composer-radius, 27px) var(--composer-radius, 27px) 0 0;
-  background: rgba(38, 38, 40, 1);
+  background: rgba(24, 24, 25, 1);
   box-shadow: none;
   list-style: none;
 }
 
-/*
- * The queue sits flush on top of the composer box and shares its exact width and
- * fill, so the two read as one rounded container: the queue rounds the top, and
- * the box drops its top rounding (keeping its rounded bottom) while follow-ups
- * are queued. A hairline divider separates the queued rows from the input.
- */
 .followUpQueue + .box {
-  border-top: 0;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+  box-shadow: 0 -16px 34px rgba(0, 0, 0, 0.18);
 }
 
 .followUpRow {
@@ -150,6 +142,50 @@
 .steerAction:hover,
 .steerAction:focus-visible {
   color: var(--orange);
+}
+
+.followUpMenu {
+  position: fixed;
+  z-index: var(--z-floating);
+  display: grid;
+  width: 154px;
+  box-sizing: border-box;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: #1f1f20;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.42);
+}
+
+.followUpMenuItem {
+  display: grid;
+  width: 100%;
+  min-height: 30px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  text-align: left;
+}
+
+.followUpMenuItem:hover,
+.followUpMenuItem:focus-visible {
+  outline: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.followUpMenuDanger:hover,
+.followUpMenuDanger:focus-visible {
+  color: var(--danger, #ef6a68);
 }
 
 .box {
@@ -383,6 +419,39 @@
   line-height: 1;
 }
 
+.followUpAttachmentPreview {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 30px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.followUpAttachmentPreview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.followUpAttachmentBadge {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  min-width: 14px;
+  padding: 1px 3px;
+  border-radius: 999px;
+  background: rgba(20, 20, 21, 0.82);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 10px;
+  line-height: 1.1;
+  text-align: center;
+}
+
 .box textarea {
   width: 100%;
   min-width: 0;
@@ -569,7 +638,7 @@
 .modelButtonText {
   min-width: 0;
   overflow: hidden;
-  color: var(--unread-blue);
+  color: var(--orange);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -590,17 +659,17 @@
 .modelButton:focus-visible {
   outline: 0;
   background: transparent;
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 .modelButton:disabled {
   cursor: default;
   opacity: 1;
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 .modelButton svg {
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 .modelMenu {
@@ -769,7 +838,7 @@
 
 .modelOption[aria-selected="true"] {
   background: transparent;
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 /* Installed-but-unloaded local models are shown so they are discoverable, but
@@ -789,7 +858,7 @@
 }
 
 .modelOption[aria-selected="true"] svg {
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 .modelOptionLabel {
@@ -815,7 +884,7 @@
 }
 
 .modelOption[aria-selected="true"] .modelOptionProvider {
-  color: var(--unread-blue);
+  color: var(--orange);
 }
 
 .modelEmptyState {
@@ -877,7 +946,7 @@
   min-width: 0;
   justify-content: flex-start;
   margin: -24px auto 0;
-  padding: 32px 12px 9px 24px;
+  padding: 30.048px 8.4px 6.048px 16.8px;
   border-radius: 0 0 var(--composer-radius, 27px) var(--composer-radius, 27px);
   background: rgba(24, 24, 25, 1);
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);

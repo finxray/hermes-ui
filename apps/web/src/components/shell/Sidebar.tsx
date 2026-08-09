@@ -64,11 +64,32 @@ const SIDEBAR_SORT_CHOICES: readonly SidebarSort[] = ["priority", "updated", "ma
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 
+type OneListEntry =
+  | {
+      key: string;
+      kind: "workspace";
+      manualIndex: number;
+      pinned: boolean;
+      session: Session;
+      updatedAt: string;
+    }
+  | {
+      groupLabel: string;
+      key: string;
+      kind: "channel";
+      localSession: Session | null;
+      manualIndex: number;
+      pinned: boolean;
+      summary: HermesSessionSummary;
+      updatedAt: string;
+    };
+
 type SidebarProps = {
   projects: Project[];
   allSessions: Session[];
   activeProject: Project;
   activeSession: Session | null;
+  selectedSessionIds?: string[];
   visibleSessionIds?: string[];
   actions: WorkspaceActions;
   hermesStatus: NormalizedHermesStatus | null;
@@ -91,6 +112,7 @@ export function Sidebar({
   projects,
   activeProject,
   activeSession,
+  selectedSessionIds = [],
   visibleSessionIds = [],
   activeSection,
   hermesSessions = [],
@@ -114,6 +136,7 @@ export function Sidebar({
     COLLAPSED_FOLDER_IDS_STORAGE_KEY
   );
   const [expandedChannelSources, setExpandedChannelSources] = useState<string[]>([]);
+  const [oneListExpanded, setOneListExpanded] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [organizeMenuOpen, setOrganizeMenuOpen] = useState(false);
@@ -169,6 +192,7 @@ export function Sidebar({
   const pinnedSessionIdSet = new Set(pinnedSessionIds);
   const pinnedProjectIdSet = new Set(pinnedProjectIds);
   const runningSessionIdSet = new Set(runningSessionIds);
+  const selectedSessionIdSet = new Set(selectedSessionIds);
   const pinnedSessions = allSessions
     .filter((session) => !session.archivedAt && pinnedSessionIdSet.has(session.id))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -243,6 +267,45 @@ export function Sidebar({
       })
       .sort((a, b) => (b.lastActiveAt ?? b.startedAt).localeCompare(a.lastActiveAt ?? a.startedAt))
   );
+  const manualSessionIndex = new Map(allSessions.map((session, index) => [session.id, index]));
+  const oneListEntries: OneListEntry[] = [
+    ...oneListSessions.map((session): OneListEntry => ({
+      key: `workspace:${session.id}`,
+      kind: "workspace",
+      manualIndex: manualSessionIndex.get(session.id) ?? Number.MAX_SAFE_INTEGER,
+      pinned: pinnedSessionIdSet.has(session.id),
+      session,
+      updatedAt: session.updatedAt
+    })),
+    ...channelGroups.flatMap((group) =>
+      group.sessions.map((summary): OneListEntry => {
+        const localSession = localSessionsByHermesId.get(summary.id) ?? null;
+        return {
+          groupLabel: group.label,
+          key: `channel:${summary.id}`,
+          kind: "channel",
+          localSession,
+          manualIndex: localSession
+            ? manualSessionIndex.get(localSession.id) ?? Number.MAX_SAFE_INTEGER
+            : Number.MAX_SAFE_INTEGER,
+          pinned: Boolean(localSession && pinnedSessionIdSet.has(localSession.id)),
+          summary,
+          updatedAt: localSession?.updatedAt ?? summary.lastActiveAt ?? summary.startedAt
+        };
+      })
+    )
+  ].sort((a, b) => {
+    if (sidebarSort === "priority" && a.pinned !== b.pinned) {
+      return Number(b.pinned) - Number(a.pinned);
+    }
+    if (sidebarSort === "manual" && a.manualIndex !== b.manualIndex) {
+      return a.manualIndex - b.manualIndex;
+    }
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
+  const visibleOneListEntries = oneListExpanded
+    ? oneListEntries
+    : oneListEntries.slice(0, Math.max(VISIBLE_CHAT_LIMIT, 10));
 
   function togglePinnedSession(sessionId: string) {
     setPinnedSessionIds((current) =>
@@ -265,6 +328,49 @@ export function Sidebar({
       current.includes(folderId)
         ? current.filter((id) => id !== folderId)
         : [folderId, ...current]
+    );
+  }
+
+  function renderChannelSessionRow(
+    summary: HermesSessionSummary,
+    groupLabel: string,
+    depth: 0 | 1
+  ) {
+    const localSession = localSessionsByHermesId.get(summary.id);
+    const displaySession: SessionRowData = localSession ?? {
+      id: summary.id,
+      title: summary.title || "Untitled session",
+      updatedAt: summary.lastActiveAt ?? summary.startedAt,
+      channel: makeDisplayChannel(summary)
+    };
+
+    async function withLocalSession(action: (sessionId: string) => void) {
+      const sessionId = localSession?.id ?? await onEnsureHermesSession?.(summary);
+      if (sessionId) {
+        action(sessionId);
+      }
+    }
+
+    return (
+      <SessionSidebarRow
+        active={Boolean(
+          (localSession && selectedSessionIdSet.has(localSession.id)) ||
+            activeSession?.hermesSessionId === summary.id && selectedSessionIdSet.has(activeSession.id)
+        )}
+        depth={depth}
+        isPinned={Boolean(localSession && pinnedSessionIdSet.has(localSession.id))}
+        onArchive={() => void withLocalSession(actions.archiveSession)}
+        onRename={(title) => void withLocalSession((sessionId) =>
+          actions.renameSession(sessionId, title)
+        )}
+        onSelect={() => {
+          onSectionChange("workspace");
+          onHermesSessionSelect?.(summary);
+        }}
+        onTogglePin={() => void withLocalSession(togglePinnedSession)}
+        projectLabel={groupLabel}
+        session={displaySession}
+      />
     );
   }
 
@@ -447,6 +553,7 @@ export function Sidebar({
           {collapsedFolderIds.includes("pinned") ? null : (
             <CollapsibleSessionList
               activeSessionId={activeSession?.id ?? null}
+              selectedSessionIds={selectedSessionIds}
               visibleSessionIds={visibleSessionIds}
               getSessionProjectLabel={(session) =>
                 projects.find((project) => project.id === session.projectId)?.name ?? "Project"
@@ -503,8 +610,15 @@ export function Sidebar({
             </SidebarIconButton>
           </span>
         </div>
-        <ul className={styles.list} id="projects-list" hidden={projectsCollapsed}>
-          {channelGroups.map((group) => {
+        <div
+          aria-hidden={projectsCollapsed}
+          className={styles.folderBody}
+          data-expanded={projectsCollapsed ? "false" : "true"}
+          inert={projectsCollapsed ? true : undefined}
+        >
+          <div className={styles.folderBodyInner}>
+        <ul className={styles.list} id="projects-list">
+          {sidebarOrganization === "project" ? channelGroups.map((group) => {
             const folderId = `channel:${group.key}`;
             const isCollapsed = collapsedFolderIds.includes(folderId);
             const showAll = expandedChannelSources.includes(group.key);
@@ -520,46 +634,19 @@ export function Sidebar({
                   label={group.label}
                   onToggle={() => toggleFolder(folderId)}
                 />
-                <div className={styles.folderBody} data-expanded={isCollapsed ? "false" : "true"}>
+                <div
+                  aria-hidden={isCollapsed}
+                  className={styles.folderBody}
+                  data-expanded={isCollapsed ? "false" : "true"}
+                  inert={isCollapsed ? true : undefined}
+                >
                   <div className={styles.folderBodyInner}>
                     <ul className={styles.childList}>
-                      {visibleSessions.map((summary) => {
-                        const localSession = localSessionsByHermesId.get(summary.id);
-                        const displaySession: SessionRowData = localSession ?? {
-                          id: summary.id,
-                          title: summary.title || "Untitled session",
-                          updatedAt: summary.lastActiveAt ?? summary.startedAt,
-                          channel: makeDisplayChannel(summary)
-                        };
-
-                        async function withLocalSession(action: (sessionId: string) => void) {
-                          const sessionId = localSession?.id ?? await onEnsureHermesSession?.(summary);
-                          if (sessionId) {
-                            action(sessionId);
-                          }
-                        }
-
-                        return (
-                          <li key={`channel-${summary.id}`}>
-                            <SessionSidebarRow
-                              active={activeSession?.hermesSessionId === summary.id}
-                              depth={1}
-                              isPinned={Boolean(localSession && pinnedSessionIdSet.has(localSession.id))}
-                              onArchive={() => void withLocalSession(actions.archiveSession)}
-                              onRename={(title) => void withLocalSession((sessionId) =>
-                                actions.renameSession(sessionId, title)
-                              )}
-                              onSelect={() => {
-                                onSectionChange("workspace");
-                                onHermesSessionSelect?.(summary);
-                              }}
-                              onTogglePin={() => void withLocalSession(togglePinnedSession)}
-                              projectLabel={group.label}
-                              session={displaySession}
-                            />
-                          </li>
-                        );
-                      })}
+                      {visibleSessions.map((summary) => (
+                        <li key={`channel-${summary.id}`}>
+                          {renderChannelSessionRow(summary, group.label, 1)}
+                        </li>
+                      ))}
                     </ul>
                     {group.sessions.length > VISIBLE_CHAT_LIMIT ? (
                       <button
@@ -579,30 +666,57 @@ export function Sidebar({
                 </div>
               </li>
             );
-          })}
+          }) : null}
           {sidebarOrganization === "list" ? (
             <li className={styles.oneListGroup}>
-              <CollapsibleSessionList
-                activeSessionId={activeSession?.id ?? null}
-                visibleSessionIds={visibleSessionIds}
-                depth={0}
-                getSessionProjectLabel={(session) => projectNameById.get(session.projectId) ?? "Project"}
-                isPinned={(sessionId) => pinnedSessionIdSet.has(sessionId)}
-                isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
-                onArchive={(sessionId) => actions.archiveSession(sessionId)}
-                onRename={actions.renameSession}
-                onSelect={(sessionId) => {
-                  onSectionChange("workspace");
-                  if (onWorkspaceSessionSelect) {
-                    onWorkspaceSessionSelect(sessionId);
-                  } else {
-                    actions.switchSession(sessionId);
-                  }
-                }}
-                onTogglePin={togglePinnedSession}
-                previewCount={Math.max(VISIBLE_CHAT_LIMIT, 10)}
-                sessions={oneListSessions}
-              />
+              <ul className={styles.childList}>
+                {visibleOneListEntries.map((entry) => (
+                  <li key={entry.key}>
+                    {entry.kind === "channel" ? (
+                      renderChannelSessionRow(entry.summary, entry.groupLabel, 0)
+                    ) : (
+                      <SessionSidebarRow
+                        active={selectedSessionIdSet.has(entry.session.id)}
+                        depth={0}
+                        isPinned={pinnedSessionIdSet.has(entry.session.id)}
+                        meta={
+                          runningSessionIdSet.has(entry.session.id) ? (
+                            <RunningSessionSpinner />
+                          ) : !visibleSessionIds.includes(entry.session.id) &&
+                            hasUnseenTerminalRun(entry.session) ? (
+                            <UnseenResultDot />
+                          ) : undefined
+                        }
+                        onArchive={() => actions.archiveSession(entry.session.id)}
+                        onRename={(title) => actions.renameSession(entry.session.id, title)}
+                        onSelect={() => {
+                          onSectionChange("workspace");
+                          if (onWorkspaceSessionSelect) {
+                            onWorkspaceSessionSelect(entry.session.id);
+                          } else {
+                            actions.switchSession(entry.session.id);
+                          }
+                        }}
+                        onTogglePin={() => togglePinnedSession(entry.session.id)}
+                        projectLabel={projectNameById.get(entry.session.projectId) ?? "Project"}
+                        rowIcon={entry.session.channel ? (
+                          <ChannelIcon source={entry.session.channel.source} size={14} />
+                        ) : undefined}
+                        session={entry.session}
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {oneListEntries.length > Math.max(VISIBLE_CHAT_LIMIT, 10) ? (
+                <button
+                  className={styles.showMoreButton}
+                  onClick={() => setOneListExpanded((expanded) => !expanded)}
+                  type="button"
+                >
+                  {oneListExpanded ? "Show less" : "Show more"}
+                </button>
+              ) : null}
             </li>
           ) : visibleProjects.map(({ project, sessions: projectSessions }) => {
             const isActiveProject = project.id === activeProject.id;
@@ -635,13 +749,19 @@ export function Sidebar({
                   onToggle={() => toggleFolder(projectFolderId)}
                   onTogglePin={() => togglePinnedProject(project.id)}
                 />
-                <div className={styles.folderBody} data-expanded={isProjectCollapsed ? "false" : "true"}>
+                <div
+                  aria-hidden={isProjectCollapsed}
+                  className={styles.folderBody}
+                  data-expanded={isProjectCollapsed ? "false" : "true"}
+                  inert={isProjectCollapsed ? true : undefined}
+                >
                   <div className={styles.folderBodyInner}>
                     {projectSessions.length === 0 ? (
                       <SidebarRow depth={1} disabled label="No chats" muted />
                     ) : (
                       <CollapsibleSessionList
                         activeSessionId={activeSession?.id ?? null}
+                        selectedSessionIds={selectedSessionIds}
                         visibleSessionIds={visibleSessionIds}
                         depth={1}
                         getSessionProjectLabel={() => project.name}
@@ -667,6 +787,8 @@ export function Sidebar({
             );
           })}
         </ul>
+          </div>
+        </div>
       </section>
 
       <section className={styles.section} aria-labelledby="chats-heading">
@@ -1409,6 +1531,7 @@ function ChatsFolderRow({
 
 function CollapsibleSessionList({
   activeSessionId,
+  selectedSessionIds = [],
   visibleSessionIds,
   autoExpandActive = true,
   depth = 0,
@@ -1426,6 +1549,7 @@ function CollapsibleSessionList({
   sessions
 }: {
   activeSessionId: string | null;
+  selectedSessionIds?: string[];
   visibleSessionIds?: string[];
   autoExpandActive?: boolean;
   depth?: 0 | 1;
@@ -1444,25 +1568,42 @@ function CollapsibleSessionList({
 }) {
   const [visibleCount, setVisibleCount] = useState(previewCount);
   const [isCollapsing, setIsCollapsing] = useState(false);
-  const lastAutoExpandedSessionIdRef = useRef<string | null>(null);
+  const lastAutoExpandedSelectionRef = useRef<string | null>(null);
   const visibleSessions = showOverflowControl ? sessions.slice(0, visibleCount) : sessions;
   const hasOverflow = showOverflowControl && sessions.length > previewCount;
+  const selectedSessionIdSet = new Set(selectedSessionIds);
+  const sessionsToReveal = selectedSessionIds.length > 0
+    ? selectedSessionIds
+    : activeSessionId
+      ? [activeSessionId]
+      : [];
+  const selectedSessionKey = sessionsToReveal.join("\u0001");
 
   useEffect(() => {
+    const selectedIds = selectedSessionKey ? selectedSessionKey.split("\u0001") : [];
     if (
       !autoExpandActive ||
-      !activeSessionId ||
+      selectedIds.length === 0 ||
       !hasOverflow ||
-      lastAutoExpandedSessionIdRef.current === activeSessionId
+      lastAutoExpandedSelectionRef.current === selectedSessionKey
     ) {
       return;
     }
-    lastAutoExpandedSessionIdRef.current = activeSessionId;
-    const activeIndex = sessions.findIndex((session) => session.id === activeSessionId);
-    if (activeIndex >= visibleCount) {
-      setVisibleCount(nextDoubledVisibleCount(previewCount, activeIndex + 1, sessions.length));
+    lastAutoExpandedSelectionRef.current = selectedSessionKey;
+    const furthestSelectedIndex = Math.max(
+      ...selectedIds.map((sessionId) => sessions.findIndex((session) => session.id === sessionId))
+    );
+    if (furthestSelectedIndex >= visibleCount) {
+      setVisibleCount(nextDoubledVisibleCount(previewCount, furthestSelectedIndex + 1, sessions.length));
     }
-  }, [activeSessionId, autoExpandActive, hasOverflow, previewCount, sessions, visibleCount]);
+  }, [
+    autoExpandActive,
+    hasOverflow,
+    previewCount,
+    selectedSessionKey,
+    sessions,
+    visibleCount
+  ]);
 
   useEffect(() => {
     setVisibleCount((current) => Math.max(previewCount, Math.min(current, sessions.length)));
@@ -1492,7 +1633,7 @@ function CollapsibleSessionList({
     return (
       <li key={session.id}>
         <SessionSidebarRow
-          active={session.id === activeSessionId}
+          active={selectedSessionIdSet.has(session.id) || session.id === activeSessionId}
           depth={depth}
           isPinned={isPinned(session.id)}
           meta={

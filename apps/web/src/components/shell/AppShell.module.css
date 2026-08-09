@@ -133,7 +133,6 @@
 @media (max-width: 1280px) {
   .shell {
     --rail-width-left: 235px;
-    --rail-width-right: 0px;
     grid-template-columns: minmax(0, 235px) minmax(0, 1fr);
   }
 

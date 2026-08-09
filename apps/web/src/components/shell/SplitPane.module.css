@@ -456,7 +456,7 @@
   transition-delay: 0s;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 760px) {
   .splitPane {
     display: none;
   }

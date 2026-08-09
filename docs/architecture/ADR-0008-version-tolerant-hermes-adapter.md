@@ -35,6 +35,12 @@ model fields were interpreted as a different raw route.
 7. A genuinely incompatible Hermes response must fail clearly at the BFF
    boundary. Stoix must not silently fall back to another provider or pretend a
    request succeeded.
+8. Provider-reported stream usage remains authoritative. When a verified local
+   provider omits usage from the stream, the adapter may recover that turn's
+   counts by subtracting Hermes' pre-run cumulative session counters from its
+   post-run counters. It must not replace an existing provider usage event, use
+   a cumulative session total as a single-turn count, or label a browser text
+   estimate as authoritative usage.
 
 ## Consequences
 
@@ -42,5 +48,7 @@ model fields were interpreted as a different raw route.
 - Hermes-specific quirks stay out of UI components.
 - New Hermes behavior is added as a tested adapter case, without branching the
   UI by server version.
+- Local providers that persist usage but omit SSE usage still produce accurate
+  per-turn input/output counts without moving Hermes state into Stoix.
 - If Hermes removes or changes a required API incompatibly, users receive an
   explicit integration error rather than a misrouted or corrupted conversation.

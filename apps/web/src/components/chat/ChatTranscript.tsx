@@ -423,7 +423,7 @@ export function ChatTranscript({
       data-start-state={isStartState ? "true" : "false"}
       aria-label={ariaLabel}
     >
-      <div className={styles.transcriptInner}>
+      <div className={styles.transcriptInner} data-chat-transcript-column="true">
         {!isStartState && activeSession ? (
           activeSession.messages.length > 0 ? (
             activeSession.messages.map((message) => {

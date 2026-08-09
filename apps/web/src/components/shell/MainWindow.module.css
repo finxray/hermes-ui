@@ -197,9 +197,36 @@
   pointer-events: none;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1100px) {
+  .mainWindow[data-single-pane="split"][data-right-pane-mode="chat"] .chatPane {
+    right: 0;
+  }
+
+  .mainWindow[data-single-pane="split"][data-right-pane-mode="chat"] > :global([data-shell-rail="right"]) {
+    width: 100%;
+  }
+
+  .mainWindow[data-single-pane="split"][data-right-pane-mode="chat"][data-focused-pane="main"]
+    > :global([data-shell-rail="right"]) {
+    transform: translateX(100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .mainWindow[data-single-pane="split"][data-right-pane-mode="chat"][data-focused-pane="side"]
+    .chatPane {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .mainWindow[data-single-pane="split"][data-right-pane-mode="chat"] .rightResizeHandle {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
   .mainWindow {
-    grid-template-columns: none;
+    border-radius: 18px 18px 0 0;
   }
 
   .chatPane {
@@ -212,14 +239,16 @@
     pointer-events: none;
   }
 
+  .mainWindow[data-right-pane-mode="chat"][data-focused-pane="side"]
+    > :global([data-shell-rail="right"]) {
+    width: 100%;
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .rightResizeHandle {
     display: none;
-  }
-}
-
-@media (max-width: 760px) {
-  .mainWindow {
-    border-radius: 18px 18px 0 0;
   }
 }
 

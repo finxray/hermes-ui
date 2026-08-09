@@ -73,6 +73,46 @@ expect(
   chatView.includes("liveTokenUsage={visibleLiveTokenUsage}"),
   "ChatView passes visible live token usage into the composer."
 );
+expect(
+  chatView.includes('usage.source === "estimated"') &&
+    chatView.includes('normalized.source === "estimated"'),
+  "ChatView rejects estimated usage before live display and run aggregation."
+);
+expect(
+  !chatView.includes("LIVE_TOKEN_ESTIMATE_INTERVAL_MS") &&
+    !chatView.includes("syncEstimatedLiveTokenUsage") &&
+    !chatView.includes("estimatePromptTokensForRequest"),
+  "ChatView never starts a client-side token estimate before Hermes reports usage."
+);
+expect(
+  chatView.includes("setLiveTokenUsage(null);\n    setVisibleLiveTokenUsage(null);"),
+  "A new run clears prior afterglow usage until Hermes reports usage for that run."
+);
+expect(
+  composerCss.includes("width: 97%;") &&
+    composerCss.includes("margin: 0 auto -12px;") &&
+    composerCss.includes("padding: 4.5px 12px 16.5px;"),
+  "Queued follow-ups use the compact inset card above the composer."
+);
+expect(
+  composer.includes("onSteerQueuedMessage?.(message.id)") &&
+    chatView.includes("function steerQueuedTurn(id: string)") &&
+    chatView.includes("prioritizeQueuedTurn(id);") &&
+    chatView.includes("handleStop();"),
+  "Steer promotes the queued follow-up and interrupts the active stream so it runs next."
+);
+expect(
+  composer.includes('role="menu"') &&
+    composer.includes("Send next") &&
+    composer.includes("Move to end") &&
+    composer.includes("runQueueAction(onRemoveQueuedMessage"),
+  "Queued follow-up overflow opens a functional action menu."
+);
+expect(
+  composerCss.includes(".followUpQueue + .box") &&
+    composerCss.includes("box-shadow: 0 -16px 34px rgba(0, 0, 0, 0.18);"),
+  "The composer casts its follow-up shadow upward."
+);
 expect(!chatView.includes("liveTokenDock"), "Live token usage must not render in a separate dock above the composer.");
 expect(!chatView.includes("disabled={!canUseRealHermes"), "ChatView must not disable composer from Hermes reachability.");
 expect(

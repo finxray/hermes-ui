@@ -11,6 +11,7 @@ const compatibilityUrl = pathToFileURL(
 ).href;
 const {
   isLocalLmStudioProvider,
+  sessionTokenUsageDelta,
   shouldSuppressHermesStreamError
 } = await import(compatibilityUrl);
 const { normalizeHermesSseEvent } = await import(
@@ -29,6 +30,43 @@ assert.equal(isLocalLmStudioProvider("lmstudio"), true);
 assert.equal(isLocalLmStudioProvider("local-lmstudio"), true);
 assert.equal(isLocalLmStudioProvider("custom:local-lmstudio-main"), true);
 assert.equal(isLocalLmStudioProvider("openrouter"), false);
+
+assert.deepEqual(
+  sessionTokenUsageDelta(
+    {
+      promptTokens: 1200,
+      completionTokens: 80,
+      cachedTokens: 20,
+      reasoningTokens: 5,
+      costUsd: 0
+    },
+    {
+      promptTokens: 19789,
+      completionTokens: 91,
+      cachedTokens: 20,
+      reasoningTokens: 6,
+      costUsd: 0
+    }
+  ),
+  {
+    promptTokens: 18589,
+    completionTokens: 11,
+    totalTokens: 18600,
+    cachedTokens: 0,
+    reasoningTokens: 1,
+    costUsd: 0,
+    source: "hermes_usage"
+  },
+  "missing local stream usage is recovered from the Hermes session counter delta"
+);
+assert.equal(
+  sessionTokenUsageDelta(
+    { promptTokens: 100, completionTokens: 20 },
+    { promptTokens: 90, completionTokens: 10 }
+  ),
+  undefined,
+  "session counter resets are not presented as turn usage"
+);
 
 assert.equal(
   shouldSuppressHermesStreamError({
@@ -132,6 +170,13 @@ assert.ok(
     streamFunction.includes("requested_provider: request.provider ?? null"),
   "requested route metadata must remain available for diagnostics"
 );
+assert.ok(
+  streamFunction.includes("const sessionUsageBaseline = recoverSessionUsage") &&
+    streamFunction.includes("sessionTokenUsageDelta(") &&
+    clientSource.includes("!streamState.hasAuthoritativePromptUsage") &&
+    clientSource.includes("!streamState.hasAuthoritativeCompletionUsage"),
+  "local session counters must fill only a missing provider usage event"
+);
 
 assert.deepEqual(
   normalizeHermesSseEvent("assistant.delta", {
@@ -180,4 +225,4 @@ assert.equal(
   "unknown optional Hermes events must be ignored without failing the stream"
 );
 
-console.log("Hermes adapter contract: 19 checks passed.");
+console.log("Hermes adapter contract: 22 checks passed.");

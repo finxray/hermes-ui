@@ -111,14 +111,14 @@ try {
     path.resolve("apps/web/src/lib/attachmentPreviews.ts"),
     "utf8"
   );
-  const messageBubble = await readFile(
+  const messageBubble = (await readFile(
     path.resolve("apps/web/src/components/chat/MessageBubble.tsx"),
     "utf8"
-  );
-  const streamRoute = await readFile(
+  )).replaceAll("\r\n", "\n");
+  const streamRoute = (await readFile(
     path.resolve("apps/web/src/app/api/hermes/chat/stream/route.ts"),
     "utf8"
-  );
+  )).replaceAll("\r\n", "\n");
   assert(!previewHelpers.includes('previewUrl ?? `/api/attachments/${encodeURIComponent(attachment.storageId)}`'));
   assert(!messageBubble.includes('attachment.storageId\n      ? `/api/attachments/'));
   assert(streamRoute.includes("if (!dataUrl) {\n      continue;\n    }"));

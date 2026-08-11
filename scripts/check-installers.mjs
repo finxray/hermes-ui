@@ -59,6 +59,10 @@ assert(powerShellInstaller.includes("Test-BundleComplete"));
 
 assert(packageRelease.includes('platform === "win32" ? ".zip" : ".tar.gz"'));
 assert(packageRelease.includes('execFileSync("tar", ["-czf"'));
+assert(
+  packageRelease.includes('while [ -L "$SELF" ]') && packageRelease.includes('readlink "$SELF"'),
+  "Unix launchers must resolve installer-created command and application symlinks"
+);
 assert(workflow.includes("artifacts/release/*.tar.gz"));
 assert(workflow.includes("macos-15"));
 assert(workflow.includes("macos-15-intel"));

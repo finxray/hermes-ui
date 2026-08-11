@@ -141,7 +141,16 @@ function writeLaunchers(target, runtimeName) {
 
   const shellLauncher = [
     "#!/usr/bin/env sh",
-    'ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"',
+    'SELF="$0"',
+    'while [ -L "$SELF" ]; do',
+    '  SELF_DIR="$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)"',
+    '  LINK_TARGET="$(readlink "$SELF")"',
+    '  case "$LINK_TARGET" in',
+    '    /*) SELF="$LINK_TARGET" ;;',
+    '    *) SELF="$SELF_DIR/$LINK_TARGET" ;;',
+    '  esac',
+    'done',
+    'ROOT="$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)"',
     `exec "$ROOT/runtime/${runtimeName}" "$ROOT/launcher/stoix-launcher.cjs" "$@"`,
     ""
   ].join("\n");

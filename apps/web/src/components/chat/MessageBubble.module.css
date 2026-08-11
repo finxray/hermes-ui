@@ -69,7 +69,7 @@
   background: rgba(30, 30, 31, 0.86);
 }
 
-.messageAttachmentTile[data-kind="image"] {
+.messageAttachmentTile[data-kind="image"][data-preview="true"] {
   display: block;
   width: 88px;
   height: 88px;
@@ -90,7 +90,7 @@
   color: rgba(255, 255, 255, 0.7);
 }
 
-.messageAttachmentTile[data-kind="image"] .messageAttachmentPreview {
+.messageAttachmentTile[data-kind="image"][data-preview="true"] .messageAttachmentPreview {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -130,7 +130,7 @@
   line-height: 1.2;
 }
 
-.messageAttachmentTile[data-kind="image"] :is(.messageAttachmentName, .messageAttachmentDetail) {
+.messageAttachmentTile[data-kind="image"][data-preview="true"] :is(.messageAttachmentName, .messageAttachmentDetail) {
   display: none;
 }
 

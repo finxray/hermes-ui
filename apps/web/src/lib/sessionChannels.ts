@@ -1,5 +1,5 @@
 import type { HermesSessionMessage, HermesSessionSummary } from "@hermes-ui/hermes-client";
-import type { ChatMessage, SessionChannel } from "@/data/types";
+import type { ChatAttachmentKind, ChatMessage, SessionChannel } from "@/data/types";
 
 type ChannelDefinition = {
   icon: string;
@@ -95,6 +95,10 @@ export function normalizeHermesMessages(messages: HermesSessionMessage[]): ChatM
       id: message.id,
       role: message.role as "user" | "assistant",
       author: message.role === "user" ? "You" : "Hermes",
+      attachments: message.attachments?.map((attachment) => ({
+        ...attachment,
+        kind: normalizeAttachmentKind(attachment.kind)
+      })),
       content: message.content,
       createdAt: formatImportedMessageTime(message.createdAt),
       status: "complete" as const
@@ -105,6 +109,22 @@ export function normalizeHermesMessages(messages: HermesSessionMessage[]): ChatM
     const previous = normalized[index - 1];
     return previous.role !== message.role || previous.content.trim() !== message.content.trim();
   });
+}
+
+function normalizeAttachmentKind(value: string): ChatAttachmentKind {
+  switch (value) {
+    case "image":
+    case "pdf":
+    case "text":
+    case "spreadsheet":
+    case "presentation":
+    case "document":
+    case "archive":
+    case "code":
+      return value;
+    default:
+      return "unknown";
+  }
 }
 
 export function formatImportedMessageTime(value: string | null | undefined): string {

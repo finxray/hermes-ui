@@ -416,7 +416,11 @@ check(
 );
 check(
   "Model select BFF route does not expose Hermes API key to browser",
-  Boolean(modelSwitchRouteFile?.includes("process.env.HERMES_API_KEY") && !modelSwitchRouteFile?.includes("NEXT_PUBLIC"))
+  Boolean(
+    modelSwitchRouteFile?.includes("resolveHermesClientConfig") &&
+      !modelSwitchRouteFile?.includes("NEXT_PUBLIC") &&
+      !modelSwitchRouteFile?.includes("apiKey:")
+  )
 );
 check(
   "Model select BFF route is force-dynamic",
@@ -543,14 +547,14 @@ check(
   )
 );
 check(
-  "Composer caps configured models with More and Less controls",
+  "Composer keeps every configured model accessible in a scrollable list",
   Boolean(
-    composerFile?.includes("CONFIGURED_MODEL_PREVIEW_LIMIT = 10") &&
-      composerFile?.includes("collapseConfiguredModels") &&
-      composerFile?.includes('expanded ? "Less" : "More"') &&
-      composerFile?.includes("isFilteringModels")
+    composerFile?.includes("styles.modelSections") &&
+      !composerFile?.includes("CONFIGURED_MODEL_PREVIEW_LIMIT") &&
+      readFile("apps/web/src/components/chat/Composer.module.css")?.includes(".modelSections") &&
+      readFile("apps/web/src/components/chat/Composer.module.css")?.includes("overflow: auto")
   ),
-  "The default list should stay compact while search and More retain access to every Hermes model."
+  "The model browser should use its visible scrollbar without hiding models behind a More control."
 );
 check(
   "Composer shows modelLabel in button text",

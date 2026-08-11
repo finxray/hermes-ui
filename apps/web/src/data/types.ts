@@ -62,13 +62,23 @@ export type ChatAttachmentKind =
 
 export type ChatAttachment = {
   id: string;
+  storageId?: string;
+  contentHash?: string;
   fileName: string;
   kind: ChatAttachmentKind;
   mimeType: string;
   previewUrl?: string;
+  downloadUrl?: string;
   sizeBytes: number;
   source: "local";
-  status: "ready" | "needs-upload" | "too-large" | "unsupported";
+  status:
+    | "ready"
+    | "uploading"
+    | "upload-error"
+    | "needs-upload"
+    | "too-large"
+    | "unsupported"
+    | "unavailable";
 };
 
 export type ChatUsageMetadata = {
@@ -257,7 +267,9 @@ export type Session = {
   projectId: string;
   hermesSessionId: string;
   title: string;
-  titleSource?: "default" | "first-message" | "manual" | "mock";
+  titleSource?: "default" | "first-message" | "model" | "manual" | "mock";
+  titleGenerationRequestedAt?: string;
+  titleGeneratedAt?: string;
   firstUserMessageAt?: string;
   renamedAt?: string;
   summary: string;

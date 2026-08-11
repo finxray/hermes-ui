@@ -101,6 +101,16 @@ after every state change, so unsaved data at unload is rare in practice.
 
 Both are wired into `npm run release:check`.
 
+## Durable binary objects
+
+IndexedDB remains the workspace presentation cache, but it is not the
+canonical store for attachment bytes. Chat attachments and future large local
+objects use the BFF-owned store described in
+`ADR-0009-local-durable-data-store.md`: SQLite manifests and references plus a
+content-addressed filesystem vault under the user's operating-system data
+directory. Browsers retain only opaque object IDs and same-origin BFF URLs, so
+the same Stoix installation can restore those objects across browser profiles.
+
 ## Manual smoke checklist
 
 1. **Create new chat** — open the app, create a chat, send/append a message.

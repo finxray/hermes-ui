@@ -102,6 +102,7 @@ type SidebarProps = {
   onWorkspaceSessionSelect?: (sessionId: string) => void;
   onHermesSessionSelect?: (session: HermesSessionSummary) => void;
   onEnsureHermesSession?: (session: HermesSessionSummary) => Promise<string | null>;
+  onWorkspaceSessionAdd?: (sessionId: string) => void;
   refreshHermesStatus: () => void;
   runningSessionIds?: string[];
 };
@@ -121,6 +122,7 @@ export function Sidebar({
   onCreateWorkspaceSession,
   onEnsureHermesSession,
   onHermesSessionSelect,
+  onWorkspaceSessionAdd,
   onWorkspaceSessionSelect,
   runningSessionIds = []
 }: SidebarProps) {
@@ -359,6 +361,9 @@ export function Sidebar({
         )}
         depth={depth}
         isPinned={Boolean(localSession && pinnedSessionIdSet.has(localSession.id))}
+        onAddToView={onWorkspaceSessionAdd
+          ? () => void withLocalSession(onWorkspaceSessionAdd)
+          : undefined}
         onArchive={() => void withLocalSession(actions.archiveSession)}
         onRename={(title) => void withLocalSession((sessionId) =>
           actions.renameSession(sessionId, title)
@@ -561,6 +566,7 @@ export function Sidebar({
               isPinned={(sessionId) => pinnedSessionIdSet.has(sessionId)}
               isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
               listClassName={styles.list}
+              onAddToView={onWorkspaceSessionAdd}
               onArchive={(sessionId) => actions.archiveSession(sessionId)}
               onRename={actions.renameSession}
               onSelect={(sessionId) => {
@@ -687,6 +693,9 @@ export function Sidebar({
                             <UnseenResultDot />
                           ) : undefined
                         }
+                        onAddToView={onWorkspaceSessionAdd
+                          ? () => onWorkspaceSessionAdd(entry.session.id)
+                          : undefined}
                         onArchive={() => actions.archiveSession(entry.session.id)}
                         onRename={(title) => actions.renameSession(entry.session.id, title)}
                         onSelect={() => {
@@ -767,6 +776,7 @@ export function Sidebar({
                         getSessionProjectLabel={() => project.name}
                         isPinned={(sessionId) => pinnedSessionIdSet.has(sessionId)}
                         isRunning={(sessionId) => runningSessionIdSet.has(sessionId)}
+                        onAddToView={onWorkspaceSessionAdd}
                         onArchive={(sessionId) => actions.archiveSession(sessionId)}
                         onRename={actions.renameSession}
                         onSelect={(sessionId) => {
@@ -1540,6 +1550,7 @@ function CollapsibleSessionList({
   isPinned,
   isRunning,
   listClassName = styles.childList,
+  onAddToView,
   onSelect,
   onArchive,
   onRename,
@@ -1558,6 +1569,7 @@ function CollapsibleSessionList({
   isPinned: (sessionId: string) => boolean;
   isRunning: (sessionId: string) => boolean;
   listClassName?: string;
+  onAddToView?: (sessionId: string) => void;
   onArchive: (sessionId: string) => void;
   onRename: (sessionId: string, title: string) => void;
   onSelect: (sessionId: string) => void;
@@ -1643,6 +1655,7 @@ function CollapsibleSessionList({
               <UnseenResultDot />
             ) : undefined
           }
+          onAddToView={onAddToView ? () => onAddToView(session.id) : undefined}
           onArchive={() => onArchive(session.id)}
           onRename={(title) => onRename(session.id, title)}
           onSelect={() => onSelect(session.id)}
@@ -1696,6 +1709,7 @@ function SessionSidebarRow({
   depth,
   isPinned,
   meta,
+  onAddToView,
   onArchive,
   onRename,
   onSelect,
@@ -1708,6 +1722,7 @@ function SessionSidebarRow({
   depth: 0 | 1;
   isPinned: boolean;
   meta?: ReactNode;
+  onAddToView?: () => void;
   onArchive: () => void;
   onRename: (title: string) => void;
   onSelect: () => void;
@@ -1926,6 +1941,17 @@ function SessionSidebarRow({
         active={active}
         actions={
           <>
+            {onAddToView ? (
+              <SidebarIconButton
+                label={`Add ${sessionTitle} to view`}
+                onMouseEnter={closeHoverCard}
+                onClick={onAddToView}
+                size="compact"
+                tooltip="Add chat to view"
+              >
+                <Plus size={13} />
+              </SidebarIconButton>
+            ) : null}
             <SidebarIconButton
               label={isPinned ? `Unpin ${sessionTitle}` : `Pin ${sessionTitle}`}
               onMouseEnter={closeHoverCard}

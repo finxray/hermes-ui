@@ -57,7 +57,8 @@ const bundleRoot = join(releaseRoot, bundleName);
 const appRoot = join(bundleRoot, "app");
 const runtimeRoot = join(bundleRoot, "runtime");
 const launcherRoot = join(bundleRoot, "launcher");
-const archiveName = `${bundleName}.zip`;
+const archiveExtension = platform === "win32" ? ".zip" : ".tar.gz";
+const archiveName = `${bundleName}${archiveExtension}`;
 const archivePath = join(releaseRoot, archiveName);
 const sourceRevision = readSourceRevision();
 
@@ -173,7 +174,7 @@ function createArchive(cwd, folderName, destination) {
     );
     return;
   }
-  execFileSync("zip", ["-q", "-r", destination, folderName], { cwd, stdio: "inherit" });
+  execFileSync("tar", ["-czf", destination, folderName], { cwd, stdio: "inherit" });
 }
 
 function assertBundleIsClean(target) {

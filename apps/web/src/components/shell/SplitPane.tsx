@@ -98,6 +98,7 @@ export function SplitPane({
               onActivate={onActivateSideChat}
               onActivityEvent={onActivityEvent}
               onGeneratingChange={onGeneratingChange}
+              onRefreshHermes={refreshHermesStatus}
               projects={projects}
               sessionModel={sideSessionModel}
               showHeader

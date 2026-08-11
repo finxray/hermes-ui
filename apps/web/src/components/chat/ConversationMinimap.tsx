@@ -184,11 +184,20 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
               Math.abs(visibleIndex - focusPosition),
               visibleTurns.length,
               compactMarkers
+            )}px`,
+            "--conversation-preview-offset": `${previewOffset(
+              focusPosition,
+              visibleIndex,
+              pointerGeometryRef.current
             )}px`
           } as CSSProperties;
 
           return (
-            <div className={`${styles.markerWrap} ${isFocused ? styles.markerFocused : ""}`} key={turn.anchorMessageId}>
+            <div
+              className={`${styles.markerWrap} ${isFocused ? styles.markerFocused : ""}`}
+              key={turn.anchorMessageId}
+              style={markerStyle}
+            >
               <button
                 aria-current={isActive ? "location" : undefined}
                 aria-label={`Jump to exchange ${turn.index + 1}: ${title}`}
@@ -196,7 +205,6 @@ export function ConversationMinimap({ messages, scrollViewportRef }: Conversatio
                 onBlur={() => setKeyboardFocusIndex(null)}
                 onClick={() => jumpToTurn(turn)}
                 onFocus={() => setKeyboardFocusIndex(visibleIndex)}
-                style={markerStyle}
                 type="button"
               >
                 <span className={styles.markerLine} aria-hidden="true" />
@@ -241,6 +249,18 @@ function focusedMarkerWidth(distance: number, markerCount: number, compact: bool
   const spread = Math.max(1.8, Math.min(4, markerCount * 0.16));
   const width = baseWidth + expansion * Math.exp(-(distance ** 2) / (2 * spread ** 2));
   return Math.round(width * 10) / 10;
+}
+
+function previewOffset(
+  focusPosition: number | null,
+  visibleIndex: number,
+  geometry: PointerGeometry | null
+) {
+  if (focusPosition === null || !geometry || geometry.markerCount < 2) {
+    return 0;
+  }
+  const markerPitch = (geometry.lastCenter - geometry.firstCenter) / (geometry.markerCount - 1);
+  return (focusPosition - visibleIndex) * markerPitch;
 }
 
 function groupConversationTurns(messages: ChatMessage[]) {

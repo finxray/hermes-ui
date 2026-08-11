@@ -22,10 +22,13 @@ Before publishing the first public release:
 2. Run `npm ci` and `npm run package:release` locally.
 3. Review `git diff` and commit from a clean release branch.
 4. Create and push an annotated tag, for example `v0.1.0`.
-5. The `Package release` workflow builds and smoke-tests Windows x64, Linux x64,
-   macOS Apple Silicon, and macOS Intel archives, attaches SHA-256 files, and
-   creates a draft GitHub Release.
-6. Download every archive from the draft and test it on a clean machine.
+5. The `Package release` workflow builds and smoke-tests Windows x64/ARM64,
+   Linux x64/ARM64, macOS Apple Silicon, and macOS Intel archives, attaches
+   SHA-256 files, and creates a draft GitHub Release.
+6. Each native job also installs its archive through the public bootstrap
+   script in an isolated per-user root, then launches and probes that installed
+   copy. Download every archive from the draft and repeat the install on a clean
+   physical or virtual machine.
 7. Add the approved license, privacy link, release notes, and known limitations.
 8. Apply required code signatures/notarization and replace unsigned assets when
    the release policy requires them.
@@ -38,6 +41,9 @@ candidates only and must not be uploaded to a release.
 ## Supported Package Behavior
 
 - The package includes Node.js and does not require a source checkout.
+- `install.sh` and `install.ps1` provide the supported one-command install path.
+- Installation is per-user, versioned, checksum-verified, and does not require
+  administrator access.
 - It binds only to `127.0.0.1`.
 - Hermes remains an external dependency.
 - Credentials live in the per-user `config.env`, never in the archive.

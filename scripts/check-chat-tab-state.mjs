@@ -6,6 +6,7 @@ const {
   appendUniqueTab,
   insertUniqueTab,
   reorderTab,
+  resolveSidebarAddTargetPane,
   resolveSidebarSelectedSessionIds,
   resolveSidebarTargetPane,
   selectSidebarTab
@@ -33,6 +34,27 @@ assert.equal(resolveSidebarTargetPane(["left"], ["right"], "main", "left"), "mai
 assert.equal(resolveSidebarTargetPane(["left"], ["right"], "main", "right"), "side");
 assert.equal(resolveSidebarTargetPane(["left"], ["right"], "main", "new"), "main");
 assert.equal(resolveSidebarTargetPane(["left"], ["right"], "side", "new"), "side");
+
+assert.equal(resolveSidebarAddTargetPane({
+  focusedPane: "side",
+  sideChatIsVisible: false,
+  singlePane: null
+}), "main");
+assert.equal(resolveSidebarAddTargetPane({
+  focusedPane: "side",
+  sideChatIsVisible: true,
+  singlePane: null
+}), "side");
+assert.equal(resolveSidebarAddTargetPane({
+  focusedPane: "main",
+  sideChatIsVisible: true,
+  singlePane: null
+}), "main");
+assert.equal(resolveSidebarAddTargetPane({
+  focusedPane: "main",
+  sideChatIsVisible: true,
+  singlePane: "side"
+}), "side");
 
 assert.deepEqual(resolveSidebarSelectedSessionIds({
   activeSessionId: "main",

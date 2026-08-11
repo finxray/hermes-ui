@@ -1,6 +1,8 @@
 import { deleteHermesSession, getHermesSession } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
 import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
+import { resolveHermesClientConfig } from "@/server/hermesClientConfig";
+import { getLocalDataStore } from "@/server/localDataStore";
 
 export const dynamic = "force-dynamic";
 
@@ -13,14 +15,9 @@ export async function GET(
     return NextResponse.json({ ok: false, session: null, sessionId: "", error: { kind: "invalid_config", message: "Session id is required." } }, { status: 400 });
   }
 
+  const config = await resolveHermesClientConfig({ signal: _request.signal, timeoutMs: 8000 });
   const result = await getHermesSession(
-    {
-      apiKey: process.env.HERMES_API_KEY,
-      baseUrl: process.env.HERMES_API_BASE_URL,
-      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
-      signal: _request.signal,
-      timeoutMs: 8000
-    },
+    config,
     id
   );
 
@@ -60,19 +57,17 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: { kind: "invalid_config", message: "Session id is required." } }, { status: 400 });
   }
 
+  const config = await resolveHermesClientConfig({ timeoutMs: 8000 });
   const result = await deleteHermesSession(
-    {
-      apiKey: process.env.HERMES_API_KEY,
-      baseUrl: process.env.HERMES_API_BASE_URL,
-      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
-      timeoutMs: 8000
-    },
+    config,
     id
   );
 
   if (!result.ok) {
     return NextResponse.json(result, { status: 502 });
   }
+
+  await getLocalDataStore().deleteSessionMessageLinks(id);
 
   return NextResponse.json(result, {
     headers: { "Cache-Control": "no-store" }

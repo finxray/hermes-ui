@@ -1,6 +1,6 @@
 # Stoix 0.1.0 Packaging Audit
 
-Date: 2026-08-05
+Date: 2026-08-12
 
 ## Implemented
 
@@ -8,19 +8,25 @@ Date: 2026-08-05
 - Hermes-only core boundary; no built-in Brain Memory API, console, client, or
   instruction bridge.
 - Cross-platform launcher for Windows, macOS, and Linux.
+- One-command native bootstrap installers with published-package and
+  verified-runtime source fallback paths.
+- Per-user immutable version installs, stable launch commands, desktop launch
+  integration, checksum verification, and isolated native installer smoke.
 - Bundled Node 24 runtime; end users do not install Node.js.
-- Loopback-only server with automatic free-port selection and browser launch.
+- Loopback-only server with a stable configurable port and browser launch; a
+  conflict fails clearly instead of silently changing the IndexedDB origin.
 - Per-user private configuration stored outside version directories.
-- Versioned portable ZIP and SHA-256 generation.
+- Versioned portable Windows ZIP and Unix tar.gz archives with SHA-256 files.
 - Package smoke that launches the bundled runtime and probes production routes.
 - Daily/manual GitHub update checks with user-visible status and no silent
   installation.
 - Cross-channel Hermes session discovery and canonical-session continuation,
   including source icons, persisted metadata, periodic/focus refresh, and a
   release contract check.
-- GitHub Actions release gate on all three operating systems.
-- Tag-triggered native packaging for Windows x64, Linux x64, macOS Apple
-  Silicon, and macOS Intel into a draft GitHub Release.
+- GitHub Actions release gate across Windows, Linux, and macOS on all six
+  supported processor targets.
+- Tag-triggered native packaging for Windows x64/ARM64, Linux x64/ARM64,
+  macOS Apple Silicon, and macOS Intel into a draft GitHub Release.
 - Expected platform and architecture assertions prevent runner-label changes
   from silently producing a mislabeled release archive.
 - Tracked-secret and packaged-secret scanning plus dependency audit.
@@ -29,6 +35,8 @@ Date: 2026-08-05
 
 - Windows x64 portable archive created.
 - Packaged runtime launched and shut down cleanly.
+- Native Windows installation, damaged-install repair, stable wrapper launch,
+  and single-instance reuse passed in an isolated per-user root.
 - Packaged browser smoke passed for Workspace, Plugins, Config, Keys, Logs, and
   Settings at desktop and compact viewports with no browser errors or page-level
   horizontal overflow.

@@ -15,7 +15,7 @@
   display: grid;
   width: 66px;
   max-height: inherit;
-  gap: 4px;
+  gap: 0;
   align-content: center;
   pointer-events: auto;
 }
@@ -23,7 +23,7 @@
 .markerWrap {
   position: relative;
   display: flex;
-  min-height: 5px;
+  min-height: 9px;
   align-items: center;
   pointer-events: auto;
 }
@@ -31,7 +31,7 @@
 .markerButton {
   display: flex;
   width: 66px;
-  height: 5px;
+  height: 9px;
   align-items: center;
   padding: 0;
   border: 0;
@@ -89,10 +89,12 @@
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
   color: var(--text-secondary);
   opacity: 0;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% + var(--conversation-preview-offset, 0px)));
   transition:
+    transform 80ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 120ms ease,
     visibility 0s linear 150ms;
+  will-change: transform;
   pointer-events: none;
 }
 

@@ -130,6 +130,18 @@ expect(
     composerCss.includes("height: 17.16px"),
   "Composer microphone keeps its requested 17.16px size without a CSS override changing it."
 );
+expect(
+  composer.includes("MAX_ATTACHMENT_ITEMS = 20") &&
+    composer.includes("pendingAttachmentCountRef") &&
+    composer.includes("deleteUnreferencedVaultAttachment(attachment.storageId)"),
+  "Composer caps concurrent attachment uploads and cleans abandoned stored files."
+);
+expect(
+  composer.includes("pendingAttachmentCount === 0") &&
+    composer.includes("setPendingAttachmentCount((current) => current + files.length)") &&
+    composer.includes("attachmentScopeRef.current === attachmentScope"),
+  "Composer waits for scoped attachment uploads before enabling send."
+);
 
 if (process.env.HERMES_UI_COMPOSER_SEND_PROBE === "1") {
   try {

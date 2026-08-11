@@ -2,7 +2,16 @@
 
 const { spawn } = require("node:child_process");
 const { createServer } = require("node:net");
-const { existsSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
+const {
+  chmodSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} = require("node:fs");
 const { homedir } = require("node:os");
 const { dirname, join, resolve } = require("node:path");
 
@@ -12,17 +21,28 @@ const appRoot = join(bundleRoot, "app");
 const serverPath = join(appRoot, "apps", "web", "server.js");
 let child = null;
 let stopping = false;
+let startupError = null;
+let instanceLockPath = null;
+let runtimeStatePath = null;
+let ownsInstanceLock = false;
+let failureExitCode = null;
 
 const stop = () => {
-  if (stopping || !child) return;
+  if (stopping) return;
   stopping = true;
+  if (!child) {
+    cleanupInstanceFiles();
+    return;
+  }
   child.kill("SIGTERM");
   setTimeout(() => child.kill("SIGKILL"), 4_000).unref();
 };
 
 main().catch((error) => {
+  failureExitCode = 1;
   console.error(error instanceof Error ? error.message : String(error));
   stop();
+  cleanupInstanceFiles();
   process.exitCode = 1;
 });
 
@@ -40,15 +60,29 @@ async function main() {
   ensureConfig(configPath);
   const config = readConfig(configPath);
   const hostname = "127.0.0.1";
-  const requestedPort = args.port ?? Number(config.STOIX_PORT || 3210);
-  const port = await choosePort(hostname, requestedPort);
+  const requestedPort = args.port ?? parsePort(config.STOIX_PORT || "3210", "STOIX_PORT");
+
+  if (args.doctor) {
+    await printDoctor(configPath, config);
+    return;
+  }
+
+  const instance = await acquireInstance(dirname(configPath));
+  if (instance) {
+    console.log(`Stoix ${instance.version || readVersion()} is already running at ${instance.url}`);
+    console.log(`Configuration: ${configPath}`);
+    if (!args.noOpen) void openBrowser(instance.url);
+    return;
+  }
+
+  const port = await choosePort(hostname, requestedPort, configPath);
   const url = `http://${hostname}:${port}/`;
 
   child = spawn(process.execPath, [serverPath], {
     cwd: appRoot,
     env: {
-      ...process.env,
       ...config,
+      ...process.env,
       HERMES_API_BASE_URL:
         process.env.HERMES_API_BASE_URL ||
         config.HERMES_API_BASE_URL ||
@@ -64,17 +98,23 @@ async function main() {
     stdio: "inherit",
     windowsHide: true
   });
+  child.once("error", (error) => {
+    startupError = error;
+  });
 
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
+  process.on("exit", cleanupInstanceFiles);
   child.once("exit", (code, signal) => {
+    cleanupInstanceFiles();
     if (!stopping && code !== 0) {
       console.error(`Stoix server exited before shutdown (code=${code}, signal=${signal || "none"}).`);
     }
-    process.exitCode = stopping ? 0 : code ?? (signal ? 1 : 0);
+    process.exitCode = failureExitCode ?? (stopping ? 0 : code ?? (signal ? 1 : 0));
   });
 
   await waitUntilReady(url, 30_000);
+  writeRuntimeState(url);
   console.log(`Stoix ${readVersion()} is running at ${url}`);
   console.log(`Configuration: ${configPath}`);
   if (args.smoke) {
@@ -85,14 +125,25 @@ async function main() {
     console.log("Stoix package smoke passed.");
     stop();
   } else if (!args.noOpen) {
-    openBrowser(url);
+    void openBrowser(url);
   }
 }
 
 function parseArgs(values) {
-  const parsed = { config: null, help: false, noOpen: false, port: null, smoke: false };
+  const parsed = {
+    config: null,
+    doctor: false,
+    help: false,
+    noOpen: false,
+    port: null,
+    smoke: false
+  };
   for (const value of values) {
     if (value === "--help" || value === "-h") parsed.help = true;
+    else if (value === "--doctor") {
+      parsed.doctor = true;
+      parsed.noOpen = true;
+    }
     else if (value === "--no-open") parsed.noOpen = true;
     else if (value === "--smoke") {
       parsed.smoke = true;
@@ -121,23 +172,30 @@ function defaultConfigPath() {
 }
 
 function ensureConfig(path) {
-  if (existsSync(path)) return;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(
-    path,
-    [
-      "# Stoix local configuration. Keep this file private.",
-      "HERMES_API_BASE_URL=http://127.0.0.1:8642",
-      "HERMES_API_KEY=",
-      "HERMES_UI_ENABLE_REAL_HERMES=true",
-      "",
-      "# Optional Hermes dashboard overrides.",
-      "HERMES_DASHBOARD_BASE_URL=",
-      "HERMES_DASHBOARD_SESSION_TOKEN=",
-      ""
-    ].join("\n"),
-    { encoding: "utf8", mode: 0o600 }
-  );
+  const configDirectory = dirname(path);
+  mkdirSync(configDirectory, { recursive: true, mode: 0o700 });
+  if (!existsSync(path)) {
+    writeFileSync(
+      path,
+      [
+        "# Stoix local configuration. Keep this file private.",
+        "HERMES_API_BASE_URL=http://127.0.0.1:8642",
+        "HERMES_API_KEY=",
+        "HERMES_UI_ENABLE_REAL_HERMES=true",
+        "STOIX_PORT=3210",
+        "",
+        "# Optional Hermes dashboard overrides.",
+        "HERMES_DASHBOARD_BASE_URL=",
+        "HERMES_DASHBOARD_SESSION_TOKEN=",
+        ""
+      ].join("\n"),
+      { encoding: "utf8", mode: 0o600 }
+    );
+  }
+  if (process.platform !== "win32") {
+    chmodSync(configDirectory, 0o700);
+    chmodSync(path, 0o600);
+  }
 }
 
 function readConfig(path) {
@@ -175,13 +233,15 @@ function unquote(value) {
   return value;
 }
 
-async function choosePort(host, preferredPort) {
-  for (let offset = 0; offset < 20; offset += 1) {
-    const candidate = preferredPort + offset;
-    if (candidate > 65535) break;
-    if (await isPortAvailable(host, candidate)) return candidate;
+async function choosePort(host, preferredPort, configPath) {
+  if (await isPortAvailable(host, preferredPort)) {
+    return preferredPort;
   }
-  throw new Error(`No free local port was found near ${preferredPort}.`);
+  throw new Error(
+    `Stoix local port ${preferredPort} is already in use. Close the application using it, ` +
+      `or set STOIX_PORT to another stable port in ${configPath}. Stoix does not switch ports ` +
+      "silently because browser workspace data is tied to the local address."
+  );
 }
 
 function isPortAvailable(host, port) {
@@ -198,6 +258,7 @@ function isPortAvailable(host, port) {
 async function waitUntilReady(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (startupError) throw new Error(`Stoix server could not start: ${startupError.message}`);
     if (child.exitCode !== null) throw new Error("Stoix server stopped during startup.");
     try {
       const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(1_500) });
@@ -217,12 +278,21 @@ function openBrowser(url) {
       : process.platform === "darwin"
         ? { file: "open", args: [url] }
         : { file: "xdg-open", args: [url] };
-  const opener = spawn(command.file, command.args, {
-    detached: true,
-    stdio: "ignore",
-    windowsHide: true
+  return new Promise((resolveOpen) => {
+    const opener = spawn(command.file, command.args, {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true
+    });
+    opener.once("error", (error) => {
+      console.warn(`Could not open the browser automatically (${error.message}). Open ${url}`);
+      resolveOpen(false);
+    });
+    opener.once("spawn", () => {
+      opener.unref();
+      resolveOpen(true);
+    });
   });
-  opener.unref();
 }
 
 function readVersion() {
@@ -241,11 +311,139 @@ Usage:
 
 Options:
   --no-open       Start without opening the default browser.
-  --port=PORT     Preferred loopback port; Stoix tries the next 19 if occupied.
+  --port=PORT     Stable loopback port (default: 3210).
   --config=PATH   Use a specific private configuration file.
+  --doctor        Check the package, configuration, and Hermes connection.
   --smoke         Start, verify the production routes, then stop.
   --help          Show this help.
 `);
+}
+
+function parsePort(value, label) {
+  const port = Number(value);
+  if (!/^\d{1,5}$/.test(String(value)) || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${label} must be an integer from 1 to 65535.`);
+  }
+  return port;
+}
+
+async function acquireInstance(configDirectory) {
+  instanceLockPath = join(configDirectory, "stoix.lock");
+  runtimeStatePath = join(configDirectory, "runtime.json");
+
+  const running = await readRunningInstance();
+  if (running) return running;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const descriptor = openSync(instanceLockPath, "wx", 0o600);
+      writeFileSync(descriptor, `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`);
+      closeSync(descriptor);
+      ownsInstanceLock = true;
+      return null;
+    } catch (error) {
+      if (!error || error.code !== "EEXIST") throw error;
+    }
+
+    const lock = readJson(instanceLockPath);
+    if (!isProcessAlive(lock?.pid)) {
+      rmSync(instanceLockPath, { force: true });
+      continue;
+    }
+
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const existing = await readRunningInstance();
+      if (existing) return existing;
+      if (!isProcessAlive(lock?.pid)) break;
+      await delay(250);
+    }
+    throw new Error("Stoix is already starting. Wait a few seconds, then run Stoix again.");
+  }
+
+  throw new Error(`Could not acquire the Stoix startup lock: ${instanceLockPath}`);
+}
+
+async function readRunningInstance() {
+  if (!runtimeStatePath || !existsSync(runtimeStatePath)) return null;
+  const state = readJson(runtimeStatePath);
+  if (!state || typeof state.url !== "string" || !/^http:\/\/127\.0\.0\.1:\d+\/$/.test(state.url)) {
+    rmSync(runtimeStatePath, { force: true });
+    return null;
+  }
+  try {
+    const response = await fetch(state.url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(1_500)
+    });
+    if (response.ok) return state;
+  } catch {
+    // A stale runtime record is removed below.
+  }
+  rmSync(runtimeStatePath, { force: true });
+  return null;
+}
+
+function writeRuntimeState(url) {
+  if (!runtimeStatePath) return;
+  writeFileSync(
+    runtimeStatePath,
+    `${JSON.stringify({ pid: process.pid, serverPid: child?.pid ?? null, url, version: readVersion() }, null, 2)}\n`,
+    { encoding: "utf8", mode: 0o600 }
+  );
+  if (process.platform !== "win32") chmodSync(runtimeStatePath, 0o600);
+}
+
+function cleanupInstanceFiles() {
+  if (!ownsInstanceLock) return;
+  if (runtimeStatePath) rmSync(runtimeStatePath, { force: true });
+  if (instanceLockPath) rmSync(instanceLockPath, { force: true });
+  ownsInstanceLock = false;
+}
+
+function readJson(path) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid < 1) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
+async function printDoctor(configPath, config) {
+  const hermesUrl = config.HERMES_API_BASE_URL || "http://127.0.0.1:8642";
+  let hermesStatus = "unreachable";
+  try {
+    const response = await fetch(new URL("/health", hermesUrl), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(2_000)
+    });
+    hermesStatus = response.ok ? "ready" : `HTTP ${response.status}`;
+  } catch {
+    // The readable unreachable status is printed below.
+  }
+
+  console.log(`Stoix ${readVersion()} diagnostics`);
+  console.log(`Platform: ${process.platform}-${process.arch}`);
+  console.log(`Application: ${existsSync(serverPath) ? "ready" : "missing"}`);
+  console.log(`Configuration: ${configPath}`);
+  console.log(`Hermes: ${hermesStatus} (${hermesUrl})`);
+  if (hermesStatus !== "ready") {
+    console.log("Recovery: run `hermes doctor`, then `hermes gateway start`.");
+  }
+}
+
+function delay(milliseconds) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
 
 function fail(message) {

@@ -23,6 +23,11 @@ import type { HermesCapabilityState, HermesUiCapabilities } from "@hermes-ui/her
 import { LiveTokenUsageTicker, type LiveTokenUsageSnapshot } from "@/components/chat/LiveTokenUsageTicker";
 import type { ChatAttachment, ChatAttachmentKind } from "@/data/types";
 import {
+  deleteUnreferencedVaultAttachment,
+  uploadAttachmentToVault
+} from "@/lib/attachmentVaultClient";
+import { useHermesServerRecovery } from "@/hooks/useHermesServerRecovery";
+import {
   collectSpeechTranscript,
   createBrowserSpeechRecognition,
   insertSpeechTranscript,
@@ -34,9 +39,9 @@ import styles from "./Composer.module.css";
 
 const PRIMARY_MENU_WIDTH_PX = Math.round(260 * 1.3 * 1.25);
 const PRIMARY_MENU_GAP_PX = 8;
-const CONFIGURED_MODEL_PREVIEW_LIMIT = 10;
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_ATTACHMENT_ITEMS = 20;
 const ATTACHMENT_ACCEPT =
   "image/*,application/pdf,text/*,.txt,.md,.markdown,.csv,.tsv,.json,.jsonl,.xml,.yaml,.yml,.log,.rtf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.html,.css,.js,.jsx,.ts,.tsx,.py,.java,.go,.rs,.c,.cpp,.h,.hpp,.sh,.ps1,.sql,.zip,.tar,.gz";
 
@@ -52,6 +57,8 @@ type ComposerProps = {
   disabled?: boolean;
   draftStorageKey?: string;
   isGenerating?: boolean;
+  hermesConnected?: boolean;
+  hermesStatusLoading?: boolean;
   isStopRequested?: boolean;
   isStartState?: boolean;
   liveTokenUsage?: LiveTokenUsageSnapshot | null;
@@ -60,6 +67,7 @@ type ComposerProps = {
   modelState?: HermesUiCapabilities["models"];
   modelSelectInProgress?: boolean;
   onModelSelect?: (modelId: string) => void;
+  onHermesRecovered?: () => void | Promise<void>;
   onDeferQueuedMessage?: (id: string) => void;
   onPrioritizeQueuedMessage?: (id: string) => void;
   onRemoveQueuedMessage?: (id: string) => void;
@@ -92,6 +100,8 @@ export function Composer({
   disabled = false,
   draftStorageKey,
   isGenerating = false,
+  hermesConnected = true,
+  hermesStatusLoading = false,
   isStopRequested = false,
   isStartState = false,
   liveTokenUsage = null,
@@ -100,6 +110,7 @@ export function Composer({
   modelState,
   modelSelectInProgress = false,
   onModelSelect,
+  onHermesRecovered,
   onDeferQueuedMessage,
   onPrioritizeQueuedMessage,
   onRemoveQueuedMessage,
@@ -115,13 +126,15 @@ export function Composer({
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
-  const [showAllConfiguredModels, setShowAllConfiguredModels] = useState(false);
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const [modelMenuStyle, setModelMenuStyle] = useState<CSSProperties | null>(null);
   const [voiceInputState, setVoiceInputState] = useState<"idle" | "listening">("idle");
   const [voiceInputHasError, setVoiceInputHasError] = useState(false);
   const [voiceInputMessage, setVoiceInputMessage] = useState("");
+  const [hermesLaunchError, setHermesLaunchError] = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [pendingAttachmentCount, setPendingAttachmentCount] = useState(0);
   const [voiceInputSupported, setVoiceInputSupported] = useState<boolean | null>(null);
   const [queueMenu, setQueueMenu] = useState<{ bottom: number; id: string; right: number } | null>(null);
   const modelControlRef = useRef<HTMLDivElement>(null);
@@ -131,6 +144,9 @@ export function Composer({
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentsRef = useRef<ChatAttachment[]>([]);
+  const pendingAttachmentCountRef = useRef(0);
+  const mountedRef = useRef(true);
+  const attachmentScopeRef = useRef(draftStorageKey);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const projectCardRef = useRef<HTMLDivElement>(null);
   const queueMenuRef = useRef<HTMLDivElement>(null);
@@ -141,8 +157,12 @@ export function Composer({
   const voiceInputSuffixRef = useRef("");
   const voiceInputIgnoreResultsRef = useRef(false);
   const hasDraft = getTrimmedDraft(textareaRef.current, draft).length > 0;
-  const sendableAttachments = attachments.filter((attachment) => attachment.status !== "too-large");
-  const canSend = (hasDraft || sendableAttachments.length > 0) && !disabled && !modelSelectInProgress;
+  const sendableAttachments = attachments.filter((attachment) => attachment.status === "ready");
+  const canSend =
+    (hasDraft || sendableAttachments.length > 0) &&
+    pendingAttachmentCount === 0 &&
+    !disabled &&
+    !modelSelectInProgress;
   const willQueue = canSend && isGenerating;
   const hasQueuedMessages = queuedMessages.length > 0;
   const modelOptions = modelState?.availableModels ?? [];
@@ -161,6 +181,15 @@ export function Composer({
       ? activeProjectName
       : "Work in a project";
   const isVoiceListening = voiceInputState === "listening";
+  const hermesDisconnected = !hermesStatusLoading && !hermesConnected;
+  const serverRecovery = useHermesServerRecovery(hermesDisconnected);
+  const composerError = attachmentError ?? hermesLaunchError ?? modelSelectError;
+
+  useEffect(() => {
+    if (hermesConnected) {
+      setHermesLaunchError(null);
+    }
+  }, [hermesConnected]);
 
   useEffect(() => {
     setVoiceInputSupported(isBrowserSpeechRecognitionSupported(window));
@@ -339,12 +368,28 @@ export function Composer({
   }, [draftStorageKey]);
 
   useEffect(() => {
+    if (attachmentScopeRef.current === draftStorageKey) {
+      return;
+    }
+    const staleAttachments = attachmentsRef.current;
+    attachmentScopeRef.current = draftStorageKey;
+    pendingAttachmentCountRef.current = 0;
+    attachmentsRef.current = [];
+    setAttachments([]);
+    setAttachmentError(null);
+    setPendingAttachmentCount(0);
+    staleAttachments.forEach(discardUnsentAttachment);
+  }, [draftStorageKey]);
+
+  useEffect(() => {
     attachmentsRef.current = attachments;
   }, [attachments]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      attachmentsRef.current.forEach(revokeAttachmentPreview);
+      mountedRef.current = false;
+      attachmentsRef.current.forEach(discardUnsentAttachment);
     };
   }, []);
 
@@ -496,6 +541,9 @@ export function Composer({
   function clearAttachmentsForSend(sentAttachments: ChatAttachment[]) {
     const sentIds = new Set(sentAttachments.map((attachment) => attachment.id));
     attachmentsRef.current = attachmentsRef.current.filter((attachment) => !sentIds.has(attachment.id));
+    if (attachmentsRef.current.length < MAX_ATTACHMENT_ITEMS) {
+      setAttachmentError(null);
+    }
     setAttachments((current) =>
       current.filter((attachment) => !sentIds.has(attachment.id))
     );
@@ -524,9 +572,10 @@ export function Composer({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const message = getTrimmedDraft(textareaRef.current, draft);
-    const currentSendableAttachments = attachments.filter((attachment) => attachment.status !== "too-large");
+    const currentSendableAttachments = attachments.filter((attachment) => attachment.status === "ready");
     const canSubmit =
       (message.length > 0 || currentSendableAttachments.length > 0) &&
+      pendingAttachmentCount === 0 &&
       !disabled &&
       !modelSelectInProgress;
     if (!canSubmit) {
@@ -547,22 +596,73 @@ export function Composer({
     fileInputRef.current?.click();
   }
 
-  function addFiles(fileList: FileList | File[]) {
-    const files = Array.from(fileList);
+  async function launchHermes() {
+    setHermesLaunchError(null);
+    const result = await serverRecovery.start();
+    if (!result.ok) {
+      setHermesLaunchError(result.error.message);
+      return;
+    }
+    await onHermesRecovered?.();
+  }
+
+  async function addFiles(fileList: FileList | File[]) {
+    const attachmentScope = draftStorageKey;
+    const requestedFiles = Array.from(fileList);
+    const availableSlots = Math.max(
+      0,
+      MAX_ATTACHMENT_ITEMS - attachmentsRef.current.length - pendingAttachmentCountRef.current
+    );
+    const files = requestedFiles.slice(0, availableSlots);
+    setAttachmentError(
+      files.length < requestedFiles.length
+        ? `A message can include up to ${MAX_ATTACHMENT_ITEMS} files.`
+        : null
+    );
     if (files.length === 0) {
       return;
     }
-    setAttachments((current) => [...current, ...files.map(fileToAttachment)]);
+    pendingAttachmentCountRef.current += files.length;
+    setPendingAttachmentCount((current) => current + files.length);
+    let nextAttachments: ChatAttachment[];
+    try {
+      nextAttachments = await Promise.all(files.map(fileToAttachment));
+    } finally {
+      if (attachmentScopeRef.current === attachmentScope) {
+        pendingAttachmentCountRef.current = Math.max(
+          0,
+          pendingAttachmentCountRef.current - files.length
+        );
+      }
+      if (mountedRef.current && attachmentScopeRef.current === attachmentScope) {
+        setPendingAttachmentCount((current) => Math.max(0, current - files.length));
+      }
+    }
+    if (!mountedRef.current || attachmentScopeRef.current !== attachmentScope) {
+      nextAttachments.forEach(discardUnsentAttachment);
+      return;
+    }
+    setAttachments((current) => {
+      const next = [...current, ...nextAttachments].slice(0, MAX_ATTACHMENT_ITEMS);
+      attachmentsRef.current = next;
+      return next;
+    });
     focusComposerInput();
   }
 
   function removeAttachment(id: string) {
+    setAttachmentError(null);
     setAttachments((current) => {
       const target = current.find((attachment) => attachment.id === id);
       if (target) {
         revokeAttachmentPreview(target);
+        if (target.storageId) {
+          void deleteUnreferencedVaultAttachment(target.storageId);
+        }
       }
-      return current.filter((attachment) => attachment.id !== id);
+      const next = current.filter((attachment) => attachment.id !== id);
+      attachmentsRef.current = next;
+      return next;
     });
   }
 
@@ -572,7 +672,7 @@ export function Composer({
     if (disabled || event.dataTransfer.files.length === 0) {
       return;
     }
-    addFiles(event.dataTransfer.files);
+    void addFiles(event.dataTransfer.files);
   }
 
   function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -580,7 +680,7 @@ export function Composer({
     if (files.length === 0) {
       return;
     }
-    addFiles(files);
+    void addFiles(files);
   }
 
   function stopGeneration() {
@@ -646,7 +746,6 @@ export function Composer({
 
   function closeModelMenu() {
     setIsModelMenuOpen(false);
-    setShowAllConfiguredModels(false);
   }
 
   function toggleModelMenu() {
@@ -686,16 +785,6 @@ export function Composer({
 
   const modelGroups = groupModelOptions(modelOptions, modelSearch);
   const isFilteringModels = modelSearch.trim().length > 0;
-  const canToggleConfiguredModels =
-    !isFilteringModels && modelGroups.hermes.length > CONFIGURED_MODEL_PREVIEW_LIMIT;
-  const visibleConfiguredModels =
-    canToggleConfiguredModels && !showAllConfiguredModels
-      ? collapseConfiguredModels(
-          modelGroups.hermes,
-          modelState?.selectedModelId ?? null,
-          CONFIGURED_MODEL_PREVIEW_LIMIT
-        )
-      : modelGroups.hermes;
 
   const modelMenu =
     isModelMenuOpen && modelMenuStyle ? (
@@ -722,16 +811,10 @@ export function Composer({
           <ModelSection
             title="Hermes Configured"
             count={modelGroups.hermes.length}
-            models={visibleConfiguredModels}
+            models={modelGroups.hermes}
             selectedModelId={modelState?.selectedModelId ?? null}
             onSelect={selectModel}
             headerTone="configured"
-            expanded={showAllConfiguredModels}
-            onToggleExpanded={
-              canToggleConfiguredModels
-                ? () => setShowAllConfiguredModels((current) => !current)
-                : undefined
-            }
           />
         </div>
       </div>
@@ -866,16 +949,19 @@ export function Composer({
               type="file"
               accept={ATTACHMENT_ACCEPT}
               onChange={(event) => {
-                addFiles(event.currentTarget.files ?? []);
+                void addFiles(event.currentTarget.files ?? []);
                 event.currentTarget.value = "";
               }}
             />
             <textarea
               ref={textareaRef}
               aria-label="Message"
+              className={hermesDisconnected ? styles.hermesDisconnectedInput : undefined}
               disabled={disabled}
               placeholder={
-                disabled
+                hermesDisconnected
+                  ? "Hermes is not connected"
+                  : disabled
                   ? "Create or select a chat to send a message."
                   : "Message Hermes…"
               }
@@ -911,28 +997,49 @@ export function Composer({
                 >
                   <Plus size={20} />
                 </button>
+                {hermesDisconnected && serverRecovery.status?.canStart ? (
+                  <button
+                    className={styles.hermesLaunchButton}
+                    disabled={serverRecovery.isStarting}
+                    onClick={() => void launchHermes()}
+                    type="button"
+                  >
+                    {serverRecovery.isStarting ? "Launching..." : "Launch Hermes"}
+                  </button>
+                ) : null}
                 <div className={styles.modelRow}>
-                  <div className={styles.modelControl} ref={modelControlRef}>
-                    <button
-                      className={styles.modelButton}
-                      ref={modelButtonRef}
-                      type="button"
-                      aria-expanded={canOpenModelMenu ? isModelMenuOpen : undefined}
-                      aria-haspopup={canOpenModelMenu ? "listbox" : undefined}
-                      aria-label={modelButtonLabel(modelState, modelOptions.length)}
-                      disabled={!canOpenModelMenu}
-                      onClick={toggleModelMenu}
-                    >
-                      <span className={styles.modelButtonText} ref={modelButtonTextRef}>
-                        {modelSelectInProgress ? "Selecting..." : modelLabel}
-                      </span>
-                      {modelSelectInProgress ? (
+                  {hermesStatusLoading ? (
+                    <div className={styles.hermesConnectionNotice}>
+                      {hermesStatusLoading ? (
                         <LoaderCircle className={styles.modelSpinner} size={14} />
-                      ) : canOpenModelMenu ? (
-                        <ChevronDown size={12} />
                       ) : null}
-                    </button>
-                  </div>
+                      <span role="status">
+                        {hermesStatusLoading ? "Checking Hermes..." : "Hermes is not connected"}
+                      </span>
+                    </div>
+                  ) : hermesDisconnected ? null : (
+                    <div className={styles.modelControl} ref={modelControlRef}>
+                      <button
+                        className={styles.modelButton}
+                        ref={modelButtonRef}
+                        type="button"
+                        aria-expanded={canOpenModelMenu ? isModelMenuOpen : undefined}
+                        aria-haspopup={canOpenModelMenu ? "listbox" : undefined}
+                        aria-label={modelButtonLabel(modelState, modelOptions.length)}
+                        disabled={!canOpenModelMenu}
+                        onClick={toggleModelMenu}
+                      >
+                        <span className={styles.modelButtonText} ref={modelButtonTextRef}>
+                          {modelSelectInProgress ? "Selecting..." : modelLabel}
+                        </span>
+                        {modelSelectInProgress ? (
+                          <LoaderCircle className={styles.modelSpinner} size={14} />
+                        ) : canOpenModelMenu ? (
+                          <ChevronDown size={12} />
+                        ) : null}
+                      </button>
+                    </div>
+                  )}
                   {showLiveTokenUsage ? (
                     <div className={styles.liveTokenSlot} aria-live="polite">
                       <LiveTokenUsageTicker
@@ -1060,9 +1167,9 @@ export function Composer({
           </div>
         </div>
       </form>
-      {modelSelectError ? (
+      {composerError ? (
         <p className={styles.modelSelectError} role="alert">
-          {modelSelectError}
+          {composerError}
         </p>
       ) : null}
     </div>
@@ -1128,16 +1235,17 @@ function AttachmentTile({
       className={styles.attachmentTile}
       data-kind={attachment.kind}
       data-status={attachment.status}
-      draggable={Boolean(attachment.previewUrl)}
+      draggable={Boolean(attachment.downloadUrl ?? attachment.previewUrl)}
       onDragStart={(event) => {
-        if (!attachment.previewUrl) {
+        const downloadUrl = attachment.downloadUrl ?? attachment.previewUrl;
+        if (!downloadUrl) {
           return;
         }
         event.dataTransfer.effectAllowed = "copy";
         event.dataTransfer.setData("text/plain", attachment.fileName);
         event.dataTransfer.setData(
           "DownloadURL",
-          `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${attachment.previewUrl}`
+          `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${downloadUrl}`
         );
       }}
     >
@@ -1160,7 +1268,11 @@ function AttachmentTile({
         <div className={styles.attachmentMeta}>
           <span className={styles.attachmentName}>{attachment.fileName}</span>
           <span className={styles.attachmentDetail}>
-            {attachment.status === "too-large" ? "Too large" : attachmentTypeLabel(attachment)}
+            {attachment.status === "too-large"
+              ? "Too large"
+              : attachment.status === "upload-error"
+                ? "Upload failed"
+                : attachmentTypeLabel(attachment)}
           </span>
         </div>
       ) : null}
@@ -1178,20 +1290,16 @@ function AttachmentTile({
 
 function ModelSection({
   count,
-  expanded = false,
   headerTone = "default",
   models,
   onSelect,
-  onToggleExpanded,
   selectedModelId,
   title
 }: {
   count: number;
-  expanded?: boolean;
   headerTone?: "default" | "configured";
   models: NonNullable<HermesUiCapabilities["models"]["availableModels"]>;
   onSelect: (modelId: string) => void;
-  onToggleExpanded?: () => void;
   selectedModelId: string | null;
   title: string;
 }) {
@@ -1244,17 +1352,6 @@ function ModelSection({
           <div className={styles.modelEmptyState}>No matching models</div>
         )}
       </div>
-      {onToggleExpanded ? (
-        <button
-          className={styles.modelSectionToggle}
-          type="button"
-          aria-expanded={expanded}
-          onClick={onToggleExpanded}
-        >
-          <span>{expanded ? "Less" : "More"}</span>
-          <ChevronDown aria-hidden="true" data-expanded={expanded ? "true" : "false"} size={13} />
-        </button>
-      ) : null}
     </section>
   );
 }
@@ -1292,22 +1389,6 @@ function groupModelOptions(
     hermes: options.filter((model) => model.catalogSource === "hermes-config" && matches(model)),
     popular: []
   };
-}
-
-function collapseConfiguredModels(
-  models: HermesUiCapabilities["models"]["availableModels"],
-  selectedModelId: string | null,
-  limit: number
-) {
-  const visible = models.slice(0, limit);
-  if (!selectedModelId || visible.some((model) => model.id === selectedModelId)) {
-    return visible;
-  }
-  const selected = models.find((model) => model.id === selectedModelId);
-  if (!selected || limit < 1) {
-    return visible;
-  }
-  return [...visible.slice(0, limit - 1), selected];
 }
 
 function formatContextLength(value: number) {
@@ -1368,26 +1449,47 @@ function resizeComposerTextarea(textarea: HTMLTextAreaElement | null) {
   textarea.style.overflowY = nextHeight > clampedHeight + 1 ? "auto" : "hidden";
 }
 
-function fileToAttachment(file: File): ChatAttachment {
+async function fileToAttachment(file: File): Promise<ChatAttachment> {
   const kind = classifyAttachment(file);
   const imageTooLarge = kind === "image" && file.size > MAX_IMAGE_BYTES;
   const tooLarge = file.size > MAX_FILE_BYTES || imageTooLarge;
-  const previewUrl = kind === "image" || kind === "pdf" ? URL.createObjectURL(file) : undefined;
+  if (!tooLarge) {
+    try {
+      return await uploadAttachmentToVault(file, kind);
+    } catch {
+      return {
+        id: `att-${crypto.randomUUID()}`,
+        fileName: file.name || fallbackAttachmentName(kind),
+        kind,
+        mimeType: file.type || fallbackMimeType(kind),
+        previewUrl: kind === "image" ? URL.createObjectURL(file) : undefined,
+        sizeBytes: file.size,
+        source: "local",
+        status: "upload-error"
+      };
+    }
+  }
   return {
     id: `att-${crypto.randomUUID()}`,
     fileName: file.name || fallbackAttachmentName(kind),
     kind,
     mimeType: file.type || fallbackMimeType(kind),
-    previewUrl,
     sizeBytes: file.size,
     source: "local",
-    status: tooLarge ? "too-large" : "needs-upload"
+    status: "too-large"
   };
 }
 
 function revokeAttachmentPreview(attachment: ChatAttachment) {
   if (attachment.previewUrl?.startsWith("blob:")) {
     URL.revokeObjectURL(attachment.previewUrl);
+  }
+}
+
+function discardUnsentAttachment(attachment: ChatAttachment) {
+  revokeAttachmentPreview(attachment);
+  if (attachment.storageId) {
+    void deleteUnreferencedVaultAttachment(attachment.storageId);
   }
 }
 

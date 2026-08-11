@@ -1,17 +1,16 @@
 import { listHermesPlugins } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
+import { resolveHermesClientConfig } from "@/server/hermesClientConfig";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const result = await listHermesPlugins({
-    apiKey: process.env.HERMES_API_KEY,
-    baseUrl: process.env.HERMES_API_BASE_URL,
+  const config = await resolveHermesClientConfig({
     dashboardBaseUrl: process.env.HERMES_DASHBOARD_BASE_URL,
     dashboardSessionToken: process.env.HERMES_DASHBOARD_SESSION_TOKEN,
-    enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
     timeoutMs: 8000
   });
+  const result = await listHermesPlugins(config);
 
   if (!result.ok) {
     return NextResponse.json(result, { status: 502 });

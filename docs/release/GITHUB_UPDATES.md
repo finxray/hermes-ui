@@ -25,6 +25,9 @@ development manifest. Public installations need no override.
 6. Publish the release. Only a published, non-prerelease release is announced to
    stable installations.
 
-Future one-click installation requires signed manifests, staged replacement,
-startup health checks, and rollback. Those capabilities are intentionally not
-claimed by `0.1.0`; see `ADR-0003-signed-release-updates.md`.
+One-command installation now verifies release checksums and stages immutable
+per-user version directories before switching the stable launcher. Automatic
+in-place updates remain a separate future feature requiring signed manifests,
+health-checked replacement, and rollback; see
+`ADR-0003-signed-release-updates.md` and
+`ADR-0011-one-command-installation.md`.

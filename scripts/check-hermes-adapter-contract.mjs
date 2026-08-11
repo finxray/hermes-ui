@@ -14,7 +14,7 @@ const {
   sessionTokenUsageDelta,
   shouldSuppressHermesStreamError
 } = await import(compatibilityUrl);
-const { normalizeHermesSseEvent } = await import(
+const { getHermesSessionMessages, listHermesPlugins, normalizeHermesSseEvent } = await import(
   pathToFileURL(resolve(root, "packages/hermes-client/src/index.ts")).href
 );
 
@@ -225,4 +225,56 @@ assert.equal(
   "unknown optional Hermes events must be ignored without failing the stream"
 );
 
-console.log("Hermes adapter contract: 22 checks passed.");
+const sessionMessages = await getHermesSessionMessages(
+  {
+    apiKey: "test",
+    baseUrl: "http://127.0.0.1:8642",
+    fetchImpl: async () => new Response(JSON.stringify({
+      data: [
+        {
+          id: 42,
+          role: "user",
+          content: [
+            { type: "text", text: "Inspect this" },
+            { type: "image_url", image_url: { url: "data:image/png;base64,AA==" } }
+          ],
+          timestamp: 1_786_000_000
+        }
+      ]
+    }), { status: 200, headers: { "Content-Type": "application/json" } })
+  },
+  "session-stable-id"
+);
+assert.equal(sessionMessages.ok, true);
+assert.equal(sessionMessages.messages[0]?.id, "42", "numeric Hermes message ids must remain stable strings");
+assert.equal(sessionMessages.messages[0]?.content, "Inspect this", "multimodal history must retain its text part");
+
+let discoveredDashboardToken = false;
+let authenticatedDashboardRequest = false;
+const plugins = await listHermesPlugins({
+  baseUrl: "http://127.0.0.1:8642",
+  dashboardSessionToken: "",
+  fetchImpl: async (input, init) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.pathname === "/skills") {
+      discoveredDashboardToken = true;
+      return new Response('<script>window.__HERMES_SESSION_TOKEN__="local-dashboard-token"</script>', {
+        status: 200,
+        headers: { "Content-Type": "text/html" }
+      });
+    }
+    if (url.pathname === "/api/dashboard/plugins/hub") {
+      authenticatedDashboardRequest = new Headers(init?.headers).get("X-Hermes-Session-Token") === "local-dashboard-token";
+      return Response.json({ plugins: [] });
+    }
+    throw new Error(`Unexpected dashboard request: ${url.pathname}`);
+  }
+});
+assert.equal(plugins.ok, true);
+assert.equal(
+  discoveredDashboardToken && authenticatedDashboardRequest,
+  true,
+  "a blank optional dashboard token must trigger local token discovery"
+);
+
+console.log("Hermes adapter contract: 25 checks passed.");

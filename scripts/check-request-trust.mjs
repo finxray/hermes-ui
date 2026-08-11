@@ -42,7 +42,11 @@ assert.equal(
 );
 
 const protectedRoutes = [
+  "apps/web/src/app/api/attachments/route.ts",
+  "apps/web/src/app/api/attachments/[id]/route.ts",
+  "apps/web/src/app/api/attachments/link/route.ts",
   "apps/web/src/app/api/hermes/chat/stream/route.ts",
+  "apps/web/src/app/api/hermes/chat/title/route.ts",
   "apps/web/src/app/api/hermes/plugins/[id]/route.ts",
   "apps/web/src/app/api/hermes/model/select/route.ts",
   "apps/web/src/app/api/hermes/skills/[id]/route.ts",

@@ -6,9 +6,11 @@ service, advertising service, or telemetry endpoint in version `0.1.0`.
 ## Data Stored Locally
 
 Projects, chats, session metadata, and UI settings are stored in the browser
-profile on the user's computer. Hermes connection settings and credentials are
-stored in the user's private Stoix `config.env` file when using the portable
-package. They are not embedded in the application archive.
+profile on the user's computer. Durable attachment bytes and manifests are
+stored in Stoix's per-user application-data directory. Hermes connection
+settings and credentials are stored in the user's private Stoix `config.env`
+file when using the packaged application. They are not embedded in the
+application archive.
 
 ## Data Sent Outside Stoix
 
@@ -25,9 +27,10 @@ metadata such as IP address and user agent may therefore be received by GitHub.
 ## User Control
 
 Users can reset local Stoix workspace data from Settings, remove the Stoix
-browser profile, delete the per-user `config.env`, or stop using the configured
-Hermes runtime. Review this notice together with the policies of any Hermes
-provider or plugin before sending sensitive information.
+browser profile, delete the Stoix application-data directory or per-user
+`config.env`, or stop using the configured Hermes runtime. Review this notice
+together with the policies of any Hermes provider or plugin before sending
+sensitive information.
 
 This notice describes the `0.1.0` software behavior and should be reviewed by
 the project owner before public release.

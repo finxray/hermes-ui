@@ -4,6 +4,9 @@
 
 Accepted for Stoix `0.1.0`.
 
+The statements about initial installation are superseded by ADR-0011. This ADR
+continues to govern automatic in-place application updates and signing.
+
 ## Context
 
 Stoix is currently a local Node/Next application started by repository
@@ -32,7 +35,8 @@ Stoix uses an opt-in, release-channel updater with these boundaries:
 8. Stable is the default channel. Beta is opt-in. Downgrades are never automatic.
 
 The `0.1.0` source distribution implements GitHub release checking and the consent
-UI. It does not claim atomic self-installation before versioned bundles exist.
+UI. ADR-0011 adds checksum-verified, staged initial installation into versioned
+bundles; automatic in-place replacement remains governed by this ADR.
 The public stable notification channel is the repository's latest non-draft,
 non-prerelease GitHub Release. The application checks at most once per 24 hours
 automatically, caches the result locally, and also supports an explicit
@@ -80,6 +84,7 @@ release assets and artifact attestations as supply-chain integrity controls:
 - `0.1.0` can safely notify users of releases without modifying their machine.
 - The public stable notification channel uses GitHub Releases by default; an
   environment variable is needed only for an approved manifest override.
-- Full one-click install requires the future versioned launcher/package.
+- One-command installation is implemented by ADR-0011. Automatic in-place
+  replacement still requires the signed update design in this ADR.
 - The updater remains OS-agnostic and does not depend on PowerShell, Bash, Homebrew,
   apt, or a mutable Git checkout.

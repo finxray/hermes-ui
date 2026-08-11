@@ -1,8 +1,9 @@
 Stoix {VERSION}
 ===============
 
-Stoix is a local Web UI for Hermes Agent. Hermes is a separate runtime and must
-be installed and started independently.
+Stoix is a local Web UI for Hermes Agent. Hermes is a separate runtime. The
+recommended one-command Stoix installer can invoke Hermes' official installer;
+this portable folder never vendors or silently replaces Hermes.
 
 Channels
 --------
@@ -31,6 +32,9 @@ The default Hermes URL is http://127.0.0.1:8642. If Hermes requires an API key,
 stop Stoix, set HERMES_API_KEY in config.env, and start Stoix again. Never share
 that file.
 
+If startup fails, run the launcher with --doctor. It reports the package,
+configuration path, and Hermes connection without printing credentials.
+
 Updates
 -------
 Settings checks the public finxray/hermes-ui GitHub Releases channel once a day.
@@ -39,8 +43,9 @@ new release from the update link shown in Settings.
 
 Data
 ----
-Projects and chats stay in the browser profile (IndexedDB). Replacing this
-application folder does not delete browser data or the private config file.
+Projects and chats stay in browser IndexedDB. Durable attachment bytes stay in
+Stoix's per-user local data store. Replacing this application folder does not
+delete either data location or the private config file.
 
 Privacy and notices
 -------------------

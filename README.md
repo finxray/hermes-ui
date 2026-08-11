@@ -10,6 +10,37 @@ runtime, and all browser requests to Hermes pass through the Stoix server-side
 BFF. Brain Memory is not bundled with Stoix `0.1.0`; it may be offered later as
 an independently installed Hermes skill or plugin.
 
+## Install And Launch
+
+**macOS or Linux:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/finxray/hermes-ui/master/install.sh | sh
+```
+
+**Windows PowerShell:**
+
+```powershell
+irm https://raw.githubusercontent.com/finxray/hermes-ui/master/install.ps1 | iex
+```
+
+That one command detects the operating system and processor, verifies the
+download, installs Stoix for the current user, adds the `stoix` command, helps
+install and configure the official Hermes Agent runtime when it is missing,
+starts its local gateway and Dashboard, and opens Stoix in the default browser.
+It does not need administrator access or a preinstalled Node.js runtime.
+
+The first installation may take several minutes when no published Stoix release
+is available because the installer builds the production package with a
+temporary, checksum-verified Node.js runtime. Later installs use the smaller
+prebuilt release package. On a new machine, Hermes may still ask the user to
+sign in to a model provider or add an API key; credentials cannot be created or
+accepted on the user's behalf.
+
+Launch Stoix later from the Start menu/application launcher or with `stoix` in
+a new terminal. Run `stoix --doctor` for a short package, configuration, and
+Hermes connection check.
+
 ## Run From Source
 
 Requirements: Node.js 24, npm 11, and a separately installed Hermes runtime.
@@ -27,14 +58,14 @@ Stoix opens on `http://127.0.0.1:3000`. Its default Hermes endpoint is
 ## Production Build
 
 ```powershell
-npm run release:check
 npm run package:release
 ```
 
 `package:release` creates a versioned portable archive and SHA-256 file under
 `artifacts/release/`, then launches the bundled runtime and probes the production
-UI and Hermes status route. The archive includes a pinned Node runtime, so end
-users do not need Node.js.
+UI and Hermes status route through both the portable launcher and the real
+native installer. The archive includes a pinned Node runtime, so end users do
+not need Node.js.
 
 The launcher binds only to `127.0.0.1`, opens the default browser, and stores its
 private configuration outside the application directory:
@@ -43,8 +74,10 @@ private configuration outside the application directory:
 - macOS: `~/Library/Application Support/Stoix/config.env`
 - Linux: `$XDG_CONFIG_HOME/stoix/config.env` or `~/.config/stoix/config.env`
 
-Hermes must be installed and started separately. User chats and projects remain
-in the browser profile's IndexedDB and are not replaced with application files.
+Hermes remains a separate runtime, although the one-command installer can invoke
+its official installer and configure its loopback API. Workspace presentation
+state stays in browser IndexedDB, while durable attachment bytes live in Stoix's
+per-user local data store. Neither is replaced with versioned application files.
 
 ## Channel Continuity
 

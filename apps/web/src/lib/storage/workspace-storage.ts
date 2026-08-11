@@ -1,5 +1,6 @@
 import { createInitialWorkspaceState } from "@/lib/workspaceStore";
 import type { WorkspaceState } from "@/data/types";
+import { removeTransientAttachmentPreviews } from "@/lib/attachmentPreviews";
 import {
   STORAGE_SCHEMA_VERSION,
   WORKSPACE_META_KEY,
@@ -51,7 +52,13 @@ export function snapshotToWorkspaceState(snapshot: MemoryStoreSnapshot): Workspa
     activeProjectId: snapshot.meta?.activeProjectId ?? defaults.activeProjectId,
     activeSessionId: snapshot.meta?.activeSessionId ?? null,
     projects: snapshot.projects,
-    sessions: snapshot.sessions,
+    sessions: snapshot.sessions.map((session) => ({
+      ...session,
+      messages: session.messages.map((message) => ({
+        ...message,
+        attachments: removeTransientAttachmentPreviews(message.attachments)
+      }))
+    })),
     // modelChoices/connectionStatus are runtime-ish; fall back to initial defaults
     // so a snapshot from an older schema still produces a valid state.
     modelChoices:

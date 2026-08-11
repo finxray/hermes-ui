@@ -26,10 +26,12 @@
     "check:app-update": "node --no-warnings scripts/check-app-update.mjs",
     "check:channel-sessions": "node --no-warnings scripts/check-channel-sessions.mjs",
     "check:chat-tabs": "node --no-warnings scripts/check-chat-tab-state.mjs",
+    "check:chat-titles": "node --no-warnings scripts/check-chat-title-generation.mjs",
     "check:composer-send": "node scripts/check-composer-send-enable.mjs",
     "check:voice-input": "node --no-warnings scripts/check-voice-input.mjs",
     "check:core-boundary": "node scripts/check-core-release-boundary.mjs",
     "check:hermes-dashboard-recovery": "node --no-warnings scripts/check-hermes-dashboard-recovery.mjs",
+    "check:hermes-server-recovery": "node --no-warnings scripts/check-hermes-server-recovery.mjs",
     "check:hermes-adapter-contract": "node --no-warnings scripts/check-hermes-adapter-contract.mjs",
     "check:hermes-model-capabilities": "node --no-warnings scripts/check-hermes-model-capabilities.mjs",
     "check:production-build": "node scripts/check-production-build.mjs",
@@ -38,12 +40,16 @@
     "check:workspace-state": "node --no-warnings scripts/check-workspace-state.mjs",
     "check:memory-store": "node --no-warnings scripts/check-memory-store.mjs",
     "check:storage-migration": "node --no-warnings scripts/check-storage-migration.mjs",
+    "check:local-data-store": "node --no-warnings --experimental-strip-types scripts/check-local-data-store.mjs",
+    "check:installers": "node --no-warnings scripts/check-installers.mjs",
     "smoke:ui": "node scripts/production-ui-smoke.mjs",
     "smoke:ui:headed": "node scripts/production-ui-smoke.mjs --headed",
-    "release:check": "npm run check:core-boundary && npm run check:app-update && npm run check:request-trust && npm run check:channel-sessions && npm run check:chat-tabs && npm run check:workspace-state && npm run check:memory-store && npm run check:storage-migration && npm run check:hermes-adapter-contract && npm run check:hermes-model-capabilities && npm run check:hermes-dashboard-recovery && npm run check:composer-send && npm run check:voice-input && npm run typecheck && npm run build && npm run check:production-build && npm run check:core-boundary && npm run check:release-secrets && npm audit --audit-level=moderate",
-    "package:current": "node scripts/package-release.mjs",
+    "release:check": "npm run check:core-boundary && npm run check:app-update && npm run check:request-trust && npm run check:channel-sessions && npm run check:chat-tabs && npm run check:chat-titles && npm run check:workspace-state && npm run check:memory-store && npm run check:storage-migration && npm run check:local-data-store && npm run check:installers && npm run check:hermes-adapter-contract && npm run check:hermes-model-capabilities && npm run check:hermes-dashboard-recovery && npm run check:hermes-server-recovery && npm run check:composer-send && npm run check:voice-input && npm run typecheck && npm run build && npm run check:production-build && npm run check:core-boundary && npm run check:release-secrets && npm audit --audit-level=moderate",
+    "package:bundle": "node scripts/package-release.mjs",
+    "package:current": "npm run build && npm run package:bundle",
     "package:smoke": "node scripts/package-smoke.mjs",
-    "package:release": "npm run release:check && npm run package:current && npm run check:release-secrets && npm run package:smoke"
+    "package:install-smoke": "node scripts/package-install-smoke.mjs",
+    "package:release": "npm run release:check && npm run package:bundle && npm run check:release-secrets && npm run package:smoke && npm run package:install-smoke"
   },
   "overrides": {
     "postcss": "8.5.25"

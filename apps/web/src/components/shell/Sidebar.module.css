@@ -9,7 +9,7 @@
   --sidebar-row-padding-x: clamp(7.2px, calc(4.8px + 0.15vw), 10.8px);
   --sidebar-icon-column: var(--icon-sm);
   --sidebar-column-gap: var(--shell-column-gap, 9px);
-  --sidebar-meta-column: 44px;
+  --sidebar-meta-column: 64px;
   --sidebar-action-icon-size: 13px;
   --sidebar-action-gap: 8px;
   --sidebar-footer-bg: transparent;

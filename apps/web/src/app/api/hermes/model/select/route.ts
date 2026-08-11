@@ -1,6 +1,7 @@
 import { selectHermesModel } from "@hermes-ui/hermes-client";
 import { NextResponse } from "next/server";
 import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
+import { resolveHermesClientConfig } from "@/server/hermesClientConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -32,14 +33,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const config = await resolveHermesClientConfig({ signal: request.signal, timeoutMs: 10_000 });
   const result = await selectHermesModel(
-    {
-      apiKey: process.env.HERMES_API_KEY,
-      baseUrl: process.env.HERMES_API_BASE_URL,
-      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
-      signal: request.signal,
-      timeoutMs: 10_000
-    },
+    config,
     sessionId,
     modelId,
     {

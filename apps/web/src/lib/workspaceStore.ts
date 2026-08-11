@@ -1,6 +1,7 @@
 import { createInitialWorkspace } from "../data/initialWorkspace";
 import type {
   Artifact,
+  ChatAttachment,
   ChatMessage,
   PersistedActivityEvent,
   ProjectContextScope,
@@ -47,8 +48,11 @@ type WorkspaceAction =
   | { type: "archiveProjectSessions"; projectId: string }
   | { type: "removeProject"; projectId: string }
   | { type: "renameSession"; sessionId: string; title: string }
+  | { type: "markSessionTitleGenerationRequested"; sessionId: string; requestedAt: string }
+  | { type: "applyGeneratedSessionTitle"; sessionId: string; title: string; generatedAt: string }
   | { type: "archiveSession"; sessionId: string }
   | { type: "appendMessage"; sessionId: string; message: ChatMessage }
+  | { type: "updateMessageAttachments"; sessionId: string; messageId: string; attachments: ChatMessage["attachments"] }
   | { type: "appendRunRecord"; sessionId: string; run: RunRecord }
   | { type: "updateRunRecord"; sessionId: string; runId: string; patch: Partial<RunRecord> }
   | {
@@ -94,10 +98,16 @@ export function workspaceReducer(
       return removeProject(state, action.projectId);
     case "renameSession":
       return renameSession(state, action.sessionId, action.title);
+    case "markSessionTitleGenerationRequested":
+      return markSessionTitleGenerationRequested(state, action.sessionId, action.requestedAt);
+    case "applyGeneratedSessionTitle":
+      return applyGeneratedSessionTitle(state, action.sessionId, action.title, action.generatedAt);
     case "archiveSession":
       return archiveSession(state, action.sessionId);
     case "appendMessage":
       return appendMessage(state, action.sessionId, action.message);
+    case "updateMessageAttachments":
+      return updateMessageAttachments(state, action.sessionId, action.messageId, action.attachments);
     case "appendRunRecord":
       return appendRunRecord(state, action.sessionId, action.run);
     case "updateRunRecord":
@@ -373,6 +383,58 @@ function renameSession(state: WorkspaceState, sessionId: string, title: string):
   return session ? touchProject(next, session.projectId, now) : next;
 }
 
+function markSessionTitleGenerationRequested(
+  state: WorkspaceState,
+  sessionId: string,
+  requestedAt: string
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session || !shouldGenerateSessionTitle(session)) {
+    return state;
+  }
+  return {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? { ...item, titleGenerationRequestedAt: requestedAt }
+        : item
+    )
+  };
+}
+
+function applyGeneratedSessionTitle(
+  state: WorkspaceState,
+  sessionId: string,
+  title: string,
+  generatedAt: string
+): WorkspaceState {
+  const cleanTitle = title.replace(/[\r\n\x00]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (
+    !cleanTitle ||
+    !session?.titleGenerationRequestedAt ||
+    session.titleSource !== "default" ||
+    !isDefaultSessionTitle(session.title)
+  ) {
+    return state;
+  }
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            title: cleanTitle,
+            titleSource: "model" as const,
+            titleGeneratedAt: generatedAt,
+            updatedAt: generatedAt
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, generatedAt);
+}
+
 function archiveSession(state: WorkspaceState, sessionId: string): WorkspaceState {
   const session = state.sessions.find((item) => item.id === sessionId);
   if (!session) {
@@ -532,6 +594,34 @@ function updateMessage(
   return touchProject(next, session.projectId, now);
 }
 
+function updateMessageAttachments(
+  state: WorkspaceState,
+  sessionId: string,
+  messageId: string,
+  attachments: ChatMessage["attachments"]
+): WorkspaceState {
+  const session = state.sessions.find((item) => item.id === sessionId);
+  if (!session) {
+    return state;
+  }
+  const now = new Date().toISOString();
+  const next = {
+    ...state,
+    sessions: state.sessions.map((item) =>
+      item.id === sessionId
+        ? {
+            ...item,
+            messages: item.messages.map((message) =>
+              message.id === messageId ? { ...message, attachments } : message
+            ),
+            updatedAt: now
+          }
+        : item
+    )
+  };
+  return touchProject(next, session.projectId, now);
+}
+
 function appendToolEvent(
   state: WorkspaceState,
   sessionId: string,
@@ -575,13 +665,94 @@ function loadHermesMessages(
       item.id === sessionId
         ? {
             ...item,
-            messages,
+            messages: mergeLocalAttachments(item.messages, messages),
             updatedAt: now,
             lastViewedAt: state.activeSessionId === sessionId ? now : item.lastViewedAt
           }
         : item
     )
   };
+}
+
+function mergeLocalAttachments(
+  localMessages: ChatMessage[],
+  hermesMessages: ChatMessage[]
+): ChatMessage[] {
+  const localById = new Map(localMessages.map((message) => [message.id, message]));
+  const localByContent = new Map<string, ChatMessage[]>();
+
+  for (const message of localMessages) {
+    if (!message.attachments?.length) {
+      continue;
+    }
+    const key = `${message.role}\u0000${message.content}`;
+    localByContent.set(key, [...(localByContent.get(key) ?? []), message]);
+  }
+
+  return hermesMessages.map((message) => {
+    const exactMatch = localById.get(message.id);
+    const contentMatches = localByContent.get(`${message.role}\u0000${message.content}`);
+    const localMatch = exactMatch?.attachments?.length ? exactMatch : contentMatches?.shift();
+    return localMatch?.attachments?.length
+      ? {
+          ...message,
+          attachments: mergeMessageAttachments(message.attachments, localMatch.attachments)
+        }
+      : message;
+  });
+}
+
+function mergeMessageAttachments(
+  hermesAttachments: ChatAttachment[] | undefined,
+  localAttachments: ChatAttachment[]
+): ChatAttachment[] {
+  if (!hermesAttachments?.length) {
+    return localAttachments;
+  }
+
+  const usedLocalAttachments = new Set<ChatAttachment>();
+  const merged = hermesAttachments.map((hermesAttachment) => {
+    const localAttachment = localAttachments.find((candidate) =>
+      !usedLocalAttachments.has(candidate) && attachmentIdentityMatches(candidate, hermesAttachment)
+    );
+    if (!localAttachment) {
+      return hermesAttachment;
+    }
+
+    usedLocalAttachments.add(localAttachment);
+    const storageId = localAttachment.storageId ?? hermesAttachment.storageId;
+    const previewUrl = localAttachment.previewUrl ?? hermesAttachment.previewUrl;
+    const downloadUrl = localAttachment.downloadUrl ?? hermesAttachment.downloadUrl ?? (
+      storageId ? `/api/attachments/${encodeURIComponent(storageId)}?download=1` : undefined
+    );
+
+    return {
+      ...hermesAttachment,
+      contentHash: localAttachment.contentHash ?? hermesAttachment.contentHash,
+      downloadUrl,
+      previewUrl,
+      storageId,
+      status: storageId || previewUrl ? "ready" : hermesAttachment.status
+    };
+  });
+
+  return [
+    ...merged,
+    ...localAttachments.filter((attachment) => !usedLocalAttachments.has(attachment))
+  ];
+}
+
+function attachmentIdentityMatches(left: ChatAttachment, right: ChatAttachment) {
+  if (left.storageId && right.storageId) {
+    return left.storageId === right.storageId;
+  }
+  if (left.id && right.id && left.id === right.id) {
+    return true;
+  }
+  if (left.contentHash && right.contentHash) {
+    return left.contentHash === right.contentHash;
+  }
+  return left.fileName === right.fileName && left.sizeBytes === right.sizeBytes;
 }
 
 function setSessionModelPreference(
@@ -693,6 +864,8 @@ function normalizeSession(session: Session, projects: Project[]): Session {
     summary: session.summary === "Empty local mock session" ? "" : session.summary,
     hermesSessionId: session.hermesSessionId || `hermes-${session.id}`,
     titleSource,
+    titleGenerationRequestedAt: normalizeTimestamp(session.titleGenerationRequestedAt),
+    titleGeneratedAt: normalizeTimestamp(session.titleGeneratedAt),
     lastViewedAt: normalizeTimestamp(session.lastViewedAt) ?? normalizeTimestamp(session.updatedAt),
     contextScope: {
       ...contextScope,
@@ -1349,6 +1522,16 @@ function isDefaultSessionTitle(title: string): boolean {
   return /^New chat(?: \d+)?$/i.test(title.trim());
 }
 
+export function shouldGenerateSessionTitle(session: Session): boolean {
+  const titleSource = session.titleSource ?? normalizeTitleSource(session);
+  return (
+    titleSource === "default" &&
+    isDefaultSessionTitle(session.title) &&
+    !session.titleGenerationRequestedAt &&
+    !session.messages.some((message) => message.role === "user")
+  );
+}
+
 function appendMessageToSession(
   session: Session,
   message: ChatMessage,
@@ -1356,11 +1539,9 @@ function appendMessageToSession(
   viewed: boolean
 ): Session {
   const titleSource = session.titleSource ?? normalizeTitleSource(session);
-  const shouldAutoTitle =
+  const isFirstUserMessage =
     message.role === "user" &&
-    titleSource === "default" &&
-    isDefaultSessionTitle(session.title);
-  const nextTitle = shouldAutoTitle ? summarizeTitle(message.content) : session.title;
+    !session.messages.some((item) => item.role === "user");
 
   return {
     ...session,
@@ -1369,10 +1550,10 @@ function appendMessageToSession(
       session.messages.length === 0 && message.role === "user"
         ? summarizeMessage(message.content)
         : session.summary,
-    title: nextTitle,
-    titleSource: shouldAutoTitle ? "first-message" : titleSource,
+    title: session.title,
+    titleSource,
     firstUserMessageAt:
-      shouldAutoTitle && !session.firstUserMessageAt ? now : session.firstUserMessageAt,
+      isFirstUserMessage && !session.firstUserMessageAt ? now : session.firstUserMessageAt,
     updatedAt: now,
     lastViewedAt: viewed ? now : session.lastViewedAt
   };
@@ -1385,6 +1566,9 @@ function markSessionViewed(sessions: Session[], sessionId: string, viewedAt: str
 }
 
 function normalizeTitleSource(session: Session): NonNullable<Session["titleSource"]> {
+  if (session.titleSource === "model") {
+    return "model";
+  }
   const firstUserMessage = session.messages?.find((message) => message.role === "user");
   if (firstUserMessage) {
     const generatedTitle = summarizeTitle(firstUserMessage.content);

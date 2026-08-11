@@ -313,7 +313,7 @@
   overflow: hidden;
   border-radius: 5px;
   background: rgb(255, 92, 103);
-  color: #ffffff;
+  color: #ff7a2f;
   clip-path: polygon(0 0, 68% 0, 100% 28%, 100% 100%, 0 100%);
 }
 
@@ -472,6 +472,10 @@
   color: var(--composer-placeholder);
 }
 
+.box textarea.hermesDisconnectedInput::placeholder {
+  color: #ff7a2f;
+}
+
 .controls {
   display: flex;
   min-width: 0;
@@ -534,6 +538,73 @@
   flex: 1 1 auto;
   align-items: center;
   gap: 14px;
+}
+
+.hermesConnectionNotice {
+  display: inline-flex;
+  min-width: 0;
+  min-height: calc(var(--control-height) * 0.86);
+  align-items: center;
+  gap: 7px;
+  color: var(--notice);
+  font-size: var(--font-body);
+  line-height: 1;
+}
+
+.hermesConnectionNotice > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesConnectionNotice > svg {
+  flex: 0 0 auto;
+}
+
+.hermesLaunchButton {
+  position: relative;
+  width: 150px;
+  min-width: 150px;
+  min-height: 30px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #ff7a2f;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  line-height: 1;
+}
+
+.hermesLaunchButton::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  content: "";
+  pointer-events: none;
+  transform: scale(0.5);
+  transform-origin: top left;
+}
+
+.hermesLaunchButton:hover,
+.hermesLaunchButton:focus-visible {
+  outline: 0;
+  border-color: #ff7a2f;
+  background: transparent;
+  color: #ff7a2f;
+}
+
+.hermesLaunchButton:disabled {
+  cursor: default;
+  opacity: 0.62;
 }
 
 .liveTokenSlot {
@@ -780,37 +851,6 @@
   align-content: start;
   min-width: 0;
   gap: 2px;
-}
-
-.modelSectionToggle {
-  display: flex;
-  width: fit-content;
-  min-height: 28px;
-  align-items: center;
-  gap: 5px;
-  margin: 1px 4px 0;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: var(--model-menu-font-small);
-  font-weight: 600;
-}
-
-.modelSectionToggle:hover,
-.modelSectionToggle:focus-visible {
-  outline: 0;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
-}
-
-.modelSectionToggle svg {
-  transition: transform 160ms ease;
-}
-
-.modelSectionToggle svg[data-expanded="true"] {
-  transform: rotate(180deg);
 }
 
 .modelOption {
@@ -1181,6 +1221,10 @@
 
   .modelButton {
     max-width: min(46vw, 200px);
+  }
+
+  .hermesConnectionNotice {
+    max-width: calc(100vw - 128px);
   }
 
   .contextPanelInner {

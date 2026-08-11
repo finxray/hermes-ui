@@ -26,6 +26,7 @@ const {
   createInitialWorkspaceState,
   formatSessionUpdatedAt,
   getVisibleSessions,
+  shouldGenerateSessionTitle,
   workspaceReducer
 } = workspaceStore;
 const { createSessionExportPreview } = replayHelpers;
@@ -46,6 +47,7 @@ checkNormalizationFillsContextScopes();
 checkNormalizationFillsTitleMetadata();
 checkRunRecordPersistence();
 checkMessageUsageMetadataPersistence();
+checkHermesMessageSyncPreservesAttachments();
 checkRunsReplayPreviewHydrationPersistence();
 checkSessionExportPreview();
 checkSessionModelPreferencePersistence();
@@ -151,6 +153,14 @@ function checkFirstUserMessageTitleCleanup() {
   const session = state.sessions[0];
   const stableSessionKey = session.contextScope.stableSessionKey;
   const hermesSessionId = session.hermesSessionId;
+  const requestedAt = "2026-08-11T12:00:00.000Z";
+
+  assert.equal(shouldGenerateSessionTitle(session), true);
+  state = workspaceReducer(state, {
+    type: "markSessionTitleGenerationRequested",
+    sessionId: session.id,
+    requestedAt
+  });
 
   state = workspaceReducer(state, {
     type: "appendMessage",
@@ -165,51 +175,41 @@ function checkFirstUserMessageTitleCleanup() {
     }
   });
 
-  const updated = state.sessions.find((item) => item.id === session.id);
-  assert.equal(updated?.title, "Verify project context");
-  assert.equal(updated?.titleSource, "first-message");
-  assert(updated?.firstUserMessageAt, "first-message auto-title should record firstUserMessageAt");
+  let updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.title, session.title, "the local heuristic must not rename a new chat");
+  assert.equal(updated?.titleSource, "default");
+  assert.equal(updated?.titleGenerationRequestedAt, requestedAt);
+  assert(updated?.firstUserMessageAt, "the first user message should record firstUserMessageAt");
+  assert.equal(shouldGenerateSessionTitle(updated), false, "later renders must not request another title");
   assert.equal(updated?.contextScope.stableSessionKey, stableSessionKey);
   assert.equal(updated?.hermesSessionId, hermesSessionId);
 
-  state = workspaceReducer(state, { type: "createSession" });
-  const longTitleSession = state.sessions[0];
-  const longPrompt =
-    "Open new tab on my chrome existing window and keep the current workspace visible while the page loads";
   state = workspaceReducer(state, {
-    type: "appendMessage",
-    sessionId: longTitleSession.id,
-    message: {
-      id: "msg-check-long-title",
-      role: "user",
-      author: "User",
-      createdAt: "12:01",
-      content: longPrompt,
-      status: "complete"
-    }
+    type: "applyGeneratedSessionTitle",
+    sessionId: session.id,
+    title: "Project Context Verification",
+    generatedAt: "2026-08-11T12:00:02.000Z"
   });
+  updated = state.sessions.find((item) => item.id === session.id);
+  assert.equal(updated?.title, "Project Context Verification");
+  assert.equal(updated?.titleSource, "model");
+  assert.equal(updated?.titleGeneratedAt, "2026-08-11T12:00:02.000Z");
 
-  const longTitle = state.sessions.find((item) => item.id === longTitleSession.id)?.title;
-  assert.equal(longTitle, "Open Chrome tab");
-  assert.equal(longTitle?.includes("..."), false, "auto-titles must rely on UI fading");
-
-  state = workspaceReducer(state, { type: "createSession" });
-  const modelInquirySession = state.sessions[0];
   state = workspaceReducer(state, {
     type: "appendMessage",
-    sessionId: modelInquirySession.id,
+    sessionId: session.id,
     message: {
-      id: "msg-check-model-title",
+      id: "msg-check-second-message",
       role: "user",
       author: "User",
-      createdAt: "12:02",
-      content: "What model are you currently using?",
+      createdAt: "12:03",
+      content: "A later follow-up must not change the title.",
       status: "complete"
     }
   });
   assert.equal(
-    state.sessions.find((item) => item.id === modelInquirySession.id)?.title,
-    "Model inquiry"
+    state.sessions.find((item) => item.id === session.id)?.title,
+    "Project Context Verification"
   );
 }
 
@@ -220,9 +220,9 @@ function checkManualRenameWins() {
   const hermesSessionId = session.hermesSessionId;
 
   state = workspaceReducer(state, {
-    type: "renameSession",
+    type: "markSessionTitleGenerationRequested",
     sessionId: session.id,
-    title: "Manual session name"
+    requestedAt: "2026-08-11T12:00:00.000Z"
   });
   state = workspaceReducer(state, {
     type: "appendMessage",
@@ -235,6 +235,17 @@ function checkManualRenameWins() {
       content: "Can you overwrite this title?",
       status: "complete"
     }
+  });
+  state = workspaceReducer(state, {
+    type: "renameSession",
+    sessionId: session.id,
+    title: "Manual session name"
+  });
+  state = workspaceReducer(state, {
+    type: "applyGeneratedSessionTitle",
+    sessionId: session.id,
+    title: "Late Model Title",
+    generatedAt: "2026-08-11T12:00:02.000Z"
   });
 
   const updated = state.sessions.find((item) => item.id === session.id);
@@ -422,6 +433,52 @@ function checkNormalizationFillsTitleMetadata() {
   const migratedSession = migrated.sessions.find((item) => item.id === generatedSession.id);
   assert.equal(migratedSession?.titleSource, "first-message");
   assert.equal(migratedSession?.title, "Concurrent tasks inquiry");
+}
+
+function checkHermesMessageSyncPreservesAttachments() {
+  let state = workspaceReducer(base, { type: "createSession" });
+  const session = state.sessions[0];
+  const attachment = {
+    id: "att-persisted-image",
+    fileName: "persisted.png",
+    kind: "image",
+    mimeType: "image/png",
+    previewUrl: "data:image/png;base64,cGVyc2lzdGVk",
+    sizeBytes: 9,
+    source: "local",
+    status: "needs-upload"
+  };
+
+  state = workspaceReducer(state, {
+    type: "appendMessage",
+    sessionId: session.id,
+    message: {
+      id: "local-user-message",
+      role: "user",
+      author: "You",
+      attachments: [attachment],
+      createdAt: "12:00",
+      content: "Review this persisted image",
+      status: "complete"
+    }
+  });
+
+  state = workspaceReducer(state, {
+    type: "loadHermesMessages",
+    sessionId: session.id,
+    messages: [{
+      id: "hermes-user-message",
+      role: "user",
+      author: "You",
+      createdAt: "12:00",
+      content: "Review this persisted image",
+      status: "complete"
+    }]
+  });
+
+  const synced = state.sessions.find((item) => item.id === session.id)?.messages[0];
+  assert.equal(synced?.attachments?.[0]?.previewUrl, attachment.previewUrl);
+  assert.equal(synced?.attachments?.[0]?.fileName, attachment.fileName);
 }
 
 function checkRunRecordPersistence() {

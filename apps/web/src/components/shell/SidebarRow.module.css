@@ -213,6 +213,7 @@
 }
 
 .actionTooltip {
+  --font-small: 13.91px;
   position: fixed;
   z-index: var(--z-floating);
   width: max-content;

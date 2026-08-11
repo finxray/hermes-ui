@@ -13,12 +13,17 @@ import {
   normalizeActivityTokenUsage
 } from "@/lib/agentActivityEvents";
 import { streamHermesChatFromBff } from "@/lib/hermesChatClient";
+import { generateChatTitleFromBff } from "@/lib/hermesTitleClient";
 import { createTokenUsageAccumulator } from "@/lib/tokenUsageAggregator";
 import {
   createPersistedActivityEvent,
   limitPersistedActivityEvents
 } from "@/lib/persistedActivityReplay";
-import { DEFAULT_USER_DISPLAY_NAME, WORKSPACE_STORAGE_VERSION } from "@/lib/workspaceStore";
+import {
+  DEFAULT_USER_DISPLAY_NAME,
+  WORKSPACE_STORAGE_VERSION,
+  shouldGenerateSessionTitle
+} from "@/lib/workspaceStore";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import type { QueuedComposerMessage } from "@/components/chat/Composer";
 import type { HermesChatRequest, HermesTokenUsage, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
@@ -58,6 +63,7 @@ type ChatViewProps = {
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
   onCloseMainInSplit?: () => void;
   onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
+  onRefreshHermes?: () => void | Promise<void>;
   onSplitView?: () => void;
   projects: Project[];
   sessionModel: HermesSessionModelSync;
@@ -80,6 +86,7 @@ export function ChatView({
   onActivityEvent,
   onCloseMainInSplit,
   onGeneratingChange,
+  onRefreshHermes,
   onSplitView,
   projects,
   sessionModel,
@@ -111,6 +118,7 @@ export function ChatView({
   const liveTokenClearTimerRef = useRef<number | null>(null);
   const liveTokenResetTimerRef = useRef<number | null>(null);
   const queuedTurnTimerRef = useRef<number | null>(null);
+  const titleGenerationSessionIdsRef = useRef(new Set<string>());
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const isTranscriptUnderTabsRef = useRef(false);
   const tabsOverlapTranscriptRef = useRef(false);
@@ -368,6 +376,34 @@ export function ChatView({
       modelState: sendModelState
     });
     const modelRequest = sessionModel.modelRequest;
+    const shouldRequestTitle =
+      shouldGenerateSessionTitle(session) &&
+      !titleGenerationSessionIdsRef.current.has(session.id);
+    if (shouldRequestTitle) {
+      titleGenerationSessionIdsRef.current.add(session.id);
+    }
+    const chatContext: HermesChatRequest["context"] = {
+      project: {
+        id: activeProject.id,
+        title: activeProject.name,
+        stableKey: activeProject.contextScope.stableProjectKey,
+        userVisibleSummary: activeProject.contextScope.userVisibleSummary
+      },
+      session: {
+        id: session.id,
+        title: session.title,
+        stableKey: session.contextScope.stableSessionKey,
+        hermesSessionId: resolveHermesSessionId(session),
+        includeProjectContext: session.contextScope.includeProjectContext,
+        includeSessionContext: session.contextScope.includeSessionContext,
+        lastContextRefreshAt: session.contextScope.lastContextRefreshAt,
+        userVisibleSummary: session.contextScope.userVisibleSummary
+      },
+      ui: {
+        source: "hermes-ui",
+        workspaceVersion: WORKSPACE_STORAGE_VERSION
+      }
+    };
     let generationStarted = false;
     const userMessage = createMessage("user", DEFAULT_USER_DISPLAY_NAME, content, "complete", attachments);
     const assistantId = `msg-${crypto.randomUUID()}`;
@@ -446,6 +482,9 @@ export function ChatView({
       });
     };
 
+    if (shouldRequestTitle) {
+      workspaceActions.markSessionTitleGenerationRequested(session.id, runStartedAt);
+    }
     workspaceActions.appendMessage(session.id, userMessage);
     workspaceActions.appendMessage(session.id, assistantMessage);
     workspaceActions.appendRunRecord(session.id, {
@@ -490,6 +529,23 @@ export function ChatView({
         summary: "Hermes unavailable; no real agent call was made."
       });
       return;
+    }
+
+    if (shouldRequestTitle) {
+      void generateChatTitleFromBff({
+        context: chatContext,
+        message: content,
+        model: modelRequest?.selectModelId ?? null,
+        provider: modelRequest?.provider ?? null
+      }).then((title) => {
+        if (title) {
+          workspaceActions.applyGeneratedSessionTitle(
+            session.id,
+            title,
+            new Date().toISOString()
+          );
+        }
+      });
     }
 
     const streamController = new AbortController();
@@ -650,28 +706,8 @@ export function ChatView({
 
     const streamResult = await streamHermesChatFromBff(
       {
-        context: {
-          project: {
-            id: activeProject.id,
-            title: activeProject.name,
-            stableKey: activeProject.contextScope.stableProjectKey,
-            userVisibleSummary: activeProject.contextScope.userVisibleSummary
-          },
-          session: {
-            id: session.id,
-            title: session.title,
-            stableKey: session.contextScope.stableSessionKey,
-            hermesSessionId: resolveHermesSessionId(session),
-            includeProjectContext: session.contextScope.includeProjectContext,
-            includeSessionContext: session.contextScope.includeSessionContext,
-            lastContextRefreshAt: session.contextScope.lastContextRefreshAt,
-            userVisibleSummary: session.contextScope.userVisibleSummary
-          },
-          ui: {
-            source: "hermes-ui",
-            workspaceVersion: WORKSPACE_STORAGE_VERSION
-          }
-        },
+        context: chatContext,
+        clientMessageId: userMessage.id,
         message: content,
         attachments: toHermesChatAttachments(attachments),
         model: modelRequest?.selectModelId ?? null,
@@ -1069,6 +1105,8 @@ export function ChatView({
                   draftStorageKey={activeSession ? composerDraftStorageKey(variant, activeSession.id) : undefined}
                   disabled={!activeSession}
                   isGenerating={isGenerating}
+                  hermesConnected={hermesStatus?.reachable === true}
+                  hermesStatusLoading={isHermesStatusLoading}
                   isStopRequested={isStopRequested}
                   isStartState
                   liveTokenUsage={visibleLiveTokenUsage}
@@ -1077,6 +1115,7 @@ export function ChatView({
                   modelSelectInProgress={modelSelectInProgress}
                   modelState={displayedProviderModelState}
                   onModelSelect={sessionModel.selectModel}
+                  onHermesRecovered={onRefreshHermes}
                   onSend={handleSend}
                   onStop={handleStop}
                   onDeferQueuedMessage={deferQueuedTurn}
@@ -1149,6 +1188,8 @@ export function ChatView({
               contextItems={composerContextItems}
               draftStorageKey={activeSession ? composerDraftStorageKey(variant, activeSession.id) : undefined}
               disabled={!activeSession}
+              hermesConnected={hermesStatus?.reachable === true}
+              hermesStatusLoading={isHermesStatusLoading}
               isGenerating={isGenerating}
               isStopRequested={isStopRequested}
               liveTokenUsage={visibleLiveTokenUsage}
@@ -1157,6 +1198,7 @@ export function ChatView({
               modelSelectInProgress={modelSelectInProgress}
               modelState={displayedProviderModelState}
               onModelSelect={sessionModel.selectModel}
+              onHermesRecovered={onRefreshHermes}
               onSend={handleSend}
               onStop={handleStop}
               onDeferQueuedMessage={deferQueuedTurn}
@@ -1295,12 +1337,14 @@ function cleanRouteValue(value?: string | null) {
 }
 
 function toHermesChatAttachments(attachments: ChatAttachment[]): NonNullable<HermesChatRequest["attachments"]> {
-  return attachments.map(({ fileName, id, kind, mimeType, sizeBytes, status }) => ({
+  return attachments.map(({ contentHash, fileName, id, kind, mimeType, sizeBytes, status, storageId }) => ({
+    contentHash,
     fileName,
     id,
     kind,
     mimeType,
     sizeBytes,
+    storageId,
     status
   }));
 }

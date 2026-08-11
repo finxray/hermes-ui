@@ -43,6 +43,8 @@ import type {
   HermesSkillsListResult,
   HermesStatusError,
   HermesTokenUsage,
+  HermesTitleRequest,
+  HermesTitleResult,
   HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
@@ -118,6 +120,8 @@ export type {
   HermesSkillsListResult,
   HermesStatusError,
   HermesTokenUsage,
+  HermesTitleRequest,
+  HermesTitleResult,
   HermesUiCapabilities,
   NormalizedHermesStatus
 } from "./types";
@@ -716,7 +720,7 @@ export async function streamHermesSessionChat(
     response = await fetchImpl(buildEndpointUrl(base, `/api/sessions/${encodeURIComponent(hermesSessionId)}/chat/stream`), {
       body: JSON.stringify({
         conversation_history: request.recentMessages ?? [],
-        input: request.message,
+        input: request.multimodalInput ?? request.message,
         instructions: request.instructions || undefined,
         // Hermes 0.20 treats repeated turn-level model fields as a raw route,
         // bypassing the verified session lock and falling back to its default
@@ -788,6 +792,177 @@ export async function streamHermesSessionChat(
             )
         : undefined
     )
+  };
+}
+
+const CHAT_TITLE_INSTRUCTIONS = [
+  "Create a concise, specific title for the chat from the user's first message.",
+  "Return only the title, with no quotes, markdown, prefix, explanation, or ending punctuation.",
+  "Use 3 to 7 words and no more than 60 characters.",
+  "Describe the actual topic or task and preserve important proper names.",
+  "Do not answer the message and do not use tools."
+].join("\n");
+
+function buildChatTitlePrompt(firstMessage: string): string {
+  return [
+    "TITLE GENERATION TASK",
+    "Do not answer, research, or act on the message below.",
+    "Write only a concise 3 to 7 word chat title, with no quotes or explanation.",
+    "",
+    "FIRST USER MESSAGE:",
+    firstMessage,
+    "",
+    "TITLE ONLY:"
+  ].join("\n");
+}
+
+export async function generateHermesSessionTitle(
+  config: HermesClientConfig,
+  request: HermesTitleRequest
+): Promise<HermesTitleResult> {
+  const baseSessionId = sanitizeHermesId(request.context.session.hermesSessionId);
+  const utilitySessionId = `${baseSessionId.slice(0, 247)}::utility`;
+  const result = await streamHermesSessionChat(config, {
+    context: {
+      ...request.context,
+      session: {
+        ...request.context.session,
+        id: `${request.context.session.id}::utility`,
+        title: `Chat title ${baseSessionId.slice(-24)}`,
+        stableKey: `${request.context.session.stableKey.slice(0, 240)}::title`,
+        hermesSessionId: utilitySessionId,
+        includeProjectContext: false,
+        includeSessionContext: false,
+        userVisibleSummary: undefined
+      }
+    },
+    instructions: CHAT_TITLE_INSTRUCTIONS,
+    message: buildChatTitlePrompt(request.message),
+    model: request.model,
+    provider: request.provider,
+    recentMessages: []
+  });
+
+  if (!result.ok) {
+    await deleteTitleUtilitySession(config, utilitySessionId);
+    return result;
+  }
+
+  const completion = await readTitleCompletion(result.stream).finally(() =>
+    deleteTitleUtilitySession(config, utilitySessionId)
+  );
+  if (!completion.ok) {
+    return completion;
+  }
+  const title = normalizeGeneratedTitle(completion.content);
+  if (!title) {
+    return chatTitleFailure("Hermes returned an empty or invalid chat title.");
+  }
+  return { ok: true, title };
+}
+
+async function deleteTitleUtilitySession(config: HermesClientConfig, sessionId: string): Promise<void> {
+  await deleteHermesSession(
+    { ...config, signal: undefined, timeoutMs: Math.min(config.timeoutMs ?? 5_000, 5_000) },
+    sessionId
+  ).catch(() => undefined);
+}
+
+async function readTitleCompletion(
+  stream: ReadableStream<Uint8Array>
+): Promise<{ ok: true; content: string } | { ok: false; status: number; error: HermesChatError }> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+
+  const consumeFrame = (frame: string) => {
+    const parsed = parseSseFrame(frame)?.payload;
+    if (parsed?.type === "message_delta" && typeof parsed.delta === "string") {
+      content += parsed.delta;
+    }
+    if (parsed?.type === "message_done") {
+      const message = objectRecord(parsed.message);
+      if (typeof message?.content === "string" && message.content.trim()) {
+        content = message.content;
+      }
+    }
+    if (parsed?.type === "error") {
+      const error = objectRecord(parsed.error);
+      return {
+        ok: false as const,
+        status: 502,
+        error: {
+          kind: "http_error" as const,
+          message: asString(error?.message) || "Hermes could not generate a chat title."
+        }
+      };
+    }
+    return null;
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\r?\n\r?\n/);
+      buffer = frames.pop() ?? "";
+      for (const frame of frames) {
+        const failure = consumeFrame(frame);
+        if (failure) return failure;
+      }
+    }
+    buffer += decoder.decode();
+    for (const frame of buffer.split(/\r?\n\r?\n/)) {
+      if (!frame.trim()) continue;
+      const failure = consumeFrame(frame);
+      if (failure) return failure;
+    }
+    return { ok: true, content };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      error: normalizeChatFetchError(error)
+    };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function normalizeGeneratedTitle(value: string): string | null {
+  const withoutThinking = value.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, " ");
+  const firstLine = withoutThinking
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) ?? "";
+  const clean = firstLine
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^(?:title|chat title)\s*:\s*/i, "")
+    .replace(/^[`'\"*]+|[`'\"*]+$/g, "")
+    .replace(/[.!?;:,]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean || /^new chat(?: \d+)?$/i.test(clean)) {
+    return null;
+  }
+  const words = clean.split(/\s+/);
+  if (words.length > 10 || /^(?:i\b|i'm\b|no web\b|the user\b|here(?:'s| is)\b)/i.test(clean)) {
+    return null;
+  }
+  if (clean.length <= 60) {
+    return clean;
+  }
+  const shortened = clean.slice(0, 60).replace(/\s+\S*$/, "").trim();
+  return shortened || clean.slice(0, 60).trim();
+}
+
+function chatTitleFailure(message: string): HermesTitleResult {
+  return {
+    ok: false,
+    status: 502,
+    error: { kind: "bad_response", message }
   };
 }
 
@@ -2668,15 +2843,50 @@ export async function getHermesSessionMessages(
   const rawMessages = Array.isArray(raw?.messages) ? raw.messages : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
   const messages: HermesSessionMessage[] = (rawMessages as unknown[])
     .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
-    .map((item) => ({
-      id: asString(item.id) || asString(item.message_id) || `msg-${Math.random().toString(36).slice(2)}`,
+    .map((item, index) => ({
+      id: stableMessageId(item.id) || stableMessageId(item.message_id) || `msg-${safeId}-${index}`,
       role: normalizeMessageRole(item.role),
-      content: asString(item.content),
-      createdAt: asString(item.created_at) || asString(item.timestamp) || undefined
+      content: normalizeSessionMessageContent(item.content),
+      createdAt: firstTimestamp(item.created_at, item.timestamp) || undefined
     }))
     .filter((msg) => Boolean(msg.content));
 
   return { ok: true, messages, sessionId: safeId, error: null };
+}
+
+function stableMessageId(value: unknown) {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "bigint") {
+    return String(value);
+  }
+  return "";
+}
+
+function normalizeSessionMessageContent(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (!Array.isArray(value)) {
+    return "";
+  }
+  return value
+    .map((part) => {
+      if (typeof part === "string") {
+        return part;
+      }
+      if (!part || typeof part !== "object" || Array.isArray(part)) {
+        return "";
+      }
+      const text = (part as Record<string, unknown>).text;
+      return typeof text === "string" ? text : "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 function normalizeHermesSessionDetail(
@@ -4589,7 +4799,7 @@ async function fetchHermesDashboardJson(args: {
   }
 
   const token =
-    args.config.dashboardSessionToken ??
+    args.config.dashboardSessionToken?.trim() ||
     await fetchHermesDashboardSessionToken(args.fetchImpl, dashboardBase, args.timeoutMs, args.config.signal);
   const abort = createLinkedAbortController(args.config.signal, args.timeoutMs);
   const headers = new Headers({ Accept: "application/json" });
@@ -4664,7 +4874,8 @@ async function listHermesDashboardSkills(
     return [];
   }
 
-  const token = config.dashboardSessionToken ?? await fetchHermesDashboardSessionToken(fetchImpl, dashboardBase, timeoutMs, config.signal);
+  const token = config.dashboardSessionToken?.trim()
+    || await fetchHermesDashboardSessionToken(fetchImpl, dashboardBase, timeoutMs, config.signal);
   const abort = createLinkedAbortController(config.signal, timeoutMs);
   const headers = new Headers({ Accept: "application/json" });
   if (token) {
@@ -4707,7 +4918,8 @@ async function setHermesDashboardSkillEnabled(
     return null;
   }
 
-  const token = config.dashboardSessionToken ?? await fetchHermesDashboardSessionToken(fetchImpl, dashboardBase, timeoutMs, config.signal);
+  const token = config.dashboardSessionToken?.trim()
+    || await fetchHermesDashboardSessionToken(fetchImpl, dashboardBase, timeoutMs, config.signal);
   const abort = createLinkedAbortController(config.signal, timeoutMs);
   const headers = new Headers({ Accept: "application/json", "Content-Type": "application/json" });
   if (token) {

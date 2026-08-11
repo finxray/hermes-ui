@@ -1,5 +1,6 @@
 import {
   streamHermesSessionChat,
+  type HermesClientConfig,
   type HermesChatContext,
   type HermesChatError,
   type HermesChatHistoryMessage,
@@ -9,6 +10,8 @@ import { NextResponse } from "next/server";
 import { buildHermesRuntimeIdentityInstruction } from "@/lib/hermesRuntimeIdentity";
 import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
 import { relayHermesSessionReply } from "@/server/hermesChannelRelay";
+import { resolveHermesClientConfig } from "@/server/hermesClientConfig";
+import { getLocalDataStore, LocalDataStoreError } from "@/server/localDataStore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,14 +31,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
+  try {
+    const storedObjectIds = (parsed.request.attachments ?? [])
+      .map((attachment) => attachment.storageId)
+      .filter((id): id is string => Boolean(id));
+    if (storedObjectIds.length > 0) {
+      if (!parsed.request.clientMessageId) {
+        return NextResponse.json(
+          { error: { kind: "bad_response", message: "Stored attachments require a stable client message id." } },
+          { status: 400 }
+        );
+      }
+      const dataStore = getLocalDataStore();
+      dataStore.linkMessageObjects({
+        sessionId: parsed.request.context.session.hermesSessionId,
+        clientMessageId: parsed.request.clientMessageId,
+        content: parsed.request.message,
+        objectIds: storedObjectIds
+      });
+      parsed.request.multimodalInput = await buildMultimodalInput(parsed.request);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Stored attachment preparation failed.";
+    const kind = error instanceof LocalDataStoreError ? error.code : "storage_error";
+    return NextResponse.json({ error: { kind: "bad_response", message: `${kind}: ${message}` } }, { status: 400 });
+  }
+
+  const config = await resolveHermesClientConfig({ signal: request.signal, timeoutMs: 60_000 });
   const result = await streamHermesSessionChat(
-    {
-      apiKey: process.env.HERMES_API_KEY,
-      baseUrl: process.env.HERMES_API_BASE_URL,
-      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
-      signal: request.signal,
-      timeoutMs: 60_000
-    },
+    config,
     parsed.request
   );
 
@@ -43,7 +67,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return new Response(relayExternalChannelCompletion(result.stream, result.hermesSessionId), {
+  return new Response(relayExternalChannelCompletion(result.stream, result.hermesSessionId, config), {
     headers: {
       "Cache-Control": "no-store, no-transform",
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -55,7 +79,8 @@ export async function POST(request: Request) {
 
 function relayExternalChannelCompletion(
   upstream: ReadableStream<Uint8Array>,
-  hermesSessionId: string
+  hermesSessionId: string,
+  config: HermesClientConfig
 ): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -89,9 +114,8 @@ function relayExternalChannelCompletion(
           try {
             const relay = await relayHermesSessionReply(
               {
-                apiKey: process.env.HERMES_API_KEY,
-                baseUrl: process.env.HERMES_API_BASE_URL,
-                enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false",
+                ...config,
+                signal: undefined,
                 timeoutMs: 8_000
               },
               hermesSessionId,
@@ -150,6 +174,9 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
   }
 
   const input = body as Record<string, unknown>;
+  if (Array.isArray(input.attachments) && input.attachments.length > MAX_ATTACHMENT_ITEMS) {
+    return badRequest("bad_response", `A message can include up to ${MAX_ATTACHMENT_ITEMS} attachments.`);
+  }
   const message = cleanText(input.message, MAX_MESSAGE_CHARS);
   const context = readContext(input.context);
   const model = cleanOptionalString(input.model, 128);
@@ -157,6 +184,7 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
   const modelSelectionScope = readModelSelectionScope(input.modelSelectionScope);
   const provider = cleanOptionalString(input.provider, 128);
   const attachments = readAttachments(input.attachments);
+  const clientMessageId = cleanOptionalString(input.clientMessageId, 128);
 
   if (!message) {
     return badRequest("bad_response", "Message is required.");
@@ -174,6 +202,7 @@ async function readChatRequest(request: Request): Promise<ParseResult> {
         buildAttachmentInstruction(attachments)
       ),
       attachments,
+      clientMessageId: clientMessageId ?? undefined,
       message,
       provider,
       modelRuntime,
@@ -195,8 +224,8 @@ function buildAttachmentInstruction(attachments: HermesChatRequest["attachments"
     })
     .join("\n");
   return [
-    "The Hermes UI attached local file metadata for this turn.",
-    "The browser UI has not uploaded raw file bytes through a verified Hermes file endpoint yet; do not claim to have read file contents unless Hermes tools or future upload events provide them.",
+    "The Stoix UI attached locally stored files for this turn.",
+    "Stored image bytes are included as multimodal input when their format is verified. Other file types currently provide metadata only; do not claim to have read those file contents.",
     "Attached file metadata:",
     summary
   ].join("\n");
@@ -359,12 +388,16 @@ function readAttachments(value: unknown): HermesChatRequest["attachments"] {
       const kind = cleanString(attachment.kind, 40) || "unknown";
       const mimeType = cleanString(attachment.mimeType, 120) || "application/octet-stream";
       const status = cleanString(attachment.status, 40) || "needs-upload";
+      const storageId = cleanOptionalString(attachment.storageId, 128);
+      const contentHash = cleanOptionalString(attachment.contentHash, 128);
       const sizeBytes = cleanOptionalNumber(attachment.sizeBytes) ?? 0;
       if (!id || !fileName) {
         return null;
       }
       return {
         id,
+        storageId: storageId ?? undefined,
+        contentHash: contentHash ?? undefined,
         fileName,
         kind,
         mimeType,
@@ -372,7 +405,25 @@ function readAttachments(value: unknown): HermesChatRequest["attachments"] {
         status
       };
     })
-    .filter((item): item is NonNullable<HermesChatRequest["attachments"]>[number] => Boolean(item));
+    .filter(Boolean) as NonNullable<HermesChatRequest["attachments"]>;
+}
+
+async function buildMultimodalInput(request: HermesChatRequest): Promise<HermesChatRequest["multimodalInput"]> {
+  const parts: Exclude<HermesChatRequest["multimodalInput"], string | undefined> = [
+    { type: "text", text: request.message }
+  ];
+  const dataStore = getLocalDataStore();
+  for (const attachment of request.attachments ?? []) {
+    if (attachment.kind !== "image" || !attachment.storageId) {
+      continue;
+    }
+    const dataUrl = await dataStore.readInlineImageDataUrl(attachment.storageId);
+    if (!dataUrl) {
+      continue;
+    }
+    parts.push({ type: "image_url", image_url: { url: dataUrl, detail: "auto" } });
+  }
+  return parts.length > 1 ? parts : undefined;
 }
 
 function readRecentMessages(value: unknown): HermesChatRequest["recentMessages"] {

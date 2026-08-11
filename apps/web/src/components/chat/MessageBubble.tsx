@@ -46,37 +46,40 @@ export const MessageBubble = memo(function MessageBubble({
         <div className={styles.userStack}>
           {message.attachments && message.attachments.length > 0 ? (
             <div className={styles.messageAttachmentGrid} aria-label="Attached files">
-              {message.attachments.map((attachment) => (
+              {message.attachments.map((attachment) => {
+                const previewUrl = getAttachmentPreviewUrl(attachment);
+                const downloadUrl = attachment.downloadUrl ?? previewUrl;
+                return (
                 <div
                   className={styles.messageAttachmentTile}
                   data-kind={attachment.kind}
-                  draggable={Boolean(attachment.previewUrl)}
+                  data-preview={Boolean(previewUrl)}
+                  draggable={Boolean(downloadUrl)}
                   key={attachment.id}
                   onDragStart={(event) => {
-                    if (!attachment.previewUrl) {
+                    if (!downloadUrl) {
                       return;
                     }
                     event.dataTransfer.effectAllowed = "copy";
                     event.dataTransfer.setData("text/plain", attachment.fileName);
                     event.dataTransfer.setData(
                       "DownloadURL",
-                      `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${attachment.previewUrl}`
+                      `${attachment.mimeType || "application/octet-stream"}:${attachment.fileName}:${downloadUrl}`
                     );
                   }}
                 >
                   <span className={styles.messageAttachmentPreview} aria-hidden="true">
-                    {attachment.kind === "image" && attachment.previewUrl ? (
-                      <img alt="" src={attachment.previewUrl} />
-                    ) : (
-                      <FileText size={22} />
-                    )}
+                    {previewUrl ? <img alt="" src={previewUrl} /> : <FileText size={22} />}
                   </span>
                   <span className={styles.messageAttachmentName}>{attachment.fileName}</span>
                   <span className={styles.messageAttachmentDetail}>
-                    {attachmentKindLabel(attachment.kind)} · {formatFileSize(attachment.sizeBytes)}
+                    {attachment.status === "unavailable" && !previewUrl
+                      ? "Preview unavailable"
+                      : `${attachmentKindLabel(attachment.kind)} · ${formatFileSize(attachment.sizeBytes)}`}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
           {message.content ? (
@@ -212,6 +215,13 @@ function formatCompactTokenValue(value: number) {
     return value.toFixed(1).replace(/\.0$/, "");
   }
   return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function getAttachmentPreviewUrl(attachment: NonNullable<ChatMessage["attachments"]>[number]) {
+  if (attachment.kind !== "image") {
+    return undefined;
+  }
+  return attachment.previewUrl;
 }
 
 function attachmentKindLabel(kind: NonNullable<ChatMessage["attachments"]>[number]["kind"]) {

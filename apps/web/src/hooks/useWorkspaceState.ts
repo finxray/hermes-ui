@@ -14,6 +14,10 @@ import {
 } from "@/lib/storage/workspace-storage";
 import type { MemoryStore } from "@/lib/storage/memory-store";
 import type { ChatMessage, RunRecord, SessionChannel, SessionModelPreference, ToolEvent } from "@/data/types";
+import {
+  linkVaultAttachmentsToMessage,
+  uploadDataPreviewToVault
+} from "@/lib/attachmentVaultClient";
 
 export function useWorkspaceState() {
   const [state, dispatch] = useReducer(workspaceReducer, undefined, createInitialWorkspaceState);
@@ -22,6 +26,7 @@ export function useWorkspaceState() {
   const isHydratedRef = useRef(false);
   const pendingHydrationActionsRef = useRef<WorkspaceAction[]>([]);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const legacyAttachmentMigrationStartedRef = useRef(false);
   // The MemoryStore is resolved asynchronously (IndexedDB open + migration).
   // We hold the resolved instance here so save effects can reuse it.
   const storeRef = useRef<MemoryStore | null>(null);
@@ -89,6 +94,59 @@ export function useWorkspaceState() {
 
     return () => window.clearTimeout(timeout);
   }, [enqueueSave, isHydrated, state]);
+
+  useEffect(() => {
+    if (!isHydrated || legacyAttachmentMigrationStartedRef.current) {
+      return;
+    }
+    const legacyMessages = state.sessions.flatMap((session) =>
+      session.messages
+        .filter((message) => message.attachments?.some(
+          (attachment) => !attachment.storageId && attachment.previewUrl?.startsWith("data:")
+        ))
+        .map((message) => ({ message, session }))
+    );
+    if (legacyMessages.length === 0) {
+      return;
+    }
+    legacyAttachmentMigrationStartedRef.current = true;
+
+    void (async () => {
+      for (const { message, session } of legacyMessages) {
+        const nextAttachments = await Promise.all((message.attachments ?? []).map(async (attachment) => {
+          if (attachment.storageId || !attachment.previewUrl?.startsWith("data:")) {
+            return attachment;
+          }
+          try {
+            return await uploadDataPreviewToVault(
+              attachment.previewUrl,
+              attachment.fileName,
+              attachment.kind
+            );
+          } catch {
+            return attachment;
+          }
+        }));
+        dispatchWorkspaceAction({
+          type: "updateMessageAttachments",
+          sessionId: session.id,
+          messageId: message.id,
+          attachments: nextAttachments
+        });
+        const objectIds = nextAttachments
+          .map((attachment) => attachment.storageId)
+          .filter((id): id is string => Boolean(id));
+        if (objectIds.length > 0) {
+          await linkVaultAttachmentsToMessage({
+            sessionId: session.hermesSessionId,
+            clientMessageId: message.id,
+            content: message.content,
+            objectIds
+          }).catch(() => undefined);
+        }
+      }
+    })();
+  }, [dispatchWorkspaceAction, isHydrated, state]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -170,6 +228,10 @@ export function useWorkspaceState() {
         dispatchWorkspaceAction({ type: "renameProject", projectId, name }),
       renameSession: (sessionId: string, title: string) =>
         dispatchWorkspaceAction({ type: "renameSession", sessionId, title }),
+      markSessionTitleGenerationRequested: (sessionId: string, requestedAt: string) =>
+        dispatchWorkspaceAction({ type: "markSessionTitleGenerationRequested", sessionId, requestedAt }),
+      applyGeneratedSessionTitle: (sessionId: string, title: string, generatedAt: string) =>
+        dispatchWorkspaceAction({ type: "applyGeneratedSessionTitle", sessionId, title, generatedAt }),
       removeProject: (projectId: string) => dispatchWorkspaceAction({ type: "removeProject", projectId }),
       reset: () => dispatchWorkspaceAction({ type: "reset" }),
       switchProject: (projectId: string) => dispatchWorkspaceAction({ type: "switchProject", projectId }),
@@ -193,6 +255,11 @@ export function useWorkspaceState() {
           status,
           usage
         }),
+      updateMessageAttachments: (
+        sessionId: string,
+        messageId: string,
+        attachments: ChatMessage["attachments"]
+      ) => dispatchWorkspaceAction({ type: "updateMessageAttachments", sessionId, messageId, attachments }),
       loadHermesMessages: (sessionId: string, messages: ChatMessage[]) =>
         dispatchWorkspaceAction({ type: "loadHermesMessages", sessionId, messages }),
       setSessionModelPreference: (sessionId: string, preference: SessionModelPreference) =>

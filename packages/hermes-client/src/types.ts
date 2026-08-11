@@ -253,12 +253,21 @@ export type HermesChatHistoryMessage = {
 
 export type HermesChatAttachment = {
   id: string;
+  storageId?: string;
+  contentHash?: string;
   fileName: string;
   kind: string;
   mimeType: string;
   sizeBytes: number;
   status: string;
 };
+
+export type HermesChatInput =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string; detail?: string } }
+    >;
 
 export type HermesChatContext = {
   project: {
@@ -287,6 +296,9 @@ export type HermesChatRequest = {
   context: HermesChatContext;
   instructions?: string | null;
   message: string;
+  /** BFF-resolved input. Browser callers must send `message` and stored attachment ids instead. */
+  multimodalInput?: HermesChatInput;
+  clientMessageId?: string;
   attachments?: HermesChatAttachment[];
   recentMessages?: HermesChatHistoryMessage[];
   model?: string | null;
@@ -295,6 +307,17 @@ export type HermesChatRequest = {
   modelSelectionScope?: "session" | "turn" | null;
   provider?: string | null;
 };
+
+export type HermesTitleRequest = {
+  context: HermesChatContext;
+  message: string;
+  model?: string | null;
+  provider?: string | null;
+};
+
+export type HermesTitleResult =
+  | { ok: true; title: string }
+  | { ok: false; status: number; error: HermesChatError };
 
 export type HermesNormalizedMessage = {
   role: "assistant";
@@ -537,6 +560,19 @@ export type HermesSessionMessage = {
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   createdAt?: string;
+  attachments?: Array<{
+    id: string;
+    storageId: string;
+    contentHash: string;
+    fileName: string;
+    kind: string;
+    mimeType: string;
+    previewUrl?: string;
+    downloadUrl: string;
+    sizeBytes: number;
+    source: "local";
+    status: "ready";
+  }>;
 };
 
 export type HermesSessionListResult =

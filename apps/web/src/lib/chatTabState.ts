@@ -47,6 +47,21 @@ export function resolveSidebarTargetPane(
   return focusedPane;
 }
 
+export function resolveSidebarAddTargetPane({
+  focusedPane,
+  sideChatIsVisible,
+  singlePane
+}: {
+  focusedPane: "main" | "side";
+  sideChatIsVisible: boolean;
+  singlePane: "main" | "side" | null;
+}) {
+  if (singlePane) {
+    return singlePane;
+  }
+  return sideChatIsVisible ? focusedPane : "main";
+}
+
 export function resolveSidebarSelectedSessionIds({
   activeSessionId,
   sideChatIsVisible,

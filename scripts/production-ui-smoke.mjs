@@ -17,6 +17,11 @@ try {
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
   });
+  page.on("response", (response) => {
+    if (response.status() >= 500) {
+      browserErrors.push(`response: HTTP ${response.status()} ${response.url()}`);
+    }
+  });
   page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });

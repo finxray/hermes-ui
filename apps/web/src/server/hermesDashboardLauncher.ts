@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import type { SpawnOptions } from "node:child_process";
 
 const DEFAULT_DASHBOARD_PORT = "9119";
-const DASHBOARD_START_TIMEOUT_MS = 20_000;
+const DASHBOARD_START_TIMEOUT_MS = 60_000;
 const DASHBOARD_POLL_INTERVAL_MS = 350;
 
 export type DashboardTarget = {
@@ -119,18 +119,26 @@ export function buildDashboardLaunchSpec(
   executable: DashboardExecutable,
   dashboardArgs: string[]
 ): DashboardLaunchSpec {
+  return buildHermesLaunchSpec(platform, executable, dashboardArgs);
+}
+
+export function buildHermesLaunchSpec(
+  platform: NodeJS.Platform,
+  executable: DashboardExecutable,
+  args: string[]
+): DashboardLaunchSpec {
   if (executable.kind === "wsl") {
     if (platform !== "win32") {
       throw new Error("WSL Dashboard launch is available only on Windows.");
     }
     return {
-      args: ["-d", executable.distro, "--", executable.path, ...dashboardArgs],
+      args: ["-d", executable.distro, "--", executable.path, ...args],
       command: "wsl.exe",
       platform
     };
   }
 
-  return { args: dashboardArgs, command: executable.path, platform };
+  return { args, command: executable.path, platform };
 }
 
 async function resolveWslHermesExecutable(distro: string): Promise<string> {
@@ -178,7 +186,12 @@ async function resolveWindowsHermesExecutable(environment: NodeJS.ProcessEnv): P
     try {
       const child = spawn("where.exe", ["hermes.exe"], discoverySpawnOptions());
       const stdout = await captureSpawnedText(child, "where.exe");
-      return { kind: "native", path: validatedWindowsHermesExecutable(stdout) };
+      const executable = validatedWindowsHermesExecutable(stdout);
+      await captureSpawnedText(
+        spawn(/* turbopackIgnore: true */ executable, ["--version"], discoverySpawnOptions()),
+        executable
+      );
+      return { kind: "native", path: executable };
     } catch (error) {
       if (mode === "native") {
         throw new Error("Hermes was not found as a native Windows executable.", { cause: error });
@@ -298,7 +311,11 @@ export async function waitForHermesDashboard(baseUrl: URL): Promise<boolean> {
 }
 
 export function isAllowedDashboardStartRequest(request: Request): boolean {
-  if (request.headers.get("x-hermes-ui-action") !== "start-dashboard") {
+  return isAllowedLocalStartRequest(request, "start-dashboard");
+}
+
+export function isAllowedLocalStartRequest(request: Request, action: string): boolean {
+  if (request.headers.get("x-hermes-ui-action") !== action) {
     return false;
   }
 

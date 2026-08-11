@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import { getCoalescedHermesStatus } from "@/lib/server/hermesStatusProbe";
+import { resolveHermesClientConfig } from "@/server/hermesClientConfig";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const config = await resolveHermesClientConfig({
+    configuredDefaultModelId: process.env.HERMES_UI_DEFAULT_MODEL_ID
+  });
   const status = await getCoalescedHermesStatus(
-    {
-      apiKey: process.env.HERMES_API_KEY,
-      baseUrl: process.env.HERMES_API_BASE_URL,
-      configuredDefaultModelId: process.env.HERMES_UI_DEFAULT_MODEL_ID,
-      enabled: process.env.HERMES_UI_ENABLE_REAL_HERMES !== "false"
-    },
+    config,
     {
       forceModels: url.searchParams.get("refreshModels") === "true"
     }

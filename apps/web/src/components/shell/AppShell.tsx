@@ -25,6 +25,7 @@ import {
   appendUniqueTab,
   insertUniqueTab,
   reorderTab,
+  resolveSidebarAddTargetPane,
   resolveSidebarSelectedSessionIds,
   resolveSidebarTargetPane,
   selectSidebarTab
@@ -753,6 +754,39 @@ function AppShellInner() {
     focusPaneComposer("side");
   }
 
+  function addWorkspaceSessionToView(sessionId: string) {
+    hermesOpenRequestRef.current += 1;
+    const targetPane = resolveSidebarAddTargetPane({
+      focusedPane: focusedChatPane,
+      sideChatIsVisible,
+      singlePane
+    });
+    const sourcePane = mainTabIds.includes(sessionId)
+      ? "main"
+      : sideTabOrder.includes(sessionId)
+        ? "side"
+        : null;
+
+    if (sourcePane && sourcePane !== targetPane) {
+      moveChatTab({
+        sessionId,
+        sourcePane,
+        targetIndex: targetPane === "main" ? mainTabIds.length : sideTabOrder.length,
+        targetPane
+      });
+      if (singlePane) {
+        setSinglePane(targetPane);
+      }
+    } else if (targetPane === "main") {
+      selectMainSession(sessionId);
+    } else {
+      selectSideSession(sessionId);
+    }
+
+    setFocusedChatPane(targetPane);
+    focusPaneComposer(targetPane);
+  }
+
   openWorkspaceSessionRef.current = openWorkspaceSession;
 
   function closeChatTab(pane: ChatPaneId, sessionId: string) {
@@ -1026,6 +1060,7 @@ function AppShellInner() {
         onHermesSessionSelect={(summary) => {
           void openHermesSession(summary);
         }}
+        onWorkspaceSessionAdd={addWorkspaceSessionToView}
         onWorkspaceSessionSelect={openWorkspaceSession}
         projects={state.projects}
         runningSessionIds={generatingSessionIds}
@@ -1075,6 +1110,7 @@ function AppShellInner() {
               onActivityEvent={appendActivityEvent}
               onCloseMainInSplit={sideSession ? promoteSideChatToMain : undefined}
               onGeneratingChange={markSessionGenerating}
+              onRefreshHermes={() => hermesStatus.refresh({ refreshModels: true })}
               onSplitView={toggleMainWindowSplit}
               projects={state.projects}
               sessionModel={hermesSessionModel}

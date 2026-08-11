@@ -18,6 +18,18 @@ Hermes is an external dependency and can be configured in the per-user
 `config.env` file. If Hermes is unavailable, Stoix reports that state honestly
 and offers supported recovery actions.
 
+## Supported: One-Command Per-User Install
+
+`install.sh` (macOS/Linux) and `install.ps1` (Windows) detect the native target,
+verify the release archive, install it into an immutable version directory,
+repair the stable user launcher, and start Stoix. The scripts use no elevation.
+They can invoke Hermes' official installer when Hermes is absent, but Hermes
+continues to own its runtime, setup, credentials, services, and updates.
+
+When no public Stoix release exists, the installers use a public-source fallback
+with a temporary Node.js runtime verified against Node's published checksum
+list. This path is slower but keeps a clean-machine installation possible.
+
 ## Update Behavior
 
 Stoix checks the public GitHub release channel at most once every 24 hours and
@@ -27,7 +39,7 @@ code and does not overwrite user data.
 
 ## Not Included
 
-- Hermes installation or service management;
+- bundled Hermes code or ownership of Hermes updates;
 - third-party skill or plugin installation outside Hermes' own interfaces;
 - platform installer registration;
 - automatic in-place updates;

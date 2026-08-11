@@ -35,7 +35,7 @@ function readFile(relPath) {
   if (!existsSync(abs)) {
     return null;
   }
-  return readFileSync(abs, "utf8");
+  return readFileSync(abs, "utf8").replaceAll("\r\n", "\n");
 }
 
 function countOccurrences(value, token) {

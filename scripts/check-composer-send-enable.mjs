@@ -7,7 +7,7 @@ const root = process.cwd();
 const failures = [];
 
 function read(path) {
-  return readFileSync(join(root, path), "utf8");
+  return readFileSync(join(root, path), "utf8").replaceAll("\r\n", "\n");
 }
 
 function expect(condition, message) {

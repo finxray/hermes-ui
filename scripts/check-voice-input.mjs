@@ -40,7 +40,8 @@ assert.equal(
 assert.equal(voiceInputErrorMessage("not-allowed"), "Microphone permission was denied.");
 assert.equal(voiceInputErrorMessage("audio-capture"), "No working microphone was found.");
 
-const composer = readFileSync("apps/web/src/components/chat/Composer.tsx", "utf8");
+const composer = readFileSync("apps/web/src/components/chat/Composer.tsx", "utf8")
+  .replaceAll("\r\n", "\n");
 assert(composer.includes("createBrowserSpeechRecognition(window)"));
 assert(composer.includes('aria-pressed={isVoiceListening}'));
 assert(composer.includes('data-listening={isVoiceListening ? "true" : "false"}'));

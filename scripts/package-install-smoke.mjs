@@ -82,7 +82,12 @@ try {
 
   console.log("Native one-command install smoke passed.");
 } finally {
-  rmSync(smokeRoot, { force: true, recursive: true });
+  rmSync(smokeRoot, {
+    force: true,
+    maxRetries: 20,
+    recursive: true,
+    retryDelay: 250
+  });
 }
 
 function runInstaller() {

@@ -10,6 +10,7 @@ const shellInstaller = read("install.sh");
 const powerShellInstaller = read("install.ps1");
 const launcher = read("packaging/stoix-launcher.cjs");
 const packageRelease = read("scripts/package-release.mjs");
+const packageInstallSmoke = read("scripts/package-install-smoke.mjs");
 const workflow = read(".github/workflows/package-release.yml");
 const readinessWorkflow = read(".github/workflows/release-readiness.yml");
 const adr = read("docs/architecture/ADR-0011-one-command-installation.md");
@@ -86,6 +87,10 @@ for (const token of [
 }
 assert(!launcher.includes("offset < 20"), "launcher must not silently change the browser storage origin");
 assert(launcher.includes("workspace data is tied to the local address"), "port conflicts must explain how to recover safely");
+assert(
+  packageInstallSmoke.includes("maxRetries: 20") && packageInstallSmoke.includes("retryDelay: 250"),
+  "native installer smoke cleanup must tolerate delayed Windows file-handle release"
+);
 
 for (const token of [
   "SHA-256",

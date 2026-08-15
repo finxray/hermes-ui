@@ -394,6 +394,11 @@ try {
 
     Set-Content -LiteralPath (Join-Path $InstallRoot "current.txt") -Value $packageVersion -Encoding ASCII
     [System.IO.File]::WriteAllText(
+        (Join-Path $InstallRoot "bin-dir.txt"),
+        $BinDir,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+    [System.IO.File]::WriteAllText(
         (Join-Path $BinDir "install-root.txt"),
         $InstallRoot,
         (New-Object System.Text.UTF8Encoding($false))

@@ -208,6 +208,8 @@ printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$
 VERSIONS_ROOT="$INSTALL_ROOT/versions"
 TARGET_ROOT="$VERSIONS_ROOT/$VERSION"
 mkdir -p "$VERSIONS_ROOT" "$BIN_DIR"
+printf '%s\n' "$BIN_DIR" > "$INSTALL_ROOT/bin-dir.txt"
+chmod 600 "$INSTALL_ROOT/bin-dir.txt"
 bundle_is_complete() {
   [ -f "$1/VERSION.json" ] &&
   [ -f "$1/app/apps/web/server.js" ] &&

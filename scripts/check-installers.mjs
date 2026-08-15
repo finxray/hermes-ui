@@ -110,10 +110,17 @@ assert(
 );
 assert(
   launcher.includes('"-InstallRoot"') &&
+    launcher.includes('"-BinDir"') &&
     launcher.includes('"-ConfigRoot"') &&
     launcher.includes('"--install-root"') &&
+    launcher.includes('"--bin-dir"') &&
     launcher.includes('"--config-root"'),
-  "self-update must preserve the existing installation and configuration roots"
+  "self-update must preserve the existing installation, command, and configuration roots"
+);
+assert(
+  shellInstaller.includes('"$INSTALL_ROOT/bin-dir.txt"') &&
+    powerShellInstaller.includes('(Join-Path $InstallRoot "bin-dir.txt")'),
+  "installers must persist the command directory for future updates"
 );
 assert(
   launcher.includes('.filter((candidate) => compareSemanticVersions(candidate.version, currentVersion) > 0)') &&

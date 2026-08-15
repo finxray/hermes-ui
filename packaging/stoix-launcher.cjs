@@ -345,6 +345,7 @@ async function updateStoix(configPath) {
   const installerName = process.platform === "win32" ? "install.ps1" : "install.sh";
   const installerPath = join(bundleRoot, "updater", installerName);
   const installRoot = resolve(bundleRoot, "..", "..");
+  const binDirectory = installedBinDirectory(installRoot);
 
   if (!existsSync(installerPath)) {
     throw new Error("This Stoix installation cannot update itself. Reinstall Stoix once to add the updater.");
@@ -364,6 +365,8 @@ async function updateStoix(configPath) {
           installerPath,
           "-InstallRoot",
           installRoot,
+          "-BinDir",
+          binDirectory,
           "-ConfigRoot",
           dirname(configPath),
           ...(update.kind === "release" ? ["-Version", update.version] : ["-Source"])
@@ -375,6 +378,8 @@ async function updateStoix(configPath) {
           installerPath,
           "--install-root",
           installRoot,
+          "--bin-dir",
+          binDirectory,
           "--config-root",
           dirname(configPath),
           ...(update.kind === "release" ? ["--version", update.version] : ["--source"])
@@ -382,6 +387,16 @@ async function updateStoix(configPath) {
       };
   await runUpdater(command.file, command.args);
   console.log("Stoix update completed.");
+}
+
+function installedBinDirectory(installRoot) {
+  const metadataPath = join(installRoot, "bin-dir.txt");
+  if (existsSync(metadataPath)) {
+    const configured = readFileSync(metadataPath, "utf8").trim();
+    if (configured) return resolve(configured);
+  }
+  if (process.platform === "win32") return join(installRoot, "bin");
+  return join(homedir(), ".local", "bin");
 }
 
 async function findUpdate(currentVersion) {

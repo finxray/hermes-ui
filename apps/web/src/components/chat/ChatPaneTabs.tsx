@@ -672,7 +672,6 @@ export function ChatPaneTabs({
               <div
                 className={styles.tabWrap}
                 data-active={active ? "true" : "false"}
-                data-has-background={active && sessions.length > 1 ? "true" : "false"}
                 data-chat-tab-id={session.id}
                 data-dragging={draggingSessionId === session.id ? "true" : "false"}
                 ref={(element) => {

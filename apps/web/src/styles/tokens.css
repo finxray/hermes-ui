@@ -79,7 +79,7 @@
   --scrollbar-thumb-min-height: 43.2px;
   --scrollbar-thumb: rgba(52, 51, 54, 0.3);
   --scrollbar-thumb-hover: rgba(82, 80, 85, 0.38);
-  --scrollbar-button: rgba(180, 176, 183, 0.192);
+  --scrollbar-button: rgba(180, 176, 183, 0.62);
   --scrollbar-button-size: var(--scrollbar-size);
   --scrollbar-track: transparent;
   --scrollbar-track-hover: transparent;

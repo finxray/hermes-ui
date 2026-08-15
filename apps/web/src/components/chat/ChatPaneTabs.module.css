@@ -330,8 +330,8 @@
   opacity: 1;
 }
 
-/* Selected tabs with a visible background keep their close control discoverable. */
-.tabWrap[data-has-background="true"] .closeButton {
+/* The active tab keeps both actions discoverable, even when it is the pane's only tab. */
+.tabWrap[data-active="true"] .closeButton {
   opacity: 1;
 }
 

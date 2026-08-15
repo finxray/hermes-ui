@@ -89,4 +89,40 @@ assert.match(chatViewSource, /onFocusCapture=\{onActivate\}/);
 assert.match(chatViewSource, /onPointerDownCapture=\{onActivate\}/);
 assert.doesNotMatch(chatViewSource, /onPointerEnter=\{onActivate\}/);
 
+const chatPaneTabsSource = await readFile("apps/web/src/components/chat/ChatPaneTabs.tsx", "utf8");
+const chatPaneTabsStyles = await readFile("apps/web/src/components/chat/ChatPaneTabs.module.css", "utf8");
+const globalStyles = await readFile("apps/web/src/app/globals.css", "utf8");
+assert.match(chatPaneTabsSource, /data-active=\{active \? "true" : "false"\}/);
+assert.doesNotMatch(chatPaneTabsSource, /data-has-background/);
+assert.match(
+  chatPaneTabsStyles,
+  /\.tabWrap\[data-active="true"\] \.closeButton\s*\{\s*opacity:\s*1;/,
+  "each pane's active tab must keep its close control visible"
+);
+assert.match(
+  chatPaneTabsStyles,
+  /\.tabWrap\[data-active="true"\] \.moreButton[\s\S]*?opacity:\s*1;/,
+  "each pane's active tab must keep its actions control visible"
+);
+assert.match(
+  chatPaneTabsStyles,
+  /\.viewport > \.tabSequence:only-child \.tabWrap\s*\{\s*background:\s*transparent;/,
+  "a pane containing one tab must keep the resting tab background transparent"
+);
+assert.match(
+  chatPaneTabsStyles,
+  /\.viewport > \.tabSequence:only-child \.tabWrap:hover,[\s\S]*?background:\s*var\(--bg-control-hover\);/,
+  "a pane containing one tab must restore its background on hover"
+);
+assert.match(
+  globalStyles,
+  /\*::-webkit-scrollbar-button\s*\{[\s\S]*?-webkit-appearance:\s*none;/,
+  "custom scrollbar buttons must bypass native macOS appearance"
+);
+assert.equal(
+  globalStyles.match(/rgba\(180%2C%20176%2C%20183%2C%200\.62\)/g)?.length,
+  4,
+  "all four scrollbar arrow directions must use the visible high-contrast treatment"
+);
+
 console.log("chat tab state checks passed");

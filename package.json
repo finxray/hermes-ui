@@ -1,6 +1,6 @@
 {
   "name": "stoix",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "A local Web UI for Hermes Agent.",
   "packageManager": "npm@11.12.1",

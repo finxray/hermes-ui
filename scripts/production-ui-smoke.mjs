@@ -64,6 +64,21 @@ try {
 
   const activeTab = page.getByRole("tab").first();
   const tabFontSize = Number.parseFloat(await activeTab.evaluate((element) => getComputedStyle(element).fontSize));
+  const mainTabBar = page.locator('[data-chat-tab-bar="true"][data-pane="main"]');
+  const initialMainTab = mainTabBar.locator("[data-chat-tab-id]").first();
+  await initialMainTab.waitFor();
+  await page.mouse.move(1400, 860);
+  await page.waitForTimeout(170);
+  const singleMainResting = await readChatTabVisualState(initialMainTab);
+  check(singleMainResting.active, "the left pane's only tab is active");
+  check(singleMainResting.closeOpacity === 1, "the active one-tab left pane keeps its close control visible");
+  check(singleMainResting.moreOpacity === 1, "the active one-tab left pane keeps its actions control visible");
+  check(isTransparentColor(singleMainResting.background), "the active one-tab left pane has no resting background");
+  await initialMainTab.hover();
+  await page.waitForTimeout(170);
+  const singleMainHovered = await readChatTabVisualState(initialMainTab);
+  check(!isTransparentColor(singleMainHovered.background), "the active one-tab left pane gains a background on hover");
+
   await page.getByRole("button", { name: /Add chat tab in left pane/ }).click();
   const addChatMenu = page.getByRole("menu", { name: /Add chat to left pane/ });
   await addChatMenu.waitFor();
@@ -81,9 +96,24 @@ try {
   check(addMenuMetrics.itemHeight <= 32, "tab picker uses compact rows");
   check(addMenuMetrics.iconSize <= 14.1, "tab picker uses compact icons");
   check(addMenuMetrics.width <= 250.1, "tab picker uses compact width");
-  await page.keyboard.press("Escape");
+  await addChatMenu.getByRole("menuitem", { name: "New chat", exact: true }).first().click();
+  await mainTabBar.locator("[data-chat-tab-id]").nth(1).waitFor();
+  await page.mouse.move(1400, 860);
+  await page.waitForTimeout(170);
+  const inactiveMainTab = mainTabBar.locator('[data-chat-tab-id][data-active="false"]').first();
+  const inactiveMainResting = await readChatTabVisualState(inactiveMainTab);
+  check(inactiveMainResting.closeOpacity === 0, "an inactive tab hides its close control at rest");
+  check(inactiveMainResting.moreOpacity === 0, "an inactive tab hides its actions control at rest");
+  check(isTransparentColor(inactiveMainResting.background), "an inactive tab has no resting background");
+  await inactiveMainTab.hover();
+  await page.waitForTimeout(170);
+  const inactiveMainHovered = await readChatTabVisualState(inactiveMainTab);
+  check(inactiveMainHovered.closeOpacity === 1, "an inactive tab reveals its close control on hover");
+  check(inactiveMainHovered.moreOpacity === 1, "an inactive tab reveals its actions control on hover");
+  check(!isTransparentColor(inactiveMainHovered.background), "an inactive tab reveals its background on hover");
 
-  await page.getByRole("button", { name: /Chat actions for/ }).first().click();
+  const activeMainTab = mainTabBar.locator('[data-chat-tab-id][data-active="true"]');
+  await activeMainTab.getByRole("button", { name: /Chat actions for/ }).click();
   const chatActionsMenu = page.getByRole("menu", { name: "Chat actions" });
   await chatActionsMenu.waitFor();
   const commandMetrics = await chatActionsMenu.locator('[role="menuitem"]').evaluateAll((items) =>
@@ -96,7 +126,17 @@ try {
   check(commandMetrics.every((item) => Math.abs(item.fontSize - tabFontSize) < 0.05), "chat menu font matches the tab title");
   check(commandMetrics.every((item) => item.itemHeight <= 30.1), "chat menu uses compact rows");
   check(commandMetrics.every((item) => item.iconSize <= 14.1), "chat menu uses compact icons");
-  await page.keyboard.press("Escape");
+  await chatActionsMenu.getByRole("menuitem", { name: "Split screen", exact: true }).click();
+  const sideTabBar = page.locator('[data-chat-tab-bar="true"][data-pane="side"]');
+  const singleSideTab = sideTabBar.locator("[data-chat-tab-id]").first();
+  await singleSideTab.waitFor();
+  await page.mouse.move(1400, 860);
+  await page.waitForTimeout(170);
+  const singleSideResting = await readChatTabVisualState(singleSideTab);
+  check(singleSideResting.active, "the right pane's only tab is active");
+  check(singleSideResting.closeOpacity === 1, "the active one-tab right pane keeps its close control visible");
+  check(singleSideResting.moreOpacity === 1, "the active one-tab right pane keeps its actions control visible");
+  check(isTransparentColor(singleSideResting.background), "the active one-tab right pane has no resting background");
 
   await page.getByRole("button", { name: "Plugins", exact: true }).click();
   await page.locator("#plugins-heading").filter({ hasText: "Plugins" }).waitFor();
@@ -153,6 +193,23 @@ function parseArgs(values) {
     else throw new Error(`Unknown argument: ${value}`);
   }
   return result;
+}
+
+async function readChatTabVisualState(tab) {
+  return tab.evaluate((element) => {
+    const closeButton = element.querySelector('button[aria-label^="Close tab"]');
+    const moreButton = element.querySelector('button[aria-label^="Chat actions for"]');
+    return {
+      active: element.getAttribute("data-active") === "true",
+      background: getComputedStyle(element).backgroundColor,
+      closeOpacity: closeButton ? Number.parseFloat(getComputedStyle(closeButton).opacity) : -1,
+      moreOpacity: moreButton ? Number.parseFloat(getComputedStyle(moreButton).opacity) : -1
+    };
+  });
+}
+
+function isTransparentColor(value) {
+  return value === "transparent" || value === "rgba(0, 0, 0, 0)";
 }
 
 async function assertHttpOk(input, label) {

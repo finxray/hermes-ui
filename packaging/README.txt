@@ -38,8 +38,14 @@ configuration path, and Hermes connection without printing credentials.
 Updates
 -------
 Settings checks the public finxray/hermes-ui GitHub Releases channel once a day.
-Stoix never installs an update without the user's action. Review and download a
-new release from the update link shown in Settings.
+Stoix never installs an update without the user's action. To install the newest
+available version on Windows, macOS, or Linux, run:
+
+  stoix update
+
+The command preserves this configuration and all external user-data locations.
+It uses the native updater bundled with this verified package and stages a new
+version before switching the stable launcher.
 
 Data
 ----

@@ -14,6 +14,7 @@ const {
 } = require("node:fs");
 const { homedir } = require("node:os");
 const { dirname, join, resolve } = require("node:path");
+const { compareSemanticVersions, normalizedSemanticVersion } = require("./stoix-version.cjs");
 
 const args = parseArgs(process.argv.slice(2));
 const bundleRoot = resolve(__dirname, "..");
@@ -52,12 +53,18 @@ async function main() {
     return;
   }
 
+  const configPath = args.config ? resolve(args.config) : defaultConfigPath();
+  ensureConfig(configPath);
+
+  if (args.update) {
+    await updateStoix(configPath);
+    return;
+  }
+
   if (!existsSync(serverPath)) {
     fail(`Stoix server is missing: ${serverPath}`);
   }
 
-  const configPath = args.config ? resolve(args.config) : defaultConfigPath();
-  ensureConfig(configPath);
   const config = readConfig(configPath);
   const hostname = "127.0.0.1";
   const requestedPort = args.port ?? parsePort(config.STOIX_PORT || "3210", "STOIX_PORT");
@@ -136,7 +143,8 @@ function parseArgs(values) {
     help: false,
     noOpen: false,
     port: null,
-    smoke: false
+    smoke: false,
+    update: false
   };
   for (const value of values) {
     if (value === "--help" || value === "-h") parsed.help = true;
@@ -145,6 +153,10 @@ function parseArgs(values) {
       parsed.noOpen = true;
     }
     else if (value === "--no-open") parsed.noOpen = true;
+    else if (value === "update") {
+      parsed.update = true;
+      parsed.noOpen = true;
+    }
     else if (value === "--smoke") {
       parsed.smoke = true;
       parsed.noOpen = true;
@@ -307,9 +319,11 @@ function printHelp() {
   console.log(`Stoix launcher
 
 Usage:
+  stoix update
   Stoix [--no-open] [--port=3210] [--config=/path/config.env]
 
 Options:
+  update          Download and install the newest Stoix version.
   --no-open       Start without opening the default browser.
   --port=PORT     Stable loopback port (default: 3210).
   --config=PATH   Use a specific private configuration file.
@@ -317,6 +331,181 @@ Options:
   --smoke         Start, verify the production routes, then stop.
   --help          Show this help.
 `);
+}
+
+async function updateStoix(configPath) {
+  const currentVersion = readVersion();
+  console.log(`Checking for an update to Stoix ${currentVersion}...`);
+  const update = await findUpdate(currentVersion);
+  if (!update) {
+    console.log(`Stoix ${currentVersion} is already up to date.`);
+    return;
+  }
+
+  const installerName = process.platform === "win32" ? "install.ps1" : "install.sh";
+  const installerPath = join(bundleRoot, "updater", installerName);
+  const installRoot = resolve(bundleRoot, "..", "..");
+
+  if (!existsSync(installerPath)) {
+    throw new Error("This Stoix installation cannot update itself. Reinstall Stoix once to add the updater.");
+  }
+
+  console.log(`Updating Stoix ${currentVersion} to ${update.version} from the ${update.kind} channel...`);
+  await stopRunningStoix(dirname(configPath));
+  const command = process.platform === "win32"
+    ? {
+        file: "powershell.exe",
+        args: [
+          "-NoLogo",
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          installerPath,
+          "-InstallRoot",
+          installRoot,
+          "-ConfigRoot",
+          dirname(configPath),
+          ...(update.kind === "release" ? ["-Version", update.version] : ["-Source"])
+        ]
+      }
+    : {
+        file: "/bin/sh",
+        args: [
+          installerPath,
+          "--install-root",
+          installRoot,
+          "--config-root",
+          dirname(configPath),
+          ...(update.kind === "release" ? ["--version", update.version] : ["--source"])
+        ]
+      };
+  await runUpdater(command.file, command.args);
+  console.log("Stoix update completed.");
+}
+
+async function findUpdate(currentVersion) {
+  const repository = validatedRepository(process.env.STOIX_REPOSITORY || "finxray/hermes-ui");
+  const branch = validatedBranch(process.env.STOIX_BRANCH || "master");
+  const candidates = [];
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": `Stoix/${currentVersion}`
+  };
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
+      cache: "no-store",
+      headers,
+      signal: AbortSignal.timeout(15_000)
+    });
+    if (response.ok) {
+      const release = await response.json();
+      const version = normalizedSemanticVersion(release?.tag_name);
+      if (version) candidates.push({ kind: "release", version });
+    } else if (response.status !== 404) {
+      console.warn(`Stoix could not check GitHub Releases (HTTP ${response.status}); checking source instead.`);
+    }
+  } catch (error) {
+    console.warn(`Stoix could not check GitHub Releases (${errorMessage(error)}); checking source instead.`);
+  }
+
+  try {
+    const sourceUrl = new URL(
+      `${repository.split("/").map(encodeURIComponent).join("/")}/${branch.split("/").map(encodeURIComponent).join("/")}/package.json`,
+      "https://raw.githubusercontent.com/"
+    );
+    const response = await fetch(sourceUrl, {
+      cache: "no-store",
+      headers: { Accept: "application/json", "User-Agent": `Stoix/${currentVersion}` },
+      signal: AbortSignal.timeout(15_000)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const metadata = await response.json();
+    const version = normalizedSemanticVersion(metadata?.version);
+    if (!version) throw new Error("invalid version metadata");
+    candidates.push({ kind: "source", version });
+  } catch (error) {
+    if (candidates.length === 0) {
+      throw new Error(`Stoix could not check for updates: ${errorMessage(error)}`);
+    }
+    console.warn(`Stoix could not check the source channel (${errorMessage(error)}).`);
+  }
+
+  return candidates
+    .filter((candidate) => compareSemanticVersions(candidate.version, currentVersion) > 0)
+    .sort((left, right) => compareSemanticVersions(right.version, left.version))[0] || null;
+}
+
+function validatedRepository(value) {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
+    throw new Error("STOIX_REPOSITORY must be a GitHub owner/repository name.");
+  }
+  return value;
+}
+
+function validatedBranch(value) {
+  if (!/^[A-Za-z0-9._/-]+$/.test(value) || value.includes("..")) {
+    throw new Error("STOIX_BRANCH is invalid.");
+  }
+  return value;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function stopRunningStoix(configDirectory) {
+  const statePath = join(configDirectory, "runtime.json");
+  const lockPath = join(configDirectory, "stoix.lock");
+  const state = readJson(statePath);
+  const lock = readJson(lockPath);
+  if (!Number.isInteger(state?.pid) || state.pid === process.pid || !isProcessAlive(state.pid)) {
+    return;
+  }
+
+  let reachable = false;
+  if (typeof state.url === "string" && /^http:\/\/127\.0\.0\.1:\d+\/$/.test(state.url)) {
+    try {
+      reachable = (await fetch(state.url, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(1_500)
+      })).ok;
+    } catch {
+      // A running launcher can still be stopped when its server is unhealthy.
+    }
+  }
+  if (!reachable && lock?.pid !== state.pid) return;
+
+  console.log("Stopping the running Stoix instance...");
+  try {
+    process.kill(state.pid, "SIGTERM");
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+  }
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline && isProcessAlive(state.pid)) {
+    await delay(200);
+  }
+  if (isProcessAlive(state.pid)) {
+    process.kill(state.pid, "SIGKILL");
+    await delay(300);
+  }
+}
+
+function runUpdater(command, commandArgs) {
+  return new Promise((resolveUpdate, rejectUpdate) => {
+    const updater = spawn(command, commandArgs, {
+      env: process.env,
+      stdio: "inherit",
+      windowsHide: true
+    });
+    updater.once("error", rejectUpdate);
+    updater.once("close", (code) => {
+      if (code === 0) resolveUpdate();
+      else rejectUpdate(new Error(`Stoix updater exited with code ${code ?? "unknown"}.`));
+    });
+  });
 }
 
 function parsePort(value, label) {

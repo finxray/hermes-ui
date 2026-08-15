@@ -57,6 +57,7 @@ const bundleRoot = join(releaseRoot, bundleName);
 const appRoot = join(bundleRoot, "app");
 const runtimeRoot = join(bundleRoot, "runtime");
 const launcherRoot = join(bundleRoot, "launcher");
+const updaterRoot = join(bundleRoot, "updater");
 const archiveExtension = platform === "win32" ? ".zip" : ".tar.gz";
 const archiveName = `${bundleName}${archiveExtension}`;
 const archivePath = join(releaseRoot, archiveName);
@@ -69,6 +70,7 @@ rmSync(bundleRoot, { recursive: true, force: true });
 rmSync(archivePath, { force: true });
 mkdirSync(runtimeRoot, { recursive: true });
 mkdirSync(launcherRoot, { recursive: true });
+mkdirSync(updaterRoot, { recursive: true });
 
 cpSync(standaloneRoot, appRoot, { dereference: true, recursive: true });
 cpSync(
@@ -88,6 +90,13 @@ copyFileSync(
   join(root, "packaging", "stoix-launcher.cjs"),
   join(launcherRoot, "stoix-launcher.cjs")
 );
+copyFileSync(
+  join(root, "packaging", "stoix-version.cjs"),
+  join(launcherRoot, "stoix-version.cjs")
+);
+copyFileSync(join(root, "install.sh"), join(updaterRoot, "install.sh"));
+copyFileSync(join(root, "install.ps1"), join(updaterRoot, "install.ps1"));
+chmodSync(join(updaterRoot, "install.sh"), 0o755);
 
 const readme = readFileSync(join(root, "packaging", "README.txt"), "utf8")
   .replaceAll("{VERSION}", version);

@@ -37,6 +37,15 @@ Stoix uses an opt-in, release-channel updater with these boundaries:
 The `0.1.0` source distribution implements GitHub release checking and the consent
 UI. ADR-0011 adds checksum-verified, staged initial installation into versioned
 bundles; automatic in-place replacement remains governed by this ADR.
+
+Version `0.1.1` also adds the explicit `stoix update` CLI command. This is not a
+browser-triggered or unattended updater: it runs only after direct user action
+and executes the platform-native installer already bundled in the installed
+Stoix package. The installer preserves external configuration and user data,
+stages a complete versioned bundle, and verifies published release archives
+against their adjacent SHA-256 digest. Until signed manifests are published,
+the public-source fallback remains a preview channel and does not satisfy the
+signed production-channel requirements above.
 The public stable notification channel is the repository's latest non-draft,
 non-prerelease GitHub Release. The application checks at most once per 24 hours
 automatically, caches the result locally, and also supports an explicit

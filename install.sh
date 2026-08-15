@@ -210,10 +210,13 @@ TARGET_ROOT="$VERSIONS_ROOT/$VERSION"
 mkdir -p "$VERSIONS_ROOT" "$BIN_DIR"
 bundle_is_complete() {
   [ -f "$1/VERSION.json" ] &&
-    [ -f "$1/app/apps/web/server.js" ] &&
-    [ -f "$1/launcher/stoix-launcher.cjs" ] &&
-    [ -x "$1/runtime/node" ] &&
-    [ -x "$1/stoix" ]
+  [ -f "$1/app/apps/web/server.js" ] &&
+  [ -f "$1/launcher/stoix-launcher.cjs" ] &&
+  [ -f "$1/launcher/stoix-version.cjs" ] &&
+  [ -f "$1/updater/install.sh" ] &&
+  [ -f "$1/updater/install.ps1" ] &&
+  [ -x "$1/runtime/node" ] &&
+  [ -x "$1/stoix" ]
 }
 if [ "$FORCE_SOURCE" = true ] && bundle_is_complete "$TARGET_ROOT"; then
   info "Replacing the installed Stoix $VERSION source build..."

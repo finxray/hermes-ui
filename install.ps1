@@ -212,6 +212,9 @@ function Test-BundleComplete([string]$Path) {
     return (Test-Path -LiteralPath (Join-Path $Path "VERSION.json")) -and
         (Test-Path -LiteralPath (Join-Path $Path "app\apps\web\server.js")) -and
         (Test-Path -LiteralPath (Join-Path $Path "launcher\stoix-launcher.cjs")) -and
+        (Test-Path -LiteralPath (Join-Path $Path "launcher\stoix-version.cjs")) -and
+        (Test-Path -LiteralPath (Join-Path $Path "updater\install.sh")) -and
+        (Test-Path -LiteralPath (Join-Path $Path "updater\install.ps1")) -and
         (Test-Path -LiteralPath (Join-Path $Path "runtime\node.exe")) -and
         (Test-Path -LiteralPath (Join-Path $Path "Stoix.cmd"))
 }

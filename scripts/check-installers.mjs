@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(process.cwd());
+const require = createRequire(import.meta.url);
+const { compareSemanticVersions, normalizedSemanticVersion } = require(
+  resolve(root, "packaging", "stoix-version.cjs")
+);
 const packageJson = JSON.parse(read("package.json"));
 const shellInstaller = read("install.sh");
 const powerShellInstaller = read("install.ps1");
@@ -85,10 +90,49 @@ for (const token of [
   "runtime.json",
   "parsePort",
   "--doctor",
+  "stoix update",
+  "updateStoix",
+  "findUpdate",
+  "compareSemanticVersions",
+  "stopRunningStoix",
   "Could not open the browser automatically"
 ]) {
   assert(launcher.includes(token), `packaged launcher is missing ${token}`);
 }
+assert(
+  launcher.includes('join(bundleRoot, "updater", installerName)') &&
+    launcher.includes('process.platform === "win32" ? "install.ps1" : "install.sh"'),
+  "self-update must use the native installer bundled with the verified Stoix package"
+);
+assert(
+  launcher.includes('file: "powershell.exe"') && launcher.includes('file: "/bin/sh"'),
+  "self-update must support Windows, macOS, and Linux"
+);
+assert(
+  launcher.includes('"-InstallRoot"') &&
+    launcher.includes('"-ConfigRoot"') &&
+    launcher.includes('"--install-root"') &&
+    launcher.includes('"--config-root"'),
+  "self-update must preserve the existing installation and configuration roots"
+);
+assert(
+  launcher.includes('.filter((candidate) => compareSemanticVersions(candidate.version, currentVersion) > 0)') &&
+    launcher.includes('update.kind === "release" ? ["-Version", update.version] : ["-Source"]') &&
+    launcher.includes('update.kind === "release" ? ["--version", update.version] : ["--source"]'),
+  "self-update must reject downgrades and select an explicit release or source update on every platform"
+);
+assert(
+  packageRelease.includes('copyFileSync(join(root, "install.sh"), join(updaterRoot, "install.sh"))') &&
+    packageRelease.includes('copyFileSync(join(root, "install.ps1"), join(updaterRoot, "install.ps1"))'),
+  "release bundles must contain both native self-update installers"
+);
+assert.equal(normalizedSemanticVersion("v1.2.3"), "1.2.3");
+assert.equal(normalizedSemanticVersion("1.2.3-rc.2+build.7"), "1.2.3-rc.2");
+assert.equal(normalizedSemanticVersion("latest"), null);
+assert(compareSemanticVersions("0.1.1", "0.1.0") > 0);
+assert(compareSemanticVersions("1.0.0", "1.0.0-rc.2") > 0);
+assert(compareSemanticVersions("1.0.0-rc.10", "1.0.0-rc.2") > 0);
+assert.equal(compareSemanticVersions("1.2.3", "1.2.3"), 0);
 assert(!launcher.includes("offset < 20"), "launcher must not silently change the browser storage origin");
 assert(launcher.includes("workspace data is tied to the local address"), "port conflicts must explain how to recover safely");
 assert(

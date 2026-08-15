@@ -93,9 +93,18 @@ Hermes does not currently provide that operation through its HTTP API.
 
 Stoix checks the stable `finxray/hermes-ui` GitHub Releases channel at most once
 every 24 hours. A blue dot beside Settings indicates an unseen release. Manual
-checks report whether the current version is up to date. Downloading remains an
-explicit user action; Stoix `0.1.0` does not execute remote scripts or silently
-replace itself.
+checks report whether the current version is up to date. Starting with `0.1.1`,
+an installed copy can be updated explicitly on macOS, Linux, or Windows with:
+
+```text
+stoix update
+```
+
+The command uses the updater bundled with the installed package, preserves the
+per-user configuration and data locations, stages the next version separately,
+and then starts Stoix. It never installs silently. Published release archives
+are verified against their adjacent SHA-256 digest; when no release exists, the
+installer uses the documented public-source fallback.
 
 See [GitHub update channel](docs/release/GITHUB_UPDATES.md),
 [packaging audit](docs/release/PACKAGING_AUDIT_0.1.0.md), and

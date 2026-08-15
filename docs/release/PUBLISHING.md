@@ -48,7 +48,8 @@ candidates only and must not be uploaded to a release.
 - Hermes remains an external dependency.
 - Credentials live in the per-user `config.env`, never in the archive.
 - Projects and chats live in browser IndexedDB, outside version directories.
-- Update checks notify and link to GitHub; they do not auto-install.
+- Browser update checks notify and link to GitHub; `stoix update` remains an
+  explicit terminal action and never runs automatically.
 
 ## Rollback
 

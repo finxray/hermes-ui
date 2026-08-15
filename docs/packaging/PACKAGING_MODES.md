@@ -33,16 +33,19 @@ list. This path is slower but keeps a clean-machine installation possible.
 ## Update Behavior
 
 Stoix checks the public GitHub release channel at most once every 24 hours and
-can also check on demand. It notifies the user and opens the release page only
-after an explicit action. Version `0.1.0` does not download or execute remote
-code and does not overwrite user data.
+can also check on demand. Starting with version `0.1.1`, the explicit
+`stoix update` command runs the platform-native updater bundled in the installed
+package. It preserves the existing install and configuration roots, installs
+into a versioned directory, and switches the stable launcher only after the new
+bundle is complete. Browser-based update checks remain notification-only, and
+no update is installed silently.
 
 ## Not Included
 
 - bundled Hermes code or ownership of Hermes updates;
 - third-party skill or plugin installation outside Hermes' own interfaces;
 - platform installer registration;
-- automatic in-place updates;
+- unattended or browser-triggered updates;
 - code signing or notarization credentials.
 
 Those boundaries keep the first package small, reversible, and OS-agnostic.

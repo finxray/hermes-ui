@@ -1,12 +1,12 @@
 "use client";
 
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import { RefreshCw, Search } from "@/components/ui/AppIcons";
+import { Check, Copy, RefreshCw, Search } from "@/components/ui/AppIcons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesDashboardRecoveryState } from "@/components/ui/HermesDashboardRecoveryState";
 import { useSectionNav } from "@/components/shell/SectionNavContext";
 import { useHermesLogs } from "@/hooks/useHermesLogs";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./LogsView.module.css";
 
 type LogsViewProps = {
@@ -23,6 +23,8 @@ type LogFilter = "all" | "warn" | "error";
 export function LogsView({ hermesStatus }: LogsViewProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LogFilter>("all");
+  const [copied, setCopied] = useState(false);
+  const copyResetTimerRef = useRef<number | null>(null);
   const canLoad = hermesStatus?.mode === "real" && hermesStatus.reachable;
   const { activeCategoryId, publishCategories, setActiveCategoryId } = useSectionNav();
   const selectedFile = LOG_FILES.some((file) => file.id === activeCategoryId) ? activeCategoryId! : "agent";
@@ -53,6 +55,26 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
       return levelMatches && queryMatches;
     });
   }, [filter, lines, query]);
+  const copyVisibleLogs = useCallback(async () => {
+    const text = filteredLines.map((line) => line.replace(/\n$/, "")).join("\n");
+    if (!text || !(await copyText(text))) {
+      return;
+    }
+    setCopied(true);
+    if (copyResetTimerRef.current !== null) {
+      window.clearTimeout(copyResetTimerRef.current);
+    }
+    copyResetTimerRef.current = window.setTimeout(() => {
+      setCopied(false);
+      copyResetTimerRef.current = null;
+    }, 1_800);
+  }, [filteredLines]);
+
+  useEffect(() => () => {
+    if (copyResetTimerRef.current !== null) {
+      window.clearTimeout(copyResetTimerRef.current);
+    }
+  }, []);
 
   return (
     <section className={styles.view} aria-labelledby="logs-heading">
@@ -65,15 +87,27 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
               : "Agent and gateway runtime logs"}
           </p>
         </div>
-        <button
-          aria-label="Refresh logs"
-          className={`${styles.iconButton} ${styles.refreshButton}${isLoading ? ` ${styles.refreshing}` : ""}`}
-          disabled={!canLoad || isLoading}
-          onClick={() => void refresh()}
-          type="button"
-        >
-          <RefreshCw size={20} />
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            aria-label={copied ? "Logs copied" : "Copy visible logs"}
+            className={styles.copyButton}
+            disabled={!canLoad || filteredLines.length === 0}
+            onClick={() => void copyVisibleLogs()}
+            type="button"
+          >
+            {copied ? <Check size={17} /> : <Copy size={17} />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+          <button
+            aria-label="Refresh logs"
+            className={`${styles.iconButton} ${styles.refreshButton}${isLoading ? ` ${styles.refreshing}` : ""}`}
+            disabled={!canLoad || isLoading}
+            onClick={() => void refresh()}
+            type="button"
+          >
+            <RefreshCw size={20} />
+          </button>
+        </div>
       </div>
 
       {canLoad ? (
@@ -158,4 +192,26 @@ function detectLevel(line: string): "error" | "warn" | "info" | null {
     return "info";
   }
   return null;
+}
+
+async function copyText(text: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall back to a temporary textarea for local browsers without clipboard permission.
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  return copied;
 }

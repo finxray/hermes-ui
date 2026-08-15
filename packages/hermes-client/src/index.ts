@@ -258,7 +258,7 @@ export async function getHermesStatus(
   const [healthDetailedResult, capabilitiesResult] = await Promise.all([
     fetchEndpoint({
       apiKey: config.apiKey,
-      auth: false,
+      auth: true,
       base,
       fetchImpl,
       name: "healthDetailed",
@@ -6217,7 +6217,19 @@ async function ensureHermesSession(args: {
       signal: abort.signal
     });
 
-    if (response.ok || response.status === 409) {
+    if (response.ok) {
+      return {
+        ok: true,
+        hermesSessionId: args.sessionId,
+        stream: new ReadableStream<Uint8Array>()
+      };
+    }
+
+    if (response.status === 409) {
+      const migrationResult = await replaceLegacyPlaceholderSession(args, headers, abort.signal);
+      if (migrationResult !== null) {
+        return migrationResult;
+      }
       return {
         ok: true,
         hermesSessionId: args.sessionId,
@@ -6236,6 +6248,94 @@ async function ensureHermesSession(args: {
   } finally {
     abort.cleanup();
   }
+}
+
+async function replaceLegacyPlaceholderSession(
+  args: {
+    apiKey?: string | null;
+    base: URL;
+    fetchImpl: typeof fetch;
+    model?: string | null;
+    signal?: AbortSignal;
+    sessionId: string;
+    sessionTitle: string;
+    timeoutMs: number;
+  },
+  headers: Headers,
+  signal: AbortSignal
+): Promise<HermesChatStreamResult | null> {
+  const sessionUrl = buildEndpointUrl(
+    args.base,
+    `/api/sessions/${encodeURIComponent(args.sessionId)}`
+  );
+  const existingResponse = await args.fetchImpl(sessionUrl, {
+    cache: "no-store",
+    headers,
+    method: "GET",
+    signal
+  });
+  if (!existingResponse.ok) {
+    return null;
+  }
+
+  const existingData = await readJsonObject(existingResponse);
+  const existingSession =
+    objectRecord(existingData?.session) ??
+    objectRecord(existingData?.data) ??
+    objectRecord(existingData);
+  const storedModel = firstString(
+    existingSession?.model,
+    existingSession?.base_model,
+    existingSession?.default_model
+  );
+  if (!isPlaceholderHermesModelId(storedModel)) {
+    return null;
+  }
+
+  // Stoix builds before 0.1.2 persisted Hermes' virtual display alias as the
+  // session's raw provider model. Current Hermes correctly passes any stored
+  // raw session model to the provider, where "Hermes-agent" returns 404. The
+  // session cannot be repaired through PATCH (Hermes only accepts client-safe
+  // metadata there), so replace only this known-invalid legacy session. Stoix
+  // retains its visible transcript locally and sends recent context per turn.
+  const deleteResponse = await args.fetchImpl(sessionUrl, {
+    cache: "no-store",
+    headers,
+    method: "DELETE",
+    signal
+  });
+  if (!deleteResponse.ok) {
+    return chatFailure(
+      deleteResponse.status,
+      "http_error",
+      await safeHermesErrorMessage(deleteResponse, "/api/sessions/{session_id}")
+    );
+  }
+
+  const recreateResponse = await args.fetchImpl(buildEndpointUrl(args.base, "/api/sessions"), {
+    body: JSON.stringify({
+      id: args.sessionId,
+      model: args.model || undefined,
+      title: makeHermesSessionTitle(args.sessionTitle, args.sessionId)
+    }),
+    cache: "no-store",
+    headers,
+    method: "POST",
+    signal
+  });
+  if (!recreateResponse.ok) {
+    return chatFailure(
+      recreateResponse.status,
+      "http_error",
+      await safeHermesErrorMessage(recreateResponse, "/api/sessions")
+    );
+  }
+
+  return {
+    ok: true,
+    hermesSessionId: args.sessionId,
+    stream: new ReadableStream<Uint8Array>()
+  };
 }
 
 function makeHermesSessionTitle(title: string, sessionId: string): string {

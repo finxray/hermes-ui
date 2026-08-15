@@ -21,6 +21,13 @@
   padding-inline-start: 8px;
 }
 
+.headerActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
 .toolbar {
   display: flex;
   min-width: 0;
@@ -136,6 +143,47 @@
     background 150ms ease,
     color 150ms ease,
     transform 150ms ease;
+}
+
+.copyButton {
+  --copy-icon-cutout: rgba(38, 38, 40, 1);
+
+  display: inline-flex;
+  min-width: 92px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(38, 38, 40, 1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-small);
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.copyButton:hover:not(:disabled),
+.copyButton:focus-visible:not(:disabled) {
+  --copy-icon-cutout: var(--bg-control-hover);
+
+  outline: 0;
+  background: var(--bg-control-hover);
+  color: var(--text-primary);
+}
+
+.copyButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.copyButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .refreshButton,

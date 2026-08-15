@@ -14,7 +14,13 @@ const {
   sessionTokenUsageDelta,
   shouldSuppressHermesStreamError
 } = await import(compatibilityUrl);
-const { getHermesSessionMessages, listHermesPlugins, normalizeHermesSseEvent } = await import(
+const {
+  getHermesSessionMessages,
+  getHermesStatus,
+  listHermesPlugins,
+  normalizeHermesSseEvent,
+  streamHermesSessionChat
+} = await import(
   pathToFileURL(resolve(root, "packages/hermes-client/src/index.ts")).href
 );
 
@@ -249,6 +255,118 @@ assert.equal(sessionMessages.ok, true);
 assert.equal(sessionMessages.messages[0]?.id, "42", "numeric Hermes message ids must remain stable strings");
 assert.equal(sessionMessages.messages[0]?.content, "Inspect this", "multimodal history must retain its text part");
 
+let detailedHealthAuthorized = false;
+const authenticatedStatus = await getHermesStatus({
+  apiKey: "private-api-key",
+  baseUrl: "http://127.0.0.1:8642",
+  includeModels: false,
+  fetchImpl: async (input, init) => {
+    const path = new URL(input instanceof Request ? input.url : input).pathname;
+    const authorization = new Headers(init?.headers).get("Authorization");
+    if (path === "/health") {
+      return Response.json({ status: "ok" });
+    }
+    if (path === "/health/detailed") {
+      detailedHealthAuthorized = authorization === "Bearer private-api-key";
+      return detailedHealthAuthorized
+        ? Response.json({ status: "ok" })
+        : Response.json({ error: "invalid API key" }, { status: 401 });
+    }
+    if (path === "/v1/capabilities") {
+      return Response.json({ features: { session_chat_streaming: true } });
+    }
+    throw new Error(`Unexpected status request: ${path}`);
+  }
+});
+assert.equal(authenticatedStatus.reachable, true);
+assert.equal(
+  detailedHealthAuthorized,
+  true,
+  "the detailed Hermes health probe must use the configured API key"
+);
+
+const legacySessionRequests = [];
+let sessionCreateCount = 0;
+const recoveredLegacySession = await streamHermesSessionChat(
+  {
+    apiKey: "private-api-key",
+    baseUrl: "http://127.0.0.1:8642",
+    fetchImpl: async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const method = init?.method ?? "GET";
+      legacySessionRequests.push(`${method} ${url.pathname}`);
+      assert.equal(
+        new Headers(init?.headers).get("Authorization"),
+        "Bearer private-api-key",
+        `${method} ${url.pathname} must stay authenticated`
+      );
+      if (url.pathname === "/v1/capabilities") {
+        return Response.json({ features: { session_chat_streaming: true } });
+      }
+      if (url.pathname === "/api/sessions" && method === "POST") {
+        sessionCreateCount += 1;
+        return sessionCreateCount === 1
+          ? Response.json({ error: { message: "Session already exists" } }, { status: 409 })
+          : Response.json({ session: { id: "legacy-session", model: null } }, { status: 201 });
+      }
+      if (url.pathname === "/api/sessions/legacy-session" && method === "GET") {
+        return Response.json({ session: { id: "legacy-session", model: "Hermes-agent" } });
+      }
+      if (url.pathname === "/api/sessions/legacy-session" && method === "DELETE") {
+        return Response.json({ id: "legacy-session", deleted: true });
+      }
+      if (url.pathname === "/api/sessions/legacy-session/chat/stream" && method === "POST") {
+        return new Response("event: done\ndata: {}\n\n", {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" }
+        });
+      }
+      throw new Error(`Unexpected legacy session request: ${method} ${url.pathname}`);
+    }
+  },
+  {
+    message: "Hello",
+    model: null,
+    provider: null,
+    recentMessages: [],
+    context: {
+      project: {
+        id: "project-1",
+        title: "Project",
+        stableKey: "project-stable-key",
+        userVisibleSummary: "Project context"
+      },
+      session: {
+        id: "local-session",
+        title: "Legacy session",
+        stableKey: "session-stable-key",
+        hermesSessionId: "legacy-session",
+        includeProjectContext: true,
+        includeSessionContext: true,
+        lastContextRefreshAt: null,
+        userVisibleSummary: "Session context"
+      },
+      ui: { source: "hermes-ui", workspaceVersion: 1 }
+    }
+  }
+);
+assert.equal(recoveredLegacySession.ok, true, "a legacy virtual-model session must recover before chat");
+assert.deepEqual(
+  legacySessionRequests.slice(1, 5),
+  [
+    "POST /api/sessions",
+    "GET /api/sessions/legacy-session",
+    "DELETE /api/sessions/legacy-session",
+    "POST /api/sessions"
+  ],
+  "Stoix must replace only the known-invalid legacy placeholder session before streaming"
+);
+assert.equal(
+  legacySessionRequests.at(-1),
+  "POST /api/sessions/legacy-session/chat/stream",
+  "chat must continue through the recreated default-routed session"
+);
+
 let discoveredDashboardToken = false;
 let authenticatedDashboardRequest = false;
 const plugins = await listHermesPlugins({
@@ -277,4 +395,19 @@ assert.equal(
   "a blank optional dashboard token must trigger local token discovery"
 );
 
-console.log("Hermes adapter contract: 25 checks passed.");
+const logsViewSource = readFileSync(
+  resolve(root, "apps/web/src/components/logs/LogsView.tsx"),
+  "utf8"
+);
+assert.equal(
+  logsViewSource.includes("Copy visible logs") && logsViewSource.includes("filteredLines.map"),
+  true,
+  "Logs must expose a copy control for the currently visible content"
+);
+assert.equal(
+  logsViewSource.includes("navigator.clipboard?.writeText") && logsViewSource.includes("document.execCommand(\"copy\")"),
+  true,
+  "Logs copy must support both modern clipboard access and the local fallback"
+);
+
+console.log("Hermes adapter contract: 31 checks passed.");

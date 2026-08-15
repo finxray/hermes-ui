@@ -1,5 +1,6 @@
 import {
   streamHermesSessionChat,
+  isPlaceholderHermesModelId,
   type HermesClientConfig,
   type HermesChatContext,
   type HermesChatError,
@@ -9,6 +10,7 @@ import {
 import { NextResponse } from "next/server";
 import { buildHermesRuntimeIdentityInstruction } from "@/lib/hermesRuntimeIdentity";
 import { isTrustedMutationRequest } from "@/lib/server/requestTrust";
+import { getCoalescedHermesStatus } from "@/lib/server/hermesStatusProbe";
 import { relayHermesSessionReply } from "@/server/hermesChannelRelay";
 import { resolveHermesClientConfig } from "@/server/hermesClientConfig";
 import { getLocalDataStore, LocalDataStoreError } from "@/server/localDataStore";
@@ -57,7 +59,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { kind: "bad_response", message: `${kind}: ${message}` } }, { status: 400 });
   }
 
-  const config = await resolveHermesClientConfig({ signal: request.signal, timeoutMs: 60_000 });
+  const baseConfig = await resolveHermesClientConfig({ signal: request.signal, timeoutMs: 60_000 });
+  const config = await withConfiguredHermesIdentity(baseConfig);
   const result = await streamHermesSessionChat(
     config,
     parsed.request
@@ -75,6 +78,25 @@ export async function POST(request: Request) {
       "X-Hermes-Session-Id": result.hermesSessionId
     }
   });
+}
+
+async function withConfiguredHermesIdentity(
+  config: HermesClientConfig
+): Promise<HermesClientConfig> {
+  let status = await getCoalescedHermesStatus(config);
+  let modelId = status.uiCapabilities.models.serverAdvertisedModel;
+  if (!modelId || isPlaceholderHermesModelId(modelId)) {
+    status = await getCoalescedHermesStatus(config, { forceModels: true });
+    modelId = status.uiCapabilities.models.serverAdvertisedModel;
+  }
+  if (!modelId || isPlaceholderHermesModelId(modelId)) {
+    return config;
+  }
+  return {
+    ...config,
+    configuredDefaultModelId: modelId,
+    configuredDefaultProviderId: status.uiCapabilities.models.serverAdvertisedProvider
+  };
 }
 
 function relayExternalChannelCompletion(

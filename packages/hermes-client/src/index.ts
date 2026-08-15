@@ -490,6 +490,7 @@ export function normalizeHermesUiCapabilities(
     selectableModels,
     configuredDefaultCandidates
   );
+  const serverAdvertisedProvider = extractConfiguredDefaultProviderId(status);
   const orderedModels = orderModelsWithDefaultFirst(selectableModels, serverAdvertisedModel);
   const modelsListAvailable = Boolean(status.models) || hasEndpoint(endpoints, "models");
   const sessionModelOverrideObj = objectRecord(status.capabilities?.session_model_override);
@@ -511,6 +512,7 @@ export function normalizeHermesUiCapabilities(
     clientSelectable,
     listAvailable: modelsListAvailable,
     serverAdvertisedModel,
+    serverAdvertisedProvider,
     statusMode: status.mode
   });
   const sessionChat = flag(features, "session_chat") || hasEndpoint(endpoints, "session_chat");
@@ -588,6 +590,7 @@ export function normalizeHermesUiCapabilities(
       selectedModelId: modelState.selectedModelId,
       selectionStatus: modelState.selectionStatus,
       serverAdvertisedModel,
+      serverAdvertisedProvider,
       serverConfiguredOnly: !clientSelectable,
       uiState: clientSelectable ? "available" : "deferred",
       sessionModelOverrideCapable: explicitOverrideSupported,
@@ -634,6 +637,7 @@ export async function streamHermesSessionChat(
   const fetchImpl = config.fetchImpl ?? fetch;
   const hermesSessionId = sanitizeHermesId(request.context.session.hermesSessionId);
   const sessionContextKey = sanitizeHeaderValue(request.context.project.stableKey);
+  const runtimeModelId = resolveRuntimeModelId(request.model);
   const supportsSessionStream = await checkSessionStreamingCapability({
     apiKey: config.apiKey,
     base,
@@ -654,7 +658,8 @@ export async function streamHermesSessionChat(
     apiKey: config.apiKey,
     base,
     fetchImpl,
-    model: null,
+    model: runtimeModelId ?? config.configuredDefaultModelId ?? null,
+    provider: request.provider ?? config.configuredDefaultProviderId ?? null,
     signal: config.signal,
     sessionId: hermesSessionId,
     sessionTitle: request.context.session.title,
@@ -665,7 +670,6 @@ export async function streamHermesSessionChat(
     return sessionResult;
   }
 
-  const runtimeModelId = resolveRuntimeModelId(request.model);
   if (runtimeModelId) {
     const modelResult = await selectHermesModel(config, hermesSessionId, runtimeModelId, {
       expectedProviderKey: request.provider ?? null,
@@ -1258,7 +1262,8 @@ export async function selectHermesModel(
     apiKey: config.apiKey,
     base,
     fetchImpl,
-    model: null,
+    model: modelId,
+    provider: options.provider ?? config.configuredDefaultProviderId ?? null,
     signal: config.signal,
     sessionId: safeSessionId,
     sessionTitle: options.sessionTitle || safeSessionId,
@@ -5541,6 +5546,31 @@ function extractConfiguredDefaultModelIds(
   return [...new Set(candidates)];
 }
 
+function extractConfiguredDefaultProviderId(
+  status: Omit<NormalizedHermesStatus, "uiCapabilities">
+): string | null {
+  const capabilities = status.capabilities;
+  const healthDetailed = objectRecord(status.health?.detailed);
+  const healthBasic = objectRecord(status.health?.basic);
+  const modelsRoot = objectRecord(status.models);
+  const gatewayDefaults = objectRecord(capabilities?.gateway_model_defaults);
+  const modelConfig = objectRecord(capabilities?.model_config);
+  const modelObject = objectRecord(capabilities?.model);
+  return firstString(
+    modelsRoot?.provider,
+    modelsRoot?.default_provider,
+    gatewayDefaults?.provider,
+    gatewayDefaults?.default_provider,
+    capabilities?.default_provider,
+    modelConfig?.provider,
+    modelObject?.provider,
+    healthDetailed?.provider,
+    healthDetailed?.default_provider,
+    healthBasic?.provider,
+    healthBasic?.default_provider
+  ) || null;
+}
+
 function flaggedDefaultModelId(models: Record<string, unknown> | null): string {
   const data = models?.data;
   if (!Array.isArray(data)) {
@@ -5615,6 +5645,14 @@ function resolveAdvertisedModelId(
     if (availableModels.some((model) => model.id === candidate)) {
       return candidate;
     }
+  }
+
+  // `/api/model/options` exposes Hermes' configured default at the root even
+  // when that model is not repeated in the authenticated provider inventory.
+  // The root value is authoritative and must not be replaced by a guessed
+  // catalog model merely because the picker list is incomplete.
+  if (candidates[0]) {
+    return candidates[0];
   }
 
   const inferredDefault = inferCatalogDefaultModelId(availableModels);
@@ -6081,6 +6119,7 @@ function normalizeModelUiState(args: {
   clientSelectable: boolean;
   listAvailable: boolean;
   serverAdvertisedModel: string | null;
+  serverAdvertisedProvider: string | null;
   statusMode: string;
 }): {
   currentModelLabel: string;
@@ -6096,8 +6135,11 @@ function normalizeModelUiState(args: {
     ? labelCatalog.find((model) => model.id === selectedModelId) ??
       args.availableModels.find((model) => model.id === selectedModelId)
     : undefined;
-  const currentModelLabel = selectedModel?.label ?? selectedModelId ?? "Hermes server model";
-  const currentProviderLabel = selectedModel?.provider ?? "Hermes server config";
+  const currentModelLabel = selectedModel?.label ??
+    (selectedModelId ? formatHermesModelLabel(selectedModelId) : "Hermes server model");
+  const currentProviderLabel = selectedModel?.provider ??
+    formatHermesProviderLabel(args.serverAdvertisedProvider) ??
+    "Hermes server config";
   const selectionStatus = modelSelectionStatus(args);
 
   return {
@@ -6192,6 +6234,7 @@ async function ensureHermesSession(args: {
   base: URL;
   fetchImpl: typeof fetch;
   model?: string | null;
+  provider?: string | null;
   signal?: AbortSignal;
   sessionId: string;
   sessionTitle: string;
@@ -6209,6 +6252,8 @@ async function ensureHermesSession(args: {
       body: JSON.stringify({
         id: args.sessionId,
         model: args.model || undefined,
+        provider: args.provider || undefined,
+        require_model_lock: Boolean(args.model || args.provider) || undefined,
         title: makeHermesSessionTitle(args.sessionTitle, args.sessionId)
       }),
       cache: "no-store",
@@ -6256,6 +6301,7 @@ async function replaceLegacyPlaceholderSession(
     base: URL;
     fetchImpl: typeof fetch;
     model?: string | null;
+    provider?: string | null;
     signal?: AbortSignal;
     sessionId: string;
     sessionTitle: string;
@@ -6292,42 +6338,32 @@ async function replaceLegacyPlaceholderSession(
     return null;
   }
 
-  // Stoix builds before 0.1.2 persisted Hermes' virtual display alias as the
-  // session's raw provider model. Current Hermes correctly passes any stored
-  // raw session model to the provider, where "Hermes-agent" returns 404. The
-  // session cannot be repaired through PATCH (Hermes only accepts client-safe
-  // metadata there), so replace only this known-invalid legacy session. Stoix
-  // retains its visible transcript locally and sends recent context per turn.
-  const deleteResponse = await args.fetchImpl(sessionUrl, {
-    cache: "no-store",
-    headers,
-    method: "DELETE",
-    signal
-  });
-  if (!deleteResponse.ok) {
-    return chatFailure(
-      deleteResponse.status,
-      "http_error",
-      await safeHermesErrorMessage(deleteResponse, "/api/sessions/{session_id}")
-    );
+  const replacementModel = asString(args.model);
+  if (!replacementModel || isPlaceholderHermesModelId(replacementModel)) {
+    return null;
   }
 
-  const recreateResponse = await args.fetchImpl(buildEndpointUrl(args.base, "/api/sessions"), {
+  // Current Hermes stores its OpenAI-facing virtual alias when a native
+  // session is created without an explicit runtime. Repair affected sessions
+  // through Hermes' model-lock endpoint so their server-side transcript is
+  // preserved; never delete and recreate a conversation to change routing.
+  const lockResponse = await args.fetchImpl(`${sessionUrl}/model`, {
     body: JSON.stringify({
-      id: args.sessionId,
-      model: args.model || undefined,
-      title: makeHermesSessionTitle(args.sessionTitle, args.sessionId)
+      global: false,
+      model: replacementModel,
+      provider: args.provider || undefined,
+      scope: "session"
     }),
     cache: "no-store",
     headers,
     method: "POST",
     signal
   });
-  if (!recreateResponse.ok) {
+  if (!lockResponse.ok) {
     return chatFailure(
-      recreateResponse.status,
+      lockResponse.status,
       "http_error",
-      await safeHermesErrorMessage(recreateResponse, "/api/sessions")
+      await safeHermesErrorMessage(lockResponse, "/api/sessions/{session_id}/model")
     );
   }
 

@@ -285,12 +285,58 @@ assert.equal(
   "the detailed Hermes health probe must use the configured API key"
 );
 
+const configuredModelStatus = await getHermesStatus({
+  apiKey: "private-api-key",
+  baseUrl: "http://127.0.0.1:8642",
+  includeModels: true,
+  fetchImpl: async (input, init) => {
+    const path = new URL(input instanceof Request ? input.url : input).pathname;
+    const authorization = new Headers(init?.headers).get("Authorization");
+    if (path === "/health") {
+      assert.equal(authorization, null, "the public basic health probe must not need a credential");
+      return Response.json({ status: "ok" });
+    }
+    assert.equal(authorization, "Bearer private-api-key", `${path} must stay authenticated`);
+    if (path === "/health/detailed") {
+      return Response.json({ status: "ok" });
+    }
+    if (path === "/v1/capabilities") {
+      return Response.json({
+        features: { session_chat_streaming: true },
+        endpoints: { model_options: { method: "GET", path: "/api/model/options" } }
+      });
+    }
+    if (path === "/api/model/options") {
+      return Response.json({
+        model: "upstage/solar-pro4:free",
+        provider: "nous",
+        providers: [
+          { id: "nous", name: "Nous", authenticated: true, models: [] }
+        ]
+      });
+    }
+    throw new Error(`Unexpected configured-model request: ${path}`);
+  }
+});
+assert.equal(
+  configuredModelStatus.uiCapabilities.models.selectedModelId,
+  "upstage/solar-pro4:free",
+  "Hermes' configured root model remains authoritative even when the picker inventory omits it"
+);
+assert.equal(
+  configuredModelStatus.uiCapabilities.models.currentProviderLabel,
+  "Nous",
+  "the Composer provider label must come from Hermes' configured provider"
+);
+
 const legacySessionRequests = [];
 let sessionCreateCount = 0;
 const recoveredLegacySession = await streamHermesSessionChat(
   {
     apiKey: "private-api-key",
     baseUrl: "http://127.0.0.1:8642",
+    configuredDefaultModelId: "upstage/solar-pro4:free",
+    configuredDefaultProviderId: "nous",
     fetchImpl: async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : input);
       const method = init?.method ?? "GET";
@@ -305,15 +351,27 @@ const recoveredLegacySession = await streamHermesSessionChat(
       }
       if (url.pathname === "/api/sessions" && method === "POST") {
         sessionCreateCount += 1;
-        return sessionCreateCount === 1
-          ? Response.json({ error: { message: "Session already exists" } }, { status: 409 })
-          : Response.json({ session: { id: "legacy-session", model: null } }, { status: 201 });
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        assert.equal(body.model, "upstage/solar-pro4:free");
+        assert.equal(body.provider, "nous");
+        assert.equal(body.require_model_lock, true);
+        return Response.json({ error: { message: "Session already exists" } }, { status: 409 });
       }
       if (url.pathname === "/api/sessions/legacy-session" && method === "GET") {
         return Response.json({ session: { id: "legacy-session", model: "Hermes-agent" } });
       }
-      if (url.pathname === "/api/sessions/legacy-session" && method === "DELETE") {
-        return Response.json({ id: "legacy-session", deleted: true });
+      if (url.pathname === "/api/sessions/legacy-session/model" && method === "POST") {
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        assert.deepEqual(body, {
+          global: false,
+          model: "upstage/solar-pro4:free",
+          provider: "nous",
+          scope: "session"
+        });
+        return Response.json({
+          session_id: "legacy-session",
+          runtime: { model: body.model, provider: body.provider, model_lock: "accepted" }
+        });
       }
       if (url.pathname === "/api/sessions/legacy-session/chat/stream" && method === "POST") {
         return new Response("event: done\ndata: {}\n\n", {
@@ -352,14 +410,13 @@ const recoveredLegacySession = await streamHermesSessionChat(
 );
 assert.equal(recoveredLegacySession.ok, true, "a legacy virtual-model session must recover before chat");
 assert.deepEqual(
-  legacySessionRequests.slice(1, 5),
+  legacySessionRequests.slice(1, 4),
   [
     "POST /api/sessions",
     "GET /api/sessions/legacy-session",
-    "DELETE /api/sessions/legacy-session",
-    "POST /api/sessions"
+    "POST /api/sessions/legacy-session/model"
   ],
-  "Stoix must replace only the known-invalid legacy placeholder session before streaming"
+  "Stoix must repair the known-invalid virtual-model session without deleting its transcript"
 );
 assert.equal(
   legacySessionRequests.at(-1),

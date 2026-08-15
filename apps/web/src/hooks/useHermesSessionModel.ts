@@ -598,6 +598,7 @@ function getProviderModelState(
     selectedModelId: null,
     selectionStatus: "unknown",
     serverAdvertisedModel: null,
+    serverAdvertisedProvider: null,
     serverConfiguredOnly: true,
     uiState: "deferred",
     sessionModelOverrideCapable: false,

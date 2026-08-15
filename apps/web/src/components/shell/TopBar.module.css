@@ -43,6 +43,7 @@
 }
 
 .right {
+  gap: 2px;
   margin-left: auto;
   justify-content: flex-end;
 }
@@ -109,6 +110,12 @@
 
 .iconButton:active {
   transform: scale(0.98);
+}
+
+.iconButton:disabled {
+  cursor: default;
+  opacity: 0.38;
+  transform: none;
 }
 
 @media (max-width: 760px) {

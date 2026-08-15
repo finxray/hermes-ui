@@ -26,6 +26,7 @@ export function useHermesStatus() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightRef = useRef(false);
   const mountedRef = useRef(true);
+  const requestedInitialModelRefreshRef = useRef(false);
 
   const refresh = useCallback(async (options: HermesStatusRefreshOptions = {}) => {
     if (inFlightRef.current) {
@@ -88,6 +89,21 @@ export function useHermesStatus() {
     }, intervalMs);
   }, [refresh, state.status?.reachable]);
 
+  useEffect(() => {
+    if (!state.status?.reachable) {
+      requestedInitialModelRefreshRef.current = false;
+      return;
+    }
+    if (
+      state.status.uiCapabilities.models.serverAdvertisedModel ||
+      requestedInitialModelRefreshRef.current
+    ) {
+      return;
+    }
+    requestedInitialModelRefreshRef.current = true;
+    void refresh({ refreshModels: true });
+  }, [refresh, state.status]);
+
   return {
     isLoading: state.isInitialLoading,
     isRefreshing: state.isRefreshing,
@@ -132,6 +148,8 @@ function preserveKnownModelOnTransientFailure(
         selectionStatus: previousModels.selectionStatus,
         serverAdvertisedModel:
           previousModels.serverAdvertisedModel ?? next.uiCapabilities.models.serverAdvertisedModel,
+        serverAdvertisedProvider:
+          previousModels.serverAdvertisedProvider ?? next.uiCapabilities.models.serverAdvertisedProvider,
         serverConfiguredOnly: previousModels.serverConfiguredOnly
       }
     }
@@ -151,6 +169,7 @@ function isMeaningfullyChanged(
     prev.configured !== next.configured ||
     prev.baseUrl !== next.baseUrl ||
     prev.uiCapabilities.models.currentModelLabel !== next.uiCapabilities.models.currentModelLabel ||
+    prev.uiCapabilities.models.currentProviderLabel !== next.uiCapabilities.models.currentProviderLabel ||
     modelListSignature(prev) !== modelListSignature(next) ||
     prev.uiCapabilities.models.selectionStatus !== next.uiCapabilities.models.selectionStatus ||
     (prev.error?.message ?? null) !== (next.error?.message ?? null)

@@ -229,6 +229,28 @@ export const MessageSquarePlus = makeIcon([
   { d: "M12 8.6v5.2M9.4 11.2h5.2" }
 ]);
 
+export const Maximize2 = makeIcon([
+  { d: "M8.5 4.5h-4v4" },
+  { d: "m4.5 4.5 5 5" },
+  { d: "M15.5 4.5h4v4" },
+  { d: "m19.5 4.5-5 5" },
+  { d: "M8.5 19.5h-4v-4" },
+  { d: "m4.5 19.5 5-5" },
+  { d: "M15.5 19.5h4v-4" },
+  { d: "m19.5 19.5-5-5" }
+]);
+
+export const Minimize2 = makeIcon([
+  { d: "M9.5 9.5h-5v-5" },
+  { d: "m4.5 9.5 5-5" },
+  { d: "M14.5 9.5h5v-5" },
+  { d: "m19.5 9.5-5-5" },
+  { d: "M9.5 14.5h-5v5" },
+  { d: "m4.5 14.5 5 5" },
+  { d: "M14.5 14.5h5v5" },
+  { d: "m19.5 14.5-5 5" }
+]);
+
 export const NewChat = makeIcon(
   [
     {

@@ -33,6 +33,23 @@ try {
   if (faviconHref) await assertHttpOk(new URL(faviconHref, baseUrl), "Stoix favicon");
   check(await page.getByRole("form", { name: "Message composer" }).isVisible(), "workspace composer is visible");
   check(!(await page.locator("body").innerText()).includes("Brain Memory"), "core workspace has no Brain Memory UI");
+  const fullscreenButton = page.getByRole("button", { name: "Enter full screen" });
+  const contextConsoleButton = page.getByRole("button", { name: "Open context console" });
+  await fullscreenButton.waitFor();
+  const fullscreenControlOrder = await fullscreenButton.evaluate((button, consoleButton) =>
+    Boolean(consoleButton && (button.compareDocumentPosition(consoleButton) & Node.DOCUMENT_POSITION_FOLLOWING)),
+    await contextConsoleButton.elementHandle()
+  );
+  check(fullscreenControlOrder, "full-screen control precedes the context console control");
+  if (!(await fullscreenButton.isDisabled())) {
+    await fullscreenButton.click();
+    await page.waitForFunction(() => Boolean(document.fullscreenElement), undefined, { timeout: 3_000 });
+    check(await page.getByRole("button", { name: "Exit full screen" }).isVisible(), "full-screen control reflects active state");
+    await page.getByRole("button", { name: "Exit full screen" }).click();
+    await page.waitForFunction(() => !document.fullscreenElement, undefined, { timeout: 3_000 });
+  } else {
+    check(true, "full-screen control degrades safely in Chromium's unsupported headless shell");
+  }
   const focusPersistentScrollbarRule = await page.evaluate(() =>
     Array.from(document.styleSheets).some((sheet) =>
       Array.from(sheet.cssRules).some(

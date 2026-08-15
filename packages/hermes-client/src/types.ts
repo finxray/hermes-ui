@@ -157,6 +157,7 @@ export type HermesUiCapabilities = {
   models: {
     listAvailable: boolean;
     serverAdvertisedModel: string | null;
+    serverAdvertisedProvider: string | null;
     serverConfiguredOnly: boolean;
     clientSelectable: boolean;
     availableModels: HermesModelDescriptor[];
@@ -220,6 +221,7 @@ export type HermesClientConfig = {
   dashboardBaseUrl?: string | null;
   dashboardSessionToken?: string | null;
   configuredDefaultModelId?: string | null;
+  configuredDefaultProviderId?: string | null;
   enabled?: boolean;
   signal?: AbortSignal;
   timeoutMs?: number;

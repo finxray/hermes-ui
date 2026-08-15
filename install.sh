@@ -215,7 +215,22 @@ bundle_is_complete() {
     [ -x "$1/runtime/node" ] &&
     [ -x "$1/stoix" ]
 }
-if ! bundle_is_complete "$TARGET_ROOT"; then
+if [ "$FORCE_SOURCE" = true ] && bundle_is_complete "$TARGET_ROOT"; then
+  info "Replacing the installed Stoix $VERSION source build..."
+  STAGING_ROOT="$VERSIONS_ROOT/.install-$VERSION-$$"
+  PREVIOUS_ROOT="$VERSIONS_ROOT/.previous-$VERSION-$$"
+  rm -rf "$STAGING_ROOT"
+  cp -R "$BUNDLE_ROOT" "$STAGING_ROOT"
+  [ -x "$STAGING_ROOT/stoix" ] || chmod 755 "$STAGING_ROOT/stoix" "$STAGING_ROOT/runtime/node"
+  bundle_is_complete "$STAGING_ROOT" || fatal "The replacement Stoix bundle is incomplete; the installed version was not changed."
+  mv "$TARGET_ROOT" "$PREVIOUS_ROOT"
+  if mv "$STAGING_ROOT" "$TARGET_ROOT"; then
+    rm -rf "$PREVIOUS_ROOT"
+  else
+    mv "$PREVIOUS_ROOT" "$TARGET_ROOT" || true
+    fatal "Stoix could not replace the installed source build; the previous version was restored."
+  fi
+elif ! bundle_is_complete "$TARGET_ROOT"; then
   if [ -e "$TARGET_ROOT" ]; then
     INCOMPLETE_ROOT="$VERSIONS_ROOT/.incomplete-$VERSION-$(date +%Y%m%d%H%M%S)-$$"
     warn "The existing Stoix $VERSION installation is incomplete; preserving it at $INCOMPLETE_ROOT and repairing it."

@@ -56,6 +56,10 @@ assert(powerShellInstaller.includes("Win32_Processor"), "Windows ARM detection m
 assert(powerShellInstaller.includes('\"dashboard\", \"--host\", \"127.0.0.1\"'));
 assert(shellInstaller.includes("dashboard --host 127.0.0.1"));
 assert(shellInstaller.includes("bundle_is_complete"));
+assert(
+  shellInstaller.includes('[ "$FORCE_SOURCE" = true ] && bundle_is_complete "$TARGET_ROOT"'),
+  "--source must replace a complete same-version installation"
+);
 assert(powerShellInstaller.includes("Test-BundleComplete"));
 
 assert(packageRelease.includes('platform === "win32" ? ".zip" : ".tar.gz"'));

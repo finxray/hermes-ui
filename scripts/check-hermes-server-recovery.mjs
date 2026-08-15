@@ -82,4 +82,10 @@ assert.equal(
   false
 );
 
+assert.match(launcher.hermesServerTimeoutMessage("darwin"), /macOS Terminal/);
+assert.match(launcher.hermesServerTimeoutMessage("darwin"), /hermes gateway restart/);
+assert.doesNotMatch(launcher.hermesServerTimeoutMessage("darwin"), /WSL/);
+assert.match(launcher.hermesServerTimeoutMessage("win32"), /inside WSL/);
+assert.doesNotMatch(route, /run `hermes gateway run` in WSL/);
+
 console.log("Hermes server recovery checks passed.");

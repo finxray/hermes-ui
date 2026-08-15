@@ -144,6 +144,19 @@ export async function waitForHermesServer(baseUrl: URL): Promise<boolean> {
   return false;
 }
 
+export function hermesServerTimeoutMessage(
+  platform: NodeJS.Platform = process.platform
+): string {
+  const healthUrl = "http://127.0.0.1:8642/health";
+  if (platform === "win32") {
+    return "Hermes did not become ready. For native Windows, run `hermes gateway restart`. If Hermes is installed in WSL, run `hermes gateway run --replace --force` inside WSL. Then check `" + healthUrl + "`.";
+  }
+  if (platform === "darwin") {
+    return "Hermes did not become ready. In macOS Terminal, run `hermes gateway restart`, then check `" + healthUrl + "`.";
+  }
+  return "Hermes did not become ready. Run `hermes gateway restart`, then check `" + healthUrl + "`.";
+}
+
 export function isAllowedHermesServerStartRequest(request: Request): boolean {
   return isAllowedLocalStartRequest(request, "start-server");
 }

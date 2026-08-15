@@ -327,6 +327,20 @@ find_hermes() {
   return 1
 }
 
+hermes_api_ready() {
+  curl -fsS --connect-timeout 1 "http://127.0.0.1:8642/health" >/dev/null 2>&1
+}
+
+wait_for_hermes_api() {
+  attempts=0
+  while [ "$attempts" -lt 45 ]; do
+    hermes_api_ready && return 0
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+  return 1
+}
+
 configure_hermes() {
   HERMES_BIN=$(find_hermes) || return 1
   info "Configuring the local Hermes API for Stoix..."
@@ -349,23 +363,27 @@ configure_hermes() {
     API_KEY_CHANGED=true
   fi
   set_config_value HERMES_API_KEY "$API_KEY"
-  if [ "$API_KEY_CHANGED" = true ]; then
-    "$HERMES_BIN" gateway stop >/dev/null 2>&1 || true
-    attempts=0
-    while [ "$attempts" -lt 5 ] && curl -fsS --connect-timeout 1 "http://127.0.0.1:8642/health" >/dev/null 2>&1; do
-      attempts=$((attempts + 1))
-      sleep 1
-    done
-  fi
-  if curl -fsS --connect-timeout 1 "http://127.0.0.1:8642/health" >/dev/null 2>&1; then
+  if [ "$API_KEY_CHANGED" != true ] && hermes_api_ready; then
     info "Hermes gateway is already running."
-  elif "$HERMES_BIN" gateway install >/dev/null 2>&1 && "$HERMES_BIN" gateway start >/dev/null 2>&1; then
-    info "Hermes gateway service is running."
   else
-    mkdir -p "${HERMES_HOME:-$HOME/.hermes}/logs"
-    nohup "$HERMES_BIN" gateway run --replace --force \
-      > "${HERMES_HOME:-$HOME/.hermes}/logs/stoix-gateway.log" 2>&1 &
-    info "Hermes gateway is starting in the background."
+    # A running gateway does not reload API_SERVER_ENABLED or API_SERVER_KEY.
+    # Stop it before installing/starting the service so macOS launchd and Linux
+    # systemd both start Hermes with the configuration written above.
+    "$HERMES_BIN" gateway stop >/dev/null 2>&1 || true
+    if "$HERMES_BIN" gateway install >/dev/null 2>&1 && \
+      "$HERMES_BIN" gateway start >/dev/null 2>&1 && \
+      wait_for_hermes_api; then
+    info "Hermes gateway service is running."
+    else
+      mkdir -p "${HERMES_HOME:-$HOME/.hermes}/logs"
+      nohup "$HERMES_BIN" gateway run --replace --force \
+        > "${HERMES_HOME:-$HOME/.hermes}/logs/stoix-gateway.log" 2>&1 &
+      if wait_for_hermes_api; then
+        info "Hermes gateway is running in the background."
+      else
+        warn "Hermes was configured but its API did not become ready. Check ${HERMES_HOME:-$HOME/.hermes}/logs/stoix-gateway.log"
+      fi
+    fi
   fi
   if ! curl -fsS --connect-timeout 1 "http://127.0.0.1:9119/skills" >/dev/null 2>&1; then
     mkdir -p "${HERMES_HOME:-$HOME/.hermes}/logs"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { HermesServerStartResult, HermesServerStatus } from "@/lib/hermesServerRecovery";
 import {
   isAllowedHermesServerStartRequest,
+  hermesServerTimeoutMessage,
   launchHermesServer,
   probeHermesServer,
   resolveHermesServerTarget,
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
       checkedAt: new Date().toISOString(),
       error: {
         kind: "timeout",
-        message: "Hermes did not become ready. Run `hermes gateway run` in WSL and check the api_server platform status."
+        message: hermesServerTimeoutMessage()
       }
     };
     return NextResponse.json(result, { status: 504 });

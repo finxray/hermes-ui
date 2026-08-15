@@ -170,11 +170,11 @@ function Build-SourceBundle([string]$Architecture) {
         $env:STOIX_SKIP_ARCHIVE = "true"
         Push-Location $sourceRoot.FullName
         Write-Info "Building the production package. This first install can take several minutes..."
-        & $npm ci --no-audit --no-fund
+        & $npm ci --no-audit --no-fund | Out-Host
         if ($LASTEXITCODE -ne 0) { Fail "npm ci failed with exit code $LASTEXITCODE." }
-        & $npm run build
+        & $npm run build | Out-Host
         if ($LASTEXITCODE -ne 0) { Fail "The Stoix production build failed with exit code $LASTEXITCODE." }
-        & $node scripts/package-release.mjs
+        & $node scripts/package-release.mjs | Out-Host
         if ($LASTEXITCODE -ne 0) { Fail "Stoix packaging failed with exit code $LASTEXITCODE." }
     } finally {
         Pop-Location

@@ -66,6 +66,11 @@ assert(
   "--source must replace a complete same-version installation"
 );
 assert(powerShellInstaller.includes("Test-BundleComplete"));
+assert(
+  powerShellInstaller.includes("& $npm ci --no-audit --no-fund | Out-Host") &&
+    powerShellInstaller.includes("& $node scripts/package-release.mjs | Out-Host"),
+  "PowerShell source builds must not mix command output into the returned bundle path"
+);
 
 assert(packageRelease.includes('platform === "win32" ? ".zip" : ".tar.gz"'));
 assert(packageRelease.includes('execFileSync("tar", ["-czf"'));

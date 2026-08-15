@@ -162,10 +162,12 @@ function Build-SourceBundle([string]$Architecture) {
     $previousPath = $env:Path
     $previousPlatform = $env:STOIX_RELEASE_PLATFORM
     $previousArchitecture = $env:STOIX_RELEASE_ARCH
+    $previousSkipArchive = $env:STOIX_SKIP_ARCHIVE
     try {
         $env:Path = "$nodeRoot;$env:Path"
         $env:STOIX_RELEASE_PLATFORM = "win32"
         $env:STOIX_RELEASE_ARCH = $Architecture
+        $env:STOIX_SKIP_ARCHIVE = "true"
         Push-Location $sourceRoot.FullName
         Write-Info "Building the production package. This first install can take several minutes..."
         & $npm ci --no-audit --no-fund
@@ -179,6 +181,7 @@ function Build-SourceBundle([string]$Architecture) {
         $env:Path = $previousPath
         $env:STOIX_RELEASE_PLATFORM = $previousPlatform
         $env:STOIX_RELEASE_ARCH = $previousArchitecture
+        $env:STOIX_SKIP_ARCHIVE = $previousSkipArchive
     }
     $bundle = Get-ChildItem -LiteralPath (Join-Path $sourceRoot.FullName "artifacts\release") -Directory |
         Where-Object { $_.Name -like "stoix-*-win32-$Architecture" } |

@@ -25,6 +25,7 @@ const supportedPlatforms = new Set(["darwin", "linux", "win32"]);
 const supportedArchitectures = new Set(["arm64", "x64"]);
 const expectedPlatform = process.env.STOIX_RELEASE_PLATFORM;
 const expectedArchitecture = process.env.STOIX_RELEASE_ARCH;
+const skipArchive = process.env.STOIX_SKIP_ARCHIVE === "true";
 
 if (!supportedPlatforms.has(platform) || !supportedArchitectures.has(arch)) {
   throw new Error(`Unsupported release target: ${platform}-${arch}`);
@@ -131,12 +132,15 @@ writeFileSync(
 
 writeLaunchers(bundleRoot, runtimeName);
 assertBundleIsClean(bundleRoot);
-createArchive(releaseRoot, bundleName, archivePath);
-
-const digest = sha256(archivePath);
-writeFileSync(join(releaseRoot, `${archiveName}.sha256`), `${digest}  ${archiveName}\n`, "utf8");
-console.log(`Created ${archivePath}`);
-console.log(`SHA-256 ${digest}`);
+if (skipArchive) {
+  console.log(`Created installable bundle ${bundleRoot}`);
+} else {
+  createArchive(releaseRoot, bundleName, archivePath);
+  const digest = sha256(archivePath);
+  writeFileSync(join(releaseRoot, `${archiveName}.sha256`), `${digest}  ${archiveName}\n`, "utf8");
+  console.log(`Created ${archivePath}`);
+  console.log(`SHA-256 ${digest}`);
+}
 
 function writeLaunchers(target, runtimeName) {
   if (platform === "win32") {

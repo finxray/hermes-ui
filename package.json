@@ -49,6 +49,7 @@
     "package:current": "npm run build && npm run package:bundle",
     "package:smoke": "node scripts/package-smoke.mjs",
     "package:install-smoke": "node scripts/package-install-smoke.mjs",
+    "package:update-smoke": "node scripts/package-update-smoke.mjs",
     "package:release": "npm run release:check && npm run package:bundle && npm run check:release-secrets && npm run package:smoke && npm run package:install-smoke"
   },
   "overrides": {

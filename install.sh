@@ -176,7 +176,7 @@ build_source_bundle() {
     cd "$SOURCE_ROOT"
     PATH="$NODE_ROOT/bin:$PATH" "$NODE_ROOT/bin/npm" ci --no-audit --no-fund
     PATH="$NODE_ROOT/bin:$PATH" "$NODE_ROOT/bin/npm" run build
-    STOIX_RELEASE_PLATFORM="$PLATFORM" STOIX_RELEASE_ARCH="$ARCH" \
+    STOIX_RELEASE_PLATFORM="$PLATFORM" STOIX_RELEASE_ARCH="$ARCH" STOIX_SKIP_ARCHIVE=true \
       PATH="$NODE_ROOT/bin:$PATH" "$NODE_ROOT/bin/node" scripts/package-release.mjs
   ) || fatal "Stoix could not build. The temporary files were removed; fix the message above and run the installer again."
   BUNDLE_ROOT=""

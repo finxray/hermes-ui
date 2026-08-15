@@ -133,6 +133,12 @@ assert(
     packageRelease.includes('copyFileSync(join(root, "install.ps1"), join(updaterRoot, "install.ps1"))'),
   "release bundles must contain both native self-update installers"
 );
+assert(
+  shellInstaller.includes("STOIX_SKIP_ARCHIVE=true") &&
+    powerShellInstaller.includes('$env:STOIX_SKIP_ARCHIVE = "true"') &&
+    packageRelease.includes('process.env.STOIX_SKIP_ARCHIVE === "true"'),
+  "source installation must skip unnecessary release archives in deep temporary paths"
+);
 assert.equal(normalizedSemanticVersion("v1.2.3"), "1.2.3");
 assert.equal(normalizedSemanticVersion("1.2.3-rc.2+build.7"), "1.2.3-rc.2");
 assert.equal(normalizedSemanticVersion("latest"), null);

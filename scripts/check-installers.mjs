@@ -42,10 +42,21 @@ for (const source of [shellInstaller, powerShellInstaller]) {
   assert(source.includes("hermes-agent.nousresearch.com"), "missing Hermes must use the official installer endpoint");
   assert(source.toLowerCase().includes("noninteractive") || source.includes("non-interactive"), "Hermes bootstrap must not wait for hidden prompts");
   assert(source.toLowerCase().includes("apikeychanged") || source.includes("API_KEY_CHANGED"), "a newly configured Hermes API key must restart a running gateway");
+  assert(source.includes("STOIX_NO_ANIMATION"), "installer animation must have a deterministic opt-out");
+  assert(source.includes("STOIX") && source.includes("version"), "successful installation must show the Stoix mark and installed version");
+  for (const phrase of [
+    "Teaching the browser where Hermes lives",
+    "Keeping every credential on this machine",
+    "Asking the gateway for a tiny sign of life"
+  ]) {
+    assert(source.includes(phrase), `installer activity copy is missing: ${phrase}`);
+  }
 }
 
 assert(!/^\s*sudo\s/m.test(shellInstaller), "Stoix installation must not invoke sudo");
 assert(!shellInstaller.includes("eval "), "the shell installer must not evaluate downloaded metadata");
+assert(shellInstaller.includes('activity_tick" -ge 25'), "the shell activity mark must wait five seconds before appearing");
+assert(shellInstaller.includes("run_quiet_activity \"Waiting for Hermes to answer on the local loopback"), "the Unix Hermes readiness wait must stay visibly active");
 assert(!shellInstaller.includes("-maxdepth"), "the Unix installer must use macOS-compatible POSIX tools");
 assert(
   shellInstaller.includes('APP_BUNDLE="$HOME/Applications/Stoix.app"') &&
@@ -54,6 +65,8 @@ assert(
 );
 assert(shellInstaller.includes("Terminal=false"), "Linux desktop launch must not leave a terminal open");
 assert(!powerShellInstaller.includes("Invoke-Expression"), "the PowerShell installer must not evaluate downloaded metadata");
+assert(powerShellInstaller.includes("TotalSeconds -lt 5"), "the PowerShell activity mark must wait five seconds before appearing");
+assert(powerShellInstaller.includes("Wait-ForLoopbackPort 8642 45"), "the Windows Hermes readiness wait must stay visibly active");
 assert(!powerShellInstaller.includes("-Verb RunAs"), "the Windows installer must not request elevation");
 assert(powerShellInstaller.includes("-WindowStyle Hidden -File"), "the Windows Start shortcut must launch without a terminal window");
 assert(powerShellInstaller.includes("robocopy.exe"), "the Windows installer must support long package paths");

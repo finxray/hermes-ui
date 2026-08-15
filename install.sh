@@ -15,10 +15,114 @@ NO_INTEGRATE="${STOIX_NO_INTEGRATE:-false}"
 SKIP_HERMES="${STOIX_SKIP_HERMES:-false}"
 FORCE_SOURCE="${STOIX_FORCE_SOURCE:-false}"
 TMP_ROOT=""
+ACTIVE_CHILD_PID=""
+ACTIVITY_SEQUENCE=0
+INTERACTIVE_UI=false
+USE_COLOR=false
 
-info() { printf '%s\n' "[Stoix] $*"; }
-warn() { printf '%s\n' "[Stoix] WARNING: $*" >&2; }
-fatal() { printf '%s\n' "[Stoix] ERROR: $*" >&2; exit 1; }
+if [ -t 1 ] && [ "${TERM:-}" != dumb ] && [ "${STOIX_NO_ANIMATION:-false}" != true ] && [ -z "${CI:-}" ]; then
+  INTERACTIVE_UI=true
+fi
+if [ -t 1 ] && [ "${TERM:-}" != dumb ] && [ -z "${NO_COLOR:-}" ]; then
+  USE_COLOR=true
+  COLOR_BLUE=$(printf '\033[38;5;75m')
+  COLOR_PURPLE=$(printf '\033[38;5;141m')
+  COLOR_YELLOW=$(printf '\033[38;5;221m')
+  COLOR_RED=$(printf '\033[38;5;203m')
+  COLOR_BOLD=$(printf '\033[1m')
+  COLOR_RESET=$(printf '\033[0m')
+else
+  COLOR_BLUE=""
+  COLOR_PURPLE=""
+  COLOR_YELLOW=""
+  COLOR_RED=""
+  COLOR_BOLD=""
+  COLOR_RESET=""
+fi
+
+info() { printf '%s[Stoix]%s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$*"; }
+warn() { printf '%s[Stoix] WARNING:%s %s\n' "$COLOR_YELLOW" "$COLOR_RESET" "$*" >&2; }
+fatal() { printf '%s[Stoix] ERROR:%s %s\n' "$COLOR_RED" "$COLOR_RESET" "$*" >&2; exit 1; }
+
+activity_phrase() {
+  phrase_index=$1
+  activity_label=$2
+  case "$phrase_index" in
+    0) printf '%s' "$activity_label" ;;
+    1) printf '%s' "Teaching the browser where Hermes lives..." ;;
+    2) printf '%s' "Keeping every credential on this machine..." ;;
+    3) printf '%s' "Asking the gateway for a tiny sign of life..." ;;
+    4) printf '%s' "Polishing the local control surface..." ;;
+    *) printf '%s' "Still working -- definitely not contemplating infinity..." ;;
+  esac
+}
+
+render_activity() {
+  activity_tick=$1
+  activity_label=$2
+  frame_index=$((activity_tick % 8))
+  case "$frame_index" in
+    0) activity_frame="S...." ;;
+    1) activity_frame="ST..." ;;
+    2) activity_frame="STO.." ;;
+    3) activity_frame="STOI." ;;
+    4) activity_frame="STOIX" ;;
+    5) activity_frame=".TOIX" ;;
+    6) activity_frame="..OIX" ;;
+    *) activity_frame="...IX" ;;
+  esac
+  phrase_index=$(((activity_tick - 25) / 20 % 6))
+  phrase=$(activity_phrase "$phrase_index" "$activity_label")
+  printf '\r\033[2K%s%s%s  %s' "$COLOR_BLUE" "$activity_frame" "$COLOR_RESET" "$phrase"
+}
+
+clear_activity() {
+  if [ "$INTERACTIVE_UI" = true ]; then
+    printf '\r\033[2K'
+  fi
+  return 0
+}
+
+run_quiet_activity() {
+  activity_label=$1
+  shift
+  ACTIVITY_SEQUENCE=$((ACTIVITY_SEQUENCE + 1))
+  activity_output="$TMP_ROOT/activity-$ACTIVITY_SEQUENCE.log"
+  "$@" >"$activity_output" 2>&1 &
+  ACTIVE_CHILD_PID=$!
+
+  if [ "$INTERACTIVE_UI" = true ]; then
+    activity_tick=0
+    while kill -0 "$ACTIVE_CHILD_PID" >/dev/null 2>&1; do
+      if [ "$activity_tick" -ge 25 ]; then
+        render_activity "$activity_tick" "$activity_label"
+      fi
+      activity_tick=$((activity_tick + 1))
+      sleep 0.2
+    done
+  fi
+
+  if wait "$ACTIVE_CHILD_PID"; then
+    activity_status=0
+  else
+    activity_status=$?
+  fi
+  ACTIVE_CHILD_PID=""
+  clear_activity
+  rm -f "$activity_output"
+  return "$activity_status"
+}
+
+show_completion() {
+  completed_version=$1
+  printf '\n'
+  printf '%s        /\\%s\n' "$COLOR_BLUE" "$COLOR_RESET"
+  printf '%s     __/  \\__%s\n' "$COLOR_BLUE" "$COLOR_RESET"
+  printf '%s    /  |  |  \\%s\n' "$COLOR_PURPLE" "$COLOR_RESET"
+  printf '%s       |/\\|%s\n' "$COLOR_PURPLE" "$COLOR_RESET"
+  printf '%s%s       STOIX%s\n' "$COLOR_BOLD" "$COLOR_BLUE" "$COLOR_RESET"
+  printf '%s      version %s%s\n\n' "$COLOR_PURPLE" "$completed_version" "$COLOR_RESET"
+}
 
 usage() {
   cat <<'EOF'
@@ -90,8 +194,19 @@ if [ -z "$INSTALL_ROOT" ]; then
 fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/stoix-install.XXXXXX") || fatal "Could not create a temporary installation directory."
-cleanup() { [ -n "$TMP_ROOT" ] && rm -rf "$TMP_ROOT"; }
-trap cleanup EXIT HUP INT TERM
+cleanup() {
+  clear_activity
+  if [ -n "$ACTIVE_CHILD_PID" ]; then
+    kill "$ACTIVE_CHILD_PID" >/dev/null 2>&1 || true
+    wait "$ACTIVE_CHILD_PID" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$TMP_ROOT" ]; then
+    rm -rf "$TMP_ROOT"
+  fi
+}
+interrupt_install() { exit 130; }
+trap cleanup EXIT
+trap interrupt_install HUP INT TERM
 
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
@@ -130,7 +245,8 @@ download_release_bundle() {
   curl -fL --retry 3 --connect-timeout 15 "$base/$asset.sha256" -o "$TMP_ROOT/$asset.sha256" || return 1
   verify_checksum "$TMP_ROOT/$asset" "$TMP_ROOT/$asset.sha256"
   mkdir -p "$TMP_ROOT/release"
-  tar -xzf "$TMP_ROOT/$asset" -C "$TMP_ROOT/release"
+  run_quiet_activity "Opening the verified Stoix package..." \
+    tar -xzf "$TMP_ROOT/$asset" -C "$TMP_ROOT/release" || fatal "The verified Stoix package could not be extracted."
   BUNDLE_ROOT="$TMP_ROOT/release/stoix-$version-$PLATFORM-$ARCH"
   [ -f "$BUNDLE_ROOT/VERSION.json" ] || fatal "The verified Stoix archive does not contain the expected application bundle."
 }
@@ -147,7 +263,8 @@ download_node_runtime() {
   printf '%s  %s\n' "$expected" "$node_asset" > "$TMP_ROOT/node.sha256"
   verify_checksum "$TMP_ROOT/$node_asset" "$TMP_ROOT/node.sha256"
   mkdir -p "$TMP_ROOT/node"
-  tar -xzf "$TMP_ROOT/$node_asset" -C "$TMP_ROOT/node"
+  run_quiet_activity "Opening the temporary build runtime..." \
+    tar -xzf "$TMP_ROOT/$node_asset" -C "$TMP_ROOT/node" || fatal "The verified Node.js runtime could not be extracted."
   NODE_ROOT="$TMP_ROOT/node/node-v$NODE_VERSION-$node_platform-$ARCH"
   [ -x "$NODE_ROOT/bin/node" ] || fatal "The verified Node.js runtime could not be extracted."
 }
@@ -165,7 +282,8 @@ build_source_bundle() {
   info "Downloading Stoix source ($source_suffix)..."
   curl -fL --retry 3 --connect-timeout 15 "https://github.com/$REPOSITORY/archive/$source_ref.tar.gz" -o "$source_archive" || fatal "Could not download the Stoix source archive."
   mkdir -p "$TMP_ROOT/source"
-  tar -xzf "$source_archive" -C "$TMP_ROOT/source"
+  run_quiet_activity "Opening the Stoix source package..." \
+    tar -xzf "$source_archive" -C "$TMP_ROOT/source" || fatal "The Stoix source package could not be extracted."
   SOURCE_ROOT=""
   for candidate in "$TMP_ROOT/source"/*; do
     if [ -d "$candidate" ]; then SOURCE_ROOT=$candidate; break; fi
@@ -189,7 +307,8 @@ build_source_bundle() {
 if [ -n "$ARCHIVE_PATH" ]; then
   [ -f "$ARCHIVE_PATH" ] || fatal "Local archive not found: $ARCHIVE_PATH"
   mkdir -p "$TMP_ROOT/release"
-  tar -xzf "$ARCHIVE_PATH" -C "$TMP_ROOT/release"
+  run_quiet_activity "Opening the local Stoix package..." \
+    tar -xzf "$ARCHIVE_PATH" -C "$TMP_ROOT/release" || fatal "The local Stoix package could not be extracted."
   BUNDLE_ROOT=""
   for candidate in "$TMP_ROOT/release"/stoix-*-$PLATFORM-$ARCH; do
     if [ -d "$candidate" ]; then BUNDLE_ROOT=$candidate; break; fi
@@ -225,7 +344,8 @@ if [ "$FORCE_SOURCE" = true ] && bundle_is_complete "$TARGET_ROOT"; then
   STAGING_ROOT="$VERSIONS_ROOT/.install-$VERSION-$$"
   PREVIOUS_ROOT="$VERSIONS_ROOT/.previous-$VERSION-$$"
   rm -rf "$STAGING_ROOT"
-  cp -R "$BUNDLE_ROOT" "$STAGING_ROOT"
+  run_quiet_activity "Placing Stoix in its versioned home..." \
+    cp -R "$BUNDLE_ROOT" "$STAGING_ROOT" || fatal "Stoix could not stage the replacement package."
   [ -x "$STAGING_ROOT/stoix" ] || chmod 755 "$STAGING_ROOT/stoix" "$STAGING_ROOT/runtime/node"
   bundle_is_complete "$STAGING_ROOT" || fatal "The replacement Stoix bundle is incomplete; the installed version was not changed."
   mv "$TARGET_ROOT" "$PREVIOUS_ROOT"
@@ -243,7 +363,8 @@ elif ! bundle_is_complete "$TARGET_ROOT"; then
   fi
   STAGING_ROOT="$VERSIONS_ROOT/.install-$VERSION-$$"
   rm -rf "$STAGING_ROOT"
-  cp -R "$BUNDLE_ROOT" "$STAGING_ROOT"
+  run_quiet_activity "Placing Stoix in its versioned home..." \
+    cp -R "$BUNDLE_ROOT" "$STAGING_ROOT" || fatal "Stoix could not stage the package."
   [ -x "$STAGING_ROOT/stoix" ] || chmod 755 "$STAGING_ROOT/stoix" "$STAGING_ROOT/runtime/node"
   mv "$STAGING_ROOT" "$TARGET_ROOT"
 fi
@@ -364,7 +485,8 @@ wait_for_hermes_api() {
 configure_hermes() {
   HERMES_BIN=$(find_hermes) || return 1
   info "Configuring the local Hermes API for Stoix..."
-  "$HERMES_BIN" config set API_SERVER_ENABLED true >/dev/null 2>&1 || {
+  run_quiet_activity "Enabling the private Hermes API..." \
+    "$HERMES_BIN" config set API_SERVER_ENABLED true || {
     warn "Hermes is installed, but its API server could not be enabled. Run: hermes config set API_SERVER_ENABLED true"
     return 1
   }
@@ -376,7 +498,8 @@ configure_hermes() {
   fi
   if [ ${#API_KEY} -lt 16 ]; then
     API_KEY=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
-    "$HERMES_BIN" config set API_SERVER_KEY "$API_KEY" >/dev/null 2>&1 || {
+    run_quiet_activity "Securing the local Hermes connection..." \
+      "$HERMES_BIN" config set API_SERVER_KEY "$API_KEY" || {
       warn "Hermes did not accept a local API key. Run: hermes config set API_SERVER_KEY YOUR_PRIVATE_KEY"
       return 1
     }
@@ -389,16 +512,20 @@ configure_hermes() {
     # A running gateway does not reload API_SERVER_ENABLED or API_SERVER_KEY.
     # Stop it before installing/starting the service so macOS launchd and Linux
     # systemd both start Hermes with the configuration written above.
-    "$HERMES_BIN" gateway stop >/dev/null 2>&1 || true
-    if "$HERMES_BIN" gateway install >/dev/null 2>&1 && \
-      "$HERMES_BIN" gateway start >/dev/null 2>&1 && \
-      wait_for_hermes_api; then
-    info "Hermes gateway service is running."
+    run_quiet_activity "Stopping the previous Hermes gateway..." \
+      "$HERMES_BIN" gateway stop || true
+    if run_quiet_activity "Installing the local Hermes gateway service..." \
+        "$HERMES_BIN" gateway install && \
+      run_quiet_activity "Starting the local Hermes gateway..." \
+        "$HERMES_BIN" gateway start && \
+      run_quiet_activity "Waiting for Hermes to answer on the local loopback..." \
+        wait_for_hermes_api; then
+      info "Hermes gateway service is running."
     else
       mkdir -p "${HERMES_HOME:-$HOME/.hermes}/logs"
       nohup "$HERMES_BIN" gateway run --replace --force \
         > "${HERMES_HOME:-$HOME/.hermes}/logs/stoix-gateway.log" 2>&1 &
-      if wait_for_hermes_api; then
+      if run_quiet_activity "Waiting for the background Hermes gateway..." wait_for_hermes_api; then
         info "Hermes gateway is running in the background."
       else
         warn "Hermes was configured but its API did not become ready. Check ${HERMES_HOME:-$HOME/.hermes}/logs/stoix-gateway.log"
@@ -428,6 +555,7 @@ if [ "$SKIP_HERMES" != true ]; then
   configure_hermes || warn "Open Stoix and follow the Hermes recovery message, or run: hermes setup"
 fi
 
+show_completion "$VERSION"
 info "Stoix $VERSION installed successfully."
 info "Command: $BIN_DIR/stoix"
 info "Configuration: $CONFIG_PATH"

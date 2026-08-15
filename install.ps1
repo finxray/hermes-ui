@@ -17,10 +17,93 @@ $Repository = if ($env:STOIX_REPOSITORY) { $env:STOIX_REPOSITORY } else { "finxr
 $Branch = if ($env:STOIX_BRANCH) { $env:STOIX_BRANCH } else { "master" }
 $NodeVersion = "24.15.0"
 $TempRoot = ""
+$script:InteractiveUi = -not [Console]::IsOutputRedirected -and
+    $env:TERM -ne "dumb" -and
+    $env:STOIX_NO_ANIMATION -ne "true" -and
+    -not $env:CI
+$script:ActivityWidth = 0
 
 function Write-Info([string]$Message) { Write-Host "[Stoix] $Message" -ForegroundColor Cyan }
 function Write-WarningMessage([string]$Message) { Write-Host "[Stoix] WARNING: $Message" -ForegroundColor Yellow }
 function Fail([string]$Message) { throw $Message }
+
+function Get-ActivityPhrase([int]$Index, [string]$Activity) {
+    switch ($Index % 6) {
+        0 { return $Activity }
+        1 { return "Teaching the browser where Hermes lives..." }
+        2 { return "Keeping every credential on this machine..." }
+        3 { return "Asking the gateway for a tiny sign of life..." }
+        4 { return "Polishing the local control surface..." }
+        default { return "Still working -- definitely not contemplating infinity..." }
+    }
+}
+
+function Show-ActivityFrame([System.Diagnostics.Stopwatch]$Stopwatch, [string]$Activity) {
+    if (-not $script:InteractiveUi -or $Stopwatch.Elapsed.TotalSeconds -lt 5) { return }
+    $frames = @("S....", "ST...", "STO..", "STOI.", "STOIX", ".TOIX", "..OIX", "...IX")
+    $tick = [Math]::Floor($Stopwatch.Elapsed.TotalMilliseconds / 200)
+    $frame = $frames[$tick % $frames.Count]
+    $phraseIndex = [Math]::Floor(($Stopwatch.Elapsed.TotalSeconds - 5) / 4)
+    $line = "$frame  $(Get-ActivityPhrase $phraseIndex $Activity)"
+    $script:ActivityWidth = [Math]::Max($script:ActivityWidth, $line.Length)
+    Write-Host ("`r" + $line.PadRight($script:ActivityWidth)) -NoNewline -ForegroundColor Cyan
+}
+
+function Clear-ActivityFrame {
+    if (-not $script:InteractiveUi -or $script:ActivityWidth -eq 0) { return }
+    Write-Host ("`r" + (" " * $script:ActivityWidth) + "`r") -NoNewline
+    $script:ActivityWidth = 0
+}
+
+function Invoke-QuietActivity(
+    [string]$Activity,
+    [string]$FilePath,
+    [string[]]$ArgumentList
+) {
+    $activityId = [Guid]::NewGuid().ToString("N")
+    $stdoutPath = Join-Path $TempRoot "activity-$activityId.out"
+    $stderrPath = Join-Path $TempRoot "activity-$activityId.err"
+    try {
+        $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList `
+            -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        while (-not $process.HasExited) {
+            Show-ActivityFrame $stopwatch $Activity
+            Start-Sleep -Milliseconds 100
+        }
+        $process.WaitForExit()
+        return $process.ExitCode
+    } finally {
+        Clear-ActivityFrame
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Wait-ForLoopbackPort([int]$Port, [int]$TimeoutSeconds, [string]$Activity) {
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        while ($stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+            if (Test-LoopbackPort $Port) { return $true }
+            Show-ActivityFrame $stopwatch $Activity
+            Start-Sleep -Milliseconds 150
+        }
+        return $false
+    } finally {
+        Clear-ActivityFrame
+    }
+}
+
+function Show-Completion([string]$InstalledVersion) {
+    Write-Host ""
+    Write-Host "        /\" -ForegroundColor Cyan
+    Write-Host "     __/  \__" -ForegroundColor Cyan
+    Write-Host "    /  |  |  \" -ForegroundColor Magenta
+    Write-Host "       |/\|" -ForegroundColor Magenta
+    Write-Host "       STOIX" -ForegroundColor Cyan
+    Write-Host "      version $InstalledVersion" -ForegroundColor Magenta
+    Write-Host ""
+}
 
 function Invoke-Download([string]$Uri, [string]$OutFile) {
     $lastError = $null
@@ -263,8 +346,10 @@ function Install-Hermes {
 function Configure-Hermes([string]$Hermes, [string]$ConfigPath, [string]$RuntimeNode) {
     if (-not $Hermes) { return }
     Write-Info "Configuring the local Hermes API for Stoix..."
-    & $Hermes config set API_SERVER_ENABLED true *> $null
-    if ($LASTEXITCODE -ne 0) {
+    $enableExitCode = Invoke-QuietActivity "Enabling the private Hermes API..." $Hermes @(
+        "config", "set", "API_SERVER_ENABLED", "true"
+    )
+    if ($enableExitCode -ne 0) {
         Write-WarningMessage "Hermes is installed, but its API server could not be enabled. Run: hermes config set API_SERVER_ENABLED true"
         return
     }
@@ -282,8 +367,10 @@ function Configure-Hermes([string]$Hermes, [string]$ConfigPath, [string]$Runtime
             Write-WarningMessage "Could not generate the private Hermes API key."
             return
         }
-        & $Hermes config set API_SERVER_KEY $apiKey *> $null
-        if ($LASTEXITCODE -ne 0) {
+        $keyExitCode = Invoke-QuietActivity "Securing the local Hermes connection..." $Hermes @(
+            "config", "set", "API_SERVER_KEY", $apiKey
+        )
+        if ($keyExitCode -ne 0) {
             Write-WarningMessage "Hermes did not accept its private API key. Run: hermes config set API_SERVER_KEY YOUR_PRIVATE_KEY"
             return
         }
@@ -293,15 +380,22 @@ function Configure-Hermes([string]$Hermes, [string]$ConfigPath, [string]$Runtime
     $logDirectory = Join-Path $hermesHome "logs"
     New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
     if ($apiKeyChanged) {
-        & $Hermes gateway stop *> $null
+        Invoke-QuietActivity "Stopping the previous Hermes gateway..." $Hermes @("gateway", "stop") | Out-Null
         for ($attempt = 0; $attempt -lt 10 -and (Test-LoopbackPort 8642); $attempt += 1) {
             Start-Sleep -Milliseconds 500
         }
     }
     if (-not (Test-LoopbackPort 8642)) {
-        & $Hermes gateway install *> $null
-        if ($LASTEXITCODE -eq 0) { & $Hermes gateway start *> $null }
-        if ($LASTEXITCODE -eq 0) {
+        $installExitCode = Invoke-QuietActivity "Installing the local Hermes gateway service..." $Hermes @(
+            "gateway", "install"
+        )
+        $startExitCode = if ($installExitCode -eq 0) {
+            Invoke-QuietActivity "Starting the local Hermes gateway..." $Hermes @("gateway", "start")
+        } else {
+            $installExitCode
+        }
+        $gatewayReady = $startExitCode -eq 0 -and (Wait-ForLoopbackPort 8642 45 "Waiting for Hermes to answer on the local loopback...")
+        if ($gatewayReady) {
             Write-Info "Hermes gateway service is running."
         } else {
             try {
@@ -309,7 +403,11 @@ function Configure-Hermes([string]$Hermes, [string]$ConfigPath, [string]$Runtime
                     -WindowStyle Hidden `
                     -RedirectStandardOutput (Join-Path $logDirectory "stoix-gateway.log") `
                     -RedirectStandardError (Join-Path $logDirectory "stoix-gateway-error.log")
-                Write-Info "Hermes gateway is starting in the background."
+                if (Wait-ForLoopbackPort 8642 45 "Waiting for the background Hermes gateway...") {
+                    Write-Info "Hermes gateway is running in the background."
+                } else {
+                    Write-WarningMessage "Hermes was configured but its API did not become ready. Check $logDirectory\stoix-gateway-error.log"
+                }
             } catch {
                 Write-WarningMessage "Hermes could not start automatically. Run: hermes gateway run --replace --force"
             }
@@ -473,6 +571,7 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0stoix.ps1"
         if (-not $hermes) { Write-WarningMessage "Open Stoix and follow the Hermes recovery message after installing Hermes." }
     }
 
+    Show-Completion $packageVersion
     Write-Info "Stoix $packageVersion installed successfully."
     Write-Info "Command: $(Join-Path $BinDir 'Stoix.cmd')"
     Write-Info "Configuration: $configPath"

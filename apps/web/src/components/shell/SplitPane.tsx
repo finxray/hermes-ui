@@ -2,6 +2,7 @@
 
 import { ChatView } from "@/components/chat/ChatView";
 import type { ChatHeaderTabs } from "@/components/chat/ChatHeader";
+import { LogsView } from "@/components/logs/LogsView";
 import { ContextRail } from "@/components/shell/ContextRail";
 import type { HermesSessionModelSync } from "@/hooks/useHermesSessionModel";
 import type { HermesSessionSummary, NormalizedHermesStatus } from "@hermes-ui/hermes-client";
@@ -12,7 +13,7 @@ import styles from "./SplitPane.module.css";
 
 type WorkspaceActions = ReturnType<typeof useWorkspaceState>["actions"];
 
-export type RightPaneMode = "chat" | "console" | "chat-console";
+export type RightPaneMode = "chat" | "console" | "chat-console" | "logs";
 
 type SplitPaneProps = {
   activeProject: Project;
@@ -30,6 +31,7 @@ type SplitPaneProps = {
   mode: RightPaneMode;
   onActivateSideChat?: () => void;
   onActivityEvent: (sessionId: string, event: AgentActivityEvent) => void;
+  onCloseLogs: () => void;
   onGeneratingChange?: (sessionId: string, isGenerating: boolean) => void;
   projects: Project[];
   refreshHermesStatus: () => void;
@@ -57,6 +59,7 @@ export function SplitPane({
   mode,
   onActivateSideChat,
   onActivityEvent,
+  onCloseLogs,
   onGeneratingChange,
   projects,
   refreshHermesStatus,
@@ -69,10 +72,11 @@ export function SplitPane({
 }: SplitPaneProps) {
   const isChatVisible = mode === "chat" || mode === "chat-console";
   const isConsoleVisible = mode === "console" || mode === "chat-console";
+  const isLogsVisible = mode === "logs";
 
   return (
     <aside
-      aria-label="Split chat and context console"
+      aria-label="Side workspace panel"
       className={styles.splitPane}
       data-active-pane={mode}
       data-layout={mode === "chat-console" ? "combined" : "single"}
@@ -130,6 +134,16 @@ export function SplitPane({
               refreshHermesSessions={refreshHermesSessions}
               workspaceActions={workspaceActions}
             />
+          ) : null}
+        </div>
+        <div
+          aria-hidden={!isLogsVisible}
+          className={`${styles.pane} ${styles.logsPane}`}
+          data-active={isLogsVisible ? "true" : "false"}
+          role="tabpanel"
+        >
+          {isLogsVisible ? (
+            <LogsView hermesStatus={hermesStatus} onClose={onCloseLogs} variant="side" />
           ) : null}
         </div>
       </div>

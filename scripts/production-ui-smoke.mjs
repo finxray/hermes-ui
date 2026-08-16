@@ -156,6 +156,13 @@ try {
     await page.locator(`#${section.toLowerCase()}-heading`).waitFor();
     check(!(await page.locator("body").innerText()).includes("Brain Memory"), `${section} has no Brain Memory UI`);
     await checkOverflow(page, `${section.toLowerCase()} desktop`);
+    if (section === "Logs") {
+      await page.getByRole("button", { name: "Open logs in side view", exact: true }).click();
+      const sideLogs = page.locator('[data-shell-rail="right"] [data-variant="side"]');
+      await sideLogs.locator("#logs-heading-side").waitFor();
+      check(await sideLogs.isVisible(), "Logs can open in the right side view");
+      await sideLogs.getByRole("button", { name: "Close side logs", exact: true }).click();
+    }
   }
 
   const settingsButton = page.getByRole("button", { name: /Open settings/ });

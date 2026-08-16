@@ -1,16 +1,20 @@
 "use client";
 
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import { Check, Copy, RefreshCw, Search } from "@/components/ui/AppIcons";
+import { Check, Copy, PanelRightClose, PanelSplit, RefreshCw, Search } from "@/components/ui/AppIcons";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { HermesDashboardRecoveryState } from "@/components/ui/HermesDashboardRecoveryState";
 import { useSectionNav } from "@/components/shell/SectionNavContext";
 import { useHermesLogs } from "@/hooks/useHermesLogs";
+import { splitLogTimestamp } from "@/lib/logPresentation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./LogsView.module.css";
 
 type LogsViewProps = {
   hermesStatus: NormalizedHermesStatus | null;
+  onClose?: () => void;
+  onOpenSideView?: () => void;
+  variant?: "main" | "side";
 };
 
 const LOG_FILES = [
@@ -20,32 +24,45 @@ const LOG_FILES = [
 
 type LogFilter = "all" | "warn" | "error";
 
-export function LogsView({ hermesStatus }: LogsViewProps) {
+export function LogsView({ hermesStatus, onClose, onOpenSideView, variant = "main" }: LogsViewProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<LogFilter>("all");
+  const [sideSelectedFile, setSideSelectedFile] = useState("agent");
   const [copied, setCopied] = useState(false);
   const copyResetTimerRef = useRef<number | null>(null);
   const canLoad = hermesStatus?.mode === "real" && hermesStatus.reachable;
   const { activeCategoryId, publishCategories, setActiveCategoryId } = useSectionNav();
-  const selectedFile = LOG_FILES.some((file) => file.id === activeCategoryId) ? activeCategoryId! : "agent";
+  const isSideView = variant === "side";
+  const selectedFile = isSideView
+    ? sideSelectedFile
+    : LOG_FILES.some((file) => file.id === activeCategoryId)
+      ? activeCategoryId!
+      : "agent";
   const { isLoading, lines, refresh, result } = useHermesLogs(canLoad, selectedFile);
 
   // The left rail lists log files; selecting one updates activeCategoryId, which
   // this view reads to choose which file to stream.
   useEffect(() => {
+    if (isSideView) {
+      return;
+    }
     publishCategories(
       "logs",
       LOG_FILES.map((file) => ({ id: file.id, label: file.label, count: 0 }))
     );
-  }, [publishCategories]);
+  }, [isSideView, publishCategories]);
 
   useEffect(() => {
+    if (isSideView) {
+      return;
+    }
     if (!LOG_FILES.some((file) => file.id === activeCategoryId)) {
       setActiveCategoryId("agent");
     }
-  }, [activeCategoryId, setActiveCategoryId]);
+  }, [activeCategoryId, isSideView, setActiveCategoryId]);
 
   const activeLabel = LOG_FILES.find((file) => file.id === selectedFile)?.label ?? selectedFile;
+  const headingId = isSideView ? "logs-heading-side" : "logs-heading";
   const filteredLines = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return lines.filter((line) => {
@@ -77,10 +94,10 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
   }, []);
 
   return (
-    <section className={styles.view} aria-labelledby="logs-heading">
+    <section className={styles.view} data-variant={variant} aria-labelledby={headingId}>
       <div className={styles.header}>
         <div>
-          <h1 id="logs-heading">Logs</h1>
+          <h1 id={headingId}>Logs</h1>
           <p>
             {canLoad
               ? `${activeLabel} log - ${filteredLines.length} of ${lines.length} lines`
@@ -88,6 +105,17 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
           </p>
         </div>
         <div className={styles.headerActions}>
+          {onOpenSideView ? (
+            <button
+              aria-label="Open logs in side view"
+              className={`${styles.copyButton} ${styles.sideViewButton}`}
+              onClick={onOpenSideView}
+              type="button"
+            >
+              <PanelSplit size={17} />
+              <span>Side view</span>
+            </button>
+          ) : null}
           <button
             aria-label={copied ? "Logs copied" : "Copy visible logs"}
             className={styles.copyButton}
@@ -107,11 +135,22 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
           >
             <RefreshCw size={20} />
           </button>
+          {onClose ? (
+            <button
+              aria-label="Close side logs"
+              className={styles.iconButton}
+              onClick={onClose}
+              title="Close side logs"
+              type="button"
+            >
+              <PanelRightClose size={20} />
+            </button>
+          ) : null}
         </div>
       </div>
 
       {canLoad ? (
-        <div className={styles.toolbar} aria-label="Log controls">
+        <div className={styles.toolbar} data-variant={variant} aria-label="Log controls">
           <label className={styles.searchBox}>
             <Search size={15} aria-hidden="true" />
             <span className={styles.srOnly}>Search logs</span>
@@ -123,10 +162,24 @@ export function LogsView({ hermesStatus }: LogsViewProps) {
               value={query}
             />
           </label>
-          <div className={styles.segmented} aria-label="Log severity" role="group">
-            <FilterButton active={filter === "all"} label="All" onClick={() => setFilter("all")} />
-            <FilterButton active={filter === "warn"} label="Warnings" onClick={() => setFilter("warn")} />
-            <FilterButton active={filter === "error"} label="Errors" onClick={() => setFilter("error")} />
+          <div className={styles.toolbarGroups}>
+            {isSideView ? (
+              <div className={styles.segmented} aria-label="Log file" role="group">
+                {LOG_FILES.map((file) => (
+                  <FilterButton
+                    active={selectedFile === file.id}
+                    key={file.id}
+                    label={file.label}
+                    onClick={() => setSideSelectedFile(file.id)}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <div className={styles.segmented} aria-label="Log severity" role="group">
+              <FilterButton active={filter === "all"} label="All" onClick={() => setFilter("all")} />
+              <FilterButton active={filter === "warn"} label="Warnings" onClick={() => setFilter("warn")} />
+              <FilterButton active={filter === "error"} label="Errors" onClick={() => setFilter("error")} />
+            </div>
           </div>
         </div>
       ) : null}
@@ -178,7 +231,19 @@ function FilterButton({
 
 function LogLine({ line }: { line: string }) {
   const level = detectLevel(line);
-  return <code className={`${styles.line} ${level ? styles[level] : ""}`}>{line.replace(/\n$/, "")}</code>;
+  const content = line.replace(/\n$/, "");
+  const parts = splitLogTimestamp(content);
+  return (
+    <code className={`${styles.line} ${level ? styles[level] : ""}`}>
+      {parts ? (
+        <>
+          <span className={styles.timestamp}>{parts.timestamp}</span>
+          {parts.separator}
+          {parts.message}
+        </>
+      ) : content}
+    </code>
+  );
 }
 
 function detectLevel(line: string): "error" | "warn" | "info" | null {

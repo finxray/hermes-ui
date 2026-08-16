@@ -644,6 +644,14 @@ function AppShellInner() {
     revealRightRailAfterRender();
   }
 
+  function openLogsSideView() {
+    setSinglePane(null);
+    setRightPaneMode("logs");
+    setFocusedChatPane("main");
+    setRightRailToMainWindowFraction(0.42);
+    revealRightRailAfterRender();
+  }
+
   function createSideSession() {
     const sessionId = actions.createSessionForProject(activeProject.id, { activate: false });
     if (activeSession?.modelPreference) {
@@ -1156,7 +1164,7 @@ function AppShellInner() {
               ) : activeSection === "keys" ? (
                 <KeysView hermesStatus={hermesStatus.status} onDetailBackChange={registerKeysBack} />
               ) : activeSection === "logs" ? (
-                <LogsView hermesStatus={hermesStatus.status} />
+                <LogsView hermesStatus={hermesStatus.status} onOpenSideView={openLogsSideView} />
               ) : activeSection === "settings" ? (
                 <SettingsView
                   activeProject={activeProject}
@@ -1208,6 +1216,7 @@ function AppShellInner() {
           mode={rightPaneMode}
           onActivateSideChat={() => setFocusedChatPane("side")}
           onActivityEvent={appendActivityEvent}
+          onCloseLogs={hideRightRail}
           onGeneratingChange={markSessionGenerating}
           refreshHermesStatus={() => {
             void hermesStatus.refresh({ refreshModels: true });

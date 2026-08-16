@@ -18,7 +18,8 @@ Before publishing the first public release:
 
 ## Build A Draft
 
-1. Update both root and Web package versions.
+1. Update the root, Web, and Hermes client package versions together, then
+   refresh the npm lockfile so every release-visible version is identical.
 2. Run `npm ci` and `npm run package:release` locally.
 3. Review `git diff` and commit from a clean release branch.
 4. Create and push an annotated tag, for example `v0.1.0`.

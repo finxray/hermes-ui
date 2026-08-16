@@ -42,7 +42,7 @@
   max-width: 100%;
   min-width: 0;
   padding: 7px 13px;
-  border-radius: 12.8px;
+  border-radius: 12.8px 12.8px 3px 12.8px;
   background: rgba(38, 38, 40, 0.7);
   box-sizing: border-box;
 }

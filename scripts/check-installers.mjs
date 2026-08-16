@@ -11,6 +11,9 @@ const { compareSemanticVersions, normalizedSemanticVersion } = require(
   resolve(root, "packaging", "stoix-version.cjs")
 );
 const packageJson = JSON.parse(read("package.json"));
+const webPackageJson = JSON.parse(read("apps/web/package.json"));
+const hermesClientPackageJson = JSON.parse(read("packages/hermes-client/package.json"));
+const packageLock = JSON.parse(read("package-lock.json"));
 const shellInstaller = read("install.sh");
 const powerShellInstaller = read("install.ps1");
 const launcher = read("packaging/stoix-launcher.cjs");
@@ -21,6 +24,28 @@ const readinessWorkflow = read(".github/workflows/release-readiness.yml");
 const adr = read("docs/architecture/ADR-0011-one-command-installation.md");
 
 assert.equal(packageJson.release?.nodeVersion, "24.15.0");
+assert.equal(webPackageJson.version, packageJson.version, "Web and release versions must match");
+assert.equal(
+  hermesClientPackageJson.version,
+  packageJson.version,
+  "Hermes client and release versions must match"
+);
+assert.equal(packageLock.version, packageJson.version, "lockfile and release versions must match");
+assert.equal(
+  packageLock.packages?.[""]?.version,
+  packageJson.version,
+  "lockfile root package and release versions must match"
+);
+assert.equal(
+  packageLock.packages?.["apps/web"]?.version,
+  packageJson.version,
+  "lockfile Web and release versions must match"
+);
+assert.equal(
+  packageLock.packages?.["packages/hermes-client"]?.version,
+  packageJson.version,
+  "lockfile Hermes client and release versions must match"
+);
 assert.equal(
   packageJson.scripts?.["package:current"],
   "npm run build && npm run package:bundle",

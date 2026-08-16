@@ -439,6 +439,10 @@
   background-color: var(--bg-workspace-solid);
 }
 
+.logsPane {
+  background-color: var(--bg-workspace-solid);
+}
+
 .splitPane[data-layout="combined"] .consolePane {
   border-left: var(--border-window-outline-width) solid var(--border-window-separator);
   opacity: 0;

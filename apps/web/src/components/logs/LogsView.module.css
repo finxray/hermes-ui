@@ -9,6 +9,12 @@
   color: var(--text-primary);
 }
 
+.view[data-variant="side"] {
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+}
+
 .header {
   display: flex;
   align-items: flex-start;
@@ -34,6 +40,11 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.toolbar[data-variant="side"] {
+  display: grid;
+  align-items: stretch;
 }
 
 .searchBox {
@@ -75,6 +86,15 @@
   padding: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.toolbarGroups {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
 
 .filterButton {
@@ -235,32 +255,40 @@
   display: grid;
   width: 100%;
   height: 100%;
-  gap: 2px;
+  gap: 7px;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
   min-height: 0;
   min-width: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
 
 .line {
   display: block;
-  min-width: max-content;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 2px 8px 3px;
   border-radius: 8px;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.55;
-  white-space: pre;
-  word-break: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
   transition:
     background 150ms ease,
     color 150ms ease;
+}
+
+.timestamp {
+  color: var(--accent-2);
 }
 
 .line:hover {
@@ -301,6 +329,12 @@
 
   .segmented {
     align-self: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .sideViewButton {
+    display: none;
   }
 }
 

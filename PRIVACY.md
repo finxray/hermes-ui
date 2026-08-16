@@ -1,7 +1,9 @@
 # Stoix Privacy Notice
 
+Last updated: 16 August 2026
+
 Stoix is local software. It does not provide a Stoix cloud account, analytics
-service, advertising service, or telemetry endpoint in version `0.1.0`.
+service, advertising service, or telemetry endpoint in version `0.1.6`.
 
 ## Data Stored Locally
 
@@ -24,6 +26,11 @@ The update checker contacts the public `finxray/hermes-ui` GitHub Releases API
 at most once every 24 hours, or when the user chooses Check now. Standard network
 metadata such as IP address and user agent may therefore be received by GitHub.
 
+When a user voluntarily submits a bug report or contribution through GitHub,
+GitHub processes that content and the report may be public. Reports must be
+redacted to remove credentials, private prompts, transcripts, attachments, and
+personal filesystem paths.
+
 ## User Control
 
 Users can reset local Stoix workspace data from Settings, remove the Stoix
@@ -32,5 +39,6 @@ browser profile, delete the Stoix application-data directory or per-user
 together with the policies of any Hermes provider or plugin before sending
 sensitive information.
 
-This notice describes the `0.1.0` software behavior and should be reviewed by
-the project owner before public release.
+This notice describes the `0.1.6` beta software behavior. Stoix is an
+independent community project and is not affiliated with or endorsed by Nous
+Research.

@@ -1,0 +1,67 @@
+name: Beta platform test
+description: Share a successful or failed Stoix test on a specific machine.
+title: "[Platform test]: "
+labels:
+  - beta-feedback
+body:
+  - type: dropdown
+    id: result
+    attributes:
+      label: Overall result
+      options:
+        - Passed the workflow
+        - Partially passed
+        - Failed to install or launch
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and architecture
+      placeholder: Windows 11 x64, macOS 15 Apple silicon, or Ubuntu 24.04 x64
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Stoix and Hermes versions
+      placeholder: Stoix commit abc1234; Hermes x.y.z
+    validations:
+      required: true
+  - type: dropdown
+    id: hermes_mode
+    attributes:
+      label: Hermes installation mode
+      options:
+        - macOS
+        - Windows WSL2
+        - Windows native
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: Stoix test type
+      options:
+        - Clean installer or package test
+        - Existing installation
+        - Run from source
+    validations:
+      required: true
+  - type: checkboxes
+    id: workflow
+    attributes:
+      label: Workflows attempted
+      options:
+        - label: Stoix launched and connected to Hermes
+        - label: Created a project and conversation
+        - label: Opened two conversations side by side
+        - label: Observed streaming or tool activity
+        - label: Restarted Stoix and recovered workspace state
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes and redacted diagnostics
+      description: Explain failures and include redacted output. Never include secrets or private content.

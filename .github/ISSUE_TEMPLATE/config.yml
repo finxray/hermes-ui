@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/finxray/hermes-ui/security/advisories/new
+    about: Do not disclose suspected vulnerabilities in a public issue.
+  - name: Hermes Agent issues
+    url: https://github.com/NousResearch/hermes-agent/issues
+    about: Report problems in the Hermes runtime to the upstream project.

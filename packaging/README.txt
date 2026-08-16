@@ -1,9 +1,14 @@
 Stoix {VERSION}
 ===============
 
-Stoix is a local Web UI for Hermes Agent. Hermes is a separate runtime. The
-recommended one-command Stoix installer can invoke Hermes' official installer;
-this portable folder never vendors or silently replaces Hermes.
+Stoix is an MIT-licensed community-beta Web UI for Hermes Agent. Hermes is a
+separate runtime. The recommended installer can invoke Hermes' official
+installer on macOS/Linux; the documented Windows beta path uses Hermes inside
+WSL2. This portable folder never vendors or silently replaces Hermes.
+
+Expect bugs. The source application has received limited maintainer testing on
+macOS and on Windows with Hermes in WSL2. Packaged clean installation has not
+yet received maintainer validation, and Linux still needs community testing.
 
 Channels
 --------
@@ -57,3 +62,4 @@ Privacy and notices
 -------------------
 See PRIVACY.md for the Stoix data-flow disclosure. Node.js license terms are in
 NODE_LICENSE.txt; runtime dependency notices are in THIRD_PARTY_NOTICES.txt.
+Stoix license terms are in LICENSE.

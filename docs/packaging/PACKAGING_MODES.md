@@ -2,7 +2,7 @@
 
 ## Supported: Portable Stoix Archive
 
-The `0.1.0` release is a self-contained archive for one operating system and
+Each `0.1.x` package target is a self-contained archive for one operating system and
 architecture. It includes:
 
 - the production Stoix web application;
@@ -26,6 +26,11 @@ repair the stable user launcher, and start Stoix. The scripts use no elevation.
 They can invoke Hermes' official installer when Hermes is absent, but Hermes
 continues to own its runtime, setup, credentials, services, and updates.
 
+During the community beta, the documented Windows configuration runs Stoix on
+Windows and Hermes inside WSL2. The Windows Stoix installer should therefore be
+run with `-HermesMode Wsl` after Hermes is installed in WSL2. It discovers the
+distribution, synchronizes the private loopback API key, and starts the gateway.
+
 When no public Stoix release exists, the installers use a public-source fallback
 with a temporary Node.js runtime verified against Node's published checksum
 list. This path is slower but keeps a clean-machine installation possible.
@@ -48,4 +53,4 @@ no update is installed silently.
 - unattended or browser-triggered updates;
 - code signing or notarization credentials.
 
-Those boundaries keep the first package small, reversible, and OS-agnostic.
+Those boundaries keep the beta package small, reversible, and OS-agnostic.

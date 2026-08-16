@@ -223,7 +223,7 @@ export async function getHermesStatus(
   // expensive `/v1/models` fetch is kept off this critical path: while Hermes is
   // busy answering `/v1/models` it cannot answer `/health`, so coupling them lets
   // one slow model listing flip the whole UI to "unreachable".
-  const healthResult = await fetchEndpoint({
+  let healthResult = await fetchEndpoint({
     apiKey: config.apiKey,
     auth: false,
     base,
@@ -232,6 +232,22 @@ export async function getHermesStatus(
     path: "/health",
     timeoutMs
   });
+
+  if (fetchImpl === fetch && !healthResult.ok && shouldRetryLoopbackHealth(base, healthResult)) {
+    for (const delayMs of [250, 500, 1_000, 1_500, 2_000, 2_500, 3_000, 3_500]) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      healthResult = await fetchEndpoint({
+        apiKey: config.apiKey,
+        auth: false,
+        base,
+        fetchImpl,
+        name: "health",
+        path: "/health",
+        timeoutMs
+      });
+      if (healthResult.ok) break;
+    }
+  }
 
   if (!healthResult.ok) {
     return withUiCapabilities(
@@ -277,20 +293,36 @@ export async function getHermesStatus(
   ]);
 
   const capabilityEndpoints = objectRecord(capabilitiesResult.data?.endpoints);
-  const modelsPath = hasEndpoint(capabilityEndpoints, "model_options")
-    ? "/api/model/options"
-    : "/v1/models";
-  const modelsResult = includeModels
-    ? await fetchEndpoint({
+  let modelsResult: HermesEndpointResult | null = null;
+  if (includeModels) {
+    const advertisedModelOptions = hasEndpoint(capabilityEndpoints, "model_options");
+    const shouldProbeModelOptions = advertisedModelOptions || !capabilitiesResult.ok;
+    if (shouldProbeModelOptions) {
+      modelsResult = await fetchEndpoint({
         apiKey: config.apiKey,
         auth: true,
         base,
         fetchImpl,
         name: "models",
-        path: modelsPath,
+        path: "/api/model/options",
         timeoutMs: modelsTimeoutMs
-      })
-    : null;
+      });
+    }
+    if (
+      !modelsResult ||
+      (!modelsResult.ok && [404, 405, 501].includes(modelsResult.status ?? 0))
+    ) {
+      modelsResult = await fetchEndpoint({
+        apiKey: config.apiKey,
+        auth: true,
+        base,
+        fetchImpl,
+        name: "models",
+        path: "/v1/models",
+        timeoutMs: modelsTimeoutMs
+      });
+    }
+  }
 
   const results: HermesEndpointResult[] = [
     healthResult,
@@ -472,18 +504,22 @@ export function normalizeHermesUiCapabilities(
 ): HermesUiCapabilities {
   const features = objectRecord(status.capabilities?.features);
   const endpoints = objectRecord(status.capabilities?.endpoints);
-  const configuredDefaultCandidates = extractConfiguredDefaultModelIds(
-    status,
-    options.configuredDefaultModelId
-  );
+  const serverConfiguredDefaultCandidates = extractConfiguredDefaultModelIds(status);
+  const configuredUiFallback = asString(options.configuredDefaultModelId);
+  const configuredDefaultCandidates = [
+    ...serverConfiguredDefaultCandidates,
+    ...(configuredUiFallback ? [configuredUiFallback] : [])
+  ];
   const catalogModels = modelDescriptors(status.models).filter((model) => !isPlaceholderHermesModelId(model.id));
   const selectableModels = dedupeSelectableModels(
     preferPublicProviderCatalogModels(catalogModels.filter(isSessionSelectableCatalogModel))
   );
   const rawServerAdvertisedModel =
-    configuredDefaultCandidates[0] ||
-    asString(status.capabilities?.model) ||
-    firstModelId(status.models) ||
+    serverConfiguredDefaultCandidates[0] ||
+    (isPlaceholderHermesModelId(asString(status.capabilities?.model))
+      ? ""
+      : asString(status.capabilities?.model)) ||
+    configuredUiFallback ||
     null;
   const serverAdvertisedModel = resolveAdvertisedModelId(
     rawServerAdvertisedModel,
@@ -5505,18 +5541,8 @@ function hasEndpoint(endpoints: Record<string, unknown> | null, key: string): bo
   return Boolean(endpoint && typeof endpoint === "object" && !Array.isArray(endpoint));
 }
 
-function firstModelId(models: Record<string, unknown> | null): string {
-  const data = models?.data;
-  if (!Array.isArray(data)) {
-    return "";
-  }
-  const first = data.find((item) => item && typeof item === "object" && !Array.isArray(item));
-  return first ? asString((first as Record<string, unknown>).id) : "";
-}
-
 function extractConfiguredDefaultModelIds(
-  status: Omit<NormalizedHermesStatus, "uiCapabilities">,
-  configuredDefaultModelId?: string | null
+  status: Omit<NormalizedHermesStatus, "uiCapabilities">
 ): string[] {
   const capabilities = status.capabilities;
   const healthDetailed = objectRecord(status.health?.detailed);
@@ -5527,7 +5553,6 @@ function extractConfiguredDefaultModelIds(
   const modelObject = objectRecord(capabilities?.model);
 
   const candidates = [
-    asString(configuredDefaultModelId),
     asString(gatewayDefaults?.model),
     asString(gatewayDefaults?.default),
     asString(gatewayDefaults?.default_model),
@@ -5653,24 +5678,6 @@ function resolveAdvertisedModelId(
   // catalog model merely because the picker list is incomplete.
   if (candidates[0]) {
     return candidates[0];
-  }
-
-  const inferredDefault = inferCatalogDefaultModelId(availableModels);
-  if (inferredDefault) {
-    return inferredDefault;
-  }
-
-  return availableModels[0]?.id ?? null;
-}
-
-function inferCatalogDefaultModelId(availableModels: HermesModelDescriptor[]): string | null {
-  const preferredPatterns = [/deepseek-v4-flash/i, /deepseek.*v4.*flash/i, /deepseek.*flash/i];
-
-  for (const pattern of preferredPatterns) {
-    const match = availableModels.find((model) => pattern.test(model.id));
-    if (match) {
-      return match.id;
-    }
   }
 
   return null;
@@ -6211,6 +6218,12 @@ function parseBaseUrl(value: string): URL | null {
   } catch {
     return null;
   }
+}
+
+function shouldRetryLoopbackHealth(base: URL, result: HermesEndpointResult): boolean {
+  const hostname = base.hostname.toLowerCase();
+  const loopback = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
+  return loopback && (result.error?.kind === "network" || result.error?.kind === "timeout");
 }
 
 function safeDisplayUrl(url: URL): string {

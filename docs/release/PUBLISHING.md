@@ -3,18 +3,22 @@
 Stoix releases are portable, OS-specific archives built in GitHub Actions. A
 tag creates a **draft** release; publishing remains an explicit owner action.
 
-## One-Time Owner Decisions
+## Owner Decisions
 
-Before publishing the first public release:
+The following decisions apply to the first public beta:
 
-1. Choose and add the project license or commercial EULA. This is a legal owner
-   decision and must not be inferred from the code.
-2. Decide whether unsigned portable archives are acceptable for the first
+1. Stoix is licensed under the MIT License.
+2. Decide whether unsigned portable archives are acceptable for each public
    preview. A broadly distributed stable release should use platform code
    signing/notarization identities.
 3. Confirm that `finxray/hermes-ui` is the permanent public update repository.
-4. Review and approve `PRIVACY.md`, which explains local storage, Hermes data
-   flow, and the GitHub update check.
+4. Keep `PRIVACY.md` aligned with local storage, Hermes data flow, and the
+   GitHub update check.
+
+The current source application has been exercised on macOS and on Windows with
+Hermes inside WSL2. Do not describe a package target as maintainer-validated
+until its downloaded archive and clean-install path have been tested. Linux and
+native-Windows Hermes integration currently require community validation.
 
 ## Build A Draft
 
@@ -30,7 +34,8 @@ Before publishing the first public release:
    script in an isolated per-user root, then launches and probes that installed
    copy. Download every archive from the draft and repeat the install on a clean
    physical or virtual machine.
-7. Add the approved license, privacy link, release notes, and known limitations.
+7. Add the MIT license, privacy link, beta release notes, validation matrix, and
+   known limitations.
 8. Apply required code signatures/notarization and replace unsigned assets when
    the release policy requires them.
 9. Publish only when all platform assets are present and verified.

@@ -199,6 +199,8 @@ function ensureConfig(path) {
         "# Optional Hermes dashboard overrides.",
         "HERMES_DASHBOARD_BASE_URL=",
         "HERMES_DASHBOARD_SESSION_TOKEN=",
+        "HERMES_DASHBOARD_WINDOWS_MODE=",
+        "STUDIO_WSL_DISTRO=",
         ""
       ].join("\n"),
       { encoding: "utf8", mode: 0o600 }
@@ -216,10 +218,12 @@ function readConfig(path) {
     "HERMES_API_KEY",
     "HERMES_DASHBOARD_BASE_URL",
     "HERMES_DASHBOARD_SESSION_TOKEN",
+    "HERMES_DASHBOARD_WINDOWS_MODE",
     "HERMES_UI_DEFAULT_MODEL_ID",
     "HERMES_UI_ENABLE_REAL_HERMES",
     "HERMES_UI_UPDATE_MANIFEST_URL",
-    "STOIX_PORT"
+    "STOIX_PORT",
+    "STUDIO_WSL_DISTRO"
   ]);
   const result = {};
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {

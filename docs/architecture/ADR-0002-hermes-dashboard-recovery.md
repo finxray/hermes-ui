@@ -36,8 +36,9 @@ The recovery contract is:
    starts only the fixed Hermes Dashboard command.
 3. Runtime selection is explicit and based on Node's host platform:
    - Windows first discovers a native `hermes.exe`, then falls back to the
-     configured WSL distribution. Operators may force `native` or `wsl` with
-     `HERMES_DASHBOARD_WINDOWS_MODE`.
+     the validated WSL distribution selected by ADR-0014. Operators may force
+     `native` or `wsl` with `HERMES_DASHBOARD_WINDOWS_MODE` and may pin a distro
+     with `STUDIO_WSL_DISTRO`.
    - macOS resolves Hermes through a login Zsh, with Bash and POSIX shell
      fallbacks so Homebrew and user-profile installations are discoverable.
    - Linux resolves Hermes through a login Bash, with a POSIX shell fallback.

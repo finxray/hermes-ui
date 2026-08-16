@@ -1,0 +1,36 @@
+name: Beta improvement
+description: Suggest a focused improvement to the Stoix beta.
+title: "[Idea]: "
+labels:
+  - enhancement
+  - beta-feedback
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to accomplish with Hermes, and where does Stoix get in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows with Hermes in WSL2
+        - Windows with native Hermes
+        - Linux
+        - Platform independent
+    validations:
+      required: true

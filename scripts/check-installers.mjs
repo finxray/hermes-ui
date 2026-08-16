@@ -96,6 +96,32 @@ assert(!powerShellInstaller.includes("-Verb RunAs"), "the Windows installer must
 assert(powerShellInstaller.includes("-WindowStyle Hidden -File"), "the Windows Start shortcut must launch without a terminal window");
 assert(powerShellInstaller.includes("robocopy.exe"), "the Windows installer must support long package paths");
 assert(powerShellInstaller.includes("Win32_Processor"), "Windows ARM detection must use the native OS architecture");
+for (const token of [
+  '[ValidateSet("Auto", "Native", "Wsl", "Skip")]',
+  "function Get-WslDistributions",
+  "function Find-WslHermes",
+  "function Configure-WslHermes",
+  '"gateway", "run", "--replace", "--force"',
+  '"HERMES_DASHBOARD_WINDOWS_MODE" "wsl"',
+  '"STUDIO_WSL_DISTRO" $Target.Distro',
+  "Wait-ForHermesHealth 120"
+]) {
+  assert(powerShellInstaller.includes(token), `Windows WSL2 installer contract is missing ${token}`);
+}
+assert(
+  powerShellInstaller.includes('$HermesMode -eq "Native"') &&
+    powerShellInstaller.includes("Install-Hermes"),
+  "native Hermes installation must require the explicit Native mode"
+);
+const wslConfigure = powerShellInstaller.slice(
+  powerShellInstaller.indexOf("function Configure-WslHermes"),
+  powerShellInstaller.indexOf("function Test-LoopbackPort")
+);
+assert(!wslConfigure.includes('"gateway", "install"'));
+assert(!wslConfigure.includes('"gateway", "start"'));
+for (const token of ["HERMES_DASHBOARD_WINDOWS_MODE", "STUDIO_WSL_DISTRO"]) {
+  assert(launcher.includes(`"${token}"`), `packaged launcher must allow ${token}`);
+}
 assert(powerShellInstaller.includes('\"dashboard\", \"--host\", \"127.0.0.1\"'));
 assert(shellInstaller.includes("dashboard --host 127.0.0.1"));
 assert(shellInstaller.includes("bundle_is_complete"));

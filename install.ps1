@@ -5,6 +5,9 @@ param(
     [string]$InstallRoot = $env:STOIX_INSTALL_ROOT,
     [string]$BinDir = $env:STOIX_BIN_DIR,
     [string]$ConfigRoot = $env:STOIX_CONFIG_ROOT,
+    [ValidateSet("Auto", "Native", "Wsl", "Skip")]
+    [string]$HermesMode = $(if ($env:STOIX_HERMES_MODE) { $env:STOIX_HERMES_MODE } else { "Auto" }),
+    [string]$WslDistribution = $env:STOIX_WSL_DISTRO,
     [switch]$SkipHermes,
     [switch]$NoLaunch,
     [switch]$NoIntegrate,
@@ -321,11 +324,79 @@ function Set-PrivateConfigValue([string]$Path, [string]$Key, [string]$Value) {
     Set-Content -LiteralPath $Path -Value $updated -Encoding UTF8
 }
 
+function Get-PrivateConfigValue([string]$Path, [string]$Key) {
+    if (-not (Test-Path -LiteralPath $Path)) { return "" }
+    $line = Get-Content -LiteralPath $Path |
+        Where-Object { $_ -match "^$([regex]::Escape($Key))=" } |
+        Select-Object -Last 1
+    if (-not $line) { return "" }
+    return ([string]$line).Substring($Key.Length + 1).Trim()
+}
+
 function Find-Hermes {
     $command = Get-Command hermes -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
     $candidate = Join-Path $env:LOCALAPPDATA "hermes\hermes-agent\venv\Scripts\hermes.exe"
     if (Test-Path -LiteralPath $candidate) { return $candidate }
+    return $null
+}
+
+function Get-WslDistributions {
+    $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if (-not $wsl) { return @() }
+    try {
+        $raw = (& $wsl.Source --list --quiet 2>$null | Out-String).Replace([char]0, "")
+    } catch {
+        return @()
+    }
+    $seen = @{}
+    $distributions = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($raw -split "`r?`n")) {
+        $candidate = $line.Trim().TrimStart("*").Trim()
+        if ($candidate -notmatch "^[A-Za-z0-9][A-Za-z0-9._ -]{0,79}$") { continue }
+        if ($candidate -match "^docker-desktop(?:-data)?$") { continue }
+        $key = $candidate.ToLowerInvariant()
+        if (-not $seen.ContainsKey($key)) {
+            $seen[$key] = $true
+            $distributions.Add($candidate)
+        }
+    }
+    return @($distributions | Sort-Object @{ Expression = {
+        $name = $_.ToLowerInvariant()
+        if ($name -eq "ubuntu") { return 0 }
+        if ($name.StartsWith("ubuntu-")) { return 1 }
+        if ($name -eq "debian") { return 2 }
+        return 3
+    } }, @{ Expression = { $_ } })
+}
+
+function Find-WslHermes([string]$RequestedDistribution = "") {
+    $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if (-not $wsl) { return $null }
+    $candidates = if ($RequestedDistribution) {
+        if ($RequestedDistribution -notmatch "^[A-Za-z0-9][A-Za-z0-9._ -]{0,79}$") {
+            Fail "Invalid WSL distribution name: $RequestedDistribution"
+        }
+        @($RequestedDistribution)
+    } else {
+        @(Get-WslDistributions)
+    }
+    foreach ($distro in $candidates) {
+        try {
+            $executable = (& $wsl.Source -d $distro -- bash -lc "command -v hermes" 2>$null | Out-String).Trim()
+            $executable = ($executable -split "`r?`n" | Select-Object -First 1).Trim()
+            if ($LASTEXITCODE -eq 0 -and $executable -match "^/[A-Za-z0-9._/+-]+$") {
+                return [pscustomobject]@{
+                    Kind = "wsl"
+                    Distro = $distro
+                    Executable = $executable
+                    Wsl = $wsl.Source
+                }
+            }
+        } catch {
+            # Continue to the next validated distribution.
+        }
+    }
     return $null
 }
 
@@ -345,6 +416,8 @@ function Install-Hermes {
 
 function Configure-Hermes([string]$Hermes, [string]$ConfigPath, [string]$RuntimeNode) {
     if (-not $Hermes) { return }
+    Set-PrivateConfigValue $ConfigPath "HERMES_DASHBOARD_WINDOWS_MODE" "native"
+    Set-PrivateConfigValue $ConfigPath "STUDIO_WSL_DISTRO" ""
     Write-Info "Configuring the local Hermes API for Stoix..."
     $enableExitCode = Invoke-QuietActivity "Enabling the private Hermes API..." $Hermes @(
         "config", "set", "API_SERVER_ENABLED", "true"
@@ -429,6 +502,106 @@ function Configure-Hermes([string]$Hermes, [string]$ConfigPath, [string]$Runtime
     }
 }
 
+function Get-WslHermesEnvValue($Target, [string]$Key) {
+    try {
+        $contents = (& $Target.Wsl -d $Target.Distro -- bash -lc "cat ~/.hermes/.env 2>/dev/null" 2>$null | Out-String)
+        if ($LASTEXITCODE -ne 0 -or $contents.Length -gt 65536) { return "" }
+        $value = ""
+        foreach ($line in ($contents -split "`r?`n")) {
+            if ($line.StartsWith("$Key=")) {
+                $value = $line.Substring($Key.Length + 1).Trim()
+            }
+        }
+        if (
+            $value.Length -ge 2 -and
+            $value[0] -eq $value[$value.Length - 1] -and
+            ($value[0] -eq '"' -or $value[0] -eq "'")
+        ) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+        return $value
+    } catch {
+        return ""
+    }
+}
+
+function Test-PrivateSecret([string]$Value) {
+    return $Value.Length -ge 16 -and $Value.Length -le 512 -and $Value -notmatch "[\x00-\x1f\x7f]"
+}
+
+function Configure-WslHermes($Target, [string]$ConfigPath, [string]$RuntimeNode) {
+    if (-not $Target) { return $false }
+    Write-Info "Configuring Hermes in WSL2 distribution $($Target.Distro)..."
+    $enableExitCode = Invoke-QuietActivity "Enabling the private Hermes API in WSL2..." $Target.Wsl @(
+        "-d", $Target.Distro, "--", $Target.Executable,
+        "config", "set", "API_SERVER_ENABLED", "true"
+    )
+    if ($enableExitCode -ne 0) {
+        Write-WarningMessage "Hermes was found in $($Target.Distro), but its API could not be enabled."
+        Write-WarningMessage "Inside that distribution run: hermes config set API_SERVER_ENABLED true"
+        return $false
+    }
+
+    $apiKey = Get-WslHermesEnvValue $Target "API_SERVER_KEY"
+    $apiKeyChanged = $false
+    if (-not (Test-PrivateSecret $apiKey)) {
+        $apiKey = (& $RuntimeNode -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")
+        if ($LASTEXITCODE -ne 0 -or -not (Test-PrivateSecret $apiKey)) {
+            Write-WarningMessage "Could not generate the private WSL2 Hermes API key."
+            return $false
+        }
+        $keyExitCode = Invoke-QuietActivity "Securing the WSL2 Hermes connection..." $Target.Wsl @(
+            "-d", $Target.Distro, "--", $Target.Executable,
+            "config", "set", "API_SERVER_KEY", $apiKey
+        )
+        if ($keyExitCode -ne 0) {
+            Write-WarningMessage "Hermes in $($Target.Distro) did not accept its private API key."
+            return $false
+        }
+        $apiKeyChanged = $true
+    }
+
+    Set-PrivateConfigValue $ConfigPath "HERMES_API_BASE_URL" "http://127.0.0.1:8642"
+    Set-PrivateConfigValue $ConfigPath "HERMES_API_KEY" $apiKey
+    Set-PrivateConfigValue $ConfigPath "HERMES_DASHBOARD_WINDOWS_MODE" "wsl"
+    Set-PrivateConfigValue $ConfigPath "STUDIO_WSL_DISTRO" $Target.Distro
+
+    if ($apiKeyChanged) {
+        Invoke-QuietActivity "Stopping the previous WSL2 Hermes gateway..." $Target.Wsl @(
+            "-d", $Target.Distro, "--", $Target.Executable, "gateway", "stop"
+        ) | Out-Null
+    }
+
+    if (Test-HermesHealth) {
+        Write-Info "Hermes in $($Target.Distro) is already connected."
+        return $true
+    }
+
+    $logDirectory = Join-Path (Split-Path -Parent $ConfigPath) "logs"
+    New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+    try {
+        Start-Process -FilePath $Target.Wsl -ArgumentList @(
+            "-d", $Target.Distro, "--", $Target.Executable,
+            "gateway", "run", "--replace", "--force"
+        ) -WindowStyle Hidden `
+            -RedirectStandardOutput (Join-Path $logDirectory "stoix-wsl-gateway.log") `
+            -RedirectStandardError (Join-Path $logDirectory "stoix-wsl-gateway-error.log") | Out-Null
+    } catch {
+        Write-WarningMessage "Stoix could not start Hermes in $($Target.Distro)."
+        Write-WarningMessage "Inside WSL2 run: hermes gateway run --replace --force"
+        return $false
+    }
+
+    if (Wait-ForHermesHealth 120 "Waiting for Hermes in WSL2 to answer on Windows localhost...") {
+        Write-Info "Hermes in $($Target.Distro) is connected and ready."
+        return $true
+    }
+
+    Write-WarningMessage "Hermes started in WSL2, but Windows could not reach http://127.0.0.1:8642/health."
+    Write-WarningMessage "Keep the API on loopback and check WSL2 localhost forwarding plus $logDirectory\stoix-wsl-gateway-error.log"
+    return $false
+}
+
 function Test-LoopbackPort([int]$Port) {
     $client = New-Object System.Net.Sockets.TcpClient
     try {
@@ -438,6 +611,31 @@ function Test-LoopbackPort([int]$Port) {
         return $false
     } finally {
         $client.Dispose()
+    }
+}
+
+function Test-HermesHealth {
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:8642/health" -TimeoutSec 2
+        if ($response.StatusCode -ne 200) { return $false }
+        $payload = $response.Content | ConvertFrom-Json
+        return $payload.status -eq "ok" -and $payload.platform -eq "hermes-agent"
+    } catch {
+        return $false
+    }
+}
+
+function Wait-ForHermesHealth([int]$TimeoutSeconds, [string]$Activity) {
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        while ($stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+            if (Test-HermesHealth) { return $true }
+            Show-ActivityFrame $stopwatch $Activity
+            Start-Sleep -Milliseconds 350
+        }
+        return $false
+    } finally {
+        Clear-ActivityFrame
     }
 }
 
@@ -454,6 +652,7 @@ try {
     if (-not $InstallRoot) { $InstallRoot = Join-Path $env:LOCALAPPDATA "Programs\Stoix" }
     if (-not $BinDir) { $BinDir = Join-Path $InstallRoot "bin" }
     if ($env:STOIX_SKIP_HERMES -eq "true") { $SkipHermes = $true }
+    if ($SkipHermes) { $HermesMode = "Skip" }
     if ($env:STOIX_NO_LAUNCH -eq "true") { $NoLaunch = $true }
     if ($env:STOIX_NO_INTEGRATE -eq "true") { $NoIntegrate = $true }
     if ($env:STOIX_FORCE_SOURCE -eq "true") { $Source = $true }
@@ -557,18 +756,60 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0stoix.ps1"
             "HERMES_UI_ENABLE_REAL_HERMES=true",
             "STOIX_PORT=3210",
             "HERMES_DASHBOARD_BASE_URL=",
-            "HERMES_DASHBOARD_SESSION_TOKEN="
+            "HERMES_DASHBOARD_SESSION_TOKEN=",
+            "HERMES_DASHBOARD_WINDOWS_MODE=",
+            "STUDIO_WSL_DISTRO="
         ) | Set-Content -LiteralPath $configPath -Encoding UTF8
     }
 
-    if (-not $SkipHermes) {
-        $hermes = Find-Hermes
-        if (-not $hermes) {
-            Install-Hermes
-            $hermes = Find-Hermes
+    if ($HermesMode -ne "Skip") {
+        $effectiveHermesMode = $HermesMode
+        $nativeHermes = $null
+        $wslHermes = $null
+
+        if ($effectiveHermesMode -eq "Auto") {
+            $savedMode = (Get-PrivateConfigValue $configPath "HERMES_DASHBOARD_WINDOWS_MODE").ToLowerInvariant()
+            if ($savedMode -eq "wsl") {
+                $effectiveHermesMode = "Wsl"
+                if (-not $WslDistribution) {
+                    $WslDistribution = Get-PrivateConfigValue $configPath "STUDIO_WSL_DISTRO"
+                }
+            } elseif ($savedMode -eq "native") {
+                $effectiveHermesMode = "Native"
+            } else {
+                $nativeHermes = Find-Hermes
+                if ($nativeHermes) {
+                    $effectiveHermesMode = "Native"
+                } else {
+                    $wslHermes = Find-WslHermes $WslDistribution
+                    if ($wslHermes) { $effectiveHermesMode = "Wsl" }
+                }
+            }
         }
-        Configure-Hermes $hermes $configPath (Join-Path $targetRoot "runtime\node.exe")
-        if (-not $hermes) { Write-WarningMessage "Open Stoix and follow the Hermes recovery message after installing Hermes." }
+
+        if ($effectiveHermesMode -eq "Native") {
+            if (-not $nativeHermes) { $nativeHermes = Find-Hermes }
+            if (-not $nativeHermes -and $HermesMode -eq "Native") {
+                Install-Hermes
+                $nativeHermes = Find-Hermes
+            }
+            if ($nativeHermes) {
+                Configure-Hermes $nativeHermes $configPath (Join-Path $targetRoot "runtime\node.exe")
+            } else {
+                Write-WarningMessage "Native Hermes was not found. Re-run with -HermesMode Native to install it explicitly."
+            }
+        } elseif ($effectiveHermesMode -eq "Wsl") {
+            if (-not $wslHermes) { $wslHermes = Find-WslHermes $WslDistribution }
+            if ($wslHermes) {
+                Configure-WslHermes $wslHermes $configPath (Join-Path $targetRoot "runtime\node.exe") | Out-Null
+            } else {
+                Write-WarningMessage "Hermes was not found in an installed WSL2 distribution."
+                Write-WarningMessage "Install Ubuntu with WSL2, install Hermes inside it, then re-run with -HermesMode Wsl."
+            }
+        } else {
+            Write-WarningMessage "Hermes was not found. Stoix is installed, but chat stays offline until Hermes is installed."
+            Write-WarningMessage "For the tested Windows path, install Hermes in WSL2 and re-run with -HermesMode Wsl."
+        }
     }
 
     Show-Completion $packageVersion

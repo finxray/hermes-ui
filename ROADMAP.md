@@ -6,12 +6,18 @@ sessions and capabilities.
 
 ## 0.1 Public Preview
 
+Stoix `0.1.x` is being developed in public as a community beta. Expect bugs.
+The current source application has received limited maintainer testing on
+macOS and on Windows with Hermes running in WSL2. Packaged clean installation
+and Linux remain community-validation work; see
+[beta testing](docs/release/BETA_TESTING.md).
+
 - Project-scoped local workspace and Hermes conversations.
 - Fast, buffered streaming with clear model and provider state.
 - Searchable selection of models configured in Hermes.
 - Plugins, skills, configuration, keys, logs, and runtime status surfaces.
 - Continuation of Hermes sessions created in supported external channels.
-- Portable loopback-only packages for Windows, macOS, and Linux.
+- Portable loopback-only package targets for Windows, macOS, and Linux.
 - Local browser storage, private per-user configuration, and explicit updates.
 
 ## Near Term

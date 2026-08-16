@@ -47,20 +47,32 @@ const lastReachable: { status: NormalizedHermesStatus | null; at: number } = {
   at: 0
 };
 
+let activeConnectionIdentity = "";
+
 export async function getCoalescedHermesStatus(
   config: HermesClientConfig,
   options: { forceModels?: boolean } = {}
 ): Promise<NormalizedHermesStatus> {
+  resetCachesForConnectionChange(config);
   const now = Date.now();
   if (options.forceModels) {
+    if (statusCache.inFlight) {
+      await statusCache.inFlight;
+    }
+    statusCache.expiresAt = 0;
+    const baseline = await computeStatus(config);
+    storeStatus(baseline);
+    if (!baseline.reachable) {
+      return baseline;
+    }
     await refreshModelsIfStale(config, true);
     statusCache.expiresAt = 0;
   }
 
-  // Keep the model catalog warm without ever blocking the reachability path.
-  triggerModelsRefreshIfStale(config);
-
   if (statusCache.value && statusCache.expiresAt > now) {
+    if (statusCache.value.reachable) {
+      triggerModelsRefreshIfStale(config);
+    }
     return statusCache.value;
   }
 
@@ -70,9 +82,11 @@ export async function getCoalescedHermesStatus(
 
   statusCache.inFlight = computeStatus(config)
     .then((status) => {
-      statusCache.value = status;
-      statusCache.expiresAt = Date.now() + (status.reachable ? STATUS_TTL_OK_MS : STATUS_TTL_ERROR_MS);
+      storeStatus(status);
       statusCache.inFlight = null;
+      if (status.reachable) {
+        triggerModelsRefreshIfStale(config);
+      }
       return status;
     })
     .catch((error) => {
@@ -81,6 +95,32 @@ export async function getCoalescedHermesStatus(
     });
 
   return statusCache.inFlight;
+}
+
+function storeStatus(status: NormalizedHermesStatus): void {
+  statusCache.value = status;
+  statusCache.expiresAt = Date.now() + (status.reachable ? STATUS_TTL_OK_MS : STATUS_TTL_ERROR_MS);
+}
+
+function resetCachesForConnectionChange(config: HermesClientConfig): void {
+  const identity = JSON.stringify([
+    config.enabled !== false,
+    config.baseUrl?.trim() || "",
+    config.apiKey || ""
+  ]);
+  if (identity === activeConnectionIdentity) {
+    return;
+  }
+  activeConnectionIdentity = identity;
+  statusCache.expiresAt = 0;
+  statusCache.inFlight = null;
+  statusCache.value = null;
+  modelsCache.value = null;
+  modelsCache.fetchedAt = 0;
+  modelsCache.lastAttemptAt = 0;
+  modelsCache.inFlight = null;
+  lastReachable.status = null;
+  lastReachable.at = 0;
 }
 
 async function computeStatus(config: HermesClientConfig): Promise<NormalizedHermesStatus> {
@@ -160,7 +200,12 @@ function refreshModelsIfStale(config: HermesClientConfig, force: boolean): Promi
     timeoutMs: HEALTH_TIMEOUT_MS
   })
     .then((status) => {
-      if (status.reachable && status.models) {
+      if (
+        status.reachable &&
+        status.models &&
+        status.models !== config.injectedModels &&
+        hasUsableModelPayload(status.models)
+      ) {
         modelsCache.value = status.models;
         modelsCache.fetchedAt = Date.now();
       }
@@ -172,4 +217,20 @@ function refreshModelsIfStale(config: HermesClientConfig, force: boolean): Promi
       modelsCache.inFlight = null;
     });
   return modelsCache.inFlight;
+}
+
+function hasUsableModelPayload(models: Record<string, unknown>): boolean {
+  for (const candidate of [models.model, models.default_model]) {
+    if (typeof candidate === "string" && candidate.trim() && candidate.trim() !== "hermes-agent") {
+      return true;
+    }
+  }
+  if (models.providers && typeof models.providers === "object") {
+    return true;
+  }
+  return Array.isArray(models.data) && models.data.some((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+    const id = (item as Record<string, unknown>).id;
+    return typeof id === "string" && id.trim() !== "" && id.trim() !== "hermes-agent";
+  });
 }

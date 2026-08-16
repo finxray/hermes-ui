@@ -1,0 +1,85 @@
+name: Beta bug report
+description: Report a reproducible problem while testing Stoix.
+title: "[Bug]: "
+labels:
+  - bug
+  - beta-feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Stoix. Remove API keys, provider tokens, private prompts, attachments, and personal paths before submitting.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed secrets and private data from this report.
+          required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Stoix platform
+      options:
+        - macOS
+        - Windows with Hermes in WSL2
+        - Windows with native Hermes
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Versions and architecture
+      description: Include OS version, CPU architecture, Stoix version or commit, Hermes version, and WSL distribution when applicable.
+      placeholder: Windows 11 x64; Stoix commit abc1234; Hermes x.y.z in Ubuntu 24.04 WSL2
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: How was Stoix started?
+      options:
+        - From source
+        - Bootstrap installer source fallback
+        - Downloaded release archive
+        - Existing installation updated in place
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open...
+        2. Select...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Paste redacted `stoix --doctor` output or relevant logs. Do not include secrets.
+      render: shell
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add screenshots only after checking them for private data.

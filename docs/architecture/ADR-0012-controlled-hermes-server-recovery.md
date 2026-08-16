@@ -32,12 +32,13 @@ The recovery contract is:
 
 1. `GET /api/hermes/server` probes the configured Hermes API and reports
    whether it is reachable and whether this local Stoix process may start it.
-2. `POST /api/hermes/server` validates a same-origin, loopback request, stops
-   an accidental `hermes serve` dashboard process, and starts the Hermes
-   gateway so its configured `api_server` can bind. WSL first stops the user
-   service, then uses the CLI-recommended foreground `gateway run` command in a
-   detached `wsl.exe` process so the WSL VM remains alive; native installs use
-   `gateway start`.
+2. `POST /api/hermes/server` validates a same-origin, loopback request and
+   starts the Hermes gateway so its configured `api_server` can bind. WSL uses
+   the CLI-recommended foreground `gateway run --replace --force` command in a
+   single managed `wsl.exe` child held by the Stoix server. A single WSL process
+   avoids repeatedly booting and stopping the distribution while its user
+   service initializes. Native installs stop an accidental `hermes serve`
+   dashboard process before using `gateway start`.
 3. Executable discovery reuses the reviewed native/WSL/macOS/Linux discovery
    used by Dashboard recovery.
 4. Hermes binding remains owned by the local gateway configuration; browser
@@ -47,7 +48,7 @@ The recovery contract is:
 6. Readiness requires the REST API's `/health` endpoint. Dashboard-only
    `/api/health` responses are deliberately not accepted.
 7. When no explicit `HERMES_API_KEY` is configured for a loopback server, the
-   Windows BFF may resolve `API_SERVER_KEY` from the configured WSL Hermes
+   Windows BFF may resolve `API_SERVER_KEY` from the selected WSL Hermes
    environment using a fixed, server-owned command. As a compatibility fallback
    for a loopback dashboard server, it may read Hermes' no-store root HTML and
    extract its injected dashboard session token. Credentials are used only by
@@ -61,16 +62,17 @@ keys or arbitrary process-control capability.
 - Server recovery is disabled when `HERMES_API_BASE_URL` is not loopback HTTP.
 - POST requests must be same-origin and addressed through a loopback host.
 - Process launch uses an argument vector, not a shell command string.
-- The fixed recovery commands are `serve --stop`, then `gateway stop` and
-  `gateway run --replace --force` in WSL, or `gateway start` for a native
-  executable.
+- The fixed recovery command in WSL is `gateway run --replace --force`. Native
+  recovery uses `serve --stop`, then `gateway start`. The WSL foreground child
+  is not unreferenced: doing so permits Windows to tear down the distribution
+  and stop the API moments later.
 - Executable discovery accepts no browser input. An absolute executable
   override remains server process configuration only.
 - Automatic session-token discovery is restricted to the configured loopback
   HTTP origin and accepts only the exact JSON string assignment emitted by
   Hermes for `window.__HERMES_SESSION_TOKEN__`.
-- WSL API-key discovery uses a fixed command and a server-configured
-  distribution name; browser input cannot select a command, file, or secret.
+- WSL API-key discovery uses a fixed command and the validated distribution
+  selected by ADR-0014; browser input cannot select a command, file, or secret.
 - Only this bounded recovery sequence is exposed. Arbitrary commands and
   non-loopback binding remain unavailable from the browser.
 

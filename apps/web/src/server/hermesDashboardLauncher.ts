@@ -1,5 +1,10 @@
 import { spawn } from "node:child_process";
 import type { SpawnOptions } from "node:child_process";
+import { configuredHermesApiBaseUrl } from "./hermesDefaults.ts";
+import {
+  resolveWslHermesInstallation,
+  validatedWslHermesExecutable
+} from "./wslHermesDiscovery.ts";
 
 const DEFAULT_DASHBOARD_PORT = "9119";
 const DASHBOARD_START_TIMEOUT_MS = 60_000;
@@ -27,7 +32,7 @@ type DashboardProbe = {
 
 export function resolveDashboardTarget(environment: NodeJS.ProcessEnv = process.env): DashboardTarget {
   const explicitDashboardUrl = environment.HERMES_DASHBOARD_BASE_URL?.trim();
-  const apiUrl = parseHttpUrl(environment.HERMES_API_BASE_URL);
+  const apiUrl = parseHttpUrl(configuredHermesApiBaseUrl(environment));
   const inferredDashboardUrl = apiUrl && isLoopbackHostname(apiUrl.hostname) && apiUrl.port === "8642"
     ? new URL(apiUrl.href)
     : null;
@@ -141,12 +146,6 @@ export function buildHermesLaunchSpec(
   return { args, command: executable.path, platform };
 }
 
-async function resolveWslHermesExecutable(distro: string): Promise<string> {
-  const child = spawn("wsl.exe", ["-d", distro, "--", "bash", "-lc", "command -v hermes"], discoverySpawnOptions());
-  const stdout = await captureSpawnedText(child, "wsl.exe");
-  return validatedUnixHermesExecutable(stdout, `Hermes was not found in the WSL distribution ${distro}.`);
-}
-
 export async function resolveHermesExecutable(
   platform: NodeJS.Platform,
   environment: NodeJS.ProcessEnv
@@ -199,8 +198,8 @@ async function resolveWindowsHermesExecutable(environment: NodeJS.ProcessEnv): P
     }
   }
 
-  const distro = environment.STUDIO_WSL_DISTRO?.trim() || "Ubuntu";
-  return { distro, kind: "wsl", path: await resolveWslHermesExecutable(distro) };
+  const installation = await resolveWslHermesInstallation(environment);
+  return { ...installation, kind: "wsl" };
 }
 
 async function resolveMacHermesExecutable() {
@@ -276,11 +275,7 @@ async function captureSpawnedText(child: ReturnType<typeof spawn>, commandLabel:
 }
 
 function validatedUnixHermesExecutable(stdout: string, message: string) {
-  const executable = stdout.trim().split(/\r?\n/)[0] ?? "";
-  if (!/^\/[A-Za-z0-9._/+-]+$/.test(executable)) {
-    throw new Error(message);
-  }
-  return executable;
+  return validatedWslHermesExecutable(stdout, message);
 }
 
 function validatedWindowsHermesExecutable(stdout: string) {

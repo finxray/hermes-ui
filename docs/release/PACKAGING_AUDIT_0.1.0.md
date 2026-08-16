@@ -31,7 +31,7 @@ Date: 2026-08-12
   from silently producing a mislabeled release archive.
 - Tracked-secret and packaged-secret scanning plus dependency audit.
 
-## Locally Verified
+## Automated Windows Development-Environment Verification
 
 - Windows x64 portable archive created.
 - Packaged runtime launched and shut down cleanly.
@@ -45,17 +45,18 @@ Date: 2026-08-12
 - Local credential values were absent from build and package output.
 - Dependency audit reported zero vulnerabilities.
 
-Cross-platform archives are generated and verified by the release workflow; a
-tag should not be published until those matrix jobs and clean-machine tests pass.
+These checks ran in a development environment and do not establish a clean
+download or installation result. Cross-platform archives are generated and
+verified by the release workflow; a package must remain clearly labeled beta
+until its clean-install status is recorded separately.
 
 ## Owner-Controlled Publication Blockers
 
-1. Add an approved software license or commercial EULA.
-2. Approve `PRIVACY.md` and add the public support/contact location.
-3. Decide whether `0.1.0` is an unsigned preview or provision code-signing and
-   macOS notarization identities for a stable public release.
-4. Run clean-machine package tests on Windows, macOS, and Linux.
+1. MIT licensing is now resolved in the root `LICENSE` file.
+2. Privacy, support, security, and beta-reporting paths must remain public.
+3. Decide whether each beta may ship unsigned or provision code-signing and
+   macOS notarization identities.
+4. Record clean-machine package tests separately for every claimed platform.
 
-These decisions require product/legal credentials and cannot be safely inferred
-by a coding agent. Until they are resolved, the generated archive is a tested
-release candidate, not a fully approved public stable release.
+Until the remaining gates are resolved, generated archives are beta test
+candidates, not approved stable releases.

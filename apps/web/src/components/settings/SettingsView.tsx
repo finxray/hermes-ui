@@ -1,7 +1,7 @@
 "use client";
 
 import type { NormalizedHermesStatus } from "@hermes-ui/hermes-client";
-import { ChevronRight, Cog, Cpu, Download, KeyRound, ScrollText } from "lucide-react";
+import { Bug, ChevronRight, Cog, Cpu, Download, KeyRound, ScrollText } from "lucide-react";
 import appPackage from "../../../package.json";
 import { RefreshCw, RotateCcw } from "@/components/ui/AppIcons";
 import type { Project, Session } from "@/data/types";
@@ -13,7 +13,7 @@ import type { ShellSection } from "@/components/shell/TopBar";
 import styles from "./SettingsView.module.css";
 
 const SETTINGS_CATEGORIES = [
-  { id: "general", label: "General", count: 3 },
+  { id: "general", label: "General", count: 4 },
   { id: "connections", label: "Connections", count: 1 },
   { id: "updates", label: "Updates", count: 2 },
   { id: "workspace", label: "Workspace", count: 4 }
@@ -98,6 +98,12 @@ export function SettingsView({
             label="Logs"
             onClick={() => onNavigate("logs")}
           />
+          <ExternalNavigationRow
+            description="Share a reproducible problem with the community beta"
+            href="https://github.com/finxray/hermes-ui/issues/new?template=bug_report.yml"
+            icon={<Bug size={20} strokeWidth={1.8} />}
+            label="Report a bug"
+          />
         </SettingsGroup>
 
         <SettingsGroup id="connections" label="Connections" register={register}>
@@ -113,7 +119,7 @@ export function SettingsView({
         </SettingsGroup>
 
         <SettingsGroup id="updates" label="Updates" register={register}>
-          <ValueRow description="Stable release channel" label="Stoix version" value={appPackage.version} />
+          <ValueRow description="Published release channel" label="Stoix version" value={appPackage.version} />
           <UpdateRow
             isChecking={appUpdate.isChecking}
             onCheck={() => void appUpdate.check()}
@@ -186,8 +192,8 @@ function updateStatusDescription(
   result: AppUpdateController["result"],
   isChecking: boolean
 ) {
-  if (isChecking) return "Checking the stable release channel";
-  if (!result) return "Check the stable release channel for a newer version";
+  if (isChecking) return "Checking the published release channel";
+  if (!result) return "Check the published release channel for a newer version";
   if (result.status === "update-available") {
     const firstNote = result.manifest?.notes[0];
     return `Version ${result.latestVersion} is available${firstNote ? ` - ${firstNote}` : ""}`;
@@ -236,6 +242,29 @@ function NavigationRow({
       </span>
       <ChevronRight aria-hidden="true" size={18} strokeWidth={1.8} />
     </button>
+  );
+}
+
+function ExternalNavigationRow({
+  description,
+  href,
+  icon,
+  label
+}: {
+  description: string;
+  href: string;
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <a className={`${styles.settingRow} ${styles.navigationRow}`} href={href} rel="noreferrer noopener" target="_blank">
+      <span className={styles.rowIcon} aria-hidden="true">{icon}</span>
+      <span className={styles.rowCopy}>
+        <strong>{label}</strong>
+        <span>{description}</span>
+      </span>
+      <ChevronRight aria-hidden="true" size={18} strokeWidth={1.8} />
+    </a>
   );
 }
 

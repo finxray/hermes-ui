@@ -58,7 +58,7 @@ requireTokens("Dashboard launcher", launcher, [
   '"/bin/bash"',
   '"/bin/sh"',
   '"command -v hermes"',
-  "resolveWslHermesExecutable",
+  "resolveWslHermesInstallation",
   "resolveWindowsHermesExecutable",
   "resolveUnixHermesExecutable",
   "validatedUnixHermesExecutable",

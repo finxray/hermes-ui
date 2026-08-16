@@ -103,9 +103,10 @@ const readme = readFileSync(join(root, "packaging", "README.txt"), "utf8")
   .replaceAll("{VERSION}", version);
 writeFileSync(join(bundleRoot, "README.txt"), readme, "utf8");
 copyFileSync(join(root, "PRIVACY.md"), join(bundleRoot, "PRIVACY.md"));
-if (existsSync(join(root, "LICENSE"))) {
-  copyFileSync(join(root, "LICENSE"), join(bundleRoot, "LICENSE"));
+if (!existsSync(join(root, "LICENSE"))) {
+  throw new Error("The MIT LICENSE file is required in every Stoix release package.");
 }
+copyFileSync(join(root, "LICENSE"), join(bundleRoot, "LICENSE"));
 copyFileSync(
   join(root, "packaging", "licenses", `NODE-${releaseNodeVersion}-LICENSE.txt`),
   join(bundleRoot, "NODE_LICENSE.txt")

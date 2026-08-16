@@ -1,5 +1,8 @@
 # Stoix VERSION
 
+State whether this is a community beta, prerelease, or stable release. Include
+the MIT license and independent-project disclaimer for every public beta.
+
 ## Highlights
 
 - Summarize user-visible improvements.
@@ -31,7 +34,15 @@ for rollback.
 
 ## Verification
 
+### Automated checks
+
 - `npm run release:check`
 - `npm run package:release`
 - GitHub Actions Windows/macOS/Linux package matrix
-- Clean-machine launch and interaction smoke on every published platform
+
+### Manual validation
+
+- List the exact operating system, architecture, Hermes installation mode, and
+  clean-machine status tested by a person.
+- Label every offered package that has automated checks only as experimental.
+- Do not turn CI coverage into a human-testing claim.

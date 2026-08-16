@@ -46,23 +46,8 @@ const wsl = launcher.buildHermesServerRecoverySpecs(
   new URL("http://localhost:8642")
 );
 assert.equal(wsl[0].command, "wsl.exe");
+assert.equal(wsl.length, 1);
 assert.deepEqual(wsl[0].args, [
-  "-d",
-  "Ubuntu",
-  "--",
-  "/home/user/.local/bin/hermes",
-  "serve",
-  "--stop"
-]);
-assert.deepEqual(wsl[1].args, [
-  "-d",
-  "Ubuntu",
-  "--",
-  "/home/user/.local/bin/hermes",
-  "gateway",
-  "stop"
-]);
-assert.deepEqual(wsl[2].args, [
   "-d",
   "Ubuntu",
   "--",
